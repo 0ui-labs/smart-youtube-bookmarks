@@ -1,12 +1,20 @@
+from datetime import datetime
 from typing import Optional, Dict, Any
+
 from sqlalchemy import String, Integer, DateTime, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
+
 from .base import BaseModel
-from datetime import datetime
 
 
 class Video(BaseModel):
+    """
+    Represents a YouTube video within a bookmark list.
+
+    Stores video metadata and extracted data according to the associated
+    bookmark list's schema. Tracks processing status for async operations.
+    """
     __tablename__ = "videos"
 
     list_id: Mapped[UUID] = mapped_column(
@@ -35,3 +43,6 @@ class Video(BaseModel):
         Index("idx_videos_status", "processing_status"),
         Index("idx_videos_list_youtube", "list_id", "youtube_id", unique=True),
     )
+
+    def __repr__(self) -> str:
+        return f"<Video(id={self.id}, youtube_id={self.youtube_id!r}, title={self.title!r})>"
