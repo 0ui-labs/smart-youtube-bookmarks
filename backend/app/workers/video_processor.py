@@ -1,5 +1,6 @@
 from uuid import UUID
 from arq import Retry
+from arq.worker import func as arq_func
 import httpx
 import asyncpg
 import logging
@@ -8,9 +9,16 @@ logger = logging.getLogger(__name__)
 
 # Error categorization
 TRANSIENT_ERRORS = (
+    # Network errors
     httpx.ConnectError,
     httpx.TimeoutException,
+    httpx.ReadTimeout,
+    httpx.WriteTimeout,
+    httpx.PoolTimeout,
+    # Database errors
     asyncpg.exceptions.PostgresConnectionError,
+    asyncpg.exceptions.TooManyConnectionsError,
+    asyncpg.exceptions.CannotConnectNowError,
 )
 
 
@@ -65,3 +73,7 @@ async def process_video(
         # Non-retryable errors: fail immediately
         logger.error(f"Fatal error processing video {video_id}: {e}")
         raise
+
+
+# Configure max_tries via arq_func decorator-style usage
+process_video.max_tries = 5

@@ -7,9 +7,12 @@ class WorkerSettings:
     """ARQ Worker configuration with 2025 best practices."""
 
     # Redis connection with pooling
+    _redis_base = RedisSettings.from_dsn(settings.redis_url)
     redis_settings = RedisSettings(
-        host=settings.redis_url.split("://")[1].split(":")[0] if "://" in settings.redis_url else "localhost",
-        port=int(settings.redis_url.split(":")[-1]) if ":" in settings.redis_url.split("://")[1] else 6379,
+        host=_redis_base.host,
+        port=_redis_base.port,
+        database=_redis_base.database,
+        password=_redis_base.password,
         max_connections=20,  # Connection pool limit (2x max_jobs)
         conn_retries=5,
         conn_retry_delay=1

@@ -59,40 +59,36 @@ async def test_process_video_updates_status(test_db):
 
     # Assert: Status changed and result is success
     await test_db.refresh(video)
-    assert video.processing_status in ["processing", "completed", "pending"]  # Will be "processing" or "completed"
+    # Stub doesn't update DB yet, so status remains "pending"
+    assert video.processing_status == "pending"
     assert result["status"] == "success"
     assert result["video_id"] == str(video.id)
 
 
 @pytest.mark.asyncio
-async def test_process_video_with_retry_on_transient_error():
-    """Test that transient errors trigger retry with exponential backoff."""
-    video_id = str(uuid4())
-    list_id = str(uuid4())
+async def test_process_video_with_retry_on_transient_error(test_db):
+    """Test that process_video categorizes transient errors correctly."""
+    from app.workers.video_processor import TRANSIENT_ERRORS
+    import asyncpg
 
-    # Track retry attempts
-    attempt_count = {"count": 0}
+    # Verify TRANSIENT_ERRORS tuple includes expected errors
+    assert httpx.ConnectError in TRANSIENT_ERRORS
+    assert httpx.TimeoutException in TRANSIENT_ERRORS
+    assert asyncpg.exceptions.PostgresConnectionError in TRANSIENT_ERRORS
 
-    # Mock ctx to simulate retries
+    # Test will be enhanced in future tasks when HTTP/DB calls are added
+    # For now, verify the error handling structure is defined
     ctx = {"job_try": 1, "max_tries": 5}
+    bookmark_list = BookmarkList(name="Test List")
+    test_db.add(bookmark_list)
+    await test_db.commit()
+    await test_db.refresh(bookmark_list)
 
-    # Mock transient error then success
-    async def mock_process_with_retry(ctx, vid, lid, schema):
-        attempt_count["count"] += 1
-        if attempt_count["count"] == 1:
-            # First attempt: simulate transient error
-            raise httpx.ConnectError("Connection failed")
-        # Second attempt: success
-        return {"status": "success", "video_id": vid}
+    video = Video(list_id=bookmark_list.id, youtube_id="test123", processing_status="pending")
+    test_db.add(video)
+    await test_db.commit()
+    await test_db.refresh(video)
 
-    # Test retry logic is present (we can't easily test actual retry without worker)
-    # This test verifies the error handling structure exists
-    with patch('app.workers.video_processor.process_video', side_effect=mock_process_with_retry):
-        # First call should raise
-        with pytest.raises(httpx.ConnectError):
-            await mock_process_with_retry(ctx, video_id, list_id, {})
-
-        # Second call should succeed
-        result = await mock_process_with_retry(ctx, video_id, list_id, {})
-        assert result['status'] == 'success'
-        assert attempt_count["count"] == 2
+    # Stub should still return success
+    result = await process_video(ctx, str(video.id), str(bookmark_list.id), {})
+    assert result["status"] == "success"
