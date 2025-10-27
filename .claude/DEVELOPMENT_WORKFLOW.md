@@ -35,6 +35,10 @@
 
 **3. 🆕 REF MCP Recherche VOR Umsetzung**
 - **CRITICAL:** Mache Recherche VOR der Implementation, nicht danach!
+- **⚠️ MANDATORY: IMMER via Subagent ausführen!**
+  - **Warum:** REF Research verbraucht viele Tokens im Main Thread
+  - **Nie direkt** im Main Thread REF MCP Tools aufrufen
+  - **Immer** über Task-Subagent dispatchen
 - Dispatche REF-Recherche Subagent:
   ```
   Task (general-purpose):
@@ -219,7 +223,7 @@ Struktur:
 |------|-------|----------------|
 | **Superpowers Skills** | Workflow-Steuerung, TDD, Reviews | Immer |
 | **task-validator** | Plan-Compliance Validierung | Nach Implementation |
-| **REF MCP** (via Subagent) | Aktuelle Best Practices recherchieren | **VOR Implementation** |
+| **REF MCP** ⚠️ NUR via Subagent! | Aktuelle Best Practices recherchieren | **VOR Implementation** (Token-Management!) |
 | **CodeRabbit CLI** | Automatisches Code Review | Nach Implementation |
 | **Semgrep** | Security & Code Quality Scan | Nach Implementation |
 | **Chrome DevTools MCP** | Frontend Testing (screenshots, navigation) | Bei Frontend-Tasks |
@@ -266,8 +270,10 @@ Struktur:
 
 ### REF MCP BEFORE Implementation
 - **CRITICAL:** Recherche VOR Implementierung
+- **MANDATORY:** IMMER via Subagent (Token-Management!)
 - Plan gegen aktuelle Docs abgleichen
 - Potenzielle Issues VOR Code-Writing identifizieren
+- NIEMALS direkt im Main Thread REF MCP Tools aufrufen
 
 ### Pause After Every Task
 - Nach Phase 6 IMMER pausieren
