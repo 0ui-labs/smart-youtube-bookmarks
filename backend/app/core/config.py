@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # Database
-    database_url: str = "postgresql+asyncpg://user:password@localhost/youtube_bookmarks"
+    database_url: str = "postgresql+asyncpg://user:changeme@localhost/youtube_bookmarks"
 
     # Redis
     redis_url: str = "redis://localhost:6379"
