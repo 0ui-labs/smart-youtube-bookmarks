@@ -6,6 +6,7 @@ from sqlalchemy.pool import NullPool
 from app.main import app
 from app.core.database import get_db
 from app.models import Base
+from app.models.list import BookmarkList
 from app.core.config import settings
 
 
@@ -65,3 +66,16 @@ async def client(test_db):
         yield ac
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def test_list(test_db: AsyncSession) -> BookmarkList:
+    """Create a test bookmark list."""
+    bookmark_list = BookmarkList(
+        name="Test List",
+        description="A test bookmark list"
+    )
+    test_db.add(bookmark_list)
+    await test_db.commit()
+    await test_db.refresh(bookmark_list)
+    return bookmark_list
