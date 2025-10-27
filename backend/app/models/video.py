@@ -25,7 +25,7 @@ class Video(BaseModel):
     title: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     channel: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     duration: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     extracted_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     processing_status: Mapped[str] = mapped_column(

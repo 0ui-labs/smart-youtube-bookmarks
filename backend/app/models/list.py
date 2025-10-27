@@ -22,7 +22,7 @@ class BookmarkList(BaseModel):
     )
 
     # Relationships
-    schema: Mapped[Optional["Schema"]] = relationship("Schema", lazy="joined")
+    schema: Mapped[Optional["Schema"]] = relationship("Schema", back_populates="lists", lazy="joined")
     videos: Mapped[list["Video"]] = relationship(
         "Video",
         back_populates="list",
