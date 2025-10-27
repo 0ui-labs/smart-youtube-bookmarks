@@ -29,7 +29,7 @@ from app.models.video import Video
 from app.schemas.video import VideoAdd, VideoResponse
 
 
-router = APIRouter()
+router = APIRouter(prefix="/api", tags=["videos"])
 
 
 def extract_youtube_id(url: str) -> str:

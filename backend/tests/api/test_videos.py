@@ -98,20 +98,20 @@ async def test_add_duplicate_video(client: AsyncClient, test_db: AsyncSession, t
         json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
     )
     assert response2.status_code == 409
-    assert "already" in response2.json()["detail"].lower()
+    assert response2.json()["detail"] == "Video already exists in this list"
 
 
 @pytest.mark.asyncio
 async def test_add_video_to_nonexistent_list(client: AsyncClient, test_db: AsyncSession):
     """Test adding a video to a non-existent list returns 404."""
-    fake_id = uuid4()
+    nonexistent_id = uuid4()
     response = await client.post(
-        f"/api/lists/{fake_id}/videos",
+        f"/api/lists/{nonexistent_id}/videos",
         json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
     )
 
     assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
+    assert response.json()["detail"] == f"List with id {nonexistent_id} not found"
 
 
 @pytest.mark.asyncio
@@ -191,11 +191,11 @@ async def test_get_videos_empty_list(client: AsyncClient, test_db: AsyncSession,
 @pytest.mark.asyncio
 async def test_get_videos_nonexistent_list(client: AsyncClient, test_db: AsyncSession):
     """Test retrieving videos from non-existent list returns 404."""
-    fake_id = uuid4()
-    response = await client.get(f"/api/lists/{fake_id}/videos")
+    nonexistent_id = uuid4()
+    response = await client.get(f"/api/lists/{nonexistent_id}/videos")
 
     assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
+    assert response.json()["detail"] == f"List with id {nonexistent_id} not found"
 
 
 @pytest.mark.asyncio
@@ -222,8 +222,8 @@ async def test_delete_video(client: AsyncClient, test_db: AsyncSession, test_lis
 @pytest.mark.asyncio
 async def test_delete_nonexistent_video(client: AsyncClient, test_db: AsyncSession):
     """Test deleting a non-existent video returns 404."""
-    fake_id = uuid4()
-    response = await client.delete(f"/api/videos/{fake_id}")
+    nonexistent_id = uuid4()
+    response = await client.delete(f"/api/videos/{nonexistent_id}")
 
     assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
+    assert response.json()["detail"] == f"Video with id {nonexistent_id} not found"

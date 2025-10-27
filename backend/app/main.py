@@ -22,7 +22,7 @@ app.add_middleware(
 
 # Register routers
 app.include_router(lists.router)
-app.include_router(videos.router, prefix="/api", tags=["videos"])
+app.include_router(videos.router)
 
 
 @app.get("/api/health")

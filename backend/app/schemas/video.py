@@ -68,7 +68,14 @@ class VideoAdd(BaseModel):
 
 
 class VideoResponse(BaseModel):
-    """Schema for video response."""
+    """
+    Schema for video response.
+
+    Note: Only includes essential fields available immediately after creation.
+    Metadata fields (title, channel, duration, thumbnail_url, etc.) will be
+    populated by background processing (Task 8/9) and added to this schema
+    in future iterations.
+    """
     id: UUID
     list_id: UUID
     youtube_id: str
