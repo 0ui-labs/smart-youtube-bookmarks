@@ -2,9 +2,8 @@ import axios from 'axios'
 
 export const api = axios.create({
   baseURL: '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // Note: Content-Type is auto-detected by Axios based on request body
+  // (e.g., application/json for objects, multipart/form-data for FormData)
 })
 
 // Response interceptor for error handling
