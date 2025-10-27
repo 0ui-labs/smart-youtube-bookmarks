@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models import BookmarkList, Video
-from app.schemas.list import ListCreate, ListUpdate, ListResponse
+from app.schemas.list import ListCreate, ListResponse
 
 router = APIRouter(prefix="/api/lists", tags=["lists"])
 
@@ -61,6 +61,7 @@ async def create_list(
     db.add(new_list)
     await db.flush()
     await db.refresh(new_list)
+    await db.commit()
 
     return ListResponse(
         id=new_list.id,
@@ -123,4 +124,5 @@ async def delete_list(list_id: UUID, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="List not found")
 
     await db.delete(list_obj)
+    await db.commit()
     return None
