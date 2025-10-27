@@ -54,7 +54,7 @@ def upgrade() -> None:
     sa.Column('published_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('thumbnail_url', sa.String(length=500), nullable=True),
     sa.Column('extracted_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('processing_status', sa.String(length=20), nullable=False),
+    sa.Column('processing_status', sa.String(length=20), server_default='pending', nullable=False),
     sa.Column('error_message', sa.String(), nullable=True),
     sa.ForeignKeyConstraint(['list_id'], ['bookmarks_lists.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
@@ -70,9 +70,9 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('list_id', postgresql.UUID(as_uuid=True), nullable=False),
     sa.Column('total_videos', sa.Integer(), nullable=False),
-    sa.Column('processed_count', sa.Integer(), nullable=False),
-    sa.Column('failed_count', sa.Integer(), nullable=False),
-    sa.Column('status', sa.String(length=20), nullable=False),
+    sa.Column('processed_count', sa.Integer(), server_default='0', nullable=False),
+    sa.Column('failed_count', sa.Integer(), server_default='0', nullable=False),
+    sa.Column('status', sa.String(length=20), server_default='running', nullable=False),
     sa.ForeignKeyConstraint(['list_id'], ['bookmarks_lists.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )

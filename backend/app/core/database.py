@@ -5,6 +5,8 @@ This module provides the async database engine, session factory, and
 the FastAPI dependency for getting database sessions in route handlers.
 """
 
+from typing import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from .config import settings
 
@@ -23,12 +25,12 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-async def get_db():
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     FastAPI dependency for getting database sessions.
 
     Yields an async database session and handles commit/rollback automatically.
-    Always closes the session after use.
+    Session is automatically closed by the context manager.
     """
     async with AsyncSessionLocal() as session:
         try:
@@ -37,5 +39,3 @@ async def get_db():
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
