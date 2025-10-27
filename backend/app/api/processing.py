@@ -1,6 +1,6 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -15,69 +15,93 @@ async def start_processing(
     list_id: UUID,
     db: AsyncSession = Depends(get_db)
 ):
-    # Verify list exists
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
-    list_obj = result.scalar_one_or_none()
-    if not list_obj:
-        raise HTTPException(status_code=404, detail="List not found")
-
-    # Get pending videos
-    result = await db.execute(
-        select(Video).where(
-            Video.list_id == list_id,
-            Video.processing_status == "pending"
+    try:
+        # Verify list exists
+        result = await db.execute(
+            select(BookmarkList).where(BookmarkList.id == list_id)
         )
-    )
-    pending_videos = result.scalars().all()
+        list_obj = result.scalar_one_or_none()
+        if not list_obj:
+            raise HTTPException(status_code=404, detail="List not found")
 
-    if not pending_videos:
-        raise HTTPException(status_code=400, detail="No pending videos to process")
+        # Count pending videos efficiently
+        count_result = await db.execute(
+            select(func.count(Video.id)).where(
+                Video.list_id == list_id,
+                Video.processing_status == "pending"
+            )
+        )
+        pending_count = count_result.scalar_one()
 
-    # Create job
-    job = ProcessingJob(
-        list_id=list_id,
-        total_videos=len(pending_videos),
-        status="running"
-    )
-    db.add(job)
-    await db.flush()
-    await db.refresh(job)
-    await db.commit()
+        if pending_count == 0:
+            raise HTTPException(status_code=400, detail="No pending videos to process")
 
-    # TODO: Enqueue ARQ tasks
+        # Create job
+        job = ProcessingJob(
+            list_id=list_id,
+            total_videos=pending_count,
+            status="running"
+        )
+        db.add(job)
+        await db.flush()
+        await db.refresh(job)
+        await db.commit()
 
-    return JobResponse(
-        job_id=job.id,
-        total_videos=len(pending_videos),
-        estimated_duration_seconds=len(pending_videos) * 30  # 30s per video estimate
-    )
+        # TODO: Enqueue ARQ tasks
+
+        return JobResponse(
+            job_id=job.id,
+            total_videos=pending_count,
+            estimated_duration_seconds=pending_count * 30  # 30s per video estimate
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Database error occurred")
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatus)
 async def get_job_status(job_id: UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(ProcessingJob).where(ProcessingJob.id == job_id)
-    )
-    job = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(ProcessingJob).where(ProcessingJob.id == job_id)
+        )
+        job = result.scalar_one_or_none()
 
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
 
-    return job
+        return job
+    except HTTPException:
+        raise
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Database error occurred")
 
 
 @router.post("/jobs/{job_id}/pause", status_code=204)
 async def pause_job(job_id: UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(ProcessingJob).where(ProcessingJob.id == job_id)
-    )
-    job = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(ProcessingJob).where(ProcessingJob.id == job_id)
+        )
+        job = result.scalar_one_or_none()
 
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
 
-    job.status = "paused"
-    await db.commit()
-    return None
+        if job.status != "running":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot pause job with status '{job.status}'. Only running jobs can be paused."
+            )
+
+        job.status = "paused"
+        await db.commit()
+        return None
+    except HTTPException:
+        raise
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Database error occurred")
