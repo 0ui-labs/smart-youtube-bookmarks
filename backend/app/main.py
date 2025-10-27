@@ -1,3 +1,10 @@
+"""
+Main FastAPI application module for Smart YouTube Bookmarks.
+
+This module sets up the FastAPI application with CORS middleware
+and provides the health check endpoint.
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,5 +20,5 @@ app.add_middleware(
 
 
 @app.get("/api/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     return {"status": "ok"}

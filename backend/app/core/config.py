@@ -1,4 +1,12 @@
-from pydantic_settings import BaseSettings
+"""
+Application configuration module.
+
+This module defines the settings for the Smart YouTube Bookmarks application,
+including database connection strings, API keys, and environment configuration.
+Settings can be overridden via environment variables or a .env file.
+"""
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -15,9 +23,10 @@ class Settings(BaseSettings):
     # App
     env: str = "development"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8"
+    )
 
 
 settings = Settings()
