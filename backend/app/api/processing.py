@@ -1,11 +1,17 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime
+from typing import Annotated, List, Optional
+from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import BookmarkList, Video, ProcessingJob
+from app.models import BookmarkList, Video, ProcessingJob, User
+from app.models.job_progress import JobProgressEvent
 from app.schemas.job import JobResponse, JobStatus
+from app.schemas.job_progress import JobProgressEventRead
 
 router = APIRouter(prefix="/api", tags=["processing"])
 
@@ -100,6 +106,65 @@ async def pause_job(job_id: UUID, db: AsyncSession = Depends(get_db)):
         job.status = "paused"
         await db.commit()
         return None
+    except HTTPException:
+        raise
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Database error occurred")
+
+
+@router.get("/jobs/{job_id}/progress-history", response_model=List[JobProgressEventRead])
+async def get_progress_history(
+    job_id: UUID,
+    user_id: UUID = Query(..., description="User ID for authentication (temporary mock auth)"),
+    since: Optional[datetime] = Query(None, description="Return events after this timestamp"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, gt=0, le=100, description="Maximum records to return"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get progress history for a job with pagination and filtering.
+
+    Supports:
+    - Filtering by 'since' timestamp for efficient reconnection
+    - Pagination with offset/limit (max 100 per request)
+    - Authorization: user can only access their own jobs
+
+    Note: Uses user_id query param for temporary mock authentication.
+    This will be replaced with proper JWT authentication later.
+    """
+    try:
+        # Verify job exists and load list relationship (with eager loading)
+        stmt = select(ProcessingJob).where(
+            ProcessingJob.id == job_id
+        ).options(selectinload(ProcessingJob.list))
+
+        result = await db.execute(stmt)
+        job = result.scalar_one_or_none()
+
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        # Authorization: Check ownership via job -> list -> user relationship
+        if job.list.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to access this job")
+
+        # Query progress events with filters and pagination
+        query = select(JobProgressEvent).where(
+            JobProgressEvent.job_id == job_id
+        )
+
+        # Apply since filter if provided
+        if since:
+            query = query.where(JobProgressEvent.created_at > since)
+
+        # Order chronologically and apply pagination
+        query = query.order_by(JobProgressEvent.created_at).offset(offset).limit(limit)
+
+        result = await db.execute(query)
+        events = result.scalars().all()
+
+        return events
     except HTTPException:
         raise
     except Exception:
