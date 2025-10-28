@@ -120,10 +120,21 @@ export const useBulkUploadVideos = (listId: string) => {
   })
 }
 
+/**
+ * Exports videos from a list as a CSV file and triggers a browser download.
+ *
+ * @param listId - The UUID of the list to export videos from
+ * @throws {Error} If the API response is not a valid Blob
+ */
 export const exportVideosCSV = async (listId: string) => {
-  const response = await api.get(`/lists/${listId}/export/csv`, {
+  const response = await api.get<Blob>(`/lists/${listId}/export/csv`, {
     responseType: 'blob',
   })
+
+  // Validate response is actually a Blob
+  if (!(response.data instanceof Blob)) {
+    throw new Error('Invalid response type: Expected Blob but received ' + typeof response.data)
+  }
 
   // Create download link
   const blob = new Blob([response.data], { type: 'text/csv' })

@@ -5,6 +5,7 @@ import {
   flexRender,
   getCoreRowModel,
 } from '@tanstack/react-table'
+import axios from 'axios'
 import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV } from '@/hooks/useVideos'
 import { CSVUpload } from './CSVUpload'
 import type { VideoResponse } from '@/types/video'
@@ -63,7 +64,12 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
     try {
       await exportVideosCSV(listId)
     } catch (error) {
-      alert('Fehler beim Exportieren der Videos. Bitte versuchen Sie es erneut.')
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.detail || 'Fehler beim Exportieren der Videos. Bitte versuchen Sie es erneut.'
+        alert(errorMessage)
+      } else {
+        alert('Fehler beim Exportieren der Videos. Bitte versuchen Sie es erneut.')
+      }
     }
   }
 
@@ -232,18 +238,21 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
             onClick={handleExportCSV}
             disabled={videos.length === 0}
             className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 transition-colors"
+            aria-label="Videos als CSV exportieren"
           >
             CSV Export
           </button>
           <button
             onClick={() => setIsUploadingCSV(true)}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            aria-label="Videos per CSV hochladen"
           >
             CSV Upload
           </button>
           <button
             onClick={() => setIsAdding(true)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            aria-label="Einzelnes Video hinzufügen"
           >
             Video hinzufügen
           </button>
