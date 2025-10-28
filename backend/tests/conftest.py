@@ -7,6 +7,7 @@ from app.main import app
 from app.core.database import get_db
 from app.models import Base
 from app.models.list import BookmarkList
+from app.models.video import Video
 from app.core.config import settings
 
 
@@ -79,3 +80,17 @@ async def test_list(test_db: AsyncSession) -> BookmarkList:
     await test_db.commit()
     await test_db.refresh(bookmark_list)
     return bookmark_list
+
+
+@pytest.fixture
+async def test_video(test_db: AsyncSession, test_list: BookmarkList) -> Video:
+    """Create a test video."""
+    video = Video(
+        list_id=test_list.id,
+        youtube_id="dQw4w9WgXcQ",
+        processing_status="pending"
+    )
+    test_db.add(video)
+    await test_db.commit()
+    await test_db.refresh(video)
+    return video

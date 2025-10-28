@@ -19,8 +19,10 @@ import re
 from typing import List, Sequence
 import csv
 import io
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -372,3 +374,79 @@ async def bulk_upload_videos(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid CSV format: {str(e)}"
         )
+
+
+@router.get("/lists/{list_id}/export/csv")
+async def export_videos_csv(
+    list_id: UUID,
+    db: AsyncSession = Depends(get_db)
+) -> StreamingResponse:
+    """
+    Export all videos in a list to CSV format.
+
+    CSV format:
+    ```
+    youtube_id,status,created_at
+    VIDEO_ID_1,pending,2025-10-28T10:00:00
+    VIDEO_ID_2,completed,2025-10-27T15:30:00
+    ```
+
+    - Validates list exists (404 if not found)
+    - Returns CSV file as downloadable attachment
+    - Empty lists return CSV with header only
+
+    Args:
+        list_id: UUID of the bookmark list
+        db: Database session
+
+    Returns:
+        StreamingResponse: CSV file download
+
+    Raises:
+        HTTPException 404: List not found
+    """
+    # Validate list exists
+    result = await db.execute(
+        select(BookmarkList).where(BookmarkList.id == list_id)
+    )
+    bookmark_list = result.scalar_one_or_none()
+
+    if not bookmark_list:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"List with id {list_id} not found"
+        )
+
+    # Get all videos
+    result = await db.execute(
+        select(Video)
+        .where(Video.list_id == list_id)
+        .order_by(Video.created_at)
+    )
+    videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
+
+    # Generate CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header
+    writer.writerow(['youtube_id', 'status', 'created_at'])
+
+    # Write video rows
+    for video in videos:
+        writer.writerow([
+            video.youtube_id,
+            video.processing_status,
+            video.created_at.isoformat()
+        ])
+
+    # Create streaming response
+    csv_content = output.getvalue()
+
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=videos_{list_id}.csv"
+        }
+    )

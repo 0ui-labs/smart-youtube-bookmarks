@@ -315,3 +315,45 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ"""
 
     assert response.status_code == 422
     assert "header" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_export_videos_csv_success(client, test_list, test_video):
+    """Test exporting videos to CSV."""
+    response = await client.get(f"/api/lists/{test_list.id}/export/csv")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert "attachment" in response.headers["content-disposition"]
+
+    # Parse CSV response
+    csv_content = response.content.decode('utf-8')
+    lines = csv_content.strip().splitlines()
+
+    assert len(lines) == 2  # Header + 1 video
+    assert lines[0] == "youtube_id,status,created_at"
+    assert test_video.youtube_id in lines[1]
+    assert "pending" in lines[1]
+
+
+@pytest.mark.asyncio
+async def test_export_videos_csv_empty_list(client, test_list):
+    """Test exporting empty list returns CSV with header only."""
+    response = await client.get(f"/api/lists/{test_list.id}/export/csv")
+
+    assert response.status_code == 200
+    csv_content = response.content.decode('utf-8')
+    lines = csv_content.strip().splitlines()
+
+    assert len(lines) == 1  # Header only
+    assert lines[0] == "youtube_id,status,created_at"
+
+
+@pytest.mark.asyncio
+async def test_export_videos_csv_list_not_found(client):
+    """Test export returns 404 when list doesn't exist."""
+    fake_list_id = "00000000-0000-0000-0000-000000000000"
+
+    response = await client.get(f"/api/lists/{fake_list_id}/export/csv")
+
+    assert response.status_code == 404
