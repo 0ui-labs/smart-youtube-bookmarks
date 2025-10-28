@@ -32,12 +32,13 @@ async def arq_worker(arq_redis):
 
 
 @pytest.mark.asyncio
-async def test_process_video_updates_status(test_db):
+async def test_process_video_updates_status(test_db, test_user):
     """Test that process_video changes status from pending."""
     # Arrange: Create test list first (foreign key requirement)
     bookmark_list = BookmarkList(
         name="Test List",
-        description="Test list for worker"
+        description="Test list for worker",
+        user_id=test_user.id
     )
     test_db.add(bookmark_list)
     await test_db.commit()
@@ -66,7 +67,7 @@ async def test_process_video_updates_status(test_db):
 
 
 @pytest.mark.asyncio
-async def test_process_video_with_retry_on_transient_error(test_db):
+async def test_process_video_with_retry_on_transient_error(test_db, test_user):
     """Test that process_video categorizes transient errors correctly."""
     from app.workers.video_processor import TRANSIENT_ERRORS
     import asyncpg
@@ -79,7 +80,7 @@ async def test_process_video_with_retry_on_transient_error(test_db):
     # Test will be enhanced in future tasks when HTTP/DB calls are added
     # For now, verify the error handling structure is defined
     ctx = {"job_try": 1, "max_tries": 5}
-    bookmark_list = BookmarkList(name="Test List")
+    bookmark_list = BookmarkList(name="Test List", user_id=test_user.id)
     test_db.add(bookmark_list)
     await test_db.commit()
     await test_db.refresh(bookmark_list)

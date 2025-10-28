@@ -6,7 +6,7 @@ Can be expanded later with full user management features.
 """
 
 from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import BaseModel
 
 
@@ -21,6 +21,9 @@ class User(BaseModel):
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+
+    # Relationships
+    lists: Mapped[list["BookmarkList"]] = relationship("BookmarkList", back_populates="user")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email})>"

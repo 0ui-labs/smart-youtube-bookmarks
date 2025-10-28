@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.models import Base
 from app.models.list import BookmarkList
 from app.models.video import Video
+from app.models.user import User
 from app.core.config import settings
 
 
@@ -70,11 +71,28 @@ async def client(test_db):
 
 
 @pytest.fixture
-async def test_list(test_db: AsyncSession) -> BookmarkList:
+async def test_user(test_db: AsyncSession) -> User:
+    """Create a test user for each test."""
+    import uuid
+    # Use unique email per test to avoid conflicts
+    user = User(
+        email=f"test-{uuid.uuid4()}@example.com",
+        hashed_password="$2b$12$placeholder_hash",
+        is_active=True
+    )
+    test_db.add(user)
+    await test_db.commit()
+    await test_db.refresh(user)
+    return user
+
+
+@pytest.fixture
+async def test_list(test_db: AsyncSession, test_user: User) -> BookmarkList:
     """Create a test bookmark list."""
     bookmark_list = BookmarkList(
         name="Test List",
-        description="A test bookmark list"
+        description="A test bookmark list",
+        user_id=test_user.id
     )
     test_db.add(bookmark_list)
     await test_db.commit()
