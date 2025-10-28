@@ -97,7 +97,6 @@ async def test_cascade_delete_job_progress_events(test_db, test_list):
     await test_db.refresh(job)
 
     # Create multiple progress events for this job
-    event_ids = []
     for i in range(3):
         event = JobProgressEvent(
             job_id=job.id,
@@ -108,7 +107,6 @@ async def test_cascade_delete_job_progress_events(test_db, test_list):
             }
         )
         test_db.add(event)
-        event_ids.append(event.id)
 
     await test_db.commit()
 
