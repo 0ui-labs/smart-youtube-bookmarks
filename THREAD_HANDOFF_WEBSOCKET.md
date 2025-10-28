@@ -2,7 +2,7 @@
 
 **Datum:** 2025-10-28
 **Branch:** `feature/websocket-progress-updates`
-**Worktree:** `.worktrees/websocket-progress`
+**Working Directory:** Main Repo (kein Worktree)
 **Status:** Design fertig, bereit für Implementation
 
 ---
@@ -28,10 +28,10 @@
      - Testing Strategy
      - Performance Considerations
 
-3. **Feature Branch & Worktree erstellt** ✅
+3. **Feature Branch erstellt** ✅
    - Branch: `feature/websocket-progress-updates`
-   - Worktree Location: `.worktrees/websocket-progress`
-   - Dependencies installiert (Backend pip + Frontend npm)
+   - Working Directory: Main Repo (kein Worktree)
+   - Dependencies bereits vorhanden (vom main branch)
 
 ---
 
@@ -43,43 +43,47 @@ HEAD: 1f06d54 - docs: add WebSocket progress updates design document
 Status: Clean
 ```
 
-**Feature Branch (im Worktree):**
+**Feature Branch:**
 ```
 Branch: feature/websocket-progress-updates
-HEAD: 1f06d54 (same as main)
-Working Directory: .worktrees/websocket-progress
+HEAD: 4acc5d4 (same as main)
+Working Directory: /Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks
 Status: Clean (ready for implementation)
 ```
 
 **Branch-Hierarchie:**
 ```
-main (1f06d54)
-  └─ feature/websocket-progress-updates (1f06d54) ← Worktree hier
+main (4acc5d4)
+  └─ feature/websocket-progress-updates (4acc5d4) ← Hier arbeiten
 ```
 
 ---
 
 ## 🎯 Nächste Schritte für neuen Thread
 
-### Schritt 1: Context & Worktree Setup ✅
+### Schritt 1: Context & Branch Setup ✅
 
-**Working Directory wechseln:**
+**Working Directory:**
 ```bash
-cd "/Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks/.worktrees/websocket-progress"
+cd "/Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks"
+```
+
+**Checkout Feature Branch:**
+```bash
+git checkout feature/websocket-progress-updates
 ```
 
 **Verify Setup:**
 ```bash
-pwd  # Should show: .../.worktrees/websocket-progress
+pwd  # Should show: .../Smart Youtube Bookmarks
 git branch  # Should show: * feature/websocket-progress-updates
 git status  # Should be clean
 ```
 
 **Docker Services (falls nicht laufen):**
 ```bash
-cd .. && docker-compose up -d postgres redis
-# Dann zurück ins Worktree:
-cd .worktrees/websocket-progress
+docker-compose up -d postgres redis
+docker-compose ps  # Verify healthy
 ```
 
 ---
@@ -544,16 +548,19 @@ Skill(superpowers:finishing-a-development-branch)
 **Copy-Paste Commands:**
 
 ```bash
-# 1. Navigate to worktree
-cd "/Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks/.worktrees/websocket-progress"
+# 1. Navigate to repo
+cd "/Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks"
 
-# 2. Verify setup
+# 2. Checkout feature branch
+git checkout feature/websocket-progress-updates
+
+# 3. Verify setup
 pwd
 git branch
 git status
 
-# 3. Check Docker
-cd ../.. && docker-compose ps && cd .worktrees/websocket-progress
+# 4. Check Docker
+docker-compose ps
 ```
 
 **In Claude Code:**
@@ -631,21 +638,22 @@ npm run build     # Check build errors
 
 ---
 
-**Version:** 1.0
+**Version:** 1.1 (Korrigiert: Kein Worktree)
 **Created:** 2025-10-28
 **Status:** Ready for Implementation
 **Estimated Total Time:** 3-4 hours
 **Branch:** feature/websocket-progress-updates
-**Worktree:** .worktrees/websocket-progress
-**Last Main Commit:** 1f06d54
+**Working Directory:** Main Repo
+**Last Main Commit:** 4acc5d4
 
 ---
 
 ## ✅ Handoff Checklist für Neuen Thread
 
 ```
-□ Navigate to worktree (.worktrees/websocket-progress)
-□ Verify branch (feature/websocket-progress-updates)
+□ Navigate to repo (/Users/philippbriese/Documents/.../Smart Youtube Bookmarks)
+□ Checkout feature branch (git checkout feature/websocket-progress-updates)
+□ Verify branch (git branch)
 □ Read DEVELOPMENT_WORKFLOW.md
 □ Read Design-Doc (websocket-progress-updates-design.md)
 □ Load superpowers:using-superpowers skill
@@ -656,8 +664,7 @@ npm run build     # Check build errors
 □ Evidence before claims (verification skill)
 □ Multi-Tool reviews nach allen Tasks
 □ Fix ALL issues (Option C)
-□ Finishing-a-development-branch skill
-□ Merge zu main
+□ Merge to main (git checkout main && git merge feature/websocket-progress-updates)
 ```
 
 ---
