@@ -8,7 +8,7 @@ and provides the health check endpoint.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import lists, videos, processing
+from app.api import lists, videos, processing, websocket
 
 app = FastAPI(title="Smart YouTube Bookmarks")
 
@@ -24,6 +24,7 @@ app.add_middleware(
 app.include_router(lists.router)
 app.include_router(videos.router)
 app.include_router(processing.router)
+app.include_router(websocket.router, prefix="/api")
 
 
 @app.get("/api/health")

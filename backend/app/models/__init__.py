@@ -4,6 +4,7 @@ from .list import BookmarkList
 from .video import Video
 from .job import ProcessingJob
 from .job_progress import JobProgressEvent
+from .user import User
 
 __all__ = [
     "Base",
@@ -13,4 +14,5 @@ __all__ = [
     "Video",
     "ProcessingJob",
     "JobProgressEvent",
+    "User",
 ]
