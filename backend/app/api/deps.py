@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import AsyncSessionLocal
 from app.models.user import User
 
 
@@ -52,8 +52,8 @@ async def get_current_ws_user(
         await websocket.close(code=1008)
         raise credentials_exception
 
-    # Query user from database
-    async for db in get_db():
+    # Query user from database using context manager
+    async with AsyncSessionLocal() as db:
         stmt = select(User).where(User.id == user_id)
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
@@ -63,7 +63,3 @@ async def get_current_ws_user(
             raise credentials_exception
 
         return user
-
-    # Should never reach here, but satisfy type checker
-    await websocket.close(code=1008)
-    raise credentials_exception

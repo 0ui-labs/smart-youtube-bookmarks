@@ -63,10 +63,17 @@ async def websocket_progress_endpoint(
                     progress_data = json.loads(message["data"])
                     await websocket.send_json(progress_data)
                 except json.JSONDecodeError as e:
+                    # Recoverable: skip malformed message and continue
                     logger.error(f"Failed to parse progress message: {e}")
-                except Exception as e:
-                    logger.error(f"Error forwarding message: {e}")
+                    continue
+                except WebSocketDisconnect:
+                    # Non-recoverable: client disconnected, stop processing
+                    logger.info(f"WebSocket disconnected while sending message for user {user.id}")
                     break
+                except Exception as e:
+                    # Other errors: log and continue (network issues, etc.)
+                    logger.error(f"Error forwarding message: {e}")
+                    continue
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected for user {user.id}")
