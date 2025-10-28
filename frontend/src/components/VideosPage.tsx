@@ -76,6 +76,7 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
   const columns = useMemo(
     () => [
       columnHelper.accessor('youtube_id', {
+        id: 'preview',
         header: 'Vorschau',
         cell: () => {
           return (
@@ -88,6 +89,7 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
         },
       }),
       columnHelper.accessor('youtube_id', {
+        id: 'title',
         header: 'Titel',
         cell: (info) => {
           const youtubeId = info.getValue()
@@ -106,6 +108,7 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
         },
       }),
       columnHelper.accessor('processing_status', {
+        id: 'duration',
         header: 'Dauer',
         cell: (info) => {
           const status = info.getValue()
@@ -119,6 +122,7 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
         },
       }),
       columnHelper.accessor('processing_status', {
+        id: 'status',
         header: 'Status',
         cell: (info) => {
           const status = info.getValue()
@@ -134,6 +138,7 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
         },
       }),
       columnHelper.accessor('created_at', {
+        id: 'created_at',
         header: 'Hinzugefügt',
         cell: (info) => (
           <span className="text-sm text-gray-500">
@@ -142,6 +147,7 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
         ),
       }),
       columnHelper.accessor('id', {
+        id: 'actions',
         header: 'Aktionen',
         cell: (info) => (
           <button
