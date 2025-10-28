@@ -12,15 +12,27 @@ const VideoResponseSchema = z.object({
   updated_at: z.string(),
 })
 
+/**
+ * Represents a single failed video upload in a bulk operation
+ */
 export interface BulkUploadFailure {
+  /** The row number in the CSV file where the error occurred (1-based) */
   row: number
+  /** The YouTube URL that failed to be added */
   url: string
+  /** Human-readable error message explaining why the upload failed */
   error: string
 }
 
+/**
+ * Response from bulk video upload operation
+ */
 export interface BulkUploadResponse {
+  /** Number of videos successfully created */
   created_count: number
+  /** Number of videos that failed to be created */
   failed_count: number
+  /** Array of detailed failure information for each failed upload */
   failures: BulkUploadFailure[]
 }
 
@@ -92,14 +104,12 @@ export const useBulkUploadVideos = (listId: string) => {
       const formData = new FormData()
       formData.append('file', file)
 
+      // Note: Content-Type header is intentionally omitted.
+      // Axios automatically sets 'multipart/form-data' with proper boundary
+      // when FormData is passed as the request body.
       const { data } = await api.post<BulkUploadResponse>(
         `/lists/${listId}/videos/bulk`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
+        formData
       )
       return data
     },

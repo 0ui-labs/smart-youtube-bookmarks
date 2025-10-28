@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useBulkUploadVideos, type BulkUploadResponse } from '@/hooks/useVideos'
+import axios from 'axios'
 
 interface CSVUploadProps {
   listId: string
@@ -7,29 +8,69 @@ interface CSVUploadProps {
   onSuccess: () => void
 }
 
+/**
+ * CSV Upload Component for bulk importing YouTube videos
+ *
+ * Allows users to upload a CSV file containing YouTube URLs to add multiple
+ * videos to a list at once. Validates file format, size, and MIME type before
+ * upload. Displays detailed success/failure information after processing.
+ *
+ * @example
+ * ```tsx
+ * <CSVUpload
+ *   listId="123e4567-e89b-12d3-a456-426614174000"
+ *   onCancel={() => setShowUpload(false)}
+ *   onSuccess={() => {
+ *     setShowUpload(false)
+ *     toast.success('Videos uploaded')
+ *   }}
+ * />
+ * ```
+ */
+
 export const CSVUpload = ({ listId, onCancel, onSuccess }: CSVUploadProps) => {
   const [file, setFile] = useState<File | null>(null)
   const [uploadResult, setUploadResult] = useState<BulkUploadResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const bulkUpload = useBulkUploadVideos(listId)
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB in bytes
+  const VALID_MIME_TYPES = ['text/csv', 'application/vnd.ms-excel']
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
+    setError(null)
+    setUploadResult(null)
+
     if (selectedFile) {
-      // Validate file type
+      // Validate file extension
       if (!selectedFile.name.endsWith('.csv')) {
-        alert('Bitte wählen Sie eine CSV-Datei aus')
+        setError('Bitte wählen Sie eine CSV-Datei aus')
         return
       }
+
+      // Validate MIME type
+      if (!VALID_MIME_TYPES.includes(selectedFile.type)) {
+        setError('Ungültiger Dateityp. Nur CSV-Dateien sind erlaubt.')
+        return
+      }
+
+      // Validate file size (max 10MB)
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        setError('Datei ist zu groß. Maximale Größe: 10MB')
+        return
+      }
+
       setFile(selectedFile)
-      setUploadResult(null)
     }
   }
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
 
     if (!file) {
-      alert('Bitte wählen Sie eine Datei aus')
+      setError('Bitte wählen Sie eine Datei aus')
       return
     }
 
@@ -43,11 +84,29 @@ export const CSVUpload = ({ listId, onCancel, onSuccess }: CSVUploadProps) => {
           onSuccess()
         }, 1500)
       }
-    } catch (error: any) {
-      if (error.response?.status === 422) {
-        alert('Ungültige CSV-Datei. Bitte überprüfen Sie das Format.')
+    } catch (err) {
+      // Type assertion for axios error structure
+      if (axios.isAxiosError(err)) {
+        if (err.response?.status === 422) {
+          // Display server validation error if available
+          const detail = err.response?.data?.detail
+          setError(
+            typeof detail === 'string'
+              ? detail
+              : 'Ungültige CSV-Datei. Bitte überprüfen Sie das Format.'
+          )
+        } else {
+          // Display server error message if available, fallback to generic
+          const detail = err.response?.data?.detail
+          setError(
+            typeof detail === 'string'
+              ? detail
+              : 'Fehler beim Hochladen der Datei. Bitte versuchen Sie es erneut.'
+          )
+        }
       } else {
-        alert('Fehler beim Hochladen der Datei. Bitte versuchen Sie es erneut.')
+        // Non-axios error
+        setError('Ein unerwarteter Fehler ist aufgetreten.')
       }
     }
   }
@@ -78,6 +137,12 @@ export const CSVUpload = ({ listId, onCancel, onSuccess }: CSVUploadProps) => {
             Beispiel: https://www.youtube.com/watch?v=VIDEO_ID
           </p>
         </div>
+
+        {error && (
+          <div className="p-4 rounded-lg bg-red-50 border border-red-200">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
 
         {uploadResult && (
           <div className={`p-4 rounded-lg ${
