@@ -17,8 +17,10 @@ Includes:
 from uuid import UUID
 import re
 from typing import List, Sequence
+import csv
+import io
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -26,7 +28,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.models.list import BookmarkList
 from app.models.video import Video
-from app.schemas.video import VideoAdd, VideoResponse
+from app.schemas.video import VideoAdd, VideoResponse, BulkUploadResponse, BulkUploadFailure
 
 
 router = APIRouter(prefix="/api", tags=["videos"])
@@ -214,3 +216,159 @@ async def delete_video(
     await db.commit()  # CRITICAL FIX: Commit to persist deletion
 
     return None
+
+
+@router.post(
+    "/lists/{list_id}/videos/bulk",
+    response_model=BulkUploadResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def bulk_upload_videos(
+    list_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db)
+) -> BulkUploadResponse:
+    """
+    Bulk upload videos from CSV file.
+
+    CSV format:
+    ```
+    url
+    https://www.youtube.com/watch?v=VIDEO_ID_1
+    https://youtu.be/VIDEO_ID_2
+    ```
+
+    - Validates list exists (404 if not found)
+    - Validates CSV header must be "url"
+    - Processes each row, collecting failures
+    - Returns created_count, failed_count, and failure details
+    - Commits all valid videos in single transaction
+
+    Args:
+        list_id: UUID of the bookmark list
+        file: CSV file with YouTube URLs
+        db: Database session
+
+    Returns:
+        BulkUploadResponse: Statistics and failure details
+
+    Raises:
+        HTTPException 404: List not found
+        HTTPException 422: Invalid CSV header or file format
+    """
+    # Validate list exists
+    result = await db.execute(
+        select(BookmarkList).where(BookmarkList.id == list_id)
+    )
+    bookmark_list = result.scalar_one_or_none()
+
+    if not bookmark_list:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"List with id {list_id} not found"
+        )
+
+    # Read and parse CSV
+    try:
+        content = await file.read()
+        csv_string = content.decode('utf-8')
+        csv_file = io.StringIO(csv_string)
+        reader = csv.DictReader(csv_file)
+
+        # Validate header
+        if reader.fieldnames is None or 'url' not in reader.fieldnames:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="CSV must have 'url' header column"
+            )
+
+        videos_to_create = []
+        failures = []
+        row_num = 1  # Start at 1 (header is row 0)
+
+        for row in reader:
+            row_num += 1
+            url = row.get('url', '').strip()
+
+            if not url:
+                failures.append(BulkUploadFailure(
+                    row=row_num,
+                    url=url,
+                    error="Empty URL"
+                ))
+                continue
+
+            # Extract YouTube ID
+            try:
+                youtube_id = extract_youtube_id(url)
+
+                # Check for duplicates in this batch
+                if any(v.youtube_id == youtube_id for v in videos_to_create):
+                    failures.append(BulkUploadFailure(
+                        row=row_num,
+                        url=url,
+                        error="Duplicate video in CSV"
+                    ))
+                    continue
+
+                # Create video object
+                video = Video(
+                    list_id=list_id,
+                    youtube_id=youtube_id,
+                    processing_status="pending"
+                )
+                videos_to_create.append(video)
+
+            except ValueError as e:
+                failures.append(BulkUploadFailure(
+                    row=row_num,
+                    url=url,
+                    error=str(e)
+                ))
+
+        # Bulk insert valid videos
+        if videos_to_create:
+            db.add_all(videos_to_create)
+            try:
+                await db.commit()
+            except IntegrityError:
+                # Handle duplicates with existing videos in DB
+                await db.rollback()
+                # Retry one by one to identify which failed
+                created = 0
+                for video in videos_to_create:
+                    try:
+                        db.add(video)
+                        await db.flush()
+                        created += 1
+                    except IntegrityError:
+                        await db.rollback()
+                        failures.append(BulkUploadFailure(
+                            row=0,  # Row unknown in retry
+                            url=f"https://www.youtube.com/watch?v={video.youtube_id}",
+                            error="Video already exists in this list"
+                        ))
+                await db.commit()
+
+                return BulkUploadResponse(
+                    created_count=created,
+                    failed_count=len(failures),
+                    failures=failures
+                )
+
+        return BulkUploadResponse(
+            created_count=len(videos_to_create),
+            failed_count=len(failures),
+            failures=failures
+        )
+
+    except UnicodeDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="File must be UTF-8 encoded"
+        )
+    except csv.Error as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid CSV format: {str(e)}"
+        )

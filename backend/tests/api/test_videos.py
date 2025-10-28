@@ -8,6 +8,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import uuid4
+import io
 
 from app.models.list import BookmarkList
 from app.models.video import Video
@@ -227,3 +228,90 @@ async def test_delete_nonexistent_video(client: AsyncClient, test_db: AsyncSessi
 
     assert response.status_code == 404
     assert response.json()["detail"] == f"Video with id {nonexistent_id} not found"
+
+
+@pytest.mark.asyncio
+async def test_bulk_upload_csv_success(client, test_list):
+    """Test bulk video upload from CSV file."""
+    # Create CSV content with 3 videos
+    csv_content = """url
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+https://youtu.be/jNQXAC9IVRw
+https://www.youtube.com/watch?v=9bZkp7q19f0"""
+
+    csv_file = io.BytesIO(csv_content.encode('utf-8'))
+
+    # Upload CSV
+    response = await client.post(
+        f"/api/lists/{test_list.id}/videos/bulk",
+        files={"file": ("videos.csv", csv_file, "text/csv")}
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["created_count"] == 3
+    assert data["failed_count"] == 0
+    assert len(data["failures"]) == 0
+
+    # Verify videos were created
+    videos_response = await client.get(f"/api/lists/{test_list.id}/videos")
+    assert videos_response.status_code == 200
+    videos = videos_response.json()
+    assert len(videos) == 3
+
+
+@pytest.mark.asyncio
+async def test_bulk_upload_csv_with_failures(client, test_list):
+    """Test bulk upload handles invalid URLs gracefully."""
+    csv_content = """url
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+https://invalid.com/video
+https://youtu.be/jNQXAC9IVRw"""
+
+    csv_file = io.BytesIO(csv_content.encode('utf-8'))
+
+    response = await client.post(
+        f"/api/lists/{test_list.id}/videos/bulk",
+        files={"file": ("videos.csv", csv_file, "text/csv")}
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["created_count"] == 2  # Only 2 valid URLs
+    assert data["failed_count"] == 1
+    assert len(data["failures"]) == 1
+    assert "invalid.com" in data["failures"][0]["url"]
+
+
+@pytest.mark.asyncio
+async def test_bulk_upload_csv_list_not_found(client):
+    """Test bulk upload returns 404 when list doesn't exist."""
+    csv_content = """url
+https://www.youtube.com/watch?v=dQw4w9WgXcQ"""
+
+    csv_file = io.BytesIO(csv_content.encode('utf-8'))
+    fake_list_id = "00000000-0000-0000-0000-000000000000"
+
+    response = await client.post(
+        f"/api/lists/{fake_list_id}/videos/bulk",
+        files={"file": ("videos.csv", csv_file, "text/csv")}
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_bulk_upload_csv_invalid_header(client, test_list):
+    """Test bulk upload validates CSV header."""
+    csv_content = """invalid_header
+https://www.youtube.com/watch?v=dQw4w9WgXcQ"""
+
+    csv_file = io.BytesIO(csv_content.encode('utf-8'))
+
+    response = await client.post(
+        f"/api/lists/{test_list.id}/videos/bulk",
+        files={"file": ("videos.csv", csv_file, "text/csv")}
+    )
+
+    assert response.status_code == 422
+    assert "header" in response.json()["detail"].lower()

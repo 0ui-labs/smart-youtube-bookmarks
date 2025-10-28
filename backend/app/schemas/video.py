@@ -86,3 +86,17 @@ class VideoResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+
+class BulkUploadFailure(BaseModel):
+    """Details about a failed video upload in bulk operation."""
+    row: int
+    url: str
+    error: str
+
+
+class BulkUploadResponse(BaseModel):
+    """Response schema for bulk video upload."""
+    created_count: int
+    failed_count: int
+    failures: list[BulkUploadFailure] = Field(default_factory=list)
