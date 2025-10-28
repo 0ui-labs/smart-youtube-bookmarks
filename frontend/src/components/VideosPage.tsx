@@ -5,7 +5,8 @@ import {
   flexRender,
   getCoreRowModel,
 } from '@tanstack/react-table'
-import { useVideos, useCreateVideo, useDeleteVideo } from '@/hooks/useVideos'
+import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV } from '@/hooks/useVideos'
+import { CSVUpload } from './CSVUpload'
 import type { VideoResponse } from '@/types/video'
 
 const columnHelper = createColumnHelper<VideoResponse>()
@@ -52,10 +53,19 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
   const [isAdding, setIsAdding] = useState(false)
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [urlError, setUrlError] = useState<string | null>(null)
+  const [isUploadingCSV, setIsUploadingCSV] = useState(false)
 
   const { data: videos = [], isLoading, error } = useVideos(listId)
   const createVideo = useCreateVideo(listId)
   const deleteVideo = useDeleteVideo(listId)
+
+  const handleExportCSV = async () => {
+    try {
+      await exportVideosCSV(listId)
+    } catch (error) {
+      alert('Fehler beim Exportieren der Videos. Bitte versuchen Sie es erneut.')
+    }
+  }
 
   const columns = useMemo(
     () => [
@@ -217,13 +227,36 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
           </button>
           <h1 className="text-3xl font-bold text-gray-900">Videos</h1>
         </div>
-        <button
-          onClick={() => setIsAdding(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Video hinzufügen
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={videos.length === 0}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 transition-colors"
+          >
+            CSV Export
+          </button>
+          <button
+            onClick={() => setIsUploadingCSV(true)}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            CSV Upload
+          </button>
+          <button
+            onClick={() => setIsAdding(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Video hinzufügen
+          </button>
+        </div>
       </div>
+
+      {isUploadingCSV && (
+        <CSVUpload
+          listId={listId}
+          onCancel={() => setIsUploadingCSV(false)}
+          onSuccess={() => setIsUploadingCSV(false)}
+        />
+      )}
 
       {isAdding && (
         <form

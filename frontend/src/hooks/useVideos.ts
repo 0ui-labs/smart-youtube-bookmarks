@@ -119,3 +119,20 @@ export const useBulkUploadVideos = (listId: string) => {
     },
   })
 }
+
+export const exportVideosCSV = async (listId: string) => {
+  const response = await api.get(`/lists/${listId}/export/csv`, {
+    responseType: 'blob',
+  })
+
+  // Create download link
+  const blob = new Blob([response.data], { type: 'text/csv' })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', `videos_${listId}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
+}
