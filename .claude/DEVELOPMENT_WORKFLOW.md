@@ -30,6 +30,75 @@ DU musst IMMER NOCH:
 
 ---
 
+## 🔄 Thread Start Protocol (MANDATORY bei jedem neuen Thread)
+
+**CRITICAL:** Führe diese Checks IMMER am Anfang eines neuen Threads aus!
+
+### 1. Dokumentation lesen
+- Read `.claude/DEVELOPMENT_WORKFLOW.md` (diese Datei)
+- Read `CLAUDE.md`
+
+### 2. Skills laden
+- Load `Skill(superpowers:using-superpowers)`
+
+### 3. Git Status prüfen
+```bash
+git status
+git log --oneline -10
+```
+
+### 4. Tool Authentication Status prüfen
+
+**BEST PRACTICE:** Nutze das automatische Check-Script:
+
+```bash
+# Führe alle Thread-Start-Checks auf einmal aus
+./.claude/thread-start-checks.sh
+```
+
+**Das Script prüft:**
+- ✅ Git Status & Recent Commits
+- ✅ Semgrep Authentication & Version
+- ✅ CodeRabbit Authentication & Version
+- ✅ Python & Node Environment
+- ✅ Docker Services Status
+- ✅ Summary mit Action Items
+
+**Manuelle Checks (alternativ):**
+```bash
+# Semgrep Authentication Check
+semgrep login 2>&1 | grep -q "already exists" && echo "✅ Semgrep authenticated (Pro Rules available)" || echo "⚠️ Semgrep NOT authenticated - Run: semgrep login"
+
+# CodeRabbit Authentication Check
+coderabbit auth status 2>&1 | grep -q "authenticated" && echo "✅ CodeRabbit authenticated" || echo "⚠️ CodeRabbit NOT authenticated - Run: coderabbit auth login"
+
+# Version Checks
+echo "Semgrep version: $(semgrep --version)"
+echo "CodeRabbit version: $(coderabbit --version 2>&1 | head -1)"
+```
+
+**Warum wichtig:**
+- **Semgrep ohne Auth** = Keine FastAPI/React Pro Rules (637 Rules fehlen!)
+- **CodeRabbit ohne Auth** = Reviews funktionieren nicht
+- In neuen Threads weißt du NICHT ob Tools authentifiziert sind
+- Diese Checks dauern <5 Sekunden und verhindern Issues später
+
+**Expected Output:**
+```
+✅ Semgrep authenticated (Pro Rules available)
+   Version: 1.139.0
+   Pro Rules: FastAPI, React, Django, Flask, Express
+
+✅ CodeRabbit authenticated
+   Version: [version]
+```
+
+### 5. Current Task Status
+- Read implementation plan: `docs/plans/2025-10-27-initial-implementation.md`
+- Identify current task and dependencies
+
+---
+
 ## 🎯 Mandatory Skills (IMMER zuerst checken)
 
 1. **superpowers:using-superpowers** - Mandatory first response protocol
@@ -141,22 +210,50 @@ Task (superpowers:code-reviewer):
 
 **9. CodeRabbit CLI**
 ```bash
-coderabbit review --plain --base-commit <BASE_SHA> --type committed
-```
-- Sammle ALLE Issues aus Output
+# AI Agent Mode (token-efficient, optimiert für Claude Code)
+coderabbit --prompt-only --type committed
 
-**10. Semgrep**
+# Alternative: Human-readable Output
+coderabbit --plain --type committed
+
+# Mit spezifischem Base Branch
+coderabbit --prompt-only --base main --type committed
+```
+- **IMPORTANT:** Läuft im Hintergrund, kann 7-30+ Minuten dauern
+- **BEST PRACTICE:** Verwende `--prompt-only` für AI Agent Integration
+- Sammle ALLE Issues aus Output (Critical, Major, Minor)
+
+**10. Semgrep** (siehe `.claude/SEMGREP_QUICKREF.md` für Details)
 ```bash
-# Backend
-semgrep --config=auto app/ tests/ --json
+# IMPORTANT: Authentifiziere zuerst für FastAPI/React-spezifische Pro Rules
+semgrep login
 
-# Frontend
-semgrep --config=auto src/ --json
+# Option A: Quick Full Scan
+semgrep scan --config=auto --text --output=semgrep-results.txt
 
-# Docker
-semgrep --config=auto docker-compose.yml Dockerfile --json
+# Option B: Backend Security Audit (empfohlen)
+semgrep scan \
+  --config=p/python \
+  --config=p/security-audit \
+  --config=p/owasp-top-ten \
+  --json-output=backend-audit.json \
+  backend/
+
+# Option C: Frontend Security Audit (empfohlen)
+semgrep scan \
+  --config=p/javascript \
+  --config=p/typescript \
+  --config=p/react \
+  --json-output=frontend-audit.json \
+  frontend/
+
+# Option D: Authenticated CI Mode (diff-aware, nur geänderte Files)
+semgrep ci --text --output=semgrep-ci.txt
 ```
-- Sammle ALLE findings
+- **Speed:** Fast (seconds-minutes) vs CodeRabbit (7-30+ min)
+- **⚠️ IMPORTANT:** Authentifiziere mit `semgrep login` für FastAPI/React Pro Rules
+- **Framework Support:** FastAPI, React, Express explizit unterstützt (GA)
+- Sammle ALLE findings (Security, Bugs, Patterns)
 
 **11. Issues konsolidieren**
 - Erstelle Master-Liste aller Issues aus:
@@ -249,8 +346,8 @@ Struktur:
 | **Superpowers Skills** | Workflow-Steuerung, TDD, Reviews | Immer |
 | **task-validator** | Plan-Compliance Validierung | Nach Implementation |
 | **REF MCP** ⚠️ NUR via Subagent! | Aktuelle Best Practices recherchieren | **VOR Implementation** (Token-Management!) |
-| **CodeRabbit CLI** | Automatisches Code Review | Nach Implementation |
-| **Semgrep** | Security & Code Quality Scan | Nach Implementation |
+| **CodeRabbit CLI** | AI-powered Code Review: Race Conditions, Memory Leaks, Security Vulnerabilities, Logic Errors | Nach Implementation (Phase 4) - Verwende `--prompt-only` |
+| **Semgrep** | Security & Code Quality Scan (Pattern Matching) | Nach Implementation (Phase 4) - Verwende `semgrep login` + `.claude/SEMGREP_QUICKREF.md` |
 | **Chrome DevTools MCP** | Frontend Testing (screenshots, navigation) | Bei Frontend-Tasks |
 | **pytest** | Backend Unit/Integration Tests | Bei Backend-Tasks |
 | **git** | Version Control, SHA tracking | Immer |
@@ -377,6 +474,216 @@ Ein Task ist NUR dann complete wenn:
 
 ---
 
-**Version:** 1.0
-**Letzte Aktualisierung:** 2025-10-27
+## 🔧 CodeRabbit CLI Setup & Verwendung
+
+### Erstmalige Installation
+```bash
+# Installation
+curl -fsSL https://cli.coderabbit.ai/install.sh | sh
+
+# Shell neustarten oder:
+source ~/.bashrc
+
+# Authentifizierung
+coderabbit auth login
+# Folge dem Browser-Flow, Token wird automatisch gespeichert
+
+# Status prüfen
+coderabbit auth status
+```
+
+### Verwendung im Workflow
+
+**Nach Task-Implementation (Phase 4):**
+```bash
+# Best Practice: AI Agent Mode
+coderabbit --prompt-only --type committed
+
+# Für uncommitted changes (vor Commit)
+coderabbit --prompt-only --type uncommitted
+
+# Mit spezifischem Base Branch
+coderabbit --prompt-only --base main
+```
+
+**Im Hintergrund laufen lassen:**
+- CodeRabbit dauert 7-30+ Minuten
+- Lasse es im Hintergrund laufen
+- Arbeite an anderen Tasks weiter (z.B. Semgrep)
+- Komme zurück für Ergebnisse
+
+**Severity Levels:**
+- **Critical**: System Failures, Security Breaches, Data Loss
+- **Major**: Funktionalitäts-/Performance-Impact
+- **Minor**: Non-Critical Issues
+- **Trivial**: Code Quality Improvements
+- **Info**: Kontextuelle Kommentare
+
+**Option C Approach:**
+- Fixe ALLE Issues (nicht nur Critical/Major)
+- Auch Minor & Trivial Issues werden adressiert
+- Re-validate nach allen Fixes
+
+### Troubleshooting
+```bash
+# Auth-Status prüfen
+coderabbit auth status
+
+# CLI updaten
+coderabbit update
+
+# Help anzeigen
+coderabbit --help
+```
+
+---
+
+## 🔍 Semgrep CLI Setup & Verwendung
+
+### Erstmalige Installation
+```bash
+# macOS (empfohlen)
+brew install semgrep
+
+# Alternativ: pip (alle Plattformen)
+python3 -m pip install semgrep
+
+# Verify Installation
+semgrep --version
+
+# Authentifizierung (für FastAPI/React Pro Rules)
+semgrep login
+# Folge dem Browser-Flow für GitHub/GitLab Auth
+```
+
+**Prerequisites:**
+- Python 3.9+
+- GitHub oder GitLab Account (für Pro Rules)
+
+### Verwendung im Workflow
+
+**Nach Task-Implementation (Phase 4):**
+```bash
+# 1. CodeRabbit starten (Hintergrund)
+coderabbit --prompt-only --type committed &
+
+# 2. Semgrep parallel (Vordergrund, schnell)
+semgrep scan \
+  --config=p/python \
+  --config=p/security-audit \
+  --config=p/owasp-top-ten \
+  backend/
+
+# 3. Frontend Scan
+semgrep scan \
+  --config=p/javascript \
+  --config=p/typescript \
+  --config=p/react \
+  frontend/
+```
+
+**Best Practices:**
+- **Authentifiziere IMMER** mit `semgrep login` für Framework-spezifische Rules
+- **Community Edition (CE):** Funktioniert ohne Auth, aber **FastAPI/React Rules fehlen!**
+- **Pro Rules:** Erfordern Auth, bieten Cross-File + Framework-spezifische Analysis
+
+### Language Support (für dieses Projekt)
+
+| Language | Status | Parse Rate | True Positive | Features |
+|----------|--------|------------|---------------|----------|
+| Python (FastAPI) | GA | 99%+ | 84% | Cross-file, Cross-function, FastAPI-specific |
+| JavaScript/TypeScript (React) | GA | 99%+ | 63% | Cross-file, Cross-function, React-specific |
+
+**⚠️ CRITICAL:** "Many framework specific Pro rules will **fail** if run on Semgrep CE"
+
+### Output Formats
+```bash
+# Text (human-readable)
+semgrep scan --config=auto --text --output=results.txt
+
+# JSON (for parsing)
+semgrep scan --config=auto --json --output=results.json
+
+# SARIF (for IDE integration)
+semgrep scan --config=auto --sarif --output=results.sarif
+
+# Multiple formats
+semgrep ci --text --output=text.txt --json-output=json.json
+```
+
+### Performance
+- **Speed:** Seconds to minutes (vs CodeRabbit: 7-30+ min)
+- **Parallel Processing:** `semgrep scan --config=auto -j 4`
+- **Timeout Control:** `semgrep ci --timeout 45 --timeout-threshold 2`
+
+### Common Rulesets
+```bash
+# Python Security
+--config=p/python
+--config=p/security-audit
+--config=p/owasp-top-ten
+
+# JavaScript/TypeScript Security
+--config=p/javascript
+--config=p/typescript
+--config=p/react
+
+# Auto-detect (all languages)
+--config=auto
+```
+
+### Troubleshooting
+```bash
+# Update Semgrep
+brew upgrade semgrep  # macOS
+python3 -m pip install --upgrade semgrep  # pip
+
+# Check version
+semgrep --version
+
+# Verbose output for debugging
+semgrep scan --config=auto -v
+
+# Profile slow scans
+semgrep scan --config=auto --time
+```
+
+**Memory Issues (Exit -11/-9):**
+- Reduce parallel jobs: `semgrep scan -j 1`
+- Skip large files: `--exclude='**/large-file.py'`
+
+### Integration mit anderen Tools
+
+| Vergleich | Semgrep | CodeRabbit |
+|-----------|---------|------------|
+| **Speed** | ⚡ Fast (sec-min) | 🐢 Slow (7-30+ min) |
+| **Method** | Pattern Matching | AI Analysis |
+| **Focus** | Security, Bugs | Comprehensive Review |
+| **Best For** | Quick security scans | In-depth reviews |
+
+**Empfehlung:** Beide Tools parallel nutzen:
+1. Starte CodeRabbit im Hintergrund
+2. Führe Semgrep im Vordergrund aus
+3. Sammle Results aus beiden Tools
+
+### Weitere Informationen
+- **Quick Reference:** `.claude/SEMGREP_QUICKREF.md`
+- **Official Docs:** https://semgrep.dev/docs
+- **Rule Explorer:** https://semgrep.dev/explore
+
+---
+
+**Version:** 1.3
+**Letzte Aktualisierung:** 2025-10-28
 **Gilt für:** Alle Tasks im Smart YouTube Bookmarks Projekt
+
+**Changes in v1.3:**
+- Added "Thread Start Protocol" section (MANDATORY für neue Threads)
+- Created automated thread-start-checks.sh script
+- Added tool authentication verification workflow
+- Ensures semgrep/CodeRabbit status is checked at thread start
+
+**Changes in v1.2:**
+- Added comprehensive Semgrep CLI section
+- Updated Phase 4 with detailed semgrep commands
+- Added reference to `.claude/SEMGREP_QUICKREF.md`

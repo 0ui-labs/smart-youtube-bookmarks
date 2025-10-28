@@ -92,9 +92,54 @@ docker-compose ps  # Check health
 
 ### Review Tools (Use ALL after implementation)
 1. **code-reviewer subagent** - Code quality review
-2. **CodeRabbit CLI** - Automated review
+2. **CodeRabbit CLI** - AI-powered automated review (Race Conditions, Memory Leaks, Security)
 3. **Semgrep** - Security & code quality scan
 4. **REF MCP** (via subagent) - Best practices (BEFORE implementation!)
+
+### CodeRabbit CLI Quick Reference
+```bash
+# After Task Implementation (Phase 4)
+coderabbit --prompt-only --type committed    # Best for AI Agents
+coderabbit --plain --type committed          # Human-readable
+
+# Before Commit (uncommitted changes)
+coderabbit --prompt-only --type uncommitted
+
+# With specific base branch
+coderabbit --prompt-only --base main
+
+# Check authentication
+coderabbit auth status
+```
+
+**IMPORTANT:**
+- Runs in background (7-30+ minutes)
+- Use `--prompt-only` for token efficiency
+- Fix ALL issues (Option C: Critical + Major + Minor + Trivial)
+
+### Semgrep CLI Quick Reference
+```bash
+# Installation & Setup
+brew install semgrep           # macOS
+python3 -m pip install semgrep # Alternative
+semgrep login                  # Authenticate for Pro Rules (FastAPI/React)
+
+# After Task Implementation (Phase 4)
+# Backend (Python/FastAPI)
+semgrep scan --config=p/python --config=p/security-audit backend/
+
+# Frontend (TypeScript/React)
+semgrep scan --config=p/javascript --config=p/typescript frontend/
+
+# Quick full scan
+semgrep scan --config=auto --text --output=results.txt
+```
+
+**IMPORTANT:**
+- Fast (seconds to minutes) - run in foreground
+- **Authenticate** with `semgrep login` for FastAPI/React Pro Rules
+- CE (Community Edition) works without auth but **lacks framework-specific rules**
+- See `.claude/SEMGREP_QUICKREF.md` for detailed commands
 
 ---
 
@@ -157,6 +202,8 @@ docker-compose ps  # Check health
 | File | Purpose |
 |------|---------|
 | `.claude/DEVELOPMENT_WORKFLOW.md` | **Main workflow documentation** |
+| `.claude/thread-start-checks.sh` | **Automated thread start checks (run at every new thread!)** |
+| `.claude/SEMGREP_QUICKREF.md` | **Semgrep CLI quick reference** |
 | `docs/plans/2025-10-27-youtube-bookmarks-design.md` | Original design document |
 | `docs/plans/2025-10-27-initial-implementation.md` | Detailed implementation plan |
 | `backend/app/main.py` | FastAPI application entry |
@@ -212,14 +259,40 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 When starting new thread:
 - [ ] Read `.claude/DEVELOPMENT_WORKFLOW.md`
-- [ ] Check `git status` and `git log`
 - [ ] Read this CLAUDE.md
-- [ ] Check current task status
 - [ ] Load `superpowers:using-superpowers`
+- [ ] **Run automated thread start checks:**
+  ```bash
+  ./.claude/thread-start-checks.sh
+  ```
+  This checks:
+  - Git status & recent commits
+  - Semgrep authentication (Pro Rules for FastAPI/React)
+  - CodeRabbit authentication
+  - Python/Node versions
+  - Docker services status
+  - Summary with action items
+- [ ] Check current task status from plan
 - [ ] Continue with workflow Phase 1
 
 ---
 
-**Last Updated:** 2025-10-27
-**Version:** 1.0
+**Last Updated:** 2025-10-28
+**Version:** 1.3
 **Branch:** feature/initial-implementation (worktree)
+
+**Changes in v1.3:**
+- Added automated thread start checks script (`.claude/thread-start-checks.sh`)
+- Updated Thread Handoff Checklist to use automated checks
+- Added tool authentication verification for new threads
+- Ensures semgrep Pro Rules availability is checked automatically
+
+**Changes in v1.2:**
+- Added comprehensive Semgrep CLI documentation
+- Created `.claude/SEMGREP_QUICKREF.md` quick reference guide
+- Updated workflow with Semgrep commands for FastAPI/React
+- Added language-specific security scanning instructions
+
+**Changes in v1.1:**
+- Added CodeRabbit CLI setup and usage instructions
+- Updated workflow documentation with CodeRabbit integration

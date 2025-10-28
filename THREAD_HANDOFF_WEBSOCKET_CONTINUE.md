@@ -13,19 +13,26 @@
 # 1. Navigate to repo
 cd "/Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks"
 
-# 2. Verify branch
-git branch  # Should show: * feature/websocket-progress-updates
-git status  # Should be clean
+# 2. Run automated thread start checks (MANDATORY!)
+./.claude/thread-start-checks.sh
 
-# 3. Check services
-docker-compose ps  # postgres & redis should be healthy
+# This single command verifies:
+# - Git status & branch
+# - Semgrep authentication (Pro Rules for FastAPI/React)
+# - CodeRabbit authentication
+# - Docker services (postgres, redis)
+# - Python/Node versions
+# - Summary with action items
 
-# 4. Read workflow
-Read(".claude/DEVELOPMENT_WORKFLOW.md")
+# Expected output:
+# ✅ Semgrep authenticated (Pro Rules available) - Version: 1.139.0
+# ✅ CodeRabbit authenticated
+# ✅ Docker services running
 ```
 
 **In Claude:**
 ```
+Read(".claude/DEVELOPMENT_WORKFLOW.md")  # v1.3 with Thread Start Protocol
 Read("THREAD_HANDOFF_WEBSOCKET_CONTINUE.md")
 Read("docs/plans/2025-10-28-websocket-progress-implementation.md")
 Skill(superpowers:using-superpowers)
@@ -319,56 +326,115 @@ Phase 6: User-Bericht + ⏸️ MANDATORY PAUSE
 
 ---
 
-## 🔧 Tool-Probleme (OFFEN)
+## 🔧 Tool Setup (✅ RESOLVED)
 
-### CodeRabbit CLI - Funktioniert lokal, aber nicht im Dashboard
+### ✅ CodeRabbit CLI - AUTHENTICATED
 
-**Was passiert ist:**
+**Status:** Fully configured and authenticated
+
+**Command für Phase 4 Reviews:**
 ```bash
-coderabbit review --plain --base-commit <SHA> --type committed
+# AI Agent Mode (recommended for Claude Code)
+coderabbit --prompt-only --type committed
+
+# Alternative: Human-readable output
+coderabbit --plain --type committed
+
+# With specific base branch
+coderabbit --prompt-only --base main --type committed
 ```
 
-**Output:** Lokale Review-Kommentare (3 Issues gefunden für Task 3)
+**Important:**
+- Runs in background (7-30+ minutes)
+- Use `--prompt-only` for token efficiency
+- Reviews ALL commits since base
+- Fix ALL issues found (Option C approach)
 
-**Problem:** User sieht NICHTS im CodeRabbit Dashboard
-
-**Mögliche Ursachen:**
-1. CLI reviewed nur lokal (nicht ans Dashboard gesendet)?
-2. Fehlende Authentication/API Key?
-3. Falscher Command-Flag?
-4. Repository muss erst in CodeRabbit Dashboard connected werden?
-
-**TODO für nächsten Thread:**
-- User fragen: Wie verwendest du CodeRabbit normalerweise?
-- Setup dokumentieren
-- Alternativ: GitHub PR erstellen → CodeRabbit reviewed automatisch?
+**Documentation:** `.claude/DEVELOPMENT_WORKFLOW.md` (Section: CodeRabbit CLI Setup)
 
 ---
 
-### Semgrep CLI - Output unklar
+### ✅ Semgrep CLI - AUTHENTICATED with Pro Rules
 
-**Was ausgeführt wurde:**
+**Status:** Authenticated, Pro Rules available (FastAPI/React specific)
+
+**Version:** 1.139.0
+
+**Pro Rules Active:**
+- 637 FastAPI-specific rules ✅
+- React security patterns ✅
+- Django, Flask, Express ✅
+- Cross-file analysis ✅
+
+**Commands für Phase 4 Reviews:**
+
 ```bash
-semgrep --config=auto backend/app/... --json
+# Backend Security Audit (recommended)
+semgrep scan \
+  --config=p/python \
+  --config=p/security-audit \
+  --config=p/owasp-top-ten \
+  backend/
+
+# Frontend Security Audit (recommended)
+semgrep scan \
+  --config=p/javascript \
+  --config=p/typescript \
+  --config=p/react \
+  frontend/
+
+# Quick scan (auto-detect)
+semgrep scan --config=auto --text --output=semgrep-results.txt
+
+# CI mode (diff-aware, only changed files)
+semgrep ci --text --output=semgrep-ci.txt
 ```
 
-**Output:** 0 findings (927 rules)
+**Important:**
+- Fast (seconds to minutes)
+- Must be authenticated for Pro Rules: `semgrep login`
+- Community Edition lacks FastAPI/React-specific rules
+- Parse rate: 99%+ for Python/TypeScript
 
-**Unsicherheit:**
-- War der Aufruf korrekt?
-- Gibt es spezielle Rulesets die verwendet werden sollten?
-- Ist `--config=auto` der richtige Ansatz?
+**Documentation:**
+- Quick Reference: `.claude/SEMGREP_QUICKREF.md`
+- Workflow Integration: `.claude/DEVELOPMENT_WORKFLOW.md` (Phase 4)
 
-**TODO für nächsten Thread:**
-- User fragen nach bevorzugter Semgrep-Konfiguration
-- Setup dokumentieren
+---
+
+### ✅ Automated Thread Start Checks
+
+**New Tool:** `.claude/thread-start-checks.sh`
+
+**Purpose:** Verify ALL tool authentication at thread start
+
+**Usage:**
+```bash
+./.claude/thread-start-checks.sh
+```
+
+**Checks:**
+- ✅ Git status & recent commits
+- ✅ Semgrep authentication & Pro Rules availability
+- ✅ CodeRabbit authentication
+- ✅ Python/Node versions
+- ✅ Docker services (postgres, redis)
+- ✅ Summary with action items
+
+**Duration:** ~5 seconds
+
+**Documentation:** `.claude/README.md`
 
 ---
 
 ## 📚 Wichtige Dateien & Ressourcen
 
 ### Workflow & Plans
-- `.claude/DEVELOPMENT_WORKFLOW.md` - **MASTER WORKFLOW** (6 Phasen)
+- `.claude/DEVELOPMENT_WORKFLOW.md` - **MASTER WORKFLOW (v1.3)** - 6 Phasen + Thread Start Protocol
+- `.claude/thread-start-checks.sh` - **Automated thread start checks (NEW!)**
+- `.claude/README.md` - **Complete .claude directory documentation (NEW!)**
+- `.claude/SEMGREP_QUICKREF.md` - **Semgrep CLI quick reference (NEW!)**
+- `.claude/CODERABBIT_EXAMPLES.md` - CodeRabbit CLI examples
 - `docs/plans/2025-10-28-websocket-progress-implementation.md` - Detaillierter Plan für Tasks 1-10
 - `docs/workflow-improvements.md` - Workflow-Hierarchie Problem & Lösungen
 
@@ -418,8 +484,8 @@ pytest backend/tests/api/test_processing.py -v
 ```
 
 ### Phase 4: Reviews (ALLE 3 Tools!)
-```
-# Code-Reviewer Subagent
+```bash
+# 1. Code-Reviewer Subagent (Code Quality)
 Task(superpowers:code-reviewer):
   WHAT_WAS_IMPLEMENTED: Task 4 Progress History API
   PLAN_OR_REQUIREMENTS: Lines 404-455 in plan
@@ -427,11 +493,22 @@ Task(superpowers:code-reviewer):
   HEAD_SHA: <new commit>
   DESCRIPTION: REST API for historical progress events
 
-# CodeRabbit CLI
-coderabbit review --plain --base-commit d0b1acb --type committed
+# 2. CodeRabbit CLI (AI-powered Review - run in background)
+coderabbit --prompt-only --type committed &
+# Note: Takes 7-30+ minutes, use --prompt-only for token efficiency
 
-# Semgrep
-semgrep --config=auto backend/app/api/processing.py --json
+# 3. Semgrep (Security & Pattern Scan - run in foreground)
+# Backend Security Audit
+semgrep scan \
+  --config=p/python \
+  --config=p/security-audit \
+  --config=p/owasp-top-ten \
+  backend/app/api/processing.py
+
+# Or quick scan
+semgrep scan --config=auto backend/app/api/processing.py --text
+
+# Note: Fast (seconds), must be authenticated for Pro Rules
 ```
 
 ### Phase 5: Fix ALL Issues (Option C)
@@ -552,10 +629,19 @@ docker-compose restart redis  # Restart service
 
 ```
 □ cd in richtiges Verzeichnis
-□ git branch prüfen (feature/websocket-progress-updates)
-□ git status (sollte clean sein)
-□ Docker services prüfen (docker-compose ps)
-□ Read DEVELOPMENT_WORKFLOW.md
+  cd "/Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks"
+
+□ Run automated thread start checks (MANDATORY!)
+  ./.claude/thread-start-checks.sh
+  # Verifies: Git, Semgrep Auth, CodeRabbit Auth, Docker, Python/Node
+  # Expected: All ✅ (Semgrep v1.139.0, CodeRabbit authenticated, Docker running)
+
+□ Fix any issues if found
+  semgrep login              # If semgrep not authenticated
+  coderabbit auth login      # If CodeRabbit not authenticated
+  docker-compose up -d       # If services not running
+
+□ Read DEVELOPMENT_WORKFLOW.md (v1.3 with Thread Start Protocol)
 □ Read dieses Handoff-Dokument
 □ Read Implementation Plan
 □ Skill(superpowers:using-superpowers) laden
@@ -567,9 +653,25 @@ docker-compose restart redis  # Restart service
 
 **Viel Erfolg mit Tasks 4-10! 🚀**
 
+---
+
+## 📝 Document Info
+
 **Branch:** feature/websocket-progress-updates
 **Last Commit:** d0b1acb
 **GitHub:** https://github.com/0ui-labs/smart-youtube-bookmarks
 **Next Task:** Task 4 - Progress History API
+
 **Created:** 2025-10-28
+**Last Updated:** 2025-10-28 (v2.0)
 **Thread Context:** 130k/200k tokens (65% - Zeit für neuen Thread)
+
+**Changes in v2.0:**
+- ✅ Added automated thread-start-checks.sh to QUICK START
+- ✅ Updated Tool Setup section (both tools now authenticated)
+- ✅ Added Semgrep Pro Rules documentation (v1.139.0)
+- ✅ Added CodeRabbit authentication confirmation
+- ✅ Updated Phase 4 commands with correct semgrep usage
+- ✅ Added references to new .claude documentation files
+- ✅ Updated checklist with mandatory thread start checks
+- ✅ Documented DEVELOPMENT_WORKFLOW.md v1.3 updates
