@@ -12,6 +12,18 @@ const VideoResponseSchema = z.object({
   updated_at: z.string(),
 })
 
+export interface BulkUploadFailure {
+  row: number
+  url: string
+  error: string
+}
+
+export interface BulkUploadResponse {
+  created_count: number
+  failed_count: number
+  failures: BulkUploadFailure[]
+}
+
 export const useVideos = (listId: string) => {
   return useQuery({
     queryKey: ['videos', listId],
@@ -67,6 +79,32 @@ export const useDeleteVideo = (listId: string) => {
     },
     // Refetch to ensure consistency
     onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['videos', listId] })
+    },
+  })
+}
+
+export const useBulkUploadVideos = (listId: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const { data } = await api.post<BulkUploadResponse>(
+        `/lists/${listId}/videos/bulk`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+      return data
+    },
+    onSuccess: () => {
+      // Invalidate videos query to refetch
       queryClient.invalidateQueries({ queryKey: ['videos', listId] })
     },
   })
