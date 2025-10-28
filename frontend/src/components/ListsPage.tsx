@@ -10,7 +10,11 @@ import type { ListResponse } from '@/types/list'
 
 const columnHelper = createColumnHelper<ListResponse>()
 
-export const ListsPage = () => {
+interface ListsPageProps {
+  onSelectList?: (listId: string) => void
+}
+
+export const ListsPage = ({ onSelectList }: ListsPageProps) => {
   const [isCreating, setIsCreating] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [newListDescription, setNewListDescription] = useState('')
@@ -52,20 +56,28 @@ export const ListsPage = () => {
       columnHelper.accessor('id', {
         header: 'Aktionen',
         cell: (info) => (
-          <button
-            onClick={() => {
-              if (window.confirm('Liste wirklich löschen?')) {
-                deleteList.mutate(info.getValue())
-              }
-            }}
-            className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-          >
-            Löschen
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onSelectList?.(info.getValue())}
+              className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+            >
+              Videos
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Liste wirklich löschen?')) {
+                  deleteList.mutate(info.getValue())
+                }
+              }}
+              className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+            >
+              Löschen
+            </button>
+          </div>
         ),
       }),
     ],
-    [deleteList]
+    [deleteList, onSelectList]
   )
 
   const table = useReactTable({
