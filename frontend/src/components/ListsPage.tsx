@@ -78,14 +78,19 @@ export const ListsPage = () => {
     e.preventDefault()
     if (!newListName.trim()) return
 
-    await createList.mutateAsync({
-      name: newListName,
-      description: newListDescription || undefined,
-    })
+    try {
+      await createList.mutateAsync({
+        name: newListName,
+        description: newListDescription || undefined,
+      })
 
-    setNewListName('')
-    setNewListDescription('')
-    setIsCreating(false)
+      setNewListName('')
+      setNewListDescription('')
+      setIsCreating(false)
+    } catch (error) {
+      // Error is already handled by React Query error state
+      // Form stays open and user input is preserved
+    }
   }
 
   if (isLoading) {
