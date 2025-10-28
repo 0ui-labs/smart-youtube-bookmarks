@@ -5,6 +5,31 @@
 
 ---
 
+## 🚨 CRITICAL: Workflow-Hierarchie
+
+**⚠️ DIESES DOKUMENT = MASTER-WORKFLOW (6 Phasen)**
+
+**Skills wie `subagent-driven-development` sind TOOLS INNERHALB dieses Workflows:**
+
+```
+Phase 1: REF MCP Research (VOR Implementation!)
+Phase 2: Implementation ← HIER: subagent-driven-development Skill
+Phase 3: Verification (Evidence before claims)
+Phase 4: Reviews ← Code-Reviewer + CodeRabbit CLI + Semgrep (ALLE 3!)
+Phase 5: Fix ALL Issues (Option C)
+Phase 6: User-Bericht + ⏸️ MANDATORY PAUSE
+```
+
+**Wenn ein Skill nur Phase 2 beschreibt = Du musst Phase 1, 3-6 TROTZDEM machen!**
+
+Der `subagent-driven-development` Skill macht NUR Phase 2 (Implementation).
+DU musst IMMER NOCH:
+- Phase 1: REF MCP Research via Subagent (VORHER!)
+- Phase 4: CodeRabbit CLI + Semgrep zusätzlich zu Code-Reviewer (NACHHER!)
+- Phase 6: User-Bericht erstellen + ⏸️ PAUSE (MANDATORY!)
+
+---
+
 ## 🎯 Mandatory Skills (IMMER zuerst checken)
 
 1. **superpowers:using-superpowers** - Mandatory first response protocol
