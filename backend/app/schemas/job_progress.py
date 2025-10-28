@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Any, Optional
 
 class ProgressData(BaseModel):
     """Schema for progress_data JSONB field"""
@@ -24,7 +24,7 @@ class JobProgressEventRead(BaseModel):
     id: UUID
     job_id: UUID
     created_at: datetime
-    progress_data: dict  # JSONB returns as dict
+    progress_data: dict[str, Any]  # JSONB returns as dict
 
     class Config:
         from_attributes = True

@@ -80,3 +80,51 @@ async def test_query_events_chronologically(test_db, test_list):
     assert events[0].progress_data["progress"] == 0
     assert events[1].progress_data["progress"] == 30
     assert events[2].progress_data["progress"] == 60
+
+@pytest.mark.asyncio
+async def test_cascade_delete_job_progress_events(test_db, test_list):
+    """Test that deleting a ProcessingJob cascades to delete all progress events"""
+    # Create a processing job
+    job = ProcessingJob(
+        list_id=test_list.id,
+        total_videos=5,
+        processed_count=0,
+        failed_count=0,
+        status="running"
+    )
+    test_db.add(job)
+    await test_db.commit()
+    await test_db.refresh(job)
+
+    # Create multiple progress events for this job
+    event_ids = []
+    for i in range(3):
+        event = JobProgressEvent(
+            job_id=job.id,
+            progress_data={
+                "progress": i * 33,
+                "current_video": i + 1,
+                "message": f"Processing video {i + 1}"
+            }
+        )
+        test_db.add(event)
+        event_ids.append(event.id)
+
+    await test_db.commit()
+
+    # Verify events exist
+    from sqlalchemy import select
+    stmt = select(JobProgressEvent).where(JobProgressEvent.job_id == job.id)
+    result = await test_db.execute(stmt)
+    events_before = result.scalars().all()
+    assert len(events_before) == 3
+
+    # Delete the job
+    await test_db.delete(job)
+    await test_db.commit()
+
+    # Verify all progress events are cascade deleted
+    stmt = select(JobProgressEvent).where(JobProgressEvent.job_id == job.id)
+    result = await test_db.execute(stmt)
+    events_after = result.scalars().all()
+    assert len(events_after) == 0
