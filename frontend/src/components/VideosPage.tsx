@@ -11,7 +11,7 @@ import type { VideoResponse } from '@/types/video'
 const columnHelper = createColumnHelper<VideoResponse>()
 
 // YouTube URL validation regex
-const YOUTUBE_URL_PATTERN = /^https:\/\/(www\.|m\.)?youtube\.com\/watch\?v=[\w-]{11}|^https:\/\/youtu\.be\/[\w-]{11}|^https:\/\/(www\.)?youtube\.com\/embed\/[\w-]{11}/
+const YOUTUBE_URL_PATTERN = /^(https:\/\/(www\.|m\.)?youtube\.com\/watch\?v=[\w-]{11}|https:\/\/youtu\.be\/[\w-]{11}|https:\/\/(www\.)?youtube\.com\/embed\/[\w-]{11})$/
 
 const getStatusColor = (status: VideoResponse['processing_status']) => {
   switch (status) {
@@ -91,8 +91,15 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
       }),
       columnHelper.accessor('processing_status', {
         header: 'Dauer',
-        cell: () => {
-          return <span className="text-sm text-gray-400 italic">Wird verarbeitet...</span>
+        cell: (info) => {
+          const status = info.getValue()
+          if (status === 'completed') {
+            return <span className="text-sm text-gray-400">Nicht verfügbar</span>
+          }
+          if (status === 'processing') {
+            return <span className="text-sm text-blue-600">Wird verarbeitet...</span>
+          }
+          return <span className="text-sm text-gray-400">—</span>
         },
       }),
       columnHelper.accessor('processing_status', {
