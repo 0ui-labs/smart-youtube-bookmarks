@@ -28,6 +28,7 @@ class ProcessingJob(BaseModel):
 
     # Relationships
     list: Mapped["BookmarkList"] = relationship("BookmarkList", back_populates="jobs")
+    progress_events = relationship("JobProgressEvent", back_populates="job", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_jobs_list_id", "list_id"),
