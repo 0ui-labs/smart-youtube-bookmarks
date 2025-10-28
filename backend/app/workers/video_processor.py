@@ -106,7 +106,7 @@ async def publish_progress(ctx: dict, progress_data: dict) -> None:
         redis = ctx["redis"]
         channel = f"progress:user:{user_id}"
         await redis.publish(channel, json.dumps(progress_data))
-        logger.debug(f"Published progress to {channel}: {progress_data.get('progress')}%")
+        logger.info(f"Published progress to {channel}: {progress_data.get('progress')}%")
     except Exception as e:
         logger.warning(f"Redis publish failed (non-fatal): {e}", exc_info=True)
         # Don't raise - best-effort
@@ -114,18 +114,17 @@ async def publish_progress(ctx: dict, progress_data: dict) -> None:
     # 2. PostgreSQL (best-effort)
     try:
         async with AsyncSessionLocal() as session:
-            event = JobProgressEvent(
-                job_id=job_id,
-                progress_data=progress_data
-            )
-            session.add(event)
-
             try:
+                event = JobProgressEvent(
+                    job_id=job_id,
+                    progress_data=progress_data
+                )
+                session.add(event)
                 await session.commit()
-                logger.debug(f"Persisted progress to DB: {progress_data.get('progress')}%")
-            except Exception as commit_error:
+                logger.info(f"Persisted progress to DB: {progress_data.get('progress')}%")
+            except Exception:
                 await session.rollback()
-                raise commit_error
+                raise
     except Exception as e:
         logger.warning(f"DB persist failed (non-fatal): {e}", exc_info=True)
         # Don't raise - best-effort

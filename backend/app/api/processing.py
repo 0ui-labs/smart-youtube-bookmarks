@@ -154,9 +154,9 @@ async def get_progress_history(
             JobProgressEvent.job_id == job_id
         )
 
-        # Apply since filter if provided
+        # Apply since filter if provided (inclusive to avoid missing events on reconnect)
         if since:
-            query = query.where(JobProgressEvent.created_at > since)
+            query = query.where(JobProgressEvent.created_at >= since)
 
         # Order chronologically and apply pagination
         query = query.order_by(JobProgressEvent.created_at).offset(offset).limit(limit)

@@ -258,8 +258,8 @@ async def test_get_progress_history_with_since_filter(client, test_db, test_user
         event.created_at = now - timedelta(minutes=5-i)
     await test_db.commit()
 
-    # Query with since parameter (get events after 3 minutes ago)
-    # This should return events with i=3 (now - 2min) and i=4 (now - 1min)
+    # Query with since parameter (get events from 3 minutes ago onwards - inclusive)
+    # This should return events with i=2 (now - 3min), i=3 (now - 2min), i=4 (now - 1min)
     since_time = now - timedelta(minutes=3)
     response = await client.get(
         f"/api/jobs/{job.id}/progress-history",
@@ -271,10 +271,12 @@ async def test_get_progress_history_with_since_filter(client, test_db, test_user
 
     assert response.status_code == 200
     data = response.json()
-    # Should return events created after 3 minutes ago (i=3 and i=4)
-    assert len(data) == 2
-    assert data[0]["progress_data"]["progress"] == 60
-    assert data[1]["progress_data"]["progress"] == 80
+    # Should return events created at or after 3 minutes ago (i=2, i=3, i=4)
+    # Using >= (inclusive) ensures clients don't miss events on reconnect
+    assert len(data) == 3
+    assert data[0]["progress_data"]["progress"] == 40  # i=2
+    assert data[1]["progress_data"]["progress"] == 60  # i=3
+    assert data[2]["progress_data"]["progress"] == 80  # i=4
 
 
 @pytest.mark.asyncio
