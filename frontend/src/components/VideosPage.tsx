@@ -11,7 +11,7 @@ import type { VideoResponse } from '@/types/video'
 const columnHelper = createColumnHelper<VideoResponse>()
 
 // YouTube URL validation regex
-const YOUTUBE_URL_PATTERN = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|m\.youtube\.com\/watch\?v=)[\w-]{11}/
+const YOUTUBE_URL_PATTERN = /^https:\/\/(www\.|m\.)?youtube\.com\/watch\?v=[\w-]{11}|^https:\/\/youtu\.be\/[\w-]{11}|^https:\/\/(www\.)?youtube\.com\/embed\/[\w-]{11}/
 
 const getStatusColor = (status: VideoResponse['processing_status']) => {
   switch (status) {
@@ -59,65 +59,40 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
 
   const columns = useMemo(
     () => [
-      columnHelper.accessor('thumbnail_url', {
+      columnHelper.accessor('youtube_id', {
         header: 'Vorschau',
-        cell: (info) => {
-          const url = info.getValue()
-          const title = info.row.original.title || 'Video'
-          return url ? (
-            <img
-              src={url}
-              alt={title}
-              className="w-32 h-18 object-cover rounded"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-32 h-18 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-500">
-              Kein Bild
+        cell: () => {
+          return (
+            <div className="w-32 h-18 bg-red-50 rounded flex items-center justify-center">
+              <svg className="w-12 h-12 text-red-600" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
             </div>
           )
         },
       }),
-      columnHelper.accessor('title', {
+      columnHelper.accessor('youtube_id', {
         header: 'Titel',
         cell: (info) => {
-          const title = info.getValue()
-          const youtubeId = info.row.original.youtube_id
+          const youtubeId = info.getValue()
           const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeId}`
 
           return (
-            <div className="flex flex-col gap-1">
-              <a
-                href={youtubeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-              >
-                {title || <span className="italic text-gray-400">Titel wird geladen...</span>}
-              </a>
-              {info.row.original.channel_name && (
-                <span className="text-sm text-gray-500">
-                  {info.row.original.channel_name}
-                </span>
-              )}
-            </div>
+            <a
+              href={youtubeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              Video {youtubeId}
+            </a>
           )
         },
       }),
-      columnHelper.accessor('duration_seconds', {
+      columnHelper.accessor('processing_status', {
         header: 'Dauer',
-        cell: (info) => {
-          const seconds = info.getValue()
-          if (!seconds) {
-            return <span className="text-sm text-gray-400">-</span>
-          }
-          const minutes = Math.floor(seconds / 60)
-          const remainingSeconds = seconds % 60
-          return (
-            <span className="text-sm text-gray-600">
-              {minutes}:{remainingSeconds.toString().padStart(2, '0')}
-            </span>
-          )
+        cell: () => {
+          return <span className="text-sm text-gray-400 italic">Wird verarbeitet...</span>
         },
       }),
       columnHelper.accessor('processing_status', {

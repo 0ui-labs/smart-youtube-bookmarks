@@ -1,15 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { z } from 'zod'
 import { api } from '@/lib/api'
 import type { VideoResponse, VideoCreate } from '@/types/video'
+
+const VideoResponseSchema = z.object({
+  id: z.string().uuid(),
+  list_id: z.string().uuid(),
+  youtube_id: z.string().length(11),
+  processing_status: z.enum(['pending', 'processing', 'completed', 'failed']),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
 
 export const useVideos = (listId: string) => {
   return useQuery({
     queryKey: ['videos', listId],
     queryFn: async () => {
       const { data } = await api.get<VideoResponse[]>(`/lists/${listId}/videos`)
-      return data
+      return VideoResponseSchema.array().parse(data)
     },
-    enabled: !!listId, // Only fetch if listId exists
   })
 }
 
@@ -50,7 +59,8 @@ export const useDeleteVideo = (listId: string) => {
       return { previous }
     },
     // Rollback on error
-    onError: (_err, _videoId, context) => {
+    onError: (err, _videoId, context) => {
+      console.error('Failed to delete video:', err)
       if (context?.previous) {
         queryClient.setQueryData(['videos', listId], context.previous)
       }
