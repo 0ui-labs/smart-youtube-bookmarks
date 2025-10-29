@@ -153,7 +153,7 @@ class GeminiClient:
                 )
                 await asyncio.sleep(delay)
 
-        raise Exception(f"Extraction failed after {self.max_retries} attempts")
+        # Unreachable: loop exits via return (success) or raise (final failure)
 
     async def count_tokens(self, text: str) -> int:
         """
