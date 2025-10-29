@@ -1,0 +1,1 @@
+Bitte schreibe das Handoff an den nächsten Thread, verwende dazu als Basis unser Template'/Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks/.claude/THREAD_HANDOFF_TEMPLATE.md' und schreibe es in '/Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks/docs/handoffs'

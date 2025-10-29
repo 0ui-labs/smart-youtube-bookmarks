@@ -1,5 +1,6 @@
 import pytest
 from uuid import uuid4
+from datetime import datetime, timedelta, timezone
 
 
 @pytest.mark.asyncio
@@ -166,3 +167,225 @@ async def test_pause_completed_job(client, test_db):
     response = await client.post(f"/api/jobs/{job_id}/pause")
     assert response.status_code == 400
     assert "Cannot pause job with status 'completed'" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_get_progress_history(client, test_db, test_user, test_list):
+    """Test retrieving progress history for a job"""
+    from app.models import ProcessingJob
+    from app.models.job_progress import JobProgressEvent
+    from sqlalchemy import select
+
+    # Create a processing job
+    job = ProcessingJob(
+        list_id=test_list.id,
+        total_videos=10,
+        status="running"
+    )
+    test_db.add(job)
+    await test_db.flush()
+    await test_db.refresh(job)
+
+    # Create progress events
+    for i in range(3):
+        event = JobProgressEvent(
+            job_id=job.id,
+            progress_data={
+                "job_id": str(job.id),
+                "status": "processing",
+                "progress": i * 30,
+                "current_video": i + 1,
+                "total_videos": 10,
+                "message": f"Processing video {i+1}/10"
+            }
+        )
+        test_db.add(event)
+    await test_db.commit()
+
+    # Request history (simulate authentication by adding user_id to request)
+    response = await client.get(
+        f"/api/jobs/{job.id}/progress-history",
+        params={"user_id": str(test_user.id)}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 3
+    # Verify chronological order
+    assert data[0]["progress_data"]["progress"] == 0
+    assert data[1]["progress_data"]["progress"] == 30
+    assert data[2]["progress_data"]["progress"] == 60
+    # Verify response schema matches JobProgressEventRead
+    assert "id" in data[0]
+    assert "job_id" in data[0]
+    assert "created_at" in data[0]
+    assert "progress_data" in data[0]
+
+
+@pytest.mark.asyncio
+async def test_get_progress_history_with_since_filter(client, test_db, test_user, test_list):
+    """Test filtering progress history by timestamp"""
+    from app.models import ProcessingJob
+    from app.models.job_progress import JobProgressEvent
+
+    # Create a processing job
+    job = ProcessingJob(
+        list_id=test_list.id,
+        total_videos=10,
+        status="running"
+    )
+    test_db.add(job)
+    await test_db.flush()
+    await test_db.refresh(job)
+
+    # Create events at different times
+    now = datetime.now(timezone.utc)
+    for i in range(5):
+        event = JobProgressEvent(
+            job_id=job.id,
+            progress_data={
+                "job_id": str(job.id),
+                "status": "processing",
+                "progress": i * 20,
+                "current_video": i + 1,
+                "total_videos": 10,
+                "message": f"Processing video {i+1}/10"
+            }
+        )
+        test_db.add(event)
+        await test_db.flush()
+        # Manually set created_at to simulate time progression
+        event.created_at = now - timedelta(minutes=5-i)
+    await test_db.commit()
+
+    # Query with since parameter (get events from 3 minutes ago onwards - inclusive)
+    # This should return events with i=2 (now - 3min), i=3 (now - 2min), i=4 (now - 1min)
+    since_time = now - timedelta(minutes=3)
+    response = await client.get(
+        f"/api/jobs/{job.id}/progress-history",
+        params={
+            "user_id": str(test_user.id),
+            "since": since_time.isoformat()
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    # Should return events created at or after 3 minutes ago (i=2, i=3, i=4)
+    # Using >= (inclusive) ensures clients don't miss events on reconnect
+    assert len(data) == 3
+    assert data[0]["progress_data"]["progress"] == 40  # i=2
+    assert data[1]["progress_data"]["progress"] == 60  # i=3
+    assert data[2]["progress_data"]["progress"] == 80  # i=4
+
+
+@pytest.mark.asyncio
+async def test_get_progress_history_pagination(client, test_db, test_user, test_list):
+    """Test pagination with offset/limit"""
+    from app.models import ProcessingJob
+    from app.models.job_progress import JobProgressEvent
+
+    # Create a processing job
+    job = ProcessingJob(
+        list_id=test_list.id,
+        total_videos=10,
+        status="running"
+    )
+    test_db.add(job)
+    await test_db.flush()
+    await test_db.refresh(job)
+
+    # Create 10 progress events
+    for i in range(10):
+        event = JobProgressEvent(
+            job_id=job.id,
+            progress_data={
+                "job_id": str(job.id),
+                "status": "processing",
+                "progress": i * 10,
+                "current_video": i + 1,
+                "total_videos": 10,
+                "message": f"Processing video {i+1}/10"
+            }
+        )
+        test_db.add(event)
+    await test_db.commit()
+
+    # Query with offset=5, limit=3
+    response = await client.get(
+        f"/api/jobs/{job.id}/progress-history",
+        params={
+            "user_id": str(test_user.id),
+            "offset": 5,
+            "limit": 3
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    # Should return events 5-7 (indices 5, 6, 7)
+    assert len(data) == 3
+    assert data[0]["progress_data"]["progress"] == 50
+    assert data[1]["progress_data"]["progress"] == 60
+    assert data[2]["progress_data"]["progress"] == 70
+
+
+@pytest.mark.asyncio
+async def test_get_progress_history_unauthorized(client, test_db, test_user, test_list):
+    """Test authorization: user cannot access other user's jobs"""
+    from app.models import ProcessingJob, User
+    from app.models.job_progress import JobProgressEvent
+
+    # Create another user with their own list
+    other_user = User(
+        email=f"other-{uuid4()}@example.com",
+        hashed_password="$2b$12$placeholder_hash",
+        is_active=True
+    )
+    test_db.add(other_user)
+    await test_db.flush()
+    await test_db.refresh(other_user)
+
+    from app.models import BookmarkList
+    other_list = BookmarkList(
+        name="Other User's List",
+        user_id=other_user.id
+    )
+    test_db.add(other_list)
+    await test_db.flush()
+    await test_db.refresh(other_list)
+
+    # Create job for other user
+    other_job = ProcessingJob(
+        list_id=other_list.id,
+        total_videos=5,
+        status="running"
+    )
+    test_db.add(other_job)
+    await test_db.flush()
+    await test_db.refresh(other_job)
+
+    # Create progress event
+    event = JobProgressEvent(
+        job_id=other_job.id,
+        progress_data={
+            "job_id": str(other_job.id),
+            "status": "processing",
+            "progress": 50,
+            "current_video": 1,
+            "total_videos": 5,
+            "message": "Processing"
+        }
+    )
+    test_db.add(event)
+    await test_db.commit()
+
+    # Try to access other user's job with test_user credentials
+    response = await client.get(
+        f"/api/jobs/{other_job.id}/progress-history",
+        params={"user_id": str(test_user.id)}
+    )
+
+    # Should return 403 Forbidden
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not authorized to access this job"

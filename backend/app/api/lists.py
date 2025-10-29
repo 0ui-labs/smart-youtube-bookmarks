@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models import BookmarkList, Video
+from app.models import BookmarkList, Video, User
 from app.schemas.list import ListCreate, ListResponse
 
 router = APIRouter(prefix="/api/lists", tags=["lists"])
@@ -19,6 +19,7 @@ async def get_lists(db: AsyncSession = Depends(get_db)):
             BookmarkList.id,
             BookmarkList.name,
             BookmarkList.description,
+            BookmarkList.user_id,
             BookmarkList.schema_id,
             BookmarkList.created_at,
             BookmarkList.updated_at,
@@ -29,6 +30,7 @@ async def get_lists(db: AsyncSession = Depends(get_db)):
             BookmarkList.id,
             BookmarkList.name,
             BookmarkList.description,
+            BookmarkList.user_id,
             BookmarkList.schema_id,
             BookmarkList.created_at,
             BookmarkList.updated_at
@@ -42,6 +44,7 @@ async def get_lists(db: AsyncSession = Depends(get_db)):
                 id=row.id,
                 name=row.name,
                 description=row.description,
+                user_id=row.user_id,
                 schema_id=row.schema_id,
                 video_count=row.video_count,
                 created_at=row.created_at,
@@ -57,6 +60,25 @@ async def create_list(
     list_data: ListCreate,
     db: AsyncSession = Depends(get_db)
 ):
+    # TODO: Replace with actual authenticated user once auth is implemented
+    # For now, use the default test user or create one if it doesn't exist
+    if not list_data.user_id:
+        result = await db.execute(
+            select(User).where(User.email == "test@example.com")
+        )
+        test_user = result.scalar_one_or_none()
+        if not test_user:
+            # Create default test user if it doesn't exist
+            test_user = User(
+                email="test@example.com",
+                hashed_password="$2b$12$placeholder_hash",
+                is_active=True
+            )
+            db.add(test_user)
+            await db.flush()
+            await db.refresh(test_user)
+        list_data.user_id = test_user.id
+
     new_list = BookmarkList(**list_data.model_dump())
     db.add(new_list)
     await db.flush()
@@ -67,6 +89,7 @@ async def create_list(
         id=new_list.id,
         name=new_list.name,
         description=new_list.description,
+        user_id=new_list.user_id,
         schema_id=new_list.schema_id,
         video_count=0,
         created_at=new_list.created_at,
@@ -81,6 +104,7 @@ async def get_list(list_id: UUID, db: AsyncSession = Depends(get_db)):
             BookmarkList.id,
             BookmarkList.name,
             BookmarkList.description,
+            BookmarkList.user_id,
             BookmarkList.schema_id,
             BookmarkList.created_at,
             BookmarkList.updated_at,
@@ -92,6 +116,7 @@ async def get_list(list_id: UUID, db: AsyncSession = Depends(get_db)):
             BookmarkList.id,
             BookmarkList.name,
             BookmarkList.description,
+            BookmarkList.user_id,
             BookmarkList.schema_id,
             BookmarkList.created_at,
             BookmarkList.updated_at
@@ -106,6 +131,7 @@ async def get_list(list_id: UUID, db: AsyncSession = Depends(get_db)):
         id=row.id,
         name=row.name,
         description=row.description,
+        user_id=row.user_id,
         schema_id=row.schema_id,
         video_count=row.video_count,
         created_at=row.created_at,

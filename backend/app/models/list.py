@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID as PyUUID
 from sqlalchemy import String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -16,12 +17,20 @@ class BookmarkList(BaseModel):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    schema_id: Mapped[Optional[UUID]] = mapped_column(
+    user_id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    schema_id: Mapped[Optional[PyUUID]] = mapped_column(
+        UUID(as_uuid=True),
         ForeignKey("schemas.id", ondelete="SET NULL"),
         nullable=True
     )
 
     # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="lists")
     schema: Mapped[Optional["Schema"]] = relationship("Schema", back_populates="lists", lazy="joined")
     videos: Mapped[list["Video"]] = relationship(
         "Video",

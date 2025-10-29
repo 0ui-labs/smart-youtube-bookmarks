@@ -34,10 +34,13 @@ export const ListsPage = ({ onSelectList }: ListsPageProps) => {
       columnHelper.accessor('description', {
         header: 'Beschreibung',
         cell: (info) => (
-          <span className="text-gray-600">
+          <span className="text-gray-600 block max-w-md break-words">
             {info.getValue() || <span className="italic text-gray-400">Keine Beschreibung</span>}
           </span>
         ),
+        meta: {
+          className: 'whitespace-normal', // Override whitespace-nowrap for this column
+        },
       }),
       columnHelper.accessor('video_count', {
         header: 'Videos',
@@ -198,7 +201,7 @@ export const ListsPage = ({ onSelectList }: ListsPageProps) => {
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -219,11 +222,17 @@ export const ListsPage = ({ onSelectList }: ListsPageProps) => {
             <tbody className="bg-white divide-y divide-gray-200">
               {table.getRowModel().rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const isDescriptionColumn = cell.column.id === 'description'
+                    return (
+                      <td
+                        key={cell.id}
+                        className={`px-6 py-4 ${isDescriptionColumn ? 'max-w-md' : 'whitespace-nowrap'}`}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>
