@@ -4,6 +4,15 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from app.clients.youtube import YouTubeClient
 
 
+def test_youtube_client_requires_api_key():
+    """Test that YouTubeClient validates API key"""
+    with pytest.raises(ValueError, match="API key is required"):
+        YouTubeClient(api_key="")
+
+    with pytest.raises(ValueError, match="API key is required"):
+        YouTubeClient(api_key="   ")  # Whitespace only
+
+
 @pytest.mark.asyncio
 async def test_get_video_metadata_success():
     """Test successful video metadata retrieval"""
@@ -170,3 +179,54 @@ async def test_get_video_transcript_uses_cache():
         redis_client.setex.assert_called_once()
 
     assert transcript1 == "Cached Transcript"
+
+
+@pytest.mark.asyncio
+async def test_get_video_metadata_quota_exceeded():
+    """Test handling of YouTube API quota exceeded (403)"""
+    from aiogoogle.excs import HTTPError
+
+    client = YouTubeClient(api_key="test-key")
+
+    # Mock 403 response
+    mock_response = MagicMock()
+    mock_response.status_code = 403
+    mock_response.json = {'error': {'errors': [{'reason': 'quotaExceeded'}]}}
+
+    with patch('app.clients.youtube.Aiogoogle') as mock_aiogoogle:
+        mock_instance = AsyncMock()
+        mock_aiogoogle.return_value.__aenter__.return_value = mock_instance
+        mock_instance.discover = AsyncMock(return_value=AsyncMock())
+        mock_instance.as_api_key = AsyncMock(side_effect=HTTPError(
+            msg="Quota exceeded",
+            req=MagicMock(),
+            res=mock_response
+        ))
+
+        with pytest.raises(ValueError, match="quota exceeded"):
+            await client.get_video_metadata("test123")
+
+
+@pytest.mark.asyncio
+async def test_get_video_metadata_rate_limited():
+    """Test handling of rate limit (429)"""
+    from aiogoogle.excs import HTTPError
+
+    client = YouTubeClient(api_key="test-key")
+
+    mock_response = MagicMock()
+    mock_response.status_code = 429
+
+    with patch('app.clients.youtube.Aiogoogle') as mock_aiogoogle:
+        mock_instance = AsyncMock()
+        mock_aiogoogle.return_value.__aenter__.return_value = mock_instance
+        mock_instance.discover = AsyncMock(return_value=AsyncMock())
+        mock_instance.as_api_key = AsyncMock(side_effect=HTTPError(
+            msg="Rate limited",
+            req=MagicMock(),
+            res=mock_response
+        ))
+
+        # Rate limit (429) should be re-raised for tenacity to handle
+        with pytest.raises(HTTPError):
+            await client.get_video_metadata("test123")
