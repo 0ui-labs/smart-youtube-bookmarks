@@ -128,3 +128,34 @@ async def mock_session_factory(test_engine):
     """Mock AsyncSessionLocal factory to use test database."""
     from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
     return async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@pytest.fixture
+async def user_factory(test_db: AsyncSession):
+    """
+    Factory fixture for creating multiple test users.
+
+    Usage:
+        async def test_example(user_factory):
+            alice = await user_factory("alice")
+            bob = await user_factory("bob")
+    """
+    created_users = []
+
+    async def _create_user(name_prefix: str = "test"):
+        """Create a test user with unique email."""
+        import uuid
+        user = User(
+            email=f"{name_prefix}-{uuid.uuid4()}@example.com",
+            hashed_password="$2b$12$placeholder_hash",
+            is_active=True
+        )
+        test_db.add(user)
+        await test_db.commit()
+        await test_db.refresh(user)
+        created_users.append(user)
+        return user
+
+    yield _create_user
+
+    # Cleanup not needed - test_db rollback handles it

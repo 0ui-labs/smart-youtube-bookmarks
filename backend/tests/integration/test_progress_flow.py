@@ -207,7 +207,7 @@ async def test_dual_write_verification(test_db: AsyncSession, test_user: User, m
 
 
 @pytest.mark.asyncio
-async def test_user_isolation_in_progress_updates(test_db: AsyncSession, mock_redis, mock_session_factory):
+async def test_user_isolation_in_progress_updates(test_db: AsyncSession, user_factory, mock_redis, mock_session_factory):
     """
     Test that users only receive their own progress updates.
 
@@ -217,25 +217,9 @@ async def test_user_isolation_in_progress_updates(test_db: AsyncSession, mock_re
     from app.workers.video_processor import process_video_list
 
     with patch('app.workers.video_processor.AsyncSessionLocal', mock_session_factory):
-        # Create User A
-        user_a = User(
-            email=f"usera-{uuid4()}@example.com",
-            hashed_password="hash",
-            is_active=True
-        )
-        test_db.add(user_a)
-        await test_db.commit()
-        await test_db.refresh(user_a)
-
-        # Create User B
-        user_b = User(
-            email=f"userb-{uuid4()}@example.com",
-            hashed_password="hash",
-            is_active=True
-        )
-        test_db.add(user_b)
-        await test_db.commit()
-        await test_db.refresh(user_b)
+        # Create User A and User B using factory
+        user_a = await user_factory("alice")
+        user_b = await user_factory("bob")
 
         # Create list for User A
         list_a = BookmarkList(name="User A List", user_id=user_a.id)
@@ -376,6 +360,61 @@ async def test_history_api_pagination(test_db: AsyncSession, test_user: User, cl
         event_time = datetime.fromisoformat(event["created_at"].replace("Z", "+00:00"))
         since_time = datetime.fromisoformat(midpoint_time.replace("Z", "+00:00"))
         assert event_time >= since_time, "All events should be after 'since' timestamp"
+
+
+@pytest.mark.asyncio
+async def test_unauthorized_access_to_progress_history(test_db: AsyncSession, user_factory, client):
+    """
+    Test that users cannot access other users' progress history.
+
+    Verifies 403 Forbidden response when user_id doesn't match job owner.
+    """
+    # Create User A and User B using factory
+    user_a = await user_factory("alice")
+    user_b = await user_factory("bob")
+
+    # User A creates a list and job
+    list_a = BookmarkList(name="User A List", user_id=user_a.id)
+    test_db.add(list_a)
+    await test_db.commit()
+
+    job_a = ProcessingJob(list_id=list_a.id, total_videos=1, status="running")
+    test_db.add(job_a)
+    await test_db.commit()
+    job_a_id = job_a.id
+
+    # Create progress event for User A's job
+    event = JobProgressEvent(
+        job_id=job_a_id,
+        progress_data={"progress": 50, "status": "processing"}
+    )
+    test_db.add(event)
+    await test_db.commit()
+
+    # User A can access their own job history (baseline check)
+    response_authorized = await client.get(
+        f"/api/jobs/{job_a_id}/progress-history",
+        params={"user_id": str(user_a.id)}
+    )
+    assert response_authorized.status_code == 200, "User A should access their own job"
+
+    # User B tries to access User A's job history (should be forbidden)
+    response_unauthorized = await client.get(
+        f"/api/jobs/{job_a_id}/progress-history",
+        params={"user_id": str(user_b.id)}
+    )
+
+    # Assert: Should return 403 Forbidden
+    assert response_unauthorized.status_code == 403, \
+        f"Expected 403 Forbidden, got {response_unauthorized.status_code}"
+
+    # Assert: Error message should indicate authorization failure
+    error_detail = response_unauthorized.json()
+    assert "detail" in error_detail, "Response should contain error detail"
+    assert "not authorized" in error_detail["detail"].lower() or \
+           "forbidden" in error_detail["detail"].lower() or \
+           "access denied" in error_detail["detail"].lower(), \
+        f"Error message should indicate authorization failure: {error_detail['detail']}"
 
 
 @pytest.mark.asyncio
