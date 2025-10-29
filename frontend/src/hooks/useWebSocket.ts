@@ -23,6 +23,7 @@ export interface UseWebSocketReturn {
   isConnected: boolean;
   reconnecting: boolean;
   authStatus: 'pending' | 'authenticated' | 'failed'; // Option B: Auth status tracking
+  historyError: string | null; // Issue #5: Expose history API errors to UI
 }
 
 // WebSocket configuration constants
@@ -48,12 +49,14 @@ export function useWebSocket(): UseWebSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [authStatus, setAuthStatus] = useState<'pending' | 'authenticated' | 'failed'>('pending');
+  const [historyError, setHistoryError] = useState<string | null>(null); // Issue #5: Track history API errors
 
   const wsRef = useRef<WebSocket | null>(null);
   const retryCountRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const isReconnectingRef = useRef(false); // Track if this is a reconnection
   const monitoredJobsRef = useRef<Set<string>>(new Set()); // Track jobs for history API
+  const lastConnectedTimeRef = useRef<Map<string, number>>(new Map()); // Issue #2: Track last connected time per job
 
   useEffect(() => {
     const connect = () => {
@@ -61,6 +64,7 @@ export function useWebSocket(): UseWebSocketReturn {
       const token = localStorage.getItem('token');
       if (!token) {
         console.error('No auth token found for WebSocket connection');
+        setAuthStatus('failed'); // Issue #4: Set auth status to failed when token missing
         return;
       }
 
@@ -79,16 +83,12 @@ export function useWebSocket(): UseWebSocketReturn {
           token: token
         }));
 
-        // OPTION B: History API Integration
-        // Fetch missed updates for monitored jobs after reconnect
-        if (isReconnectingRef.current && monitoredJobsRef.current.size > 0) {
-          await fetchJobHistory(Array.from(monitoredJobsRef.current), token);
-        }
+        // Issue #6: ALWAYS reset retry count on successful connection
+        retryCountRef.current = 0;
 
-        // Reset reconnection flags after successful reconnect
+        // Reset reconnecting flag if this was a reconnection
         if (isReconnectingRef.current) {
           setReconnecting(false);
-          retryCountRef.current = 0;
           isReconnectingRef.current = false;
         }
       };
@@ -100,6 +100,11 @@ export function useWebSocket(): UseWebSocketReturn {
           // Handle auth confirmation/failure messages
           if (data.type === 'auth_confirmed' && data.authenticated) {
             setAuthStatus('authenticated');
+
+            // Issue #1: NOW fetch history after auth confirmed (not in onopen)
+            if (isReconnectingRef.current && monitoredJobsRef.current.size > 0) {
+              fetchJobHistory(Array.from(monitoredJobsRef.current), token);
+            }
             return;
           }
 
@@ -115,8 +120,18 @@ export function useWebSocket(): UseWebSocketReturn {
           // Add timestamp for cleanup logic
           update.timestamp = Date.now();
 
+          // Issue #2: Track last connected time for this job
+          lastConnectedTimeRef.current.set(update.job_id, update.timestamp);
+
           // Track this job for history API on reconnect
           monitoredJobsRef.current.add(update.job_id);
+
+          // Issue #3: Remove from monitored set after TTL if terminal state
+          if (['completed', 'failed', 'completed_with_errors'].includes(update.status)) {
+            setTimeout(() => {
+              monitoredJobsRef.current.delete(update.job_id);
+            }, COMPLETED_JOB_TTL);
+          }
 
           setJobProgress(prev => {
             const next = new Map(prev);
@@ -164,13 +179,8 @@ export function useWebSocket(): UseWebSocketReturn {
     const fetchJobHistory = async (jobIds: string[], token: string) => {
       for (const jobId of jobIds) {
         try {
-          // Use functional setState to get latest jobProgress
-          let sinceTimestamp = 0;
-          setJobProgress(prev => {
-            const lastUpdate = prev.get(jobId);
-            sinceTimestamp = lastUpdate?.timestamp || 0;
-            return prev; // No change, just reading
-          });
+          // Issue #2: Use ref for last connected timestamp (avoid stale reads)
+          const sinceTimestamp = lastConnectedTimeRef.current.get(jobId) || 0;
 
           const response = await fetch(
             `/api/jobs/${jobId}/progress-history?since=${sinceTimestamp}`,
@@ -182,23 +192,30 @@ export function useWebSocket(): UseWebSocketReturn {
           );
 
           if (!response.ok) {
-            console.error(`Failed to fetch history for job ${jobId}:`, response.statusText);
+            const errorMsg = `Failed to load progress history for job ${jobId}`;
+            console.error(errorMsg, response.statusText);
+            setHistoryError(errorMsg); // Issue #5: Set error state
             continue;
           }
 
           const events: ProgressUpdate[] = await response.json();
 
-          // Merge events into state
-          events.forEach(event => {
-            event.timestamp = event.timestamp || Date.now();
+          // Issue #8: Batch state updates (reduce re-renders)
+          if (events.length > 0) {
             setJobProgress(prev => {
               const next = new Map(prev);
-              next.set(event.job_id, event);
+              for (const event of events) {
+                const update: ProgressUpdate = { ...event };
+                update.timestamp = event.timestamp || Date.now();
+                next.set(update.job_id, update);
+              }
               return next;
             });
-          });
+          }
         } catch (error) {
-          console.error(`Error fetching history for job ${jobId}:`, error);
+          const errorMsg = `Failed to load progress history for job ${jobId}`;
+          console.error(errorMsg, error);
+          setHistoryError(errorMsg); // Issue #5: Set error state
         }
       }
     };
@@ -244,5 +261,5 @@ export function useWebSocket(): UseWebSocketReturn {
     return () => clearInterval(cleanup);
   }, []);
 
-  return { jobProgress, isConnected, reconnecting, authStatus };
+  return { jobProgress, isConnected, reconnecting, authStatus, historyError };
 }

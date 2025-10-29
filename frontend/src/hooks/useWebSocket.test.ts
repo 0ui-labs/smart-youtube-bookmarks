@@ -149,7 +149,7 @@ describe('useWebSocket', () => {
     });
 
     it('handles disconnect and sets reconnecting flag', async () => {
-      const { result } = renderHook(() => useWebSocket ());
+      const { result } = renderHook(() => useWebSocket());
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0);
@@ -240,6 +240,13 @@ describe('useWebSocket', () => {
       const wsInstance = MockWebSocket.instances[0]!;
       await act(async () => {
         wsInstance.simulateMessage({
+          type: 'auth_confirmed',
+          authenticated: true
+        });
+      });
+
+      await act(async () => {
+        wsInstance.simulateMessage({
           job_id: 'job-123',
           status: 'processing',
           progress: 50,
@@ -257,6 +264,15 @@ describe('useWebSocket', () => {
       // Reconnect
       await act(async () => {
         await vi.advanceTimersByTimeAsync(3000);
+      });
+
+      // Issue #1: Now history is fetched after auth confirmation (not in onopen)
+      const wsInstance2 = MockWebSocket.instances[1]!;
+      await act(async () => {
+        wsInstance2.simulateMessage({
+          type: 'auth_confirmed',
+          authenticated: true
+        });
       });
 
       // Wait for async fetch call to complete with proper timeout
@@ -511,11 +527,11 @@ describe('useWebSocket', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('handles missing token gracefully', async () => {
+    it('handles missing token gracefully and sets auth status to failed', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       localStorage.clear(); // Clear before removing token
 
-      renderHook(() => useWebSocket());
+      const { result } = renderHook(() => useWebSocket());
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0);
@@ -530,7 +546,72 @@ describe('useWebSocket', () => {
       );
       expect(errorCall).toBeDefined();
 
+      // Issue #4: Should set auth status to 'failed'
+      expect(result.current.authStatus).toBe('failed');
+
       consoleErrorSpy.mockRestore();
+    });
+
+    it('sets historyError when history API fails', async () => {
+      // Mock fetch for history API to fail
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        statusText: 'Not Found'
+      });
+      global.fetch = mockFetch;
+
+      const { result } = renderHook(() => useWebSocket());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // Receive initial progress update to track this job
+      const wsInstance = MockWebSocket.instances[0]!;
+      await act(async () => {
+        wsInstance.simulateMessage({
+          type: 'auth_confirmed',
+          authenticated: true
+        });
+      });
+
+      await act(async () => {
+        wsInstance.simulateMessage({
+          job_id: 'job-123',
+          status: 'processing',
+          progress: 50,
+          current_video: 5,
+          total_videos: 10,
+          message: 'Processing video 5/10'
+        });
+      });
+
+      // Disconnect
+      await act(async () => {
+        wsInstance.close();
+      });
+
+      // Reconnect
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+
+      // Trigger auth confirmation to initiate history fetch
+      const wsInstance2 = MockWebSocket.instances[1]!;
+      await act(async () => {
+        wsInstance2.simulateMessage({
+          type: 'auth_confirmed',
+          authenticated: true
+        });
+      });
+
+      // Wait for async fetch call to complete
+      await act(async () => {
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // Issue #5: Should have set historyError state
+      expect(result.current.historyError).toContain('Failed to load progress history');
     });
   });
 
