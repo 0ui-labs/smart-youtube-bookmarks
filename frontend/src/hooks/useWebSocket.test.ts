@@ -64,17 +64,18 @@ describe('useWebSocket', () => {
   });
 
   describe('Option B Security: Post-Connection Authentication', () => {
-    it('connects WITHOUT token in URL', async () => {
+    it('connects WITH token in URL (Query Parameter Auth)', async () => {
       renderHook(() => useWebSocket());
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0); // Flush immediate timers only
       });
 
-      // Critical: WebSocket URL must NOT contain token
+      // UPDATED: Backend requires token as query parameter
+      // (changed from post-connection auth to query param auth)
       const wsInstance = MockWebSocket.instances[0]!;
-      expect(wsInstance.url).not.toContain('token');
-      expect(wsInstance.url).not.toContain('test-token-123');
+      expect(wsInstance.url).toContain('token=');
+      expect(wsInstance.url).toContain('test-token-123');
     });
 
     it('sends auth message AFTER connection opens', async () => {

@@ -231,8 +231,18 @@ async def test_delete_nonexistent_video(client: AsyncClient, test_db: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_bulk_upload_csv_success(client, test_list):
+async def test_bulk_upload_csv_success(client, test_list, monkeypatch):
     """Test bulk video upload from CSV file."""
+    # Mock ARQ pool to avoid event loop issues in tests
+    from unittest.mock import AsyncMock
+    mock_arq_pool = AsyncMock()
+    mock_arq_pool.enqueue_job = AsyncMock()
+
+    async def mock_get_arq_pool():
+        return mock_arq_pool
+
+    monkeypatch.setattr("app.api.videos.get_arq_pool", mock_get_arq_pool)
+
     # Create CSV content with 3 videos
     csv_content = """url
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
@@ -261,8 +271,18 @@ https://www.youtube.com/watch?v=9bZkp7q19f0"""
 
 
 @pytest.mark.asyncio
-async def test_bulk_upload_csv_with_failures(client, test_list):
+async def test_bulk_upload_csv_with_failures(client, test_list, monkeypatch):
     """Test bulk upload handles invalid URLs gracefully."""
+    # Mock ARQ pool to avoid event loop issues in tests
+    from unittest.mock import AsyncMock
+    mock_arq_pool = AsyncMock()
+    mock_arq_pool.enqueue_job = AsyncMock()
+
+    async def mock_get_arq_pool():
+        return mock_arq_pool
+
+    monkeypatch.setattr("app.api.videos.get_arq_pool", mock_get_arq_pool)
+
     csv_content = """url
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 https://invalid.com/video
