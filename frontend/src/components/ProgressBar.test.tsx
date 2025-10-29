@@ -175,11 +175,73 @@ describe('ProgressBar', () => {
           message: `Status: ${status}`,
         };
 
-        const { container } = render(<ProgressBar progress={progress} />);
+        const { container, unmount } = render(<ProgressBar progress={progress} />);
         const progressFill = container.querySelector('.progress-fill');
 
         expect(progressFill).toHaveClass(expectedColors[status]);
+
+        // Clean up DOM between iterations to prevent false positives
+        unmount();
       });
+    });
+  });
+
+  describe('Input Validation', () => {
+    it('clamps progress to 0-100 range for negative values', () => {
+      const progress: ProgressUpdate = {
+        job_id: 'job-123',
+        status: 'processing',
+        progress: -10,
+        current_video: 0,
+        total_videos: 10,
+        message: 'Processing',
+      };
+
+      const { container } = render(<ProgressBar progress={progress} />);
+      const progressBar = screen.getByRole('progressbar');
+
+      expect(progressBar).toHaveAttribute('aria-valuenow', '0');
+
+      const progressFill = container.querySelector('.progress-fill');
+      expect(progressFill).toHaveStyle({ width: '0%' });
+    });
+
+    it('clamps progress to 0-100 range for values above 100', () => {
+      const progress: ProgressUpdate = {
+        job_id: 'job-123',
+        status: 'processing',
+        progress: 150,
+        current_video: 10,
+        total_videos: 10,
+        message: 'Processing',
+      };
+
+      const { container } = render(<ProgressBar progress={progress} />);
+      const progressBar = screen.getByRole('progressbar');
+
+      expect(progressBar).toHaveAttribute('aria-valuenow', '100');
+
+      const progressFill = container.querySelector('.progress-fill');
+      expect(progressFill).toHaveStyle({ width: '100%' });
+    });
+
+    it('handles NaN progress values gracefully', () => {
+      const progress: ProgressUpdate = {
+        job_id: 'job-123',
+        status: 'processing',
+        progress: NaN,
+        current_video: 5,
+        total_videos: 10,
+        message: 'Processing',
+      };
+
+      const { container } = render(<ProgressBar progress={progress} />);
+      const progressBar = screen.getByRole('progressbar');
+
+      expect(progressBar).toHaveAttribute('aria-valuenow', '0');
+
+      const progressFill = container.querySelector('.progress-fill');
+      expect(progressFill).toHaveStyle({ width: '0%' });
     });
   });
 });

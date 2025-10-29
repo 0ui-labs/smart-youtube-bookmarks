@@ -40,6 +40,11 @@ const statusIcons = {
 export function ProgressBar({ progress }: ProgressBarProps) {
   const progressId = useId();
   const messageId = useId();
+
+  // Validate and clamp progress value to [0, 100] range
+  // Handles NaN, negative values, and values above 100
+  const clampedProgress = Math.max(0, Math.min(100, progress.progress || 0));
+
   const colorClass = statusColors[progress.status];
   const badgeClass = statusBadgeClasses[progress.status];
   const statusLabel = statusLabels[progress.status];
@@ -53,7 +58,7 @@ export function ProgressBar({ progress }: ProgressBarProps) {
           {progress.message}
         </span>
         <span className="text-sm font-bold text-gray-900">
-          {progress.progress}%
+          {clampedProgress}%
         </span>
       </div>
 
@@ -61,7 +66,7 @@ export function ProgressBar({ progress }: ProgressBarProps) {
       <div
         className="progress-track w-full bg-gray-200 rounded-full h-3 mb-2"
         role="progressbar"
-        aria-valuenow={progress.progress}
+        aria-valuenow={clampedProgress}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-labelledby={messageId}
@@ -69,7 +74,7 @@ export function ProgressBar({ progress }: ProgressBarProps) {
       >
         <div
           className={`progress-fill ${colorClass} h-full rounded-full motion-safe:transition-all motion-safe:duration-300 motion-reduce:transition-none`}
-          style={{ width: `${progress.progress}%` }}
+          style={{ width: `${clampedProgress}%` }}
         />
       </div>
 
@@ -90,7 +95,7 @@ export function ProgressBar({ progress }: ProgressBarProps) {
         aria-atomic="true"
         className="sr-only"
       >
-        {progress.message} - {progress.progress}% complete. Processing video{' '}
+        {progress.message} - {clampedProgress}% complete. Processing video{' '}
         {progress.current_video} of {progress.total_videos}.
       </div>
 
