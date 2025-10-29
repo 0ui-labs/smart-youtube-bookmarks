@@ -282,7 +282,7 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-yellow-800">
-                Reconnecting to progress updates...
+                Verbindung zu Fortschritts-Updates wird wiederhergestellt...
               </p>
             </div>
           </div>
@@ -300,7 +300,7 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
             </div>
             <div className="ml-3">
               <h3 className="text-sm font-medium text-red-800">
-                Failed to load progress history
+                Fehler beim Laden der Verlaufshistorie
               </h3>
               <p className="mt-1 text-sm text-red-700">
                 {historyError}
