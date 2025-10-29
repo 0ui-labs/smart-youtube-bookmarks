@@ -112,3 +112,19 @@ async def test_video(test_db: AsyncSession, test_list: BookmarkList) -> Video:
     await test_db.commit()
     await test_db.refresh(video)
     return video
+
+
+@pytest.fixture
+async def mock_redis():
+    """Mock Redis client for testing."""
+    from unittest.mock import AsyncMock
+    redis_mock = AsyncMock()
+    redis_mock.publish = AsyncMock(return_value=1)
+    return redis_mock
+
+
+@pytest.fixture
+async def mock_session_factory(test_engine):
+    """Mock AsyncSessionLocal factory to use test database."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    return async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
