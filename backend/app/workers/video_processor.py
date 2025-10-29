@@ -37,7 +37,7 @@ TRANSIENT_ERRORS = (
 
 def parse_iso8601_duration(duration_str: str) -> int:
     """
-    Parse ISO 8601 duration (PT3M33S) to total seconds
+    Parse ISO 8601 duration (PT3M33S) to total seconds using isodate library
 
     Args:
         duration_str: ISO 8601 duration string (e.g., "PT3M33S", "PT1H2M3S")
@@ -45,19 +45,13 @@ def parse_iso8601_duration(duration_str: str) -> int:
     Returns:
         Total duration in seconds
     """
-    import re
+    from isodate import parse_duration
 
-    pattern = r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?'
-    match = re.match(pattern, duration_str)
-
-    if not match:
-        return 0
-
-    hours = int(match.group(1) or 0)
-    minutes = int(match.group(2) or 0)
-    seconds = int(match.group(3) or 0)
-
-    return hours * 3600 + minutes * 60 + seconds
+    try:
+        duration_obj = parse_duration(duration_str)
+        return int(duration_obj.total_seconds())
+    except Exception:
+        return 0  # Fallback
 
 
 async def process_video(

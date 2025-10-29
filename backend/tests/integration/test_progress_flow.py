@@ -185,7 +185,7 @@ async def test_dual_write_verification(test_db: AsyncSession, test_user: User, m
         redis_progress_values = set()
         for call_args in mock_redis.publish.call_args_list:
             if len(call_args[0]) >= 2:
-                channel, message = call_args[0]
+                _, message = call_args[0]  # Use underscore for unused variable
                 try:
                     message_data = json.loads(message)
                     if "progress" in message_data:
