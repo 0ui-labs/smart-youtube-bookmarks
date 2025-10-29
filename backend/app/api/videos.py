@@ -28,8 +28,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
+from app.core.redis import get_arq_pool
 from app.models.list import BookmarkList
 from app.models.video import Video
+from app.models.job import ProcessingJob
 from app.schemas.video import VideoAdd, VideoResponse, BulkUploadResponse, BulkUploadFailure
 
 
@@ -352,11 +354,69 @@ async def bulk_upload_videos(
                         ))
                 await db.commit()
 
+                # Create processing job if videos were created
+                if created > 0:
+                    job = ProcessingJob(
+                        list_id=list_id,
+                        total_videos=created,
+                        status="running"
+                    )
+                    db.add(job)
+                    await db.commit()
+                    await db.refresh(job)
+
+                    # Get all pending video IDs for this list
+                    result = await db.execute(
+                        select(Video.id).where(
+                            Video.list_id == list_id,
+                            Video.processing_status == "pending"
+                        )
+                    )
+                    video_ids = [str(vid) for vid in result.scalars().all()]
+
+                    # Enqueue ARQ task
+                    arq_pool = await get_arq_pool()
+                    await arq_pool.enqueue_job(
+                        "process_video_list",
+                        str(job.id),
+                        str(list_id),
+                        video_ids
+                    )
+
                 return BulkUploadResponse(
                     created_count=created,
                     failed_count=len(failures),
                     failures=failures
                 )
+
+        # Create processing job if videos were created
+        if len(videos_to_create) > 0:
+            job = ProcessingJob(
+                list_id=list_id,
+                total_videos=len(videos_to_create),
+                status="running"
+            )
+            db.add(job)
+            await db.commit()
+            await db.refresh(job)
+
+            # Get all pending video IDs for this list
+            result = await db.execute(
+                select(Video.id).where(
+                    Video.list_id == list_id,
+                    Video.processing_status == "pending"
+                )
+            )
+            video_ids = [str(vid) for vid in result.scalars().all()]
+
+            # Enqueue ARQ task
+            arq_pool = await get_arq_pool()
+            await arq_pool.enqueue_job(
+                "process_video_list",
+                str(job.id),
+                str(list_id),
+                video_ids
+            )
 
         return BulkUploadResponse(
             created_count=len(videos_to_create),

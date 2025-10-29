@@ -358,6 +358,11 @@ See [`docs/testing/websocket-progress-automated-tests.md`](docs/testing/websocke
 - Console warning: "No auth token found for WebSocket connection" (expected)
 - Production deployment requires OAuth/JWT implementation
 
+### CSV Upload & Processing
+- CSV upload endpoint (`/api/lists/{id}/videos/bulk`) automatically creates and starts processing jobs
+- Real-time progress updates via WebSocket connection
+- ARQ worker must be running for video metadata processing
+
 ### Performance
 - Large CSV uploads (1000+ videos) may take significant time
 - WebSocket throttling limits progress updates to 5% steps

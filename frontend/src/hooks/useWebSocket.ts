@@ -68,9 +68,9 @@ export function useWebSocket(): UseWebSocketReturn {
         return;
       }
 
-      // OPTION B SECURITY FIX: Connect WITHOUT token in URL
-      // This prevents token exposure in server logs
-      const ws = new WebSocket(WS_URL);
+      // Connect WITH token as query parameter (backend expects this)
+      // TODO: Move to post-connection auth (Option B) once backend supports it
+      const ws = new WebSocket(`${WS_URL}?token=${token}`);
 
       ws.onopen = async () => {
         console.log('WebSocket connected');

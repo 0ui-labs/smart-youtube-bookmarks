@@ -1,6 +1,6 @@
 from arq.connections import RedisSettings
 from app.core.config import settings
-from .video_processor import process_video
+from .video_processor import process_video, process_video_list
 
 
 class WorkerSettings:
@@ -19,7 +19,7 @@ class WorkerSettings:
     )
 
     # Task registration
-    functions = [process_video]
+    functions = [process_video, process_video_list]
 
     # Worker performance
     max_jobs = 10  # Process up to 10 videos in parallel
