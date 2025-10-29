@@ -110,21 +110,20 @@ async def test_process_video_with_gemini_extraction(
     This is perfect for people with no prior programming experience.
     """
 
-    # Mock Gemini API extraction
-    with patch("app.workers.video_processor.GeminiClient") as MockGeminiClient:
-        mock_gemini_instance = AsyncMock()
+    # Mock Gemini API extraction (patch get_gemini_client for singleton pattern)
+    mock_gemini_instance = AsyncMock()
 
-        # Mock extracted data response
-        mock_extracted_data = MagicMock()
-        mock_extracted_data.model_dump.return_value = {
-            "categories": ["Tutorial", "Python", "Programming"],
-            "difficulty_level": "Beginner",
-            "key_topics": ["Variables", "Data Types", "Control Flow"],
-        }
+    # Mock extracted data response
+    mock_extracted_data = MagicMock()
+    mock_extracted_data.model_dump.return_value = {
+        "categories": ["Tutorial", "Python", "Programming"],
+        "difficulty_level": "Beginner",
+        "key_topics": ["Variables", "Data Types", "Control Flow"],
+    }
 
-        mock_gemini_instance.extract_structured_data.return_value = mock_extracted_data
-        MockGeminiClient.return_value = mock_gemini_instance
+    mock_gemini_instance.extract_structured_data.return_value = mock_extracted_data
 
+    with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
         # Mock session factory
         with patch(
             "app.workers.video_processor.AsyncSessionLocal", mock_session_factory
@@ -156,8 +155,7 @@ async def test_process_video_with_gemini_extraction(
         "Control Flow",
     ]
 
-    # Assert: Gemini client was called correctly
-    MockGeminiClient.assert_called_once()
+    # Assert: Gemini extraction was called correctly
     mock_gemini_instance.extract_structured_data.assert_called_once()
 
 
@@ -271,14 +269,13 @@ async def test_process_video_handles_gemini_errors_gracefully(
     }
     mock_youtube_instance.get_video_transcript.return_value = "Test transcript"
 
-    # Mock Gemini to raise exception
-    with patch("app.workers.video_processor.GeminiClient") as MockGeminiClient:
-        mock_gemini_instance = AsyncMock()
-        mock_gemini_instance.extract_structured_data.side_effect = Exception(
-            "Gemini API quota exceeded"
-        )
-        MockGeminiClient.return_value = mock_gemini_instance
+    # Mock Gemini to raise exception (patch get_gemini_client for singleton pattern)
+    mock_gemini_instance = AsyncMock()
+    mock_gemini_instance.extract_structured_data.side_effect = Exception(
+        "Gemini API quota exceeded"
+    )
 
+    with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
         with patch(
             "app.workers.video_processor.AsyncSessionLocal", mock_session_factory
         ):
@@ -388,24 +385,23 @@ async def test_process_video_list_propagates_schema_to_extraction(
     }
     mock_youtube_instance.get_video_transcript.return_value = "Test transcript content"
 
-    # Mock Gemini extraction
-    with patch("app.workers.video_processor.GeminiClient") as MockGeminiClient:
-        mock_gemini_instance = AsyncMock()
+    # Mock Gemini extraction (patch get_gemini_client for singleton pattern)
+    mock_gemini_instance = AsyncMock()
 
-        # Mock extracted data response
-        mock_extracted_data = MagicMock()
-        mock_extracted_data.model_dump.return_value = {
-            "categories": ["Tutorial", "Tech"],
-            "sentiment": "Positive",
-        }
+    # Mock extracted data response
+    mock_extracted_data = MagicMock()
+    mock_extracted_data.model_dump.return_value = {
+        "categories": ["Tutorial", "Tech"],
+        "sentiment": "Positive",
+    }
 
-        mock_gemini_instance.extract_structured_data.return_value = mock_extracted_data
-        MockGeminiClient.return_value = mock_gemini_instance
+    mock_gemini_instance.extract_structured_data.return_value = mock_extracted_data
 
-        # Mock session factory and Redis
-        mock_redis = AsyncMock()
-        mock_redis.publish = AsyncMock(return_value=1)
+    # Mock session factory and Redis
+    mock_redis = AsyncMock()
+    mock_redis.publish = AsyncMock(return_value=1)
 
+    with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
         with patch("app.workers.video_processor.AsyncSessionLocal", mock_session_factory):
             # Act: Process videos with schema (NEW PARAMETER)
             ctx = {"redis": mock_redis}

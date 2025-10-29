@@ -23,6 +23,26 @@ from app.core.redis import get_redis_client
 
 logger = logging.getLogger(__name__)
 
+# Cached Gemini client instance (module-level singleton)
+_gemini_client: Optional[GeminiClient] = None
+
+
+def get_gemini_client() -> GeminiClient:
+    """
+    Get or create cached Gemini client instance.
+
+    Uses module-level singleton to avoid creating new client for each video.
+    This improves performance and reduces resource usage.
+
+    Returns:
+        GeminiClient: Cached client instance
+    """
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = GeminiClient(api_key=settings.gemini_api_key)
+        logger.info("Created new Gemini client instance")
+    return _gemini_client
+
 # Error categorization
 TRANSIENT_ERRORS = (
     # Network errors
@@ -182,8 +202,8 @@ async def process_video(
                 # Create Pydantic schema from JSONB schema definition
                 schema_model = _create_pydantic_schema_from_jsonb(schema)
 
-                # Initialize Gemini client
-                gemini_client = GeminiClient(api_key=settings.gemini_api_key)
+                # Get cached Gemini client (singleton)
+                gemini_client = get_gemini_client()
 
                 # Extract structured data
                 logger.info(f"Extracting structured data for video {video_id} with Gemini")
