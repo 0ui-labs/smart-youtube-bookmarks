@@ -291,7 +291,7 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
 
       {/* History Error Display */}
       {historyError && (
-        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded-lg">
+        <div role="alert" className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded-lg">
           <div className="flex">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
