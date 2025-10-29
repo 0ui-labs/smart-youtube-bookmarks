@@ -8,6 +8,8 @@ import time
 import json
 import random
 from datetime import datetime
+from typing import Optional, Dict, Any
+from pydantic import BaseModel, Field, create_model
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from app.models.job_progress import JobProgressEvent
@@ -15,6 +17,7 @@ from app.models.job import ProcessingJob
 from app.models.video import Video
 from app.core.database import AsyncSessionLocal
 from app.clients.youtube import YouTubeClient
+from app.clients.gemini import GeminiClient
 from app.core.config import settings
 from app.core.redis import get_redis_client
 
@@ -52,6 +55,77 @@ def parse_iso8601_duration(duration_str: str) -> int:
         return int(duration_obj.total_seconds())
     except Exception:
         return 0  # Fallback
+
+
+def _create_pydantic_schema_from_jsonb(schema_fields: Dict[str, Any]) -> type[BaseModel]:
+    """
+    Create Pydantic model dynamically from JSONB schema definition.
+
+    Converts Schema.fields JSONB format to a Pydantic BaseModel for use
+    with Gemini API structured output.
+
+    Args:
+        schema_fields: Dictionary from Schema.fields JSONB column
+            Example: {
+                "categories": {
+                    "type": "array",
+                    "description": "Video categories",
+                    "required": True
+                },
+                "difficulty_level": {
+                    "type": "string",
+                    "description": "Difficulty level",
+                    "required": True
+                }
+            }
+
+    Returns:
+        Dynamically created Pydantic BaseModel class
+
+    Raises:
+        ValueError: If schema_fields is empty or malformed
+    """
+    if not schema_fields:
+        raise ValueError("schema_fields cannot be empty")
+
+    # Type mapping from JSON schema to Python types
+    type_mapping = {
+        "string": str,
+        "integer": int,
+        "number": float,
+        "boolean": bool,
+        "array": list[str],  # Simplified - assumes array of strings
+        "object": Dict[str, Any],
+    }
+
+    # Build Pydantic field definitions
+    fields = {}
+    for field_name, field_spec in schema_fields.items():
+        # Get field type
+        json_type = field_spec.get("type", "string")
+        python_type = type_mapping.get(json_type, str)
+
+        # Get description
+        description = field_spec.get("description", "")
+
+        # Determine if required
+        is_required = field_spec.get("required", False)
+
+        # Create field definition
+        if is_required:
+            # Required field
+            fields[field_name] = (python_type, Field(description=description))
+        else:
+            # Optional field with default None
+            fields[field_name] = (
+                Optional[python_type],
+                Field(default=None, description=description),
+            )
+
+    # Create dynamic Pydantic model
+    schema_model = create_model("DynamicExtractionSchema", **fields)
+
+    return schema_model
 
 
 async def process_video(
@@ -101,6 +175,36 @@ async def process_video(
         # Fetch transcript (optional - graceful degradation)
         transcript = await youtube_client.get_video_transcript(youtube_id)
 
+        # Extract structured data using Gemini (if schema and transcript available)
+        extracted_data = None
+        if schema and transcript:
+            try:
+                # Create Pydantic schema from JSONB schema definition
+                schema_model = _create_pydantic_schema_from_jsonb(schema)
+
+                # Initialize Gemini client
+                gemini_client = GeminiClient(api_key=settings.gemini_api_key)
+
+                # Extract structured data
+                logger.info(f"Extracting structured data for video {video_id} with Gemini")
+                result = await gemini_client.extract_structured_data(
+                    transcript=transcript,
+                    schema_model=schema_model
+                )
+
+                # Convert to dict for JSONB storage
+                extracted_data = result.model_dump()
+                logger.info(f"Gemini extraction completed for video {video_id}")
+
+            except Exception as e:
+                # Graceful degradation - log error but don't fail video processing
+                logger.warning(
+                    f"Gemini extraction failed for video {video_id}: {e}. "
+                    f"Continuing with metadata only.",
+                    exc_info=True
+                )
+                # extracted_data remains None
+
         # Parse published_at timestamp
         published_at = None
         if metadata.get("published_at"):
@@ -112,7 +216,7 @@ async def process_video(
         # Parse duration from ISO 8601 to seconds
         duration_seconds = parse_iso8601_duration(metadata.get("duration", ""))
 
-        # Update video in database with metadata
+        # Update video in database with metadata AND extracted data
         async with AsyncSessionLocal() as db:
             video = await db.get(Video, UUID(video_id))
             if video:
@@ -121,7 +225,7 @@ async def process_video(
                 video.duration = duration_seconds
                 video.thumbnail_url = metadata["thumbnail_url"]
                 video.published_at = published_at
-                # Note: transcript not stored in Video model yet
+                video.extracted_data = extracted_data  # NEW: Store Gemini extraction
                 video.processing_status = "completed"
                 await db.commit()
 
