@@ -2,6 +2,9 @@
  * Vitest setup file for test environment configuration
  */
 
+// Import jest-dom custom matchers for toBeInTheDocument, toHaveAttribute, etc.
+import '@testing-library/jest-dom/vitest';
+
 // Mock localStorage for tests
 class LocalStorageMock {
   private store: Record<string, string> = {};
