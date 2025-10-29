@@ -82,5 +82,49 @@ class Settings(BaseSettings):
 
         return v
 
+    @field_validator("gemini_api_key")
+    @classmethod
+    def validate_gemini_api_key(cls, v: str, info) -> str:
+        """
+        Validate Gemini API key at startup.
+
+        In production, require API key to be set (non-empty).
+        In development, allow empty but warn if Gemini features are used.
+
+        Args:
+            v: Gemini API key value
+            info: Validation context
+
+        Returns:
+            Validated API key
+
+        Raises:
+            ValueError: If production environment has empty API key
+        """
+        import logging
+
+        # Get env from values being validated
+        env = info.data.get("env", "development")
+
+        # Check if API key is empty
+        is_empty = not v or not v.strip()
+
+        # In production, reject empty API key
+        if env == "production" and is_empty:
+            raise ValueError(
+                "Gemini API key is required in production. "
+                "Set GEMINI_API_KEY environment variable."
+            )
+
+        # In development, warn if empty (features requiring Gemini will fail)
+        if is_empty and env == "development":
+            logging.warning(
+                "Gemini API key not set. "
+                "Video extraction features will not work. "
+                "Set GEMINI_API_KEY environment variable to enable."
+            )
+
+        return v
+
 
 settings = Settings()
