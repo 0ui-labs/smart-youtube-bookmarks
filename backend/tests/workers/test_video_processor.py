@@ -35,7 +35,7 @@ async def arq_worker(arq_redis):
 
 
 @pytest.mark.asyncio
-async def test_process_video_updates_status(test_db, test_user):
+async def test_process_video_updates_status(test_db, test_user, mock_session_factory, mock_youtube_client):
     """Test that process_video changes status from pending."""
     # Arrange: Create test list first (foreign key requirement)
     bookmark_list = BookmarkList(
@@ -58,19 +58,19 @@ async def test_process_video_updates_status(test_db, test_user):
     await test_db.refresh(video)
 
     # Act: Process video
-    ctx = {"db": test_db}
-    result = await process_video(ctx, str(video.id), str(bookmark_list.id), {})
+    with patch('app.workers.video_processor.AsyncSessionLocal', mock_session_factory):
+        ctx = {"db": test_db}
+        result = await process_video(ctx, str(video.id), str(bookmark_list.id), {})
 
     # Assert: Status changed and result is success
     await test_db.refresh(video)
-    # Stub doesn't update DB yet, so status remains "pending"
-    assert video.processing_status == "pending"
+    assert video.processing_status == "completed"
     assert result["status"] == "success"
     assert result["video_id"] == str(video.id)
 
 
 @pytest.mark.asyncio
-async def test_process_video_with_retry_on_transient_error(test_db, test_user):
+async def test_process_video_with_retry_on_transient_error(test_db, test_user, mock_session_factory, mock_youtube_client):
     """Test that process_video categorizes transient errors correctly."""
     from app.workers.video_processor import TRANSIENT_ERRORS
     import asyncpg
@@ -93,8 +93,9 @@ async def test_process_video_with_retry_on_transient_error(test_db, test_user):
     await test_db.commit()
     await test_db.refresh(video)
 
-    # Stub should still return success
-    result = await process_video(ctx, str(video.id), str(bookmark_list.id), {})
+    # Now returns success with YouTube integration
+    with patch('app.workers.video_processor.AsyncSessionLocal', mock_session_factory):
+        result = await process_video(ctx, str(video.id), str(bookmark_list.id), {})
     assert result["status"] == "success"
 
 
@@ -113,8 +114,26 @@ async def mock_session_factory(test_engine):
     return async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
 
 
+@pytest.fixture
+def mock_youtube_client():
+    """Mock YouTube client for all worker tests"""
+    with patch('app.workers.video_processor.YouTubeClient') as mock_client_class:
+        mock_client = AsyncMock()
+        mock_client.get_video_metadata.return_value = {
+            "video_id": "test123",
+            "title": "Test Video",
+            "channel": "Test Channel",
+            "published_at": "2025-01-01T00:00:00Z",
+            "thumbnail_url": "https://example.com/thumb.jpg",
+            "duration": "PT3M33S"
+        }
+        mock_client.get_video_transcript.return_value = "Test transcript"
+        mock_client_class.return_value = mock_client
+        yield mock_client_class
+
+
 @pytest.mark.asyncio
-async def test_worker_publishes_progress_to_redis_and_db(mock_redis, test_db, test_user, mock_session_factory):
+async def test_worker_publishes_progress_to_redis_and_db(mock_redis, test_db, test_user, mock_session_factory, mock_youtube_client):
     """Test that worker publishes progress to both Redis and DB"""
     from app.workers.video_processor import process_video_list
 
@@ -163,7 +182,7 @@ async def test_worker_publishes_progress_to_redis_and_db(mock_redis, test_db, te
 
 
 @pytest.mark.asyncio
-async def test_worker_continues_on_redis_failure(mock_redis, test_db, test_user, mock_session_factory):
+async def test_worker_continues_on_redis_failure(mock_redis, test_db, test_user, mock_session_factory, mock_youtube_client):
     """Test that worker continues processing if Redis publish fails (best-effort)"""
     from app.workers.video_processor import process_video_list
 
@@ -245,7 +264,7 @@ async def test_worker_continues_on_db_failure(mock_redis, test_db, test_user):
 
 
 @pytest.mark.asyncio
-async def test_worker_throttles_progress_updates(mock_redis, test_db, test_user, mock_session_factory):
+async def test_worker_throttles_progress_updates(mock_redis, test_db, test_user, mock_session_factory, mock_youtube_client):
     """Test that worker throttles progress for large batches"""
     from app.workers.video_processor import process_video_list
 
@@ -291,7 +310,7 @@ async def test_worker_throttles_progress_updates(mock_redis, test_db, test_user,
 
 
 @pytest.mark.asyncio
-async def test_user_id_cached_in_context(mock_redis, test_db, test_user, mock_session_factory):
+async def test_user_id_cached_in_context(mock_redis, test_db, test_user, mock_session_factory, mock_youtube_client):
     """Test that user_id is looked up once and cached"""
     from app.workers.video_processor import process_video_list
 
@@ -331,3 +350,65 @@ async def test_user_id_cached_in_context(mock_redis, test_db, test_user, mock_se
         # Assert: Context contains cached user_id
         assert "job_user_id" in ctx
         assert ctx["job_user_id"] == str(test_user.id)
+
+
+@pytest.mark.asyncio
+async def test_process_video_with_youtube_integration(test_db, test_user, mock_session_factory):
+    """Test video processing with YouTube client integration"""
+    from app.workers.video_processor import process_video
+
+    # Arrange: Create test list
+    bookmark_list = BookmarkList(
+        name="Test List",
+        description="Test list for YouTube integration",
+        user_id=test_user.id
+    )
+    test_db.add(bookmark_list)
+    await test_db.commit()
+    await test_db.refresh(bookmark_list)
+
+    # Arrange: Create test video
+    video = Video(
+        list_id=bookmark_list.id,
+        youtube_id="dQw4w9WgXcQ",
+        processing_status="pending"
+    )
+    test_db.add(video)
+    await test_db.commit()
+    await test_db.refresh(video)
+
+    # Mock YouTube client responses
+    mock_metadata = {
+        "video_id": "dQw4w9WgXcQ",
+        "title": "Test Video Title",
+        "channel": "Test Channel",
+        "published_at": "2025-01-01T00:00:00Z",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "duration": "PT3M33S"
+    }
+
+    mock_transcript = "This is a test transcript"
+
+    with patch('app.workers.video_processor.AsyncSessionLocal', mock_session_factory), \
+         patch('app.workers.video_processor.YouTubeClient') as mock_client_class:
+        mock_client = AsyncMock()
+        mock_client.get_video_metadata.return_value = mock_metadata
+        mock_client.get_video_transcript.return_value = mock_transcript
+        mock_client_class.return_value = mock_client
+
+        # Act: Call process_video
+        ctx = {"db": test_db}
+        result = await process_video(ctx, str(video.id), str(bookmark_list.id), {})
+
+    # Assert: Result is success
+    assert result["status"] == "success"
+    assert mock_client.get_video_metadata.called
+    assert mock_client.get_video_transcript.called
+
+    # Assert: Video was updated in database
+    await test_db.refresh(video)
+    assert video.title == "Test Video Title"
+    assert video.channel == "Test Channel"
+    assert video.duration == 213  # PT3M33S = 3*60 + 33 = 213 seconds
+    assert video.thumbnail_url == "https://example.com/thumb.jpg"
+    assert video.processing_status == "completed"

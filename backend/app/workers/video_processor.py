@@ -6,11 +6,17 @@ import asyncpg
 import logging
 import time
 import json
+import random
+from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from app.models.job_progress import JobProgressEvent
 from app.models.job import ProcessingJob
+from app.models.video import Video
 from app.core.database import AsyncSessionLocal
+from app.clients.youtube import YouTubeClient
+from app.core.config import settings
+from app.core.redis import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +33,31 @@ TRANSIENT_ERRORS = (
     asyncpg.exceptions.TooManyConnectionsError,
     asyncpg.exceptions.CannotConnectNowError,
 )
+
+
+def parse_iso8601_duration(duration_str: str) -> int:
+    """
+    Parse ISO 8601 duration (PT3M33S) to total seconds
+
+    Args:
+        duration_str: ISO 8601 duration string (e.g., "PT3M33S", "PT1H2M3S")
+
+    Returns:
+        Total duration in seconds
+    """
+    import re
+
+    pattern = r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?'
+    match = re.match(pattern, duration_str)
+
+    if not match:
+        return 0
+
+    hours = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    seconds = int(match.group(3) or 0)
+
+    return hours * 3600 + minutes * 60 + seconds
 
 
 async def process_video(
@@ -56,14 +87,61 @@ async def process_video(
     logger.info(f"Processing video {video_id} (attempt {job_try}/{max_tries})")
 
     try:
-        # TODO: Implement full processing pipeline
-        # 1. Fetch YouTube metadata
-        # 2. Get transcript
-        # 3. Extract data via Gemini
-        # 4. Update database
+        # Fetch video from database to get YouTube ID
+        async with AsyncSessionLocal() as db:
+            video = await db.get(Video, UUID(video_id))
+            if not video:
+                raise ValueError(f"Video not found in database: {video_id}")
+            youtube_id = video.youtube_id
 
-        # For now, just mark as success (stub implementation)
+        # Initialize YouTube client with Redis caching
+        redis = await get_redis_client()
+        youtube_client = YouTubeClient(
+            api_key=settings.youtube_api_key,
+            redis_client=redis
+        )
+
+        # Fetch video metadata
+        metadata = await youtube_client.get_video_metadata(youtube_id)
+
+        # Fetch transcript (optional - graceful degradation)
+        transcript = await youtube_client.get_video_transcript(youtube_id)
+
+        # Parse published_at timestamp
+        published_at = None
+        if metadata.get("published_at"):
+            try:
+                published_at = datetime.fromisoformat(metadata["published_at"].replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                logger.warning(f"Failed to parse published_at: {metadata.get('published_at')}")
+
+        # Parse duration from ISO 8601 to seconds
+        duration_seconds = parse_iso8601_duration(metadata.get("duration", ""))
+
+        # Update video in database with metadata
+        async with AsyncSessionLocal() as db:
+            video = await db.get(Video, UUID(video_id))
+            if video:
+                video.title = metadata["title"]
+                video.channel = metadata["channel"]
+                video.duration = duration_seconds
+                video.thumbnail_url = metadata["thumbnail_url"]
+                video.published_at = published_at
+                # Note: transcript not stored in Video model yet
+                video.processing_status = "completed"
+                await db.commit()
+
         return {"status": "success", "video_id": video_id}
+
+    except ValueError as e:
+        # Video not found (404)
+        logger.warning(f"Video not found: {video_id} - {e}")
+        async with AsyncSessionLocal() as db:
+            video = await db.get(Video, UUID(video_id))
+            if video:
+                video.processing_status = "failed"
+                await db.commit()
+        return {"status": "failed", "error": str(e)}
 
     except TRANSIENT_ERRORS as e:
         # Transient errors: retry with exponential backoff
