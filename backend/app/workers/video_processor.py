@@ -310,9 +310,22 @@ async def process_video_list(
     ctx: dict,
     job_id: str,
     list_id: str,
-    video_ids: list[str]
+    video_ids: list[str],
+    schema: dict = None
 ) -> dict:
-    """Process multiple videos with throttled progress updates"""
+    """
+    Process multiple videos with throttled progress updates.
+
+    Args:
+        ctx: ARQ context
+        job_id: Processing job UUID
+        list_id: Bookmark list UUID
+        video_ids: List of video UUIDs to process
+        schema: Optional schema fields for Gemini extraction (JSONB format)
+
+    Returns:
+        dict: Processing results with counts
+    """
 
     # OPTIMIZATION: Lookup user_id ONCE at start, cache in context
     async with AsyncSessionLocal() as session:
@@ -355,8 +368,8 @@ async def process_video_list(
         is_error = False
         error_msg = None
         try:
-            # Process single video (existing function)
-            result = await process_video(ctx, video_id, list_id, {})
+            # Process single video with schema
+            result = await process_video(ctx, video_id, list_id, schema or {})
             processed += 1
         except Exception as e:
             failed += 1

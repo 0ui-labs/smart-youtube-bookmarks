@@ -296,3 +296,142 @@ async def test_process_video_handles_gemini_errors_gracefully(
     assert video.title == "Test"  # Metadata saved
     # Extracted data should contain error info or be None
     # (Implementation can decide: store error in extracted_data or leave None)
+
+
+@pytest.mark.asyncio
+async def test_process_video_list_propagates_schema_to_extraction(
+    test_db, test_user, mock_session_factory, mock_youtube_client
+):
+    """
+    CRITICAL TEST: Verify schema is propagated through the entire pipeline.
+
+    This test verifies the fix for the critical bug where schema was hardcoded
+    as {} in process_video_list at line 359.
+
+    Flow:
+    1. Create schema in database
+    2. Create list with schema_id
+    3. Create videos
+    4. Call process_video_list WITH schema parameter
+    5. Verify Gemini extraction is called WITH the schema
+
+    RED PHASE: This test will FAIL until we fix process_video_list signature
+    and update the call at line 359.
+    """
+    from app.workers.video_processor import process_video_list
+    from app.models.job import ProcessingJob
+
+    # Arrange: Create schema
+    schema = Schema(
+        name="Pipeline Test Schema",
+        fields={
+            "categories": {
+                "type": "array",
+                "description": "Video categories",
+                "required": True,
+            },
+            "sentiment": {
+                "type": "string",
+                "description": "Overall sentiment",
+                "required": True,
+            },
+        },
+    )
+    test_db.add(schema)
+    await test_db.commit()
+    await test_db.refresh(schema)
+
+    # Arrange: Create list with schema
+    bookmark_list = BookmarkList(
+        name="Test List with Schema",
+        user_id=test_user.id,
+        schema_id=schema.id,
+    )
+    test_db.add(bookmark_list)
+    await test_db.commit()
+    await test_db.refresh(bookmark_list)
+
+    # Arrange: Create processing job
+    job = ProcessingJob(
+        list_id=bookmark_list.id,
+        total_videos=2,
+        status="running"
+    )
+    test_db.add(job)
+    await test_db.commit()
+    await test_db.refresh(job)
+
+    # Arrange: Create test videos
+    video1 = Video(
+        list_id=bookmark_list.id,
+        youtube_id="video1",
+        processing_status="pending",
+    )
+    video2 = Video(
+        list_id=bookmark_list.id,
+        youtube_id="video2",
+        processing_status="pending",
+    )
+    test_db.add_all([video1, video2])
+    await test_db.commit()
+    await test_db.refresh(video1)
+    await test_db.refresh(video2)
+
+    # Mock YouTube API
+    mock_youtube_instance = mock_youtube_client.return_value
+    mock_youtube_instance.get_video_metadata.return_value = {
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "duration": "PT5M",
+        "thumbnail_url": "https://test.jpg",
+        "published_at": "2024-01-01T00:00:00Z",
+    }
+    mock_youtube_instance.get_video_transcript.return_value = "Test transcript content"
+
+    # Mock Gemini extraction
+    with patch("app.workers.video_processor.GeminiClient") as MockGeminiClient:
+        mock_gemini_instance = AsyncMock()
+
+        # Mock extracted data response
+        mock_extracted_data = MagicMock()
+        mock_extracted_data.model_dump.return_value = {
+            "categories": ["Tutorial", "Tech"],
+            "sentiment": "Positive",
+        }
+
+        mock_gemini_instance.extract_structured_data.return_value = mock_extracted_data
+        MockGeminiClient.return_value = mock_gemini_instance
+
+        # Mock session factory and Redis
+        mock_redis = AsyncMock()
+        mock_redis.publish = AsyncMock(return_value=1)
+
+        with patch("app.workers.video_processor.AsyncSessionLocal", mock_session_factory):
+            # Act: Process videos with schema (NEW PARAMETER)
+            ctx = {"redis": mock_redis}
+            result = await process_video_list(
+                ctx,
+                job_id=str(job.id),
+                list_id=str(bookmark_list.id),
+                video_ids=[str(video1.id), str(video2.id)],
+                schema=schema.fields  # CRITICAL: Pass schema to worker
+            )
+
+    # Assert: Videos were processed successfully
+    await test_db.refresh(video1)
+    await test_db.refresh(video2)
+
+    assert result["processed"] == 2
+    assert result["failed"] == 0
+
+    # Assert: Gemini extraction was called FOR EACH VIDEO
+    assert mock_gemini_instance.extract_structured_data.call_count == 2
+
+    # Assert: Extracted data was stored in both videos
+    assert video1.extracted_data is not None
+    assert video1.extracted_data["categories"] == ["Tutorial", "Tech"]
+    assert video1.extracted_data["sentiment"] == "Positive"
+
+    assert video2.extracted_data is not None
+    assert video2.extracted_data["categories"] == ["Tutorial", "Tech"]
+    assert video2.extracted_data["sentiment"] == "Positive"

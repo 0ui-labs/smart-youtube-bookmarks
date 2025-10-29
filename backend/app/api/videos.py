@@ -43,9 +43,33 @@ async def _enqueue_video_processing(
     list_id: int,
     total_videos: int
 ) -> Optional[ProcessingJob]:
-    """Helper to create ProcessingJob and enqueue ARQ task"""
+    """
+    Helper to create ProcessingJob and enqueue ARQ task.
+
+    CRITICAL: Fetches schema from list and passes it to worker for Gemini extraction.
+    """
     if total_videos == 0:
         return None
+
+    # Fetch list with schema (eager load)
+    result = await db.execute(
+        select(BookmarkList).where(BookmarkList.id == list_id)
+    )
+    bookmark_list = result.scalar_one_or_none()
+
+    if not bookmark_list:
+        raise ValueError(f"List {list_id} not found")
+
+    # Fetch schema fields if list has schema
+    schema_fields = None
+    if bookmark_list.schema_id:
+        from app.models.schema import Schema
+        result = await db.execute(
+            select(Schema).where(Schema.id == bookmark_list.schema_id)
+        )
+        schema = result.scalar_one_or_none()
+        if schema:
+            schema_fields = schema.fields  # JSONB dict
 
     # Create processing job
     job = ProcessingJob(
@@ -66,13 +90,14 @@ async def _enqueue_video_processing(
     )
     video_ids = [str(vid) for vid in result.scalars().all()]
 
-    # Enqueue ARQ job
+    # Enqueue ARQ job with schema
     arq_pool = await get_arq_pool()
     await arq_pool.enqueue_job(
         "process_video_list",
         str(job.id),
         str(list_id),
-        video_ids
+        video_ids,
+        schema_fields  # CRITICAL: Pass schema to worker
     )
 
     return job
