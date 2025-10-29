@@ -205,8 +205,14 @@ async def process_video(
                 # Get cached Gemini client (singleton)
                 gemini_client = get_gemini_client()
 
+                # Cost tracking: Count input tokens
+                input_tokens = await gemini_client.count_tokens(transcript)
+
                 # Extract structured data
-                logger.info(f"Extracting structured data for video {video_id} with Gemini")
+                logger.info(
+                    f"Extracting structured data for video {video_id} with Gemini "
+                    f"(input tokens: {input_tokens})"
+                )
                 result = await gemini_client.extract_structured_data(
                     transcript=transcript,
                     schema_model=schema_model
@@ -214,7 +220,22 @@ async def process_video(
 
                 # Convert to dict for JSONB storage
                 extracted_data = result.model_dump()
-                logger.info(f"Gemini extraction completed for video {video_id}")
+
+                # Cost tracking: Count output tokens and calculate cost
+                output_text = json.dumps(extracted_data)
+                output_tokens = await gemini_client.count_tokens(output_text)
+
+                # Gemini 2.0 Flash pricing (per 1M tokens)
+                input_cost = (input_tokens / 1_000_000) * 0.075  # $0.075 per 1M
+                output_cost = (output_tokens / 1_000_000) * 0.30  # $0.30 per 1M
+                total_cost = input_cost + output_cost
+
+                logger.info(
+                    f"Gemini extraction completed for video {video_id}: "
+                    f"input={input_tokens} tokens (${input_cost:.6f}), "
+                    f"output={output_tokens} tokens (${output_cost:.6f}), "
+                    f"total=${total_cost:.6f}"
+                )
 
             except Exception as e:
                 # Graceful degradation - log error but don't fail video processing

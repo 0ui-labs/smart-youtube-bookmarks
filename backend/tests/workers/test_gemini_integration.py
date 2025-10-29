@@ -122,6 +122,8 @@ async def test_process_video_with_gemini_extraction(
     }
 
     mock_gemini_instance.extract_structured_data.return_value = mock_extracted_data
+    # Mock token counting for cost tracking
+    mock_gemini_instance.count_tokens.return_value = 1500  # Mock token count
 
     with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
         # Mock session factory
@@ -274,6 +276,8 @@ async def test_process_video_handles_gemini_errors_gracefully(
     mock_gemini_instance.extract_structured_data.side_effect = Exception(
         "Gemini API quota exceeded"
     )
+    # Mock token counting for cost tracking (called before exception)
+    mock_gemini_instance.count_tokens.return_value = 1500
 
     with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
         with patch(
@@ -396,6 +400,8 @@ async def test_process_video_list_propagates_schema_to_extraction(
     }
 
     mock_gemini_instance.extract_structured_data.return_value = mock_extracted_data
+    # Mock token counting for cost tracking
+    mock_gemini_instance.count_tokens.return_value = 1500  # Mock token count
 
     # Mock session factory and Redis
     mock_redis = AsyncMock()
