@@ -19,13 +19,21 @@ echo ""
 # 2. Semgrep Authentication
 echo "🔍 Semgrep Status:"
 echo "----------------------------------------"
-if semgrep login 2>&1 | grep -q "already exists"; then
+# Use 'semgrep whoami' to check auth status without triggering login
+if semgrep whoami &> /dev/null; then
     echo "✅ Semgrep authenticated (Pro Rules available)"
+    echo "   User: $(semgrep whoami 2>/dev/null | head -1)"
     echo "   Version: $(semgrep --version)"
     echo "   Pro Rules: FastAPI, React, Django, Flask, Express"
 else
-    echo "⚠️  Semgrep NOT authenticated"
-    echo "   Run: semgrep login"
+    echo "❌ Semgrep NOT authenticated"
+    echo ""
+    echo "   ⚠️  MANUAL ACTION REQUIRED ⚠️"
+    echo "   Login nicht möglich via Bash (Token-Eingabe erforderlich)"
+    echo ""
+    echo "   Bitte in DEINEM Terminal ausführen:"
+    echo "   → semgrep login"
+    echo ""
     echo "   Impact: Missing 637 FastAPI/React Pro Rules!"
 fi
 echo ""
@@ -39,12 +47,24 @@ if command -v coderabbit &> /dev/null; then
         CODERABBIT_VERSION=$(coderabbit --version 2>&1 | head -1 || echo "Unknown")
         echo "   Version: $CODERABBIT_VERSION"
     else
-        echo "⚠️  CodeRabbit NOT authenticated"
-        echo "   Run: coderabbit auth login"
+        echo "❌ CodeRabbit NOT authenticated"
+        echo ""
+        echo "   ⚠️  MANUAL ACTION REQUIRED ⚠️"
+        echo "   Login nicht möglich via Bash (Browser-Auth erforderlich)"
+        echo ""
+        echo "   Bitte in DEINEM Terminal ausführen:"
+        echo "   → coderabbit auth login"
+        echo ""
+        echo "   (Öffnet Browser für GitHub OAuth)"
     fi
 else
-    echo "⚠️  CodeRabbit CLI not installed"
-    echo "   Install: curl -fsSL https://cli.coderabbit.ai/install.sh | sh"
+    echo "❌ CodeRabbit CLI not installed"
+    echo ""
+    echo "   ⚠️  MANUAL ACTION REQUIRED ⚠️"
+    echo "   Installation nicht möglich via Bash"
+    echo ""
+    echo "   Bitte in DEINEM Terminal ausführen:"
+    echo "   → curl -fsSL https://cli.coderabbit.ai/install.sh | sh"
 fi
 echo ""
 
@@ -90,20 +110,27 @@ echo ""
 
 ISSUES=0
 
-# Check semgrep
-if ! semgrep login 2>&1 | grep -q "already exists"; then
-    echo "⚠️  ACTION REQUIRED: semgrep login"
+# Check semgrep (use whoami instead of login to avoid triggering auth flow)
+if ! semgrep whoami &> /dev/null; then
+    echo "❌ ACTION REQUIRED: Semgrep Login"
+    echo "   → Open YOUR terminal and run: semgrep login"
+    echo ""
     ISSUES=$((ISSUES + 1))
 fi
 
 # Check CodeRabbit
 if command -v coderabbit &> /dev/null; then
     if ! coderabbit auth status 2>&1 | grep -q "authenticated"; then
-        echo "⚠️  ACTION REQUIRED: coderabbit auth login"
+        echo "❌ ACTION REQUIRED: CodeRabbit Login"
+        echo "   → Open YOUR terminal and run: coderabbit auth login"
+        echo ""
         ISSUES=$((ISSUES + 1))
     fi
 else
-    echo "⚠️  ACTION REQUIRED: Install CodeRabbit CLI"
+    echo "❌ ACTION REQUIRED: Install CodeRabbit CLI"
+    echo "   → Open YOUR terminal and run:"
+    echo "   → curl -fsSL https://cli.coderabbit.ai/install.sh | sh"
+    echo ""
     ISSUES=$((ISSUES + 1))
 fi
 
@@ -111,8 +138,11 @@ if [ $ISSUES -eq 0 ]; then
     echo "✅ All tools ready! You can start working."
 else
     echo ""
-    echo "Found $ISSUES issue(s) that need attention."
-    echo "Fix these before starting Phase 1 of the workflow."
+    echo "⚠️  Found $ISSUES issue(s) that need attention."
+    echo "⚠️  User muss diese MANUELL im Terminal beheben!"
+    echo "⚠️  (Login/Installation nicht möglich via Claude Bash)"
+    echo ""
+    echo "After fixing, re-run this script to verify."
 fi
 
 echo ""
