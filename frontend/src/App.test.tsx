@@ -31,7 +31,7 @@ describe('App Navigation', () => {
     vi.clearAllMocks();
   });
 
-  it('shows navigation menu with Lists, Videos, Dashboard links', () => {
+  it('shows navigation menu with Lists and Dashboard links', () => {
     render(<App />);
 
     expect(screen.getByText('Lists')).toBeInTheDocument();
