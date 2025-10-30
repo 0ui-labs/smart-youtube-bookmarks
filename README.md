@@ -56,6 +56,34 @@ WebSocket-based progress tracking for CSV video imports with resilient reconnect
 
 ---
 
+### Dashboard 📊
+
+Real-time job progress monitoring dashboard with WebSocket connection.
+
+**Features:**
+- Live progress updates (no page refresh required)
+- Connection status indicator (connecting/connected/reconnecting/disconnected)
+- Job cards with progress bars
+- Error messages for failed jobs
+- Auto-cleanup (completed jobs removed after 5 min)
+- History sync on reconnection
+
+**Technology:**
+- `react-use-websocket` for connection management
+- FastAPI WebSocket endpoint (`/api/ws/progress`)
+- Redis Pub/Sub for real-time events
+- PostgreSQL for progress history persistence
+
+**Usage:**
+1. Click "Dashboard" in navigation menu
+2. View all active video processing jobs
+3. Monitor real-time progress updates
+4. Jobs automatically disappear after completion (5 min TTL)
+
+**See:** `docs/features/dashboard-real-time-progress.md` for detailed documentation.
+
+---
+
 ### Video Collections Management 📚
 
 - **List Organization** - Create and manage multiple video collections
