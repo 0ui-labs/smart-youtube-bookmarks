@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Dashboard } from './Dashboard';
 import { ReadyState } from 'react-use-websocket';
@@ -69,9 +69,12 @@ describe('Dashboard Integration Tests', () => {
     expect(screen.getByText(/job-1/i)).toBeInTheDocument();
     expect(screen.getByText(/job-2/i)).toBeInTheDocument();
 
-    // Should show progress for each job
-    expect(screen.getByText('25%')).toBeInTheDocument();
-    expect(screen.getByText('100%')).toBeInTheDocument();
+    // Should show progress for each job (scoped to specific job cards)
+    const job1Card = screen.getByTestId('job-card-job-1');
+    const job2Card = screen.getByTestId('job-card-job-2');
+
+    expect(within(job1Card).getByText('25%')).toBeInTheDocument();
+    expect(within(job2Card).getByText('100%')).toBeInTheDocument();
   });
 
   it('updates UI when job progress changes', async () => {
@@ -99,7 +102,10 @@ describe('Dashboard Integration Tests', () => {
     });
 
     const { rerender } = render(<Dashboard />);
-    expect(screen.getByText('25%')).toBeInTheDocument();
+
+    // Verify initial 25% progress (scoped to job card)
+    const job1Card = screen.getByTestId('job-card-job-1');
+    expect(within(job1Card).getByText('25%')).toBeInTheDocument();
 
     // Update to 50% progress
     const updatedJobs = new Map<string, ProgressUpdate>([
@@ -122,8 +128,10 @@ describe('Dashboard Integration Tests', () => {
 
     rerender(<Dashboard />);
 
+    // Verify updated 50% progress (scoped to job card)
     await waitFor(() => {
-      expect(screen.getByText('50%')).toBeInTheDocument();
+      const updatedJob1Card = screen.getByTestId('job-card-job-1');
+      expect(within(updatedJob1Card).getByText('50%')).toBeInTheDocument();
     });
   });
 

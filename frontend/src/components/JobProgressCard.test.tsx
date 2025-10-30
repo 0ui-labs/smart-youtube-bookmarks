@@ -22,6 +22,13 @@ describe('JobProgressCard', () => {
     expect(screen.getByText('Processing videos...')).toBeInTheDocument();
   });
 
+  it('renders with data-testid for precise targeting', () => {
+    render(<JobProgressCard job={mockJob} />);
+
+    // Should have data-testid with job_id for test targeting
+    expect(screen.getByTestId('job-card-test-job-123')).toBeInTheDocument();
+  });
+
   it('displays ProgressBar component', () => {
     render(<JobProgressCard job={mockJob} />);
 

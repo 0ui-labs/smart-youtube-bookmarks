@@ -12,7 +12,10 @@ export interface JobProgressCardProps {
  */
 export function JobProgressCard({ job }: JobProgressCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200">
+    <div
+      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200"
+      data-testid={`job-card-${job.job_id}`}
+    >
       {/* Card Header */}
       <div className="px-4 pt-4 pb-2 border-b border-gray-200">
         <div className="flex justify-between items-center">
