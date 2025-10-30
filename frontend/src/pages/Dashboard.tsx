@@ -1,5 +1,6 @@
 import { useWebSocket } from '../hooks/useWebSocket';
 import { ReadyState } from 'react-use-websocket';
+import { JobProgressCard } from '../components/JobProgressCard';
 
 /**
  * Dashboard Page - Real-time job progress monitoring
@@ -70,17 +71,7 @@ export function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {jobs.map((job) => (
-              <div key={job.job_id} className="bg-white rounded-lg shadow p-4">
-                <p className="text-sm font-medium text-gray-900">
-                  Job {job.job_id.slice(0, 8)}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {job.message}
-                </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  Progress: {job.progress}% ({job.current_video}/{job.total_videos} videos)
-                </p>
-              </div>
+              <JobProgressCard key={job.job_id} job={job} />
             ))}
           </div>
         )}
