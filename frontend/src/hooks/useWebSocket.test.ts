@@ -63,6 +63,33 @@ describe('useWebSocket', () => {
     MockWebSocket.instances = [];
   });
 
+  describe('Hybrid Approach: react-use-websocket Integration', () => {
+    it('uses react-use-websocket for connection management', async () => {
+      // This test will fail until we refactor to use react-use-websocket
+      const { result } = renderHook(() => useWebSocket());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // Should have readyState from react-use-websocket
+      expect(result.current.readyState).toBeDefined();
+      expect([0, 1, 2, 3]).toContain(result.current.readyState); // Valid WebSocket states
+    });
+
+    it('provides sendJsonMessage function from react-use-websocket', async () => {
+      const { result } = renderHook(() => useWebSocket());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // Should have sendJsonMessage function
+      expect(result.current.sendJsonMessage).toBeDefined();
+      expect(typeof result.current.sendJsonMessage).toBe('function');
+    });
+  });
+
   describe('Option B Security: Post-Connection Authentication', () => {
     it('connects WITH token in URL (Query Parameter Auth)', async () => {
       renderHook(() => useWebSocket());
