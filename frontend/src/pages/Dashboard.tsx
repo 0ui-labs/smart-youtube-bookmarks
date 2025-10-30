@@ -1,6 +1,7 @@
 import { useWebSocket } from '../hooks/useWebSocket';
 import { ReadyState } from 'react-use-websocket';
 import { JobProgressCard } from '../components/JobProgressCard';
+import { ConnectionStatusBanner } from '../components/ConnectionStatusBanner';
 
 /**
  * Dashboard Page - Real-time job progress monitoring
@@ -14,10 +15,6 @@ export function Dashboard() {
   // Convert Map to Array for rendering
   const jobs = Array.from(jobProgress.values());
 
-  // Connection status
-  const isConnected = readyState === ReadyState.OPEN;
-  const isConnecting = readyState === ReadyState.CONNECTING;
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -30,35 +27,7 @@ export function Dashboard() {
       </header>
 
       {/* Connection Status Banner */}
-      {isConnecting && (
-        <div className="bg-yellow-50 border-b border-yellow-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-            <p className="text-sm text-yellow-800">
-              ⏳ Connecting to progress feed...
-            </p>
-          </div>
-        </div>
-      )}
-
-      {reconnecting && (
-        <div className="bg-orange-50 border-b border-orange-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-            <p className="text-sm text-orange-800">
-              🔄 Connection lost. Reconnecting...
-            </p>
-          </div>
-        </div>
-      )}
-
-      {isConnected && !reconnecting && (
-        <div className="bg-green-50 border-b border-green-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-            <p className="text-sm text-green-800">
-              ✓ Connected - Live updates enabled
-            </p>
-          </div>
-        </div>
-      )}
+      <ConnectionStatusBanner readyState={readyState} reconnecting={reconnecting} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
