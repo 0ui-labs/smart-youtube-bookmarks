@@ -1,5 +1,4 @@
 import { useWebSocket } from '../hooks/useWebSocket';
-import { ReadyState } from 'react-use-websocket';
 import { JobProgressCard } from '../components/JobProgressCard';
 import { ConnectionStatusBanner } from '../components/ConnectionStatusBanner';
 
