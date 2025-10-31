@@ -7,7 +7,16 @@ const VideoResponseSchema = z.object({
   id: z.string().uuid(),
   list_id: z.string().uuid(),
   youtube_id: z.string().length(11),
+
+  // YouTube Metadata (optional fields from API)
+  title: z.string().nullable(),
+  channel: z.string().nullable(),
+  thumbnail_url: z.string().nullable(),
+  duration: z.number().nullable(),
+  published_at: z.string().nullable(),
+
   processing_status: z.enum(['pending', 'processing', 'completed', 'failed']),
+  error_message: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 })

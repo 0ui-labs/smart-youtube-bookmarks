@@ -71,15 +71,22 @@ class VideoResponse(BaseModel):
     """
     Schema for video response.
 
-    Note: Only includes essential fields available immediately after creation.
-    Metadata fields (title, channel, duration, thumbnail_url, etc.) will be
-    populated by background processing (Task 8/9) and added to this schema
-    in future iterations.
+    Includes YouTube metadata fields populated immediately via API fetch.
+    Fields may be None if metadata fetch fails or video is not found.
     """
     id: UUID
     list_id: UUID
     youtube_id: str
+
+    # YouTube Metadata (fetched from YouTube Data API v3)
+    title: str | None = None
+    channel: str | None = None
+    thumbnail_url: str | None = None
+    duration: int | None = None  # Duration in seconds
+    published_at: datetime | None = None
+
     processing_status: str
+    error_message: str | None = None
     created_at: datetime
     updated_at: datetime
 

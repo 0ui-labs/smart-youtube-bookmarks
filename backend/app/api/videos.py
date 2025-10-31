@@ -157,9 +157,9 @@ async def add_video_to_list(
 
     - Validates list exists (404 if not found)
     - Extracts YouTube video ID from URL
+    - Fetches YouTube metadata immediately (title, channel, thumbnail, duration)
     - Checks for duplicates (409 if already in list)
-    - Sets processing status to "pending"
-    - Commits to database (critical fix)
+    - Commits to database with full metadata
 
     Args:
         list_id: UUID of the bookmark list
@@ -195,12 +195,60 @@ async def add_video_to_list(
             detail=str(e)
         )
 
-    # Create video
-    new_video = Video(
-        list_id=list_id,
-        youtube_id=youtube_id,
-        processing_status="pending"
+    # Fetch YouTube metadata immediately
+    redis = await get_redis_client()
+    youtube_client = YouTubeClient(
+        api_key=settings.youtube_api_key,
+        redis_client=redis
     )
+
+    # Fetch metadata for single video
+    try:
+        metadata_list = await youtube_client.get_batch_metadata([youtube_id])
+        metadata = metadata_list[0] if metadata_list else None
+    except Exception as e:
+        logger.error(f"YouTube metadata fetch failed for {youtube_id}: {e}")
+        metadata = None
+
+    # Create video with metadata (or basic if fetch failed)
+    if metadata:
+        # Parse duration from ISO 8601 to seconds
+        duration_seconds = None
+        if metadata.get("duration"):
+            try:
+                duration_obj = parse_duration(metadata["duration"])
+                duration_seconds = int(duration_obj.total_seconds())
+            except Exception:
+                pass
+
+        # Parse published_at
+        published_at = None
+        if metadata.get("published_at"):
+            try:
+                published_at = datetime.fromisoformat(
+                    metadata["published_at"].replace('Z', '+00:00')
+                )
+            except (ValueError, AttributeError):
+                pass
+
+        new_video = Video(
+            list_id=list_id,
+            youtube_id=youtube_id,
+            title=metadata.get("title"),
+            channel=metadata.get("channel"),
+            duration=duration_seconds,
+            thumbnail_url=metadata.get("thumbnail_url"),
+            published_at=published_at,
+            processing_status="completed"  # Metadata fetched successfully
+        )
+    else:
+        # Fallback: Create basic video if metadata fetch failed
+        new_video = Video(
+            list_id=list_id,
+            youtube_id=youtube_id,
+            processing_status="failed",
+            error_message="Could not fetch video metadata from YouTube"
+        )
 
     try:
         db.add(new_video)
