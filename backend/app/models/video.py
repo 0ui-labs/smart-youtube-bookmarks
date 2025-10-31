@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from .base import BaseModel
+from .tag import video_tags
 
 
 class Video(BaseModel):
@@ -37,6 +38,11 @@ class Video(BaseModel):
 
     # Relationships
     list: Mapped["BookmarkList"] = relationship("BookmarkList", back_populates="videos")
+    tags: Mapped[list["Tag"]] = relationship(
+        "Tag",
+        secondary=video_tags,
+        back_populates="videos"
+    )
 
     __table_args__ = (
         Index("idx_videos_list_id", "list_id"),

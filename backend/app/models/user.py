@@ -24,6 +24,7 @@ class User(BaseModel):
 
     # Relationships
     lists: Mapped[list["BookmarkList"]] = relationship("BookmarkList", back_populates="user")
+    tags: Mapped[list["Tag"]] = relationship("Tag", back_populates="user")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email})>"
