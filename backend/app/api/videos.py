@@ -500,7 +500,7 @@ async def bulk_upload_videos(
                             duration=duration_seconds,
                             thumbnail_url=metadata.get("thumbnail_url"),
                             published_at=published_at,
-                            processing_status="pending"  # Still pending for AI analysis
+                            processing_status="completed"  # Metadata fetched successfully
                         )
                         video_objects.append(video)
                     else:
@@ -522,7 +522,8 @@ async def bulk_upload_videos(
                     video = Video(
                         list_id=list_id,
                         youtube_id=video_data["youtube_id"],
-                        processing_status="pending"
+                        processing_status="failed",
+                        error_message="Failed to fetch video metadata from YouTube"
                     )
                     video_objects.append(video)
                 videos_to_create = video_objects

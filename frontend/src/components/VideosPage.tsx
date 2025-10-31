@@ -18,36 +18,6 @@ const columnHelper = createColumnHelper<VideoResponse>()
 // YouTube URL validation regex
 const YOUTUBE_URL_PATTERN = /^(https:\/\/(www\.|m\.)?youtube\.com\/watch\?v=[\w-]{11}|https:\/\/youtu\.be\/[\w-]{11}|https:\/\/(www\.)?youtube\.com\/embed\/[\w-]{11})$/
 
-const getStatusColor = (status: VideoResponse['processing_status']) => {
-  switch (status) {
-    case 'pending':
-      return 'bg-yellow-100 text-yellow-800'
-    case 'processing':
-      return 'bg-blue-100 text-blue-800'
-    case 'completed':
-      return 'bg-green-100 text-green-800'
-    case 'failed':
-      return 'bg-red-100 text-red-800'
-    default:
-      return 'bg-gray-100 text-gray-800'
-  }
-}
-
-const getStatusLabel = (status: VideoResponse['processing_status']) => {
-  switch (status) {
-    case 'pending':
-      return 'Ausstehend'
-    case 'processing':
-      return 'Verarbeitung'
-    case 'completed':
-      return 'Abgeschlossen'
-    case 'failed':
-      return 'Fehler'
-    default:
-      return status
-  }
-}
-
 interface VideosPageProps {
   listId: string
   onBack: () => void
@@ -94,7 +64,12 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
   const deleteVideo = useDeleteVideo(listId)
 
   // WebSocket hook for real-time progress updates
-  const { jobProgress, reconnecting, historyError } = useWebSocket()
+  // TEMPORARILY DISABLED: Causes flicker due to heartbeat re-renders
+  // Will be re-enabled when background jobs are implemented (Task 8/9)
+  // const { jobProgress, reconnecting, historyError } = useWebSocket()
+  const jobProgress = new Map()
+  const reconnecting = false
+  const historyError = null
 
   const handleExportCSV = async () => {
     try {
@@ -169,25 +144,7 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
         },
       }),
 
-      // Column 4: Status (unchanged)
-      columnHelper.accessor('processing_status', {
-        id: 'status',
-        header: 'Status',
-        cell: (info) => {
-          const status = info.getValue()
-          return (
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                status
-              )}`}
-            >
-              {getStatusLabel(status)}
-            </span>
-          )
-        },
-      }),
-
-      // Column 5: Actions (unchanged)
+      // Column 4: Actions
       columnHelper.accessor('id', {
         id: 'actions',
         header: 'Aktionen',
@@ -307,8 +264,8 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
         </div>
       </div>
 
-      {/* WebSocket Connection Status Banner */}
-      {reconnecting && (
+      {/* WebSocket Connection Status Banner - Only show when jobs are active */}
+      {reconnecting && jobProgress.size > 0 && (
         <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
           <div className="flex items-center">
             <div className="flex-shrink-0">

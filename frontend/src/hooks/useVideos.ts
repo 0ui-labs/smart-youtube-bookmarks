@@ -52,6 +52,11 @@ export const useVideos = (listId: string) => {
       const { data } = await api.get<VideoResponse[]>(`/lists/${listId}/videos`)
       return VideoResponseSchema.array().parse(data)
     },
+    // Prevent excessive refetching that causes UI flicker
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
   })
 }
 
