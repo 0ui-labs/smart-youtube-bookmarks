@@ -27,6 +27,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 from isodate import parse_duration
 
 from app.core.database import get_db
@@ -36,7 +37,10 @@ from app.clients.youtube import YouTubeClient
 from app.models.list import BookmarkList
 from app.models.video import Video
 from app.models.job import ProcessingJob
+from app.models.tag import Tag, video_tags
 from app.schemas.video import VideoAdd, VideoResponse, BulkUploadResponse, BulkUploadFailure
+from app.schemas.tag import TagResponse
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -656,3 +660,113 @@ async def export_videos_csv(
             "Content-Disposition": f"attachment; filename=videos_{list_id}.csv"
         }
     )
+
+
+# Video-Tag Assignment Endpoints
+
+class AssignTagsRequest(BaseModel):
+    tag_ids: list[UUID]
+
+
+@router.post("/videos/{video_id}/tags", response_model=list[TagResponse])
+async def assign_tags_to_video(
+    video_id: UUID,
+    request: AssignTagsRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Assign tags to a video (many-to-many). Returns the updated list of tags."""
+    # Verify video exists
+    video_stmt = select(Video).where(Video.id == video_id)
+    video_result = await db.execute(video_stmt)
+    video = video_result.scalar_one_or_none()
+
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Verify all tags exist
+    tags_stmt = select(Tag).where(Tag.id.in_(request.tag_ids))
+    tags_result = await db.execute(tags_stmt)
+    tags = list(tags_result.scalars().all())
+
+    if len(tags) != len(request.tag_ids):
+        raise HTTPException(status_code=400, detail="One or more tags not found")
+
+    # Get existing tag associations for this video
+    existing_stmt = select(video_tags.c.tag_id).where(video_tags.c.video_id == video_id)
+    existing_result = await db.execute(existing_stmt)
+    existing_tag_ids = {row[0] for row in existing_result.all()}
+
+    # Insert only new associations (idempotent)
+    for tag_id in request.tag_ids:
+        if tag_id not in existing_tag_ids:
+            await db.execute(
+                video_tags.insert().values(video_id=video_id, tag_id=tag_id)
+            )
+
+    await db.commit()
+
+    # Return all tags for this video
+    final_tags_stmt = (
+        select(Tag)
+        .join(video_tags)
+        .where(video_tags.c.video_id == video_id)
+    )
+    final_tags_result = await db.execute(final_tags_stmt)
+    return list(final_tags_result.scalars().all())
+
+
+@router.delete("/videos/{video_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_tag_from_video(
+    video_id: UUID,
+    tag_id: UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Remove a tag from a video."""
+    # Verify video exists
+    video_stmt = select(Video).where(Video.id == video_id)
+    video_result = await db.execute(video_stmt)
+    video = video_result.scalar_one_or_none()
+
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Check if tag is assigned to video
+    check_stmt = select(video_tags).where(
+        video_tags.c.video_id == video_id,
+        video_tags.c.tag_id == tag_id
+    )
+    check_result = await db.execute(check_stmt)
+    association = check_result.first()
+
+    if not association:
+        raise HTTPException(status_code=404, detail="Tag not assigned to this video")
+
+    # Delete association
+    delete_stmt = video_tags.delete().where(
+        video_tags.c.video_id == video_id,
+        video_tags.c.tag_id == tag_id
+    )
+    await db.execute(delete_stmt)
+    await db.commit()
+    return None
+
+
+@router.get("/videos/{video_id}/tags", response_model=list[TagResponse])
+async def get_video_tags(video_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Get all tags for a video."""
+    # Verify video exists
+    video_stmt = select(Video).where(Video.id == video_id)
+    video_result = await db.execute(video_stmt)
+    video = video_result.scalar_one_or_none()
+
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Get tags via junction table
+    tags_stmt = (
+        select(Tag)
+        .join(video_tags)
+        .where(video_tags.c.video_id == video_id)
+    )
+    tags_result = await db.execute(tags_stmt)
+    return list(tags_result.scalars().all())
