@@ -10,6 +10,7 @@ import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV } from '@/ho
 import { CSVUpload } from './CSVUpload'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { ProgressBar } from './ProgressBar'
+import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
 
 const columnHelper = createColumnHelper<VideoResponse>()
@@ -80,52 +81,92 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
 
   const columns = useMemo(
     () => [
-      columnHelper.accessor('youtube_id', {
-        id: 'preview',
+      // Column 1: Thumbnail (with Aspect Ratio + Loading State)
+      columnHelper.accessor('thumbnail_url', {
+        id: 'thumbnail',
         header: 'Vorschau',
-        cell: () => {
+        cell: (info) => {
+          const thumbnailUrl = info.getValue()
+          const row = info.row.original
+          const title = row.title || `Video ${row.youtube_id}`
+
+          if (!thumbnailUrl) {
+            // No thumbnail - show placeholder
+            return (
+              <div className="w-32 aspect-video bg-gray-100 rounded flex items-center justify-center">
+                <svg className="w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                </svg>
+              </div>
+            )
+          }
+
           return (
-            <div className="w-32 h-18 bg-red-50 rounded flex items-center justify-center">
-              <svg className="w-12 h-12 text-red-600" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-              </svg>
+            <img
+              src={thumbnailUrl}
+              alt={title}
+              loading="lazy"
+              className="w-32 aspect-video object-cover rounded shadow-sm"
+              onError={(e) => {
+                // Fallback to placeholder on error
+                const target = e.target as HTMLImageElement
+                target.style.display = 'none'
+                const placeholder = document.createElement('div')
+                placeholder.className = 'w-32 aspect-video bg-gray-100 rounded flex items-center justify-center'
+                placeholder.innerHTML = '<svg class="w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>'
+                target.parentNode?.appendChild(placeholder)
+              }}
+            />
+          )
+        },
+      }),
+
+      // Column 2: Title + Channel
+      columnHelper.accessor('title', {
+        id: 'title',
+        header: 'Titel',
+        cell: (info) => {
+          const row = info.row.original
+          const title = info.getValue() || `Video ${row.youtube_id}`
+          const channel = row.channel
+          const youtubeUrl = `https://www.youtube.com/watch?v=${row.youtube_id}`
+
+          return (
+            <div className="flex flex-col gap-1 min-w-[200px] max-w-[400px]">
+              <a
+                href={youtubeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-gray-900 hover:text-blue-600 hover:underline line-clamp-2 leading-tight"
+                title={title}
+              >
+                {title}
+              </a>
+              {channel && (
+                <span className="text-sm text-gray-600 truncate">
+                  {channel}
+                </span>
+              )}
             </div>
           )
         },
       }),
-      columnHelper.accessor('youtube_id', {
-        id: 'title',
-        header: 'Titel',
-        cell: (info) => {
-          const youtubeId = info.getValue()
-          const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeId}`
 
-          return (
-            <a
-              href={youtubeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-            >
-              Video {youtubeId}
-            </a>
-          )
-        },
-      }),
-      columnHelper.accessor('processing_status', {
+      // Column 3: Duration
+      columnHelper.accessor('duration', {
         id: 'duration',
         header: 'Dauer',
         cell: (info) => {
-          const status = info.getValue()
-          if (status === 'completed') {
-            return <span className="text-sm text-gray-400">Nicht verfügbar</span>
-          }
-          if (status === 'processing') {
-            return <span className="text-sm text-blue-600">Wird verarbeitet...</span>
-          }
-          return <span className="text-sm text-gray-400">—</span>
+          const duration = info.getValue()
+          return (
+            <span className="text-sm text-gray-700 font-mono tabular-nums">
+              {formatDuration(duration)}
+            </span>
+          )
         },
       }),
+
+      // Column 4: Status (unchanged)
       columnHelper.accessor('processing_status', {
         id: 'status',
         header: 'Status',
@@ -142,15 +183,8 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
           )
         },
       }),
-      columnHelper.accessor('created_at', {
-        id: 'created_at',
-        header: 'Hinzugefügt',
-        cell: (info) => (
-          <span className="text-sm text-gray-500">
-            {new Date(info.getValue()).toLocaleDateString('de-DE')}
-          </span>
-        ),
-      }),
+
+      // Column 5: Actions (unchanged)
       columnHelper.accessor('id', {
         id: 'actions',
         header: 'Aktionen',
