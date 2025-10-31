@@ -230,3 +230,160 @@ async def test_get_video_metadata_rate_limited():
         # Rate limit (429) should be re-raised for tenacity to handle
         with pytest.raises(HTTPError):
             await client.get_video_metadata("test123")
+
+
+@pytest.mark.asyncio
+async def test_get_batch_metadata_success():
+    """Test fetching metadata for multiple videos in batch."""
+    from unittest.mock import AsyncMock
+
+    # Create mock Redis client
+    redis_client = AsyncMock()
+    redis_client.get.return_value = None  # Cache miss
+    redis_client.setex = AsyncMock()
+
+    client = YouTubeClient(api_key="test-key", redis_client=redis_client)
+
+    video_ids = ["VIDEO_ID_1", "VIDEO_ID_2", "VIDEO_ID_3"]
+
+    # Mock YouTube API batch response
+    mock_response_data = {
+        "items": [
+            {
+                "id": "VIDEO_ID_1",
+                "snippet": {
+                    "title": "Python Tutorial",
+                    "channelTitle": "Tech Channel",
+                    "description": "Learn Python basics",
+                    "publishedAt": "2024-01-15T10:00:00Z",
+                    "thumbnails": {
+                        "high": {
+                            "url": "https://i.ytimg.com/vi/VIDEO_ID_1/hqdefault.jpg"
+                        }
+                    }
+                },
+                "contentDetails": {
+                    "duration": "PT15M30S"
+                }
+            },
+            {
+                "id": "VIDEO_ID_2",
+                "snippet": {
+                    "title": "FastAPI Guide",
+                    "channelTitle": "Web Dev Channel",
+                    "description": "Build APIs with FastAPI",
+                    "publishedAt": "2024-02-20T14:30:00Z",
+                    "thumbnails": {
+                        "high": {
+                            "url": "https://i.ytimg.com/vi/VIDEO_ID_2/hqdefault.jpg"
+                        }
+                    }
+                },
+                "contentDetails": {
+                    "duration": "PT25M45S"
+                }
+            },
+            {
+                "id": "VIDEO_ID_3",
+                "snippet": {
+                    "title": "React Hooks",
+                    "channelTitle": "Frontend Pro",
+                    "description": "Master React Hooks",
+                    "publishedAt": "2024-03-10T09:15:00Z",
+                    "thumbnails": {
+                        "high": {
+                            "url": "https://i.ytimg.com/vi/VIDEO_ID_3/hqdefault.jpg"
+                        }
+                    }
+                },
+                "contentDetails": {
+                    "duration": "PT30M00S"
+                }
+            }
+        ]
+    }
+
+    # Mock httpx.AsyncClient
+    with patch('httpx.AsyncClient') as mock_client_class:
+        mock_client = AsyncMock()
+        mock_response = MagicMock()  # Not AsyncMock - response.json() is sync
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value=mock_response_data)
+
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_client_class.return_value.__aexit__.return_value = AsyncMock()
+
+        # Call batch method
+        results = await client.get_batch_metadata(video_ids)
+
+    # Verify results
+    assert len(results) == 3
+    assert results[0]["youtube_id"] == "VIDEO_ID_1"
+    assert results[0]["title"] == "Python Tutorial"
+    assert results[0]["channel"] == "Tech Channel"
+    assert results[1]["youtube_id"] == "VIDEO_ID_2"
+    assert results[1]["title"] == "FastAPI Guide"
+    assert results[2]["youtube_id"] == "VIDEO_ID_3"
+    assert results[2]["title"] == "React Hooks"
+
+
+@pytest.mark.asyncio
+async def test_get_batch_metadata_empty_list():
+    """Test batch fetch with empty video IDs list."""
+    client = YouTubeClient(api_key="test-key")
+    results = await client.get_batch_metadata([])
+    assert results == []
+
+
+@pytest.mark.asyncio
+async def test_get_batch_metadata_partial_failure():
+    """Test batch fetch when some videos are not found."""
+    from unittest.mock import AsyncMock
+
+    redis_client = AsyncMock()
+    redis_client.get.return_value = None
+    redis_client.setex = AsyncMock()
+
+    client = YouTubeClient(api_key="test-key", redis_client=redis_client)
+
+    video_ids = ["VALID_ID", "INVALID_ID"]
+
+    # Mock response with only one valid video
+    mock_response_data = {
+        "items": [
+            {
+                "id": "VALID_ID",
+                "snippet": {
+                    "title": "Valid Video",
+                    "channelTitle": "Test Channel",
+                    "description": "Test",
+                    "publishedAt": "2024-01-01T00:00:00Z",
+                    "thumbnails": {
+                        "high": {
+                            "url": "https://i.ytimg.com/vi/VALID_ID/hqdefault.jpg"
+                        }
+                    }
+                },
+                "contentDetails": {
+                    "duration": "PT5M00S"
+                }
+            }
+        ]
+    }
+
+    with patch('httpx.AsyncClient') as mock_client_class:
+        mock_client = AsyncMock()
+        mock_response = MagicMock()  # Not AsyncMock - response.json() is sync
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value=mock_response_data)
+
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_client_class.return_value.__aexit__.return_value = AsyncMock()
+
+        results = await client.get_batch_metadata(video_ids)
+
+    # Should only return valid video
+    assert len(results) == 1
+    assert results[0]["youtube_id"] == "VALID_ID"

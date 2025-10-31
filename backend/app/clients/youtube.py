@@ -195,3 +195,126 @@ class YouTubeClient:
             await self.redis.setex(cache_key, 3600, json.dumps(None))
 
         return None
+
+    async def get_batch_metadata(
+        self,
+        video_ids: list[str]
+    ) -> list[dict]:
+        """
+        Fetch metadata for multiple videos in one API call.
+
+        YouTube API allows fetching up to 50 videos per request.
+        This method automatically batches requests if more than 50 videos.
+
+        Args:
+            video_ids: List of YouTube video IDs (max 50 per batch)
+
+        Returns:
+            List of metadata dicts, one per video. Format matches get_video_metadata().
+            Videos not found are omitted from results.
+
+        Example:
+            >>> results = await client.get_batch_metadata(["VIDEO_1", "VIDEO_2"])
+            >>> print(results[0]["title"])
+            "Python Tutorial"
+        """
+        if not video_ids:
+            return []
+
+        # YouTube API limit: 50 videos per request
+        BATCH_SIZE = 50
+        all_results = []
+
+        # Process in batches of 50
+        for i in range(0, len(video_ids), BATCH_SIZE):
+            batch = video_ids[i:i + BATCH_SIZE]
+
+            # Check Redis cache for each video
+            cached_results = []
+            uncached_ids = []
+
+            if self.redis:
+                for video_id in batch:
+                    cache_key = f"youtube:v1:video:{video_id}"
+                    cached = await self.redis.get(cache_key)
+
+                    if cached:
+                        try:
+                            cached_data = json.loads(cached)
+                            # Convert from old format (video_id) to new format (youtube_id)
+                            if "video_id" in cached_data:
+                                cached_data["youtube_id"] = cached_data.pop("video_id")
+                            cached_results.append(cached_data)
+                            logger.info(f"Cache HIT for video {video_id}")
+                        except json.JSONDecodeError:
+                            # Cache corrupted, fetch fresh
+                            uncached_ids.append(video_id)
+                    else:
+                        uncached_ids.append(video_id)
+            else:
+                # No Redis, fetch all
+                uncached_ids = batch
+
+            # Add cached results
+            all_results.extend(cached_results)
+
+            # Fetch uncached videos from API
+            if uncached_ids:
+                try:
+                    # Join video IDs with comma for batch request
+                    ids_param = ",".join(uncached_ids)
+
+                    url = "https://www.googleapis.com/youtube/v3/videos"
+                    params = {
+                        "part": "snippet,contentDetails",
+                        "id": ids_param,
+                        "key": self.api_key,
+                    }
+
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        response = await client.get(url, params=params)
+                        response.raise_for_status()
+                        data = response.json()
+
+                    # Parse each video in response
+                    for item in data.get("items", []):
+                        video_id = item["id"]
+                        snippet = item.get("snippet", {})
+                        content_details = item.get("contentDetails", {})
+
+                        metadata = {
+                            "youtube_id": video_id,
+                            "title": snippet.get("title", "Unknown Title"),
+                            "channel": snippet.get("channelTitle", "Unknown Channel"),
+                            "description": snippet.get("description", ""),
+                            "published_at": snippet.get("publishedAt"),
+                            "duration": content_details.get("duration", "PT0S"),
+                            "thumbnail_url": snippet.get("thumbnails", {})
+                                .get("high", {})
+                                .get("url", ""),
+                        }
+
+                        # Cache for 7 days (same as get_video_metadata)
+                        if self.redis:
+                            cache_key = f"youtube:v1:video:{video_id}"
+                            ttl = 7 * 24 * 3600 + random.randint(0, 3600)  # Add jitter
+                            # Store with old format key for compatibility
+                            cache_data = {**metadata, "video_id": video_id}
+                            await self.redis.setex(
+                                cache_key,
+                                ttl,
+                                json.dumps(cache_data)
+                            )
+
+                        all_results.append(metadata)
+
+                    logger.info(
+                        f"Fetched {len(data.get('items', []))} videos from YouTube API "
+                        f"(batch of {len(uncached_ids)})"
+                    )
+
+                except httpx.HTTPError as e:
+                    logger.error(f"YouTube API batch request failed: {e}")
+                    # Continue with partial results rather than failing completely
+
+        return all_results
