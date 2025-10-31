@@ -20,19 +20,25 @@ from typing import List, Sequence, Optional
 import csv
 import io
 from datetime import datetime
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from isodate import parse_duration
 
 from app.core.database import get_db
-from app.core.redis import get_arq_pool
+from app.core.redis import get_arq_pool, get_redis_client
+from app.core.config import settings
+from app.clients.youtube import YouTubeClient
 from app.models.list import BookmarkList
 from app.models.video import Video
 from app.models.job import ProcessingJob
 from app.schemas.video import VideoAdd, VideoResponse, BulkUploadResponse, BulkUploadFailure
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/api", tags=["videos"])
@@ -372,7 +378,7 @@ async def bulk_upload_videos(
                 youtube_id = extract_youtube_id(url)
 
                 # Check for duplicates in this batch
-                if any(v.youtube_id == youtube_id for v in videos_to_create):
+                if any(v["youtube_id"] == youtube_id for v in videos_to_create):
                     failures.append(BulkUploadFailure(
                         row=row_num,
                         url=url,
@@ -380,13 +386,11 @@ async def bulk_upload_videos(
                     ))
                     continue
 
-                # Create video object
-                video = Video(
-                    list_id=list_id,
-                    youtube_id=youtube_id,
-                    processing_status="pending"
-                )
-                videos_to_create.append(video)
+                # Store YouTube ID and row for later metadata fetch
+                videos_to_create.append({
+                    "youtube_id": youtube_id,
+                    "row": row_num,
+                })
 
             except ValueError as e:
                 failures.append(BulkUploadFailure(
@@ -394,6 +398,86 @@ async def bulk_upload_videos(
                     url=url,
                     error=str(e)
                 ))
+
+        # Fetch YouTube metadata in batch before inserting
+        if videos_to_create:
+            # Extract YouTube IDs for batch fetch
+            youtube_ids = [v["youtube_id"] for v in videos_to_create]
+
+            # Fetch YouTube metadata in batch
+            redis = await get_redis_client()
+            youtube_client = YouTubeClient(
+                api_key=settings.youtube_api_key,
+                redis_client=redis
+            )
+
+            try:
+                metadata_list = await youtube_client.get_batch_metadata(youtube_ids)
+
+                # Create lookup dict for fast access
+                metadata_by_id = {m["youtube_id"]: m for m in metadata_list}
+
+                # Create video objects with metadata
+                video_objects = []
+                for video_data in videos_to_create:
+                    youtube_id = video_data["youtube_id"]
+                    metadata = metadata_by_id.get(youtube_id)
+
+                    if metadata:
+                        # Parse duration from ISO 8601 to seconds
+                        duration_seconds = 0
+                        if metadata.get("duration"):
+                            try:
+                                duration_obj = parse_duration(metadata["duration"])
+                                duration_seconds = int(duration_obj.total_seconds())
+                            except Exception:
+                                pass
+
+                        # Parse published_at
+                        published_at = None
+                        if metadata.get("published_at"):
+                            try:
+                                published_at = datetime.fromisoformat(
+                                    metadata["published_at"].replace('Z', '+00:00')
+                                )
+                            except (ValueError, AttributeError):
+                                pass
+
+                        # Create video with full metadata
+                        video = Video(
+                            list_id=list_id,
+                            youtube_id=youtube_id,
+                            title=metadata.get("title"),
+                            channel=metadata.get("channel"),
+                            duration=duration_seconds,
+                            thumbnail_url=metadata.get("thumbnail_url"),
+                            published_at=published_at,
+                            processing_status="pending"  # Still pending for AI analysis
+                        )
+                        video_objects.append(video)
+                    else:
+                        # Video not found on YouTube
+                        failures.append(BulkUploadFailure(
+                            row=video_data["row"],
+                            url=f"https://www.youtube.com/watch?v={youtube_id}",
+                            error="Video not found on YouTube or unavailable"
+                        ))
+
+                # Update videos_to_create to actual Video objects
+                videos_to_create = video_objects
+
+            except Exception as e:
+                # If batch fetch fails entirely, fall back to basic videos
+                logger.error(f"YouTube batch fetch failed: {e}")
+                video_objects = []
+                for video_data in videos_to_create:
+                    video = Video(
+                        list_id=list_id,
+                        youtube_id=video_data["youtube_id"],
+                        processing_status="pending"
+                    )
+                    video_objects.append(video)
+                videos_to_create = video_objects
 
         # Bulk insert valid videos
         if videos_to_create:
