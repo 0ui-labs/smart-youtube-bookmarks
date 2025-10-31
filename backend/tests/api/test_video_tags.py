@@ -6,9 +6,10 @@ from httpx import AsyncClient
 @pytest.mark.asyncio
 async def test_assign_tags_to_video(client: AsyncClient, test_user, test_list, test_video):
     """Test assigning tags to a video."""
-    # Create two tags
-    tag1_response = await client.post("/api/tags", json={"name": "Tutorial"})
-    tag2_response = await client.post("/api/tags", json={"name": "Python"})
+    # Create two tags with unique names
+    import uuid
+    tag1_response = await client.post("/api/tags", json={"name": f"Tutorial-{uuid.uuid4().hex[:8]}"})
+    tag2_response = await client.post("/api/tags", json={"name": f"Python-{uuid.uuid4().hex[:8]}"})
     tag1_id = tag1_response.json()["id"]
     tag2_id = tag2_response.json()["id"]
 
@@ -21,8 +22,8 @@ async def test_assign_tags_to_video(client: AsyncClient, test_user, test_list, t
     assert response.status_code == 200
     tags = response.json()
     assert len(tags) == 2
-    assert any(t["name"] == "Tutorial" for t in tags)
-    assert any(t["name"] == "Python" for t in tags)
+    assert any(t["id"] == tag1_id for t in tags)
+    assert any(t["id"] == tag2_id for t in tags)
 
 
 @pytest.mark.asyncio
