@@ -267,6 +267,10 @@ async def add_video_to_list(
             detail="Video already exists in this list"
         )
 
+    # Set tags to empty list to avoid async relationship loading issues
+    # (newly created video has no tags assigned yet)
+    new_video.__dict__['tags'] = []
+
     return new_video
 
 
@@ -307,6 +311,18 @@ async def get_videos_in_list(
         .order_by(Video.created_at)
     )
     videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
+
+    # Load tags for each video via junction table
+    # (async lazy loading doesn't work reliably, so we query explicitly)
+    for video in videos:
+        tags_stmt = (
+            select(Tag)
+            .join(video_tags)
+            .where(video_tags.c.video_id == video.id)
+        )
+        tags_result = await db.execute(tags_stmt)
+        # Set tags via __dict__ to avoid SQLAlchemy relationship issues
+        video.__dict__['tags'] = list(tags_result.scalars().all())
 
     return list(videos)
 

@@ -482,3 +482,38 @@ async def test_bulk_upload_fetches_youtube_metadata(client, test_list, test_db, 
         mock_client.get_batch_metadata.assert_called_once()
         called_ids = mock_client.get_batch_metadata.call_args[0][0]
         assert set(called_ids) == {"VIDEO_ID_1", "VIDEO_ID_2"}
+
+
+@pytest.mark.asyncio
+async def test_get_videos_includes_tags(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
+    """Test that GET /api/lists/{list_id}/videos includes tags for each video."""
+    # Add a video
+    video_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
+    )
+    video_id = video_response.json()["id"]
+
+    # Create tags
+    tag1_response = await client.post("/api/tags", json={"name": "Python-test", "color": "#3B82F6"})
+    tag2_response = await client.post("/api/tags", json={"name": "Tutorial-test", "color": "#10B981"})
+    tag1_id = tag1_response.json()["id"]
+    tag2_id = tag2_response.json()["id"]
+
+    # Assign tags to video
+    await client.post(f"/api/videos/{video_id}/tags", json={"tag_ids": [tag1_id, tag2_id]})
+
+    # Get videos in list
+    response = await client.get(f"/api/lists/{test_list.id}/videos")
+
+    assert response.status_code == 200
+    videos = response.json()
+    assert len(videos) == 1
+
+    # Verify tags are included in response
+    video = videos[0]
+    assert "tags" in video
+    assert len(video["tags"]) == 2
+    tag_names = [t["name"] for t in video["tags"]]
+    assert "Python-test" in tag_names
+    assert "Tutorial-test" in tag_names
