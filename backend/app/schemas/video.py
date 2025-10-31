@@ -12,6 +12,11 @@ import re
 
 from pydantic import BaseModel, Field, AfterValidator
 
+# Import for circular dependency resolution (TYPE_CHECKING)
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .tag import TagResponse
+
 
 def validate_youtube_url(url: str) -> str:
     """
@@ -85,6 +90,9 @@ class VideoResponse(BaseModel):
     duration: int | None = None  # Duration in seconds
     published_at: datetime | None = None
 
+    # Tags (many-to-many relationship)
+    tags: list["TagResponse"] = Field(default_factory=list)
+
     processing_status: str
     error_message: str | None = None
     created_at: datetime
@@ -107,3 +115,14 @@ class BulkUploadResponse(BaseModel):
     created_count: int
     failed_count: int
     failures: list[BulkUploadFailure] = Field(default_factory=list)
+
+
+# Resolve forward references after all schemas are defined
+def rebuild_schemas():
+    """Rebuild schemas to resolve forward references (TagResponse)."""
+    from .tag import TagResponse  # noqa: F401
+    VideoResponse.model_rebuild()
+
+
+# Call rebuild when module is imported
+rebuild_schemas()
