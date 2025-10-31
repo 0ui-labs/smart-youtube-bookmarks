@@ -24,10 +24,11 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from isodate import parse_duration
 
 from app.core.database import get_db
@@ -682,6 +683,98 @@ async def export_videos_csv(
 
 class AssignTagsRequest(BaseModel):
     tag_ids: list[UUID]
+
+
+class BulkAssignTagsRequest(BaseModel):
+    video_ids: list[UUID]
+    tag_ids: list[UUID]
+
+
+# IMPORTANT: Bulk endpoint must be registered BEFORE parameterized endpoints
+# to avoid path matching conflicts (/videos/bulk/tags vs /videos/{video_id}/tags)
+
+@router.post("/videos/bulk/tags", response_model=dict)
+async def bulk_assign_tags_to_videos(
+    request: BulkAssignTagsRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Bulk assign tags to multiple videos (cartesian product).
+
+    Creates all possible video-tag associations for the given video_ids and tag_ids.
+    Duplicates are ignored (idempotent).
+
+    Args:
+        request: BulkAssignTagsRequest with video_ids and tag_ids
+        db: Database session
+
+    Returns:
+        dict: {"assigned": int, "total_requested": int}
+        - assigned: number of new associations created
+        - total_requested: total number of assignments requested
+
+    Raises:
+        HTTPException 400: Batch exceeds 10,000 assignments
+        HTTPException 404: Some videos or tags not found
+    """
+    # Handle empty arrays
+    if not request.video_ids or not request.tag_ids:
+        return {
+            "assigned": 0,
+            "total_requested": 0
+        }
+
+    # Batch size limit
+    total = len(request.video_ids) * len(request.tag_ids)
+    if total > 10000:
+        raise HTTPException(
+            status_code=400,
+            detail="Batch exceeds 10,000 assignments"
+        )
+
+    # Pre-validate videos exist
+    video_count = await db.scalar(
+        select(func.count()).select_from(Video)
+        .where(Video.id.in_(request.video_ids))
+    )
+    if video_count != len(request.video_ids):
+        raise HTTPException(
+            status_code=404,
+            detail="Some videos not found"
+        )
+
+    # Pre-validate tags exist
+    tag_count = await db.scalar(
+        select(func.count()).select_from(Tag)
+        .where(Tag.id.in_(request.tag_ids))
+    )
+    if tag_count != len(request.tag_ids):
+        raise HTTPException(
+            status_code=404,
+            detail="Some tags not found"
+        )
+
+    # Cartesian product
+    assignments = [
+        {"video_id": vid, "tag_id": tag}
+        for vid in request.video_ids
+        for tag in request.tag_ids
+    ]
+
+    # Bulk insert with ON CONFLICT DO NOTHING
+    # Use constraint_name instead of index_elements for named constraints
+    stmt = pg_insert(video_tags).values(assignments)
+    stmt = stmt.on_conflict_do_nothing(
+        constraint="uq_video_tags_video_tag"
+    )
+
+    result = await db.execute(stmt)
+    await db.commit()
+
+    return {
+        "assigned": result.rowcount,
+        "total_requested": len(assignments)
+    }
 
 
 @router.post("/videos/{video_id}/tags", response_model=list[TagResponse])
