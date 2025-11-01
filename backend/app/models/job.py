@@ -1,4 +1,5 @@
-from sqlalchemy import String, Integer, ForeignKey, Index
+from typing import Optional
+from sqlalchemy import String, Integer, ForeignKey, Index, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from .base import BaseModel
@@ -25,6 +26,7 @@ class ProcessingJob(BaseModel):
         nullable=False,
         default="running"
     )
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
     list: Mapped["BookmarkList"] = relationship("BookmarkList", back_populates="jobs")
