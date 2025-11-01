@@ -1,19 +1,26 @@
 """Tests for bulk tag assignment endpoint."""
 import pytest
+import random
+import string
 from httpx import AsyncClient
+
+
+def generate_youtube_id() -> str:
+    """Generate a realistic YouTube video ID (11 chars from [A-Za-z0-9_-])."""
+    chars = string.ascii_letters + string.digits + '_-'
+    return ''.join(random.choices(chars, k=11))
 
 
 @pytest.mark.asyncio
 async def test_bulk_assign_tags_to_videos(client: AsyncClient, test_user, test_list, test_video):
     """Test bulk assigning tags to multiple videos."""
     # Use existing test_video and create one more video
-    import uuid
     video1_id = str(test_video.id)
 
     # Create second video with unique YouTube ID
     video2_response = await client.post(
         f"/api/lists/{test_list.id}/videos",
-        json={"url": f"https://www.youtube.com/watch?v={uuid.uuid4().hex[:11]}"}
+        json={"url": f"https://www.youtube.com/watch?v={generate_youtube_id()}"}
     )
     assert video2_response.status_code == 201
     video2_id = video2_response.json()["id"]
