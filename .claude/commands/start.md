@@ -14,7 +14,7 @@ Nach der Umsetzung und nach dem alle Tests ausgeführt und bestanden wurden und 
 
 Denke daran das ein Coderabbit Review etwas länger dauern kann so zwischen 7 und 30 Minuten. Sei also geduldig und warte immer auf die Ergebnisse. 
 
-Wir fixen IMMER alle Issues bevor wird zum nächsten Task übergehen. 
+Wir fixen IMMER alle Issues bevor wir zum nächsten Task übergehen. 
 
 Am Ende schreiben wir IMMER ein Handoff für den nächsten Task im nächsten Thread, verwende dazu als Basis unser Template
 

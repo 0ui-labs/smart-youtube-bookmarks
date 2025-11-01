@@ -1,0 +1,28 @@
+Starting CodeRabbit review in plain text mode...
+
+Connecting to review service
+Setting up
+Analyzing
+Reviewing
+
+============================================================================
+File: backend/app/api/videos.py
+Line: 229 to 275
+Type: potential_issue
+
+Prompt for AI Agent:
+In backend/app/api/videos.py around lines 229-275, the ARQ enqueue except-block currently only logs errors leaving the newly created video permanently in "pending"; update the except block to mark the video as failed and persist that state: set new_video.processing_status = "failed" and new_video.error_message = f"Failed to queue processing: {e}", then commit those changes to the DB (handle commit errors with a rollback as needed), log the failure, and optionally raise an HTTPException or trigger a retry mechanism/queue for later reprocessing.
+
+
+
+============================================================================
+File: .claude/commands/start.md
+Line: 17
+Type: potential_issue
+
+Prompt for AI Agent:
+In .claude/commands/start.md around line 17, the sentence contains a typo "bevor wird" — replace "bevor wird" with the correct "bevor wir" so the grammar reads "Wir fixen IMMER alle Issues bevor wir zum nächsten Task übergehen."
+
+
+
+Review completed ✔

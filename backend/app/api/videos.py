@@ -269,9 +269,18 @@ async def add_video_to_list(
         )
         logger.info(f"Queued video {new_video.id} for background processing")
     except Exception as e:
-        # Best-effort: Log error but don't fail request
-        # Video can be reprocessed later via manual trigger
+        # CRITICAL FIX: Mark video as failed if queue fails
+        # Prevents video from being stuck in "pending" state forever
         logger.error(f"Failed to queue ARQ task for video {new_video.id}: {e}")
+
+        try:
+            new_video.processing_status = "failed"
+            new_video.error_message = f"Failed to queue processing: {e}"
+            await db.commit()
+        except Exception as commit_error:
+            # If commit fails, rollback but don't fail the response
+            await db.rollback()
+            logger.error(f"Failed to mark video as failed: {commit_error}")
 
     # Set tags to empty list to avoid async relationship loading issues
     # (newly created video has no tags assigned yet)
