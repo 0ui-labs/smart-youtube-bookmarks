@@ -74,6 +74,18 @@ export function CollapsibleSidebar({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isMobile, isOpen])
 
+  // Close sidebar with ESC key (mobile only)
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (isMobile && isOpen && e.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isMobile, isOpen])
+
   return (
     <>
       {/* Mobile toggle button */}
@@ -90,21 +102,21 @@ export function CollapsibleSidebar({
         </div>
       )}
 
-      <AnimatePresence mode="wait">
-        {/* Desktop sidebar - always visible */}
-        {!isMobile && (
-          <aside
-            ref={sidebarRef}
-            className={cn(
-              'hidden md:flex md:flex-col md:w-64 md:h-screen md:border-r md:bg-background',
-              className
-            )}
-          >
-            {children}
-          </aside>
-        )}
+      {/* Desktop sidebar - always visible, OUTSIDE AnimatePresence */}
+      {!isMobile && (
+        <aside
+          ref={sidebarRef}
+          className={cn(
+            'hidden md:flex md:flex-col md:w-64 md:h-screen md:border-r md:bg-background',
+            className
+          )}
+        >
+          {children}
+        </aside>
+      )}
 
-        {/* Mobile drawer */}
+      {/* Mobile drawer - INSIDE AnimatePresence for exit animations */}
+      <AnimatePresence mode="wait">
         {isMobile && isOpen && (
           <>
             {/* Backdrop */}
