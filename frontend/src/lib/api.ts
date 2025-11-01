@@ -5,12 +5,14 @@ import axios from 'axios'
  *
  * Base URL is '/api' which is proxied by Vite to http://localhost:8000/api
  * (see vite.config.ts for proxy configuration).
+ *
+ * Note: Content-Type is auto-detected by Axios based on request body type:
+ * - Objects/Arrays: application/json
+ * - FormData: multipart/form-data
+ * - URLSearchParams: application/x-www-form-urlencoded
  */
 export const api = axios.create({
   baseURL: '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 /**
