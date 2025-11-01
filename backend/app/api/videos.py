@@ -24,7 +24,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
@@ -348,24 +348,25 @@ async def list_all_videos(
     """
     stmt = select(Video).order_by(Video.created_at)
 
-    # Filter by tags (OR logic)
+    # Filter by tags (OR logic) - case-insensitive
     if tags and len(tags) > 0:
-        # Join to tags and filter by tag names
+        # Join to tags and filter by tag names using case-insensitive ILIKE
+        # or_() creates OR conditions for each tag
         stmt = (
             stmt.join(Video.tags)
-            .where(Tag.name.in_(tags))
+            .where(or_(*[Tag.name.ilike(tag) for tag in tags]))
             .distinct()
         )
 
-    # Filter by tags (AND logic)
+    # Filter by tags (AND logic) - case-insensitive
     if tags_all and len(tags_all) > 0:
-        # Subquery: videos that have ALL specified tags
+        # Subquery: videos that have ALL specified tags (case-insensitive)
         # Count distinct tag matches - only include videos with count == number of requested tags
         subquery = (
             select(video_tags.c.video_id)
             .select_from(video_tags)
             .join(Tag, video_tags.c.tag_id == Tag.id)
-            .where(Tag.name.in_(tags_all))
+            .where(or_(*[Tag.name.ilike(tag) for tag in tags_all]))
             .group_by(video_tags.c.video_id)
             .having(func.count(func.distinct(video_tags.c.tag_id)) == len(tags_all))
         )
