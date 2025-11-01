@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # App
     env: str = "development"
 
+    # Database connection pool (for ARQ workers)
+    db_pool_size: int = 10  # Match ARQ max_jobs
+    db_max_overflow: int = 5
+    db_pool_pre_ping: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8"
