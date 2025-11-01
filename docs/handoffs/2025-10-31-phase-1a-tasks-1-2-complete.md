@@ -22,10 +22,6 @@ cd .. && ./.claude/thread-start-checks.sh
 # ✅ Docker services running
 # ✅ Python 3.13.1, Node v23.4.0
 
-# 3. Fix authentication issues
-semgrep login              # User must do this in THEIR terminal
-coderabbit auth login      # User must do this in THEIR terminal
-```
 
 **In Claude:**
 ```
