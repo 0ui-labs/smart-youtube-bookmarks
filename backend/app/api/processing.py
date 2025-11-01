@@ -1,6 +1,7 @@
 from uuid import UUID
 from datetime import datetime
 from typing import Annotated, List, Optional
+import asyncio
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
@@ -76,19 +77,25 @@ async def start_processing(
         )
         pending_videos = videos_result.scalars().all()
 
-        # Enqueue ARQ jobs (one per video) with error handling
+        # Enqueue ARQ jobs atomically (all-or-nothing with asyncio.gather)
         try:
-            for video in pending_videos:
-                await arq_pool.enqueue_job(
+            # Build list of enqueue coroutines
+            enqueue_tasks = [
+                arq_pool.enqueue_job(
                     'process_video',     # Function name from WorkerSettings
                     str(video.id),       # video_id
                     str(list_id),        # list_id
                     schema_fields,       # schema for Gemini
                     str(job.id)          # job_id for progress updates
                 )
+                for video in pending_videos
+            ]
+
+            # Execute all enqueues atomically
+            await asyncio.gather(*enqueue_tasks)
             logger.info(f"Enqueued {len(pending_videos)} videos for processing (job {job.id})")
         except Exception as e:
-            # Mark job as failed if enqueueing fails
+            # Mark job as failed if ANY enqueue fails
             logger.error(f"Failed to enqueue jobs for list {list_id}: {e}")
             job.status = "failed"
             job.error_message = f"Failed to enqueue jobs: {str(e)}"
