@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -24,10 +24,12 @@ async def create_tag(
     if not current_user:
         raise HTTPException(status_code=400, detail="No user found")
 
-    # Check if tag name already exists for this user
+    # Check if tag name already exists for this user (case-insensitive)
+    # This prevents case-sensitive duplicates (e.g., "Python" and "python")
+    # which would break the AND filter logic with ilike() queries
     stmt = select(Tag).where(
         Tag.user_id == current_user.id,
-        Tag.name == tag.name
+        func.lower(Tag.name) == tag.name.lower()
     )
     result = await db.execute(stmt)
     existing = result.scalar_one_or_none()
