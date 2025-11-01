@@ -16,14 +16,18 @@ export function getQueryClient(): QueryClient {
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
-          // Data is considered fresh for 60 seconds
-          staleTime: 60 * 1000,
-          // Unused data is garbage collected after 5 minutes
-          gcTime: 5 * 60 * 1000,
-          // Don't refetch when user returns to window (avoid unnecessary requests)
-          refetchOnWindowFocus: false,
-          // Retry failed requests once before giving up
-          retry: 1,
+          // Data is considered fresh for 5 minutes (lists don't change often)
+          staleTime: 5 * 60 * 1000,
+          // Unused data is garbage collected after 10 minutes (longer than staleTime)
+          gcTime: 10 * 60 * 1000,
+          // Retry failed requests 3 times to handle transient network failures
+          retry: 3,
+          // Enable multi-tab synchronization (refetch when user returns to window)
+          refetchOnWindowFocus: true,
+        },
+        mutations: {
+          // Don't retry mutations to avoid duplicate operations
+          retry: 0,
         },
       },
     })
