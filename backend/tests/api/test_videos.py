@@ -16,7 +16,7 @@ from app.models.video import Video
 
 @pytest.mark.asyncio
 async def test_add_video_to_list(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
-    """Test adding a video to a list with standard YouTube URL."""
+    """Test adding a video to a list with standard YouTube URL (Option B: ARQ background tasks)."""
     response = await client.post(
         f"/api/lists/{test_list.id}/videos",
         json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
@@ -26,9 +26,9 @@ async def test_add_video_to_list(client: AsyncClient, test_db: AsyncSession, tes
     data = response.json()
     assert data["youtube_id"] == "dQw4w9WgXcQ"
     assert data["list_id"] == str(test_list.id)
-    # NOTE: Status is "completed" because we fetch metadata synchronously
-    # ARQ background task refactoring (Fix #2b) would change this to "pending"
-    assert data["processing_status"] == "completed"
+    # Option B: ARQ background task - metadata fetched asynchronously
+    # Video starts with "pending" status, ARQ worker updates to "completed" after fetching
+    assert data["processing_status"] == "pending"
     assert "id" in data
     assert "created_at" in data
 
@@ -471,25 +471,18 @@ async def test_bulk_upload_fetches_youtube_metadata(client, test_list, test_db, 
 
         assert len(videos) == 2
 
-        # Check first video has metadata
+        # Option B: Videos start with pending status (metadata fetched by ARQ worker)
         video1 = next(v for v in videos if v.youtube_id == "VIDEO_ID_1")
-        assert video1.title == "Python Tutorial"
-        assert video1.channel == "Tech Channel"
-        assert video1.thumbnail_url == "https://i.ytimg.com/vi/VIDEO_ID_1/hqdefault.jpg"
-        assert video1.duration == 930  # 15m30s in seconds
-        # NOTE: Status is "completed" because metadata is fetched synchronously
-        # ARQ background task refactoring (Fix #2b) would change this to "pending"
-        assert video1.processing_status == "completed"
+        assert video1.processing_status == "pending"
+        assert video1.title is None  # Metadata not fetched yet
 
-        # Check second video
         video2 = next(v for v in videos if v.youtube_id == "VIDEO_ID_2")
-        assert video2.title == "FastAPI Guide"
-        assert video2.channel == "Web Dev"
+        assert video2.processing_status == "pending"
+        assert video2.title is None  # Metadata not fetched yet
 
-        # Verify YouTube client was called with batch
-        mock_client.get_batch_metadata.assert_called_once()
-        called_ids = mock_client.get_batch_metadata.call_args[0][0]
-        assert set(called_ids) == {"VIDEO_ID_1", "VIDEO_ID_2"}
+        # No batch metadata fetch in bulk_upload anymore (moved to ARQ worker)
+        # Mock is no longer used in this endpoint
+        mock_client.get_batch_metadata.assert_not_called()
 
 
 @pytest.mark.asyncio

@@ -182,13 +182,15 @@ async def add_video_to_list(
     db: AsyncSession = Depends(get_db)
 ) -> Video:
     """
-    Add a video to a bookmark list.
+    Add a video to a bookmark list with ARQ background processing (Option B).
 
     - Validates list exists (404 if not found)
     - Extracts YouTube video ID from URL
-    - Fetches YouTube metadata immediately (title, channel, thumbnail, duration)
+    - Creates video with pending status
+    - Queues ARQ background task for metadata fetching
     - Checks for duplicates (409 if already in list)
-    - Commits to database with full metadata
+
+    This approach is production-ready for large batches and prevents request timeouts.
 
     Args:
         list_id: UUID of the bookmark list
@@ -196,7 +198,7 @@ async def add_video_to_list(
         db: Database session
 
     Returns:
-        VideoResponse: Created video with metadata
+        VideoResponse: Created video with pending status
 
     Raises:
         HTTPException 404: List not found
@@ -224,58 +226,52 @@ async def add_video_to_list(
             detail=str(e)
         )
 
-    # Fetch YouTube metadata immediately
-    redis = await get_redis_client()
-    youtube_client = YouTubeClient(
-        api_key=settings.youtube_api_key,
-        redis_client=redis
+    # Create video with PENDING status (metadata will be fetched by ARQ worker)
+    new_video = Video(
+        list_id=list_id,
+        youtube_id=youtube_id,
+        processing_status="pending"  # Option B: Queue background task
     )
-
-    # Fetch metadata for single video
-    try:
-        metadata_list = await youtube_client.get_batch_metadata([youtube_id])
-        metadata = metadata_list[0] if metadata_list else None
-    except Exception as e:
-        logger.error(f"YouTube metadata fetch failed for {youtube_id}: {e}")
-        metadata = None
-
-    # Create video with metadata (or basic if fetch failed)
-    if metadata:
-        # Parse duration and timestamp using helper functions
-        duration_seconds = parse_youtube_duration(metadata.get("duration"))
-        published_at = parse_youtube_timestamp(metadata.get("published_at"))
-
-        new_video = Video(
-            list_id=list_id,
-            youtube_id=youtube_id,
-            title=metadata.get("title"),
-            channel=metadata.get("channel"),
-            duration=duration_seconds,
-            thumbnail_url=metadata.get("thumbnail_url"),
-            published_at=published_at,
-            processing_status="completed"  # Metadata fetched successfully
-        )
-    else:
-        # Fallback: Create basic video if metadata fetch failed
-        new_video = Video(
-            list_id=list_id,
-            youtube_id=youtube_id,
-            processing_status="failed",
-            error_message="Could not fetch video metadata from YouTube"
-        )
 
     try:
         db.add(new_video)
         await db.flush()
         await db.refresh(new_video)
-        await db.commit()  # CRITICAL FIX: Commit to persist data
+        await db.commit()
     except IntegrityError:
-        # CRITICAL FIX: Handle race conditions and duplicate constraint violations
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Video already exists in this list"
         )
+
+    # Queue ARQ background task for metadata fetching
+    try:
+        arq_pool = await get_arq_pool()
+
+        # Fetch schema for Gemini extraction (if list has schema)
+        schema_fields = {}
+        if bookmark_list.schema_id:
+            from app.models.schema import Schema
+            schema_result = await db.execute(
+                select(Schema).where(Schema.id == bookmark_list.schema_id)
+            )
+            schema = schema_result.scalar_one_or_none()
+            if schema:
+                schema_fields = schema.fields  # JSONB dict
+
+        # Enqueue background task (non-blocking)
+        await arq_pool.enqueue_job(
+            'process_video',
+            str(new_video.id),
+            str(list_id),
+            schema_fields
+        )
+        logger.info(f"Queued video {new_video.id} for background processing")
+    except Exception as e:
+        # Best-effort: Log error but don't fail request
+        # Video can be reprocessed later via manual trigger
+        logger.error(f"Failed to queue ARQ task for video {new_video.id}: {e}")
 
     # Set tags to empty list to avoid async relationship loading issues
     # (newly created video has no tags assigned yet)
@@ -564,101 +560,26 @@ async def bulk_upload_videos(
                     error=str(e)
                 ))
 
-        # Fetch YouTube metadata in batch before inserting
+        # Create videos with pending status and queue ARQ background tasks (Option B)
         if videos_to_create:
-            # Extract YouTube IDs for batch fetch
-            youtube_ids = [v["youtube_id"] for v in videos_to_create]
+            # Create video objects with PENDING status
+            # Metadata will be fetched by ARQ worker in background
+            video_objects = []
+            for video_data in videos_to_create:
+                youtube_id = video_data["youtube_id"]
 
-            # Fetch YouTube metadata in batch
-            redis = await get_redis_client()
-            youtube_client = YouTubeClient(
-                api_key=settings.youtube_api_key,
-                redis_client=redis
-            )
+                # Create video with pending status
+                video = Video(
+                    list_id=list_id,
+                    youtube_id=youtube_id,
+                    processing_status="pending"  # Option B: Queue background task
+                )
+                video_objects.append(video)
 
-            try:
-                metadata_list = await youtube_client.get_batch_metadata(youtube_ids)
+            # Update videos_to_create to actual Video objects
+            videos_to_create = video_objects
 
-                # Create lookup dict for fast access
-                metadata_by_id = {m["youtube_id"]: m for m in metadata_list}
-
-                # Create video objects with metadata
-                video_objects = []
-                for video_data in videos_to_create:
-                    youtube_id = video_data["youtube_id"]
-                    metadata = metadata_by_id.get(youtube_id)
-
-                    if metadata:
-                        # Parse duration and timestamp using helper functions
-                        duration_seconds = parse_youtube_duration(metadata.get("duration"))
-                        published_at = parse_youtube_timestamp(metadata.get("published_at"))
-
-                        # Create video with full metadata
-                        video = Video(
-                            list_id=list_id,
-                            youtube_id=youtube_id,
-                            title=metadata.get("title"),
-                            channel=metadata.get("channel"),
-                            duration=duration_seconds,
-                            thumbnail_url=metadata.get("thumbnail_url"),
-                            published_at=published_at,
-                            processing_status="completed"  # Metadata fetched successfully
-                        )
-                        video_objects.append(video)
-                    else:
-                        # Video not found on YouTube
-                        failures.append(BulkUploadFailure(
-                            row=video_data["row"],
-                            url=f"https://www.youtube.com/watch?v={youtube_id}",
-                            error="Video not found on YouTube or unavailable"
-                        ))
-
-                # Update videos_to_create to actual Video objects
-                videos_to_create = video_objects
-
-            except TimeoutException:
-                logger.warning("YouTube API timeout during batch fetch")
-                # Fall back to pending status, queue individual tasks
-                video_objects = []
-                for video_data in videos_to_create:
-                    video = Video(
-                        list_id=list_id,
-                        youtube_id=video_data["youtube_id"],
-                        processing_status="pending"
-                    )
-                    video_objects.append(video)
-                videos_to_create = video_objects
-            except HTTPError as e:
-                logger.error(f"YouTube API HTTP error: {e}")
-                if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
-                    if e.response.status_code == 403:
-                        logger.error("Quota exceeded, marking as pending")
-                # Handle quota/auth errors - fall back to pending status
-                video_objects = []
-                for video_data in videos_to_create:
-                    video = Video(
-                        list_id=list_id,
-                        youtube_id=video_data["youtube_id"],
-                        processing_status="pending",
-                        error_message="YouTube API quota exceeded or authentication error"
-                    )
-                    video_objects.append(video)
-                videos_to_create = video_objects
-            except Exception as e:
-                # If batch fetch fails entirely, fall back to basic videos
-                logger.exception(f"Unexpected error fetching YouTube metadata: {e}")
-                video_objects = []
-                for video_data in videos_to_create:
-                    video = Video(
-                        list_id=list_id,
-                        youtube_id=video_data["youtube_id"],
-                        processing_status="failed",
-                        error_message="Failed to fetch video metadata from YouTube"
-                    )
-                    video_objects.append(video)
-                videos_to_create = video_objects
-
-        # Bulk insert valid videos
+        # Bulk insert valid videos (all with pending status)
         if videos_to_create:
             db.add_all(videos_to_create)
             try:
