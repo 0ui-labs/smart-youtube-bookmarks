@@ -76,10 +76,14 @@ async def after_job_end(ctx: dict) -> None:
 class WorkerSettings:
     """ARQ worker configuration."""
 
+    # Parse database number from path, handling edge cases
+    db_str = redis_dsn.path.lstrip('/') if redis_dsn.path else ''
+    redis_db = int(db_str) if db_str.isdigit() else 0
+
     redis_settings = RedisSettings(
         host=redis_dsn.hostname or 'localhost',
         port=redis_dsn.port or 6379,
-        database=int(redis_dsn.path.lstrip('/')) if redis_dsn.path else 0,
+        database=redis_db,
         password=redis_dsn.password,
     )
 
