@@ -435,8 +435,12 @@ async def test_bulk_upload_fetches_youtube_metadata(client, test_list, test_db, 
     with patch('app.api.videos.YouTubeClient') as mock_youtube_client_class, \
          patch('app.api.videos.extract_youtube_id') as mock_extract_id:
 
-        # Mock extract_youtube_id to return our test IDs
-        mock_extract_id.side_effect = lambda url: "VIDEO_ID_1" if "VIDEO_ID_1" in url else "VIDEO_ID_2"
+        # Mock extract_youtube_id with exact URL mapping (not substring matching)
+        url_to_id = {
+            "https://www.youtube.com/watch?v=VIDEO_ID_1": "VIDEO_ID_1",
+            "https://youtu.be/VIDEO_ID_2": "VIDEO_ID_2"
+        }
+        mock_extract_id.side_effect = lambda url: url_to_id[url]
 
         # Mock YouTube client instance
         mock_client = AsyncMock()

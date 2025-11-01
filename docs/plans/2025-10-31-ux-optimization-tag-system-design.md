@@ -128,13 +128,14 @@ query = select(Video).join(video_tags).join(Tag).where(
 ).distinct()
 
 # AND filter (all tags required)
-query = select(Video).where(
-    Video.id.in_(
-        select(video_tags.c.video_id)
-        .group_by(video_tags.c.video_id)
-        .having(func.count(video_tags.c.tag_id) == len(tag_ids))
-    )
+subquery = (
+    select(video_tags.c.video_id)
+    .join(Tag, video_tags.c.tag_id == Tag.id)
+    .where(Tag.id.in_(tag_ids))  # Filter by specific tag IDs
+    .group_by(video_tags.c.video_id)
+    .having(func.count(func.distinct(video_tags.c.tag_id)) == len(tag_ids))  # Use distinct count
 )
+query = select(Video).where(Video.id.in_(subquery))
 ```
 
 #### 3. Response Schema Updates

@@ -313,17 +313,29 @@ async def get_videos_in_list(
     )
     videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
 
-    # Load tags for each video via junction table
-    # (async lazy loading doesn't work reliably, so we query explicitly)
+    if not videos:
+        return []
+
+    # Load all tags for all videos in a single query (prevents N+1)
+    # This is more explicit than selectinload and works better with FastAPI response models
+    video_ids = [video.id for video in videos]
+    tags_stmt = (
+        select(video_tags.c.video_id, Tag)
+        .join(Tag, video_tags.c.tag_id == Tag.id)
+        .where(video_tags.c.video_id.in_(video_ids))
+    )
+    tags_result = await db.execute(tags_stmt)
+
+    # Group tags by video_id
+    tags_by_video: dict = {}
+    for video_id, tag in tags_result:
+        if video_id not in tags_by_video:
+            tags_by_video[video_id] = []
+        tags_by_video[video_id].append(tag)
+
+    # Assign tags to videos
     for video in videos:
-        tags_stmt = (
-            select(Tag)
-            .join(video_tags)
-            .where(video_tags.c.video_id == video.id)
-        )
-        tags_result = await db.execute(tags_stmt)
-        # Set tags via __dict__ to avoid SQLAlchemy relationship issues
-        video.__dict__['tags'] = list(tags_result.scalars().all())
+        video.__dict__['tags'] = tags_by_video.get(video.id, [])
 
     return list(videos)
 

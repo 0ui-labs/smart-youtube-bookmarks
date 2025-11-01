@@ -270,21 +270,27 @@ const columns = useMemo(
           )
         }
 
+        // Use React state for error handling instead of imperative DOM manipulation
+        const [imageError, setImageError] = useState(false)
+
+        if (imageError) {
+          return (
+            <div className="w-32 aspect-video bg-gray-100 rounded flex items-center justify-center">
+              <svg className="w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+              <span className="text-xs text-gray-500 mt-1">Failed to load</span>
+            </div>
+          )
+        }
+
         return (
           <img
             src={thumbnailUrl}
             alt={title}
             loading="lazy"
             className="w-32 aspect-video object-cover rounded shadow-sm"
-            onError={(e) => {
-              // Fallback to placeholder on error
-              const target = e.target as HTMLImageElement
-              target.style.display = 'none'
-              const placeholder = document.createElement('div')
-              placeholder.className = 'w-32 aspect-video bg-gray-100 rounded flex items-center justify-center'
-              placeholder.innerHTML = '<svg class="w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>'
-              target.parentNode?.appendChild(placeholder)
-            }}
+            onError={() => setImageError(true)}
           />
         )
       },

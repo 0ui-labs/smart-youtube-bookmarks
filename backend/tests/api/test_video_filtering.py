@@ -61,17 +61,17 @@ async def test_filter_videos_by_tags_and(client: AsyncClient, test_db: AsyncSess
     tag2_id = tag2_resp.json()["id"]
 
     # Create videos
-    # Video 1 has BOTH Python and Advanced tags
+    # Video 1 has BOTH JavaScript and Expert tags
     video1 = Video(
         list_id=test_list.id,
         youtube_id="VIDEO_ID_1",
-        title="Advanced Python Video"
+        title="Advanced JavaScript Video"
     )
-    # Video 2 has ONLY Python tag
+    # Video 2 has ONLY JavaScript tag
     video2 = Video(
         list_id=test_list.id,
         youtube_id="VIDEO_ID_2",
-        title="Basic Python Video"
+        title="Basic JavaScript Video"
     )
     test_db.add(video1)
     test_db.add(video2)

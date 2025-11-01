@@ -59,7 +59,7 @@ export function CollapsibleSidebar({
 
   // Close sidebar when clicking outside (mobile only)
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       if (
         isMobile &&
         isOpen &&
@@ -70,8 +70,9 @@ export function CollapsibleSidebar({
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    // Use Pointer Events API (modern, unified mouse/touch/pen handling)
+    document.addEventListener('pointerdown', handleClickOutside as EventListener)
+    return () => document.removeEventListener('pointerdown', handleClickOutside as EventListener)
   }, [isMobile, isOpen])
 
   // Close sidebar with ESC key (mobile only)

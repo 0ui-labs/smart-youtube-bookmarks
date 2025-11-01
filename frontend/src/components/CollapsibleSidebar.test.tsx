@@ -11,6 +11,18 @@ describe('CollapsibleSidebar', () => {
       configurable: true,
       value: 1024, // Desktop by default
     })
+    // Dispatch resize event to trigger component's resize listener
+    window.dispatchEvent(new Event('resize'))
+  })
+
+  // Clean up and reset to desktop after each test
+  afterEach(() => {
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1024,
+    })
+    window.dispatchEvent(new Event('resize'))
   })
 
   it('renders sidebar content on desktop', () => {
@@ -36,7 +48,12 @@ describe('CollapsibleSidebar', () => {
 
   it('renders toggle button on mobile', () => {
     // Mock mobile viewport
-    Object.defineProperty(window, 'innerWidth', { value: 375 })
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 375
+    })
+    window.dispatchEvent(new Event('resize'))
 
     render(
       <CollapsibleSidebar>
@@ -48,7 +65,12 @@ describe('CollapsibleSidebar', () => {
   })
 
   it('toggles sidebar on mobile when button clicked', async () => {
-    Object.defineProperty(window, 'innerWidth', { value: 375 })
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 375
+    })
+    window.dispatchEvent(new Event('resize'))
     const user = userEvent.setup()
 
     render(
@@ -71,7 +93,12 @@ describe('CollapsibleSidebar', () => {
   })
 
   it('closes mobile sidebar when backdrop clicked', async () => {
-    Object.defineProperty(window, 'innerWidth', { value: 375 })
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 375
+    })
+    window.dispatchEvent(new Event('resize'))
     const user = userEvent.setup()
 
     render(
@@ -101,7 +128,12 @@ describe('CollapsibleSidebar', () => {
   })
 
   it('has proper ARIA attributes', () => {
-    Object.defineProperty(window, 'innerWidth', { value: 375 })
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 375
+    })
+    window.dispatchEvent(new Event('resize'))
 
     render(
       <CollapsibleSidebar>

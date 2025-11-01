@@ -109,11 +109,11 @@ async def update_tag(
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
 
-    # Check for duplicate name if name is being updated
-    if tag_update.name is not None and tag_update.name != tag.name:
+    # Check for duplicate name if name is being updated (case-insensitive)
+    if tag_update.name is not None and tag_update.name.lower() != tag.name.lower():
         duplicate_check = select(Tag).where(
             Tag.user_id == current_user.id,
-            Tag.name == tag_update.name
+            func.lower(Tag.name) == tag_update.name.lower()
         )
         duplicate_result = await db.execute(duplicate_check)
         existing = duplicate_result.scalar_one_or_none()
