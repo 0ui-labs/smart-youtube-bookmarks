@@ -5,6 +5,7 @@ Provides singleton Redis client for pub/sub and caching operations.
 """
 
 import asyncio
+from urllib.parse import urlparse
 import redis.asyncio as redis
 from arq import create_pool
 from arq.connections import RedisSettings, ArqRedis
@@ -77,7 +78,17 @@ async def get_arq_pool() -> ArqRedis:
     async with _arq_lock:
         # Double-check: another coroutine might have initialized it
         if _arq_pool is None:
-            redis_settings = RedisSettings.from_dsn(settings.redis_url)
+            # Parse Redis DSN manually (RedisSettings.from_dsn() doesn't exist)
+            redis_dsn = urlparse(settings.redis_url)
+            db_str = redis_dsn.path.lstrip('/') if redis_dsn.path else ''
+            redis_db = int(db_str) if db_str.isdigit() else 0  # Safe int conversion
+
+            redis_settings = RedisSettings(
+                host=redis_dsn.hostname or 'localhost',
+                port=redis_dsn.port or 6379,
+                database=redis_db,
+                password=redis_dsn.password,
+            )
             _arq_pool = await create_pool(redis_settings)
         return _arq_pool
 
@@ -90,5 +101,5 @@ async def close_arq_pool() -> None:
     """
     global _arq_pool
     if _arq_pool:
-        await _arq_pool.close()
+        await _arq_pool.close(close_connection_pool=True)
         _arq_pool = None

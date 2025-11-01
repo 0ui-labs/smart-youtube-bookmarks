@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import lists, videos, processing, websocket, tags
-from app.core.redis import close_redis_client
+from app.core.redis import close_redis_client, close_arq_pool, get_arq_pool
 
 
 @asynccontextmanager
@@ -19,12 +19,14 @@ async def lifespan(app: FastAPI):
     Application lifespan manager.
 
     Handles startup and shutdown events for the application.
-    Currently manages Redis connection lifecycle.
+    Manages Redis client and ARQ pool lifecycle.
     """
-    # Startup: nothing to do yet
+    # Startup: Initialize ARQ pool eagerly (not lazy on first request)
+    await get_arq_pool()
     yield
-    # Shutdown: close Redis connection
+    # Shutdown: Close both Redis client and ARQ pool
     await close_redis_client()
+    await close_arq_pool()
 
 
 app = FastAPI(title="Smart YouTube Bookmarks", lifespan=lifespan)
