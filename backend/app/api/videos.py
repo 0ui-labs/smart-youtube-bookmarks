@@ -22,7 +22,7 @@ import io
 from datetime import datetime
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -323,6 +323,66 @@ async def get_videos_in_list(
         )
         tags_result = await db.execute(tags_stmt)
         # Set tags via __dict__ to avoid SQLAlchemy relationship issues
+        video.__dict__['tags'] = list(tags_result.scalars().all())
+
+    return list(videos)
+
+
+@router.get("/videos", response_model=List[VideoResponse])
+async def list_all_videos(
+    tags: Optional[List[str]] = Query(None),
+    tags_all: Optional[List[str]] = Query(None),
+    db: AsyncSession = Depends(get_db)
+) -> List[Video]:
+    """
+    List all videos with optional tag filtering.
+
+    Query params:
+    - tags: OR filter (any matching tag) - can be specified multiple times
+    - tags_all: AND filter (all tags required) - can be specified multiple times
+
+    Examples:
+    - /api/videos - All videos
+    - /api/videos?tags=Python&tags=Tutorial - Videos with Python OR Tutorial tags
+    - /api/videos?tags_all=Python&tags_all=Advanced - Videos with BOTH Python AND Advanced tags
+    """
+    stmt = select(Video).order_by(Video.created_at)
+
+    # Filter by tags (OR logic)
+    if tags and len(tags) > 0:
+        # Join to tags and filter by tag names
+        stmt = (
+            stmt.join(Video.tags)
+            .where(Tag.name.in_(tags))
+            .distinct()
+        )
+
+    # Filter by tags (AND logic)
+    if tags_all and len(tags_all) > 0:
+        # Subquery: videos that have ALL specified tags
+        # Count distinct tag matches - only include videos with count == number of requested tags
+        subquery = (
+            select(video_tags.c.video_id)
+            .select_from(video_tags)
+            .join(Tag, video_tags.c.tag_id == Tag.id)
+            .where(Tag.name.in_(tags_all))
+            .group_by(video_tags.c.video_id)
+            .having(func.count(func.distinct(video_tags.c.tag_id)) == len(tags_all))
+        )
+
+        stmt = stmt.where(Video.id.in_(subquery))
+
+    result = await db.execute(stmt)
+    videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
+
+    # Load tags for each video
+    for video in videos:
+        tags_stmt = (
+            select(Tag)
+            .join(video_tags)
+            .where(video_tags.c.video_id == video.id)
+        )
+        tags_result = await db.execute(tags_stmt)
         video.__dict__['tags'] = list(tags_result.scalars().all())
 
     return list(videos)
