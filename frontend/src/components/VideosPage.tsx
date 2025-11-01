@@ -8,7 +8,7 @@ import {
 import axios from 'axios'
 import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV } from '@/hooks/useVideos'
 import { CSVUpload } from './CSVUpload'
-import { useWebSocket } from '@/hooks/useWebSocket'
+// import { useWebSocket } from '@/hooks/useWebSocket' // Temporarily commented for Task 1.7
 import { ProgressBar } from './ProgressBar'
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
