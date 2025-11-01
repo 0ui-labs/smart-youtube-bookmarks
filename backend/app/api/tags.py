@@ -107,6 +107,21 @@ async def update_tag(
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
 
+    # Check for duplicate name if name is being updated
+    if tag_update.name is not None and tag_update.name != tag.name:
+        duplicate_check = select(Tag).where(
+            Tag.user_id == current_user.id,
+            Tag.name == tag_update.name
+        )
+        duplicate_result = await db.execute(duplicate_check)
+        existing = duplicate_result.scalar_one_or_none()
+
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tag '{tag_update.name}' already exists"
+            )
+
     # Update fields
     if tag_update.name is not None:
         tag.name = tag_update.name

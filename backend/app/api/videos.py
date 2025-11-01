@@ -494,7 +494,7 @@ async def bulk_upload_videos(
 
                     if metadata:
                         # Parse duration from ISO 8601 to seconds
-                        duration_seconds = 0
+                        duration_seconds = None
                         if metadata.get("duration"):
                             try:
                                 duration_obj = parse_duration(metadata["duration"])

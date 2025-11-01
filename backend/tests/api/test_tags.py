@@ -97,6 +97,52 @@ async def test_update_tag(client: AsyncClient, test_user):
 
 
 @pytest.mark.asyncio
+async def test_update_tag_duplicate_name(client: AsyncClient, test_user):
+    """Test updating tag to duplicate name fails."""
+    # Create two tags
+    await client.post("/api/tags", json={"name": "ExistingTag"})
+    create_response = await client.post("/api/tags", json={"name": "TagToRename"})
+    tag_id = create_response.json()["id"]
+
+    # Try to rename second tag to match first tag
+    response = await client.put(
+        f"/api/tags/{tag_id}",
+        json={"name": "ExistingTag"}
+    )
+
+    assert response.status_code == 400
+    assert "already exists" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_update_tag_updates_timestamp(client: AsyncClient, test_user):
+    """Test that updating a tag automatically updates the updated_at timestamp."""
+    import asyncio
+    from datetime import datetime
+
+    # Create tag
+    create_response = await client.post("/api/tags", json={"name": "TimestampTest"})
+    tag_id = create_response.json()["id"]
+    original_updated_at = create_response.json()["updated_at"]
+
+    # Wait a moment to ensure timestamps differ
+    await asyncio.sleep(0.1)
+
+    # Update tag
+    update_response = await client.put(
+        f"/api/tags/{tag_id}",
+        json={"name": "TimestampTestUpdated"}
+    )
+
+    assert update_response.status_code == 200
+    new_updated_at = update_response.json()["updated_at"]
+
+    # Verify updated_at changed
+    assert new_updated_at != original_updated_at
+    assert new_updated_at > original_updated_at
+
+
+@pytest.mark.asyncio
 async def test_delete_tag(client: AsyncClient, test_user):
     """Test deleting a tag."""
     # Create tag
