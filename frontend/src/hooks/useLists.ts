@@ -33,8 +33,8 @@ export const useCreateList = () => {
       console.error('Failed to create list:', error)
     },
     onSettled: async () => {
-      // Await invalidation to keep mutation pending until refetch completes
-      return await queryClient.invalidateQueries({ queryKey: ['lists'] })
+      // Invalidate and refetch to ensure UI consistency
+      await queryClient.invalidateQueries({ queryKey: ['lists'] })
     },
   })
 }
@@ -52,7 +52,7 @@ export const useDeleteList = () => {
       await queryClient.cancelQueries({ queryKey: ['lists'] })
       const previous = queryClient.getQueryData(listsOptions().queryKey)
 
-      queryClient.setQueryData<ListResponse[]>(listsOptions().queryKey, (old) =>
+      queryClient.setQueryData(listsOptions().queryKey, (old: ListResponse[] | undefined) =>
         old?.filter((list) => list.id !== listId) ?? []
       )
 
@@ -65,9 +65,9 @@ export const useDeleteList = () => {
         queryClient.setQueryData(listsOptions().queryKey, context.previous)
       }
     },
-    // Refetch to ensure consistency
+    // Refetch to ensure consistency after success or error
     onSettled: async () => {
-      return await queryClient.invalidateQueries({ queryKey: ['lists'] })
+      await queryClient.invalidateQueries({ queryKey: ['lists'] })
     },
   })
 }

@@ -26,27 +26,34 @@ describe('getQueryClient', () => {
     const client = getQueryClient()
     const defaults = client.getDefaultOptions()
 
-    expect(defaults.queries?.staleTime).toBe(60 * 1000) // 60 seconds
+    expect(defaults.queries?.staleTime).toBe(5 * 60 * 1000) // 5 minutes
   })
 
   it('should have correct default gcTime configuration', () => {
     const client = getQueryClient()
     const defaults = client.getDefaultOptions()
 
-    expect(defaults.queries?.gcTime).toBe(5 * 60 * 1000) // 5 minutes
+    expect(defaults.queries?.gcTime).toBe(10 * 60 * 1000) // 10 minutes
   })
 
   it('should have correct default refetchOnWindowFocus configuration', () => {
     const client = getQueryClient()
     const defaults = client.getDefaultOptions()
 
-    expect(defaults.queries?.refetchOnWindowFocus).toBe(false)
+    expect(defaults.queries?.refetchOnWindowFocus).toBe(true)
   })
 
   it('should have correct default retry configuration', () => {
     const client = getQueryClient()
     const defaults = client.getDefaultOptions()
 
-    expect(defaults.queries?.retry).toBe(1)
+    expect(defaults.queries?.retry).toBe(3)
+  })
+
+  it('should have correct default mutation retry configuration', () => {
+    const client = getQueryClient()
+    const defaults = client.getDefaultOptions()
+
+    expect(defaults.mutations?.retry).toBe(0)
   })
 })
