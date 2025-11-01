@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { CollapsibleSidebar } from './components/CollapsibleSidebar'
 import { ListsPage } from './components/ListsPage'
 import { VideosPage } from './components/VideosPage'
 import { Dashboard } from './pages/Dashboard'
+import { useState } from 'react'
 
 function App() {
   const [currentView, setCurrentView] = useState<'lists' | 'videos' | 'dashboard'>('lists')
@@ -18,41 +19,36 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation Bar */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8 h-16 items-center">
-            <button
-              onClick={() => setCurrentView('lists')}
-              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                currentView === 'lists'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              Lists
-            </button>
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                currentView === 'dashboard'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              Dashboard
-            </button>
-          </div>
-        </div>
-      </nav>
+    <div className="flex h-screen bg-gray-50">
+      <CollapsibleSidebar>
+        <nav className="flex flex-col gap-2 p-4">
+          <h2 className="text-lg font-semibold mb-4">Navigation</h2>
+          <button
+            onClick={() => setCurrentView('lists')}
+            className={`px-3 py-2 rounded text-left hover:bg-gray-100 ${
+              currentView === 'lists' ? 'bg-gray-100 font-medium' : ''
+            }`}
+          >
+            Lists
+          </button>
+          <button
+            onClick={() => setCurrentView('dashboard')}
+            className={`px-3 py-2 rounded text-left hover:bg-gray-100 ${
+              currentView === 'dashboard' ? 'bg-gray-100 font-medium' : ''
+            }`}
+          >
+            Dashboard
+          </button>
+        </nav>
+      </CollapsibleSidebar>
 
-      {/* Main Content */}
-      {currentView === 'lists' && <ListsPage onSelectList={handleSelectList} />}
-      {currentView === 'videos' && selectedListId && (
-        <VideosPage listId={selectedListId} onBack={handleBackToLists} />
-      )}
-      {currentView === 'dashboard' && <Dashboard />}
+      <main className="flex-1 overflow-y-auto p-8">
+        {currentView === 'lists' && <ListsPage onSelectList={handleSelectList} />}
+        {currentView === 'videos' && selectedListId && (
+          <VideosPage listId={selectedListId} onBack={handleBackToLists} />
+        )}
+        {currentView === 'dashboard' && <Dashboard />}
+      </main>
     </div>
   )
 }
