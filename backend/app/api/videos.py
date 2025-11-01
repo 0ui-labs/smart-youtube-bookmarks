@@ -19,7 +19,7 @@ import re
 from typing import List, Sequence, Optional, Annotated
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
@@ -30,6 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from isodate import parse_duration
+from httpx import HTTPError, TimeoutException
 
 from app.core.database import get_db
 from app.core.redis import get_arq_pool, get_redis_client
@@ -44,6 +45,29 @@ from app.schemas.tag import TagResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+def parse_youtube_duration(iso_duration: str | None) -> int | None:
+    """Parse ISO 8601 duration to seconds."""
+    if not iso_duration:
+        return None
+    try:
+        duration_obj = parse_duration(iso_duration)
+        return int(duration_obj.total_seconds())
+    except Exception as e:
+        logger.debug(f"Invalid duration format '{iso_duration}': {e}")
+        return None
+
+
+def parse_youtube_timestamp(timestamp: str | None) -> datetime | None:
+    """Parse YouTube API timestamp to timezone-aware datetime."""
+    if not timestamp:
+        return None
+    try:
+        return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+    except (ValueError, AttributeError) as e:
+        logger.debug(f"Invalid timestamp format '{timestamp}': {e}")
+        return None
 
 
 router = APIRouter(prefix="/api", tags=["videos"])
@@ -217,24 +241,9 @@ async def add_video_to_list(
 
     # Create video with metadata (or basic if fetch failed)
     if metadata:
-        # Parse duration from ISO 8601 to seconds
-        duration_seconds = None
-        if metadata.get("duration"):
-            try:
-                duration_obj = parse_duration(metadata["duration"])
-                duration_seconds = int(duration_obj.total_seconds())
-            except Exception:
-                pass
-
-        # Parse published_at
-        published_at = None
-        if metadata.get("published_at"):
-            try:
-                published_at = datetime.fromisoformat(
-                    metadata["published_at"].replace('Z', '+00:00')
-                )
-            except (ValueError, AttributeError):
-                pass
+        # Parse duration and timestamp using helper functions
+        duration_seconds = parse_youtube_duration(metadata.get("duration"))
+        published_at = parse_youtube_timestamp(metadata.get("published_at"))
 
         new_video = Video(
             list_id=list_id,
@@ -388,15 +397,29 @@ async def list_all_videos(
     result = await db.execute(stmt)
     videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
 
-    # Load tags for each video
+    if not videos:
+        return []
+
+    # Load all tags for all videos in a single batch query (prevents N+1)
+    # Use a join query to fetch all tags at once
+    video_ids = [video.id for video in videos]
+    tags_stmt = (
+        select(video_tags.c.video_id, Tag)
+        .join(Tag, video_tags.c.tag_id == Tag.id)
+        .where(video_tags.c.video_id.in_(video_ids))
+    )
+    tags_result = await db.execute(tags_stmt)
+
+    # Group tags by video_id
+    tags_by_video: dict = {}
+    for video_id, tag in tags_result:
+        if video_id not in tags_by_video:
+            tags_by_video[video_id] = []
+        tags_by_video[video_id].append(tag)
+
+    # Assign tags to videos
     for video in videos:
-        tags_stmt = (
-            select(Tag)
-            .join(video_tags)
-            .where(video_tags.c.video_id == video.id)
-        )
-        tags_result = await db.execute(tags_stmt)
-        video.__dict__['tags'] = list(tags_result.scalars().all())
+        video.__dict__['tags'] = tags_by_video.get(video.id, [])
 
     return list(videos)
 
@@ -566,24 +589,9 @@ async def bulk_upload_videos(
                     metadata = metadata_by_id.get(youtube_id)
 
                     if metadata:
-                        # Parse duration from ISO 8601 to seconds
-                        duration_seconds = None
-                        if metadata.get("duration"):
-                            try:
-                                duration_obj = parse_duration(metadata["duration"])
-                                duration_seconds = int(duration_obj.total_seconds())
-                            except Exception:
-                                pass
-
-                        # Parse published_at
-                        published_at = None
-                        if metadata.get("published_at"):
-                            try:
-                                published_at = datetime.fromisoformat(
-                                    metadata["published_at"].replace('Z', '+00:00')
-                                )
-                            except (ValueError, AttributeError):
-                                pass
+                        # Parse duration and timestamp using helper functions
+                        duration_seconds = parse_youtube_duration(metadata.get("duration"))
+                        published_at = parse_youtube_timestamp(metadata.get("published_at"))
 
                         # Create video with full metadata
                         video = Video(
@@ -608,9 +616,37 @@ async def bulk_upload_videos(
                 # Update videos_to_create to actual Video objects
                 videos_to_create = video_objects
 
+            except TimeoutException:
+                logger.warning("YouTube API timeout during batch fetch")
+                # Fall back to pending status, queue individual tasks
+                video_objects = []
+                for video_data in videos_to_create:
+                    video = Video(
+                        list_id=list_id,
+                        youtube_id=video_data["youtube_id"],
+                        processing_status="pending"
+                    )
+                    video_objects.append(video)
+                videos_to_create = video_objects
+            except HTTPError as e:
+                logger.error(f"YouTube API HTTP error: {e}")
+                if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
+                    if e.response.status_code == 403:
+                        logger.error("Quota exceeded, marking as pending")
+                # Handle quota/auth errors - fall back to pending status
+                video_objects = []
+                for video_data in videos_to_create:
+                    video = Video(
+                        list_id=list_id,
+                        youtube_id=video_data["youtube_id"],
+                        processing_status="pending",
+                        error_message="YouTube API quota exceeded or authentication error"
+                    )
+                    video_objects.append(video)
+                videos_to_create = video_objects
             except Exception as e:
                 # If batch fetch fails entirely, fall back to basic videos
-                logger.error(f"YouTube batch fetch failed: {e}")
+                logger.exception(f"Unexpected error fetching YouTube metadata: {e}")
                 video_objects = []
                 for video_data in videos_to_create:
                     video = Video(

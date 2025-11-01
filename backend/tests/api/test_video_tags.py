@@ -29,8 +29,10 @@ async def test_assign_tags_to_video(client: AsyncClient, test_user, test_list, t
 @pytest.mark.asyncio
 async def test_assign_duplicate_tag(client: AsyncClient, test_user, test_list, test_video):
     """Test assigning the same tag twice is idempotent."""
-    # Create tag
-    tag_response = await client.post("/api/tags", json={"name": "DuplicateTest"})
+    # Create tag with unique name
+    import uuid
+    tag_name = f"DuplicateTest_{uuid.uuid4().hex[:8]}"
+    tag_response = await client.post("/api/tags", json={"name": tag_name})
     tag_id = tag_response.json()["id"]
 
     # Assign tag twice
@@ -40,14 +42,16 @@ async def test_assign_duplicate_tag(client: AsyncClient, test_user, test_list, t
     assert response.status_code == 200
     tags = response.json()
     # Should still have only one tag
-    assert len([t for t in tags if t["name"] == "DuplicateTest"]) == 1
+    assert len([t for t in tags if t["name"] == tag_name]) == 1
 
 
 @pytest.mark.asyncio
 async def test_remove_tag_from_video(client: AsyncClient, test_user, test_list, test_video):
     """Test removing a tag from a video."""
-    # Create and assign tag
-    tag_response = await client.post("/api/tags", json={"name": "RemoveTest"})
+    # Create and assign tag with unique name
+    import uuid
+    tag_name = f"RemoveTest_{uuid.uuid4().hex[:8]}"
+    tag_response = await client.post("/api/tags", json={"name": tag_name})
     tag_id = tag_response.json()["id"]
     await client.post(f"/api/videos/{test_video.id}/tags", json={"tag_ids": [tag_id]})
 

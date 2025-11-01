@@ -24,6 +24,14 @@ describe('formatDuration', () => {
   })
 
   it('handles zero', () => {
-    expect(formatDuration(0)).toBe('-')
+    // Zero seconds should display as "0:00" (valid duration), not "-" (invalid/null)
+    expect(formatDuration(0)).toBe('0:00')
+  })
+
+  it('handles invalid values', () => {
+    expect(formatDuration(NaN)).toBe('-')
+    expect(formatDuration(Infinity)).toBe('-')
+    expect(formatDuration(-Infinity)).toBe('-')
+    expect(formatDuration(-10)).toBe('-')
   })
 })

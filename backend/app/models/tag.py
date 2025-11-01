@@ -1,5 +1,5 @@
-from datetime import datetime
-from sqlalchemy import String, DateTime, ForeignKey, Table, Column, UniqueConstraint
+from datetime import datetime, timezone
+from sqlalchemy import String, DateTime, ForeignKey, Table, Column, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import uuid
@@ -13,7 +13,7 @@ video_tags = Table(
     Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
     Column('video_id', UUID(as_uuid=True), ForeignKey('videos.id', ondelete='CASCADE')),
     Column('tag_id', UUID(as_uuid=True), ForeignKey('tags.id', ondelete='CASCADE')),
-    Column('created_at', DateTime, default=datetime.utcnow),
+    Column('created_at', DateTime(timezone=True), server_default=func.now()),
     # Unique constraint to prevent duplicate video-tag assignments
     UniqueConstraint('video_id', 'tag_id', name='uq_video_tags_video_tag')
 )
