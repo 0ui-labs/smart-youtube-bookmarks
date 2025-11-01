@@ -16,7 +16,7 @@ Includes:
 
 from uuid import UUID
 import re
-from typing import List, Sequence, Optional
+from typing import List, Sequence, Optional, Annotated
 import csv
 import io
 from datetime import datetime
@@ -330,8 +330,8 @@ async def get_videos_in_list(
 
 @router.get("/videos", response_model=List[VideoResponse])
 async def list_all_videos(
-    tags: Optional[List[str]] = Query(None),
-    tags_all: Optional[List[str]] = Query(None),
+    tags: Annotated[Optional[List[str]], Query(max_length=10)] = None,
+    tags_all: Annotated[Optional[List[str]], Query(max_length=10)] = None,
     db: AsyncSession = Depends(get_db)
 ) -> List[Video]:
     """

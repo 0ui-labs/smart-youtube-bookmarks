@@ -176,3 +176,74 @@ async def test_filter_videos_by_tags_and_case_insensitive(client: AsyncClient, t
     data = response.json()
     assert len(data) == 1
     assert data[0]["id"] == str(video.id)
+
+
+@pytest.mark.asyncio
+async def test_filter_videos_or_too_many_tags(client: AsyncClient, test_db: AsyncSession, test_list, test_user):
+    """Test OR filter with more than 10 tags returns 422 validation error."""
+    # Act: Try to filter with 11 tags (exceeds max of 10)
+    tags_list = [f"Tag{i}" for i in range(11)]
+    response = await client.get(
+        "/api/videos",
+        params={"tags": tags_list}
+    )
+
+    # Assert: Should return 422 validation error
+    assert response.status_code == 422
+    error_detail = response.json()["detail"]
+    # FastAPI/Pydantic validation error format
+    assert isinstance(error_detail, list)
+    assert any("tags" in str(err).lower() for err in error_detail)
+
+
+@pytest.mark.asyncio
+async def test_filter_videos_and_too_many_tags(client: AsyncClient, test_db: AsyncSession, test_list, test_user):
+    """Test AND filter with more than 10 tags returns 422 validation error."""
+    # Act: Try to filter with 11 tags (exceeds max of 10)
+    tags_list = [f"Tag{i}" for i in range(11)]
+    response = await client.get(
+        "/api/videos",
+        params={"tags_all": tags_list}
+    )
+
+    # Assert: Should return 422 validation error
+    assert response.status_code == 422
+    error_detail = response.json()["detail"]
+    assert isinstance(error_detail, list)
+    assert any("tags_all" in str(err).lower() for err in error_detail)
+
+
+@pytest.mark.asyncio
+async def test_filter_videos_exactly_10_tags(client: AsyncClient, test_db: AsyncSession, test_list, test_user):
+    """Test filtering with exactly 10 tags works (boundary test)."""
+    # Arrange: Create 10 tags
+    tag_ids = []
+    for i in range(10):
+        tag_resp = await client.post("/api/tags", json={"name": f"BoundaryTag{i}"})
+        tag_ids.append(tag_resp.json()["id"])
+
+    # Create video with all 10 tags
+    video = Video(
+        list_id=test_list.id,
+        youtube_id="VIDEO_ID_BOUNDARY",
+        title="Boundary Test Video"
+    )
+    test_db.add(video)
+    await test_db.commit()
+    await test_db.refresh(video)
+
+    # Assign all 10 tags
+    await client.post(f"/api/videos/{video.id}/tags", json={"tag_ids": tag_ids})
+
+    # Act: Filter with exactly 10 tags (boundary - should work)
+    tags_list = [f"BoundaryTag{i}" for i in range(10)]
+    response = await client.get(
+        "/api/videos",
+        params={"tags": tags_list}
+    )
+
+    # Assert: Should return 200 and find the video
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == str(video.id)
