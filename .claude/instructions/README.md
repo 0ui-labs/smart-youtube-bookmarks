@@ -106,7 +106,7 @@ cp .claude/THREAD_HANDOFF_TEMPLATE.md THREAD_HANDOFF_[FEATURE_NAME].md
 - ✅ Summary with action items
 
 **Expected output:**
-```
+```text
 ✅ Semgrep authenticated (Pro Rules available)
    Version: 1.139.0
    Pro Rules: FastAPI, React, Django, Flask, Express
@@ -120,7 +120,7 @@ cp .claude/THREAD_HANDOFF_TEMPLATE.md THREAD_HANDOFF_[FEATURE_NAME].md
 ```
 
 **If issues found:**
-```
+```text
 ⚠️  ACTION REQUIRED: semgrep login
 ⚠️  ACTION REQUIRED: coderabbit auth login
 ```

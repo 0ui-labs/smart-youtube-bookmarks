@@ -101,8 +101,9 @@ cd frontend && npm run dev
 **CRITICAL:** Always check and restart servers after merge!
 
 ```bash
-# 1. Check server status
-BashOutput on existing server IDs
+# 1. Check server status (check both ports are listening)
+lsof -i:8000  # Backend should show uvicorn process
+lsof -i:5173  # Frontend should show Vite process
 
 # 2. If killed or not responding:
 lsof -ti:8000 -ti:5173 | xargs kill -9
@@ -156,7 +157,7 @@ curl http://localhost:5173
 
 Use this at the start of EVERY new thread:
 
-```
+```bash
 □ Kill old processes: lsof -ti:8000 -ti:5173 | xargs kill -9
 □ Verify clean: lsof -ti:8000 -ti:5173 (should be empty)
 □ Check Docker: docker-compose ps (postgres, redis healthy)
@@ -191,11 +192,13 @@ curl http://localhost:5173
 lsof -i:8000
 lsof -i:5173
 
-# 4. Check backend logs
-BashOutput [backend_bash_id]
+# 4. Check backend logs (replace <bash_id> with actual ID from system reminders)
+# BashOutput tool with the backend bash process ID
+ps aux | grep "uvicorn app.main:app"
 
-# 5. Check frontend logs
-BashOutput [frontend_bash_id]
+# 5. Check frontend logs (replace <bash_id> with actual ID from system reminders)
+# BashOutput tool with the frontend bash process ID
+ps aux | grep "vite"
 ```
 
 **Fix:**

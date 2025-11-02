@@ -337,7 +337,7 @@ grep "MAJOR" review.txt
 ## 📊 Expected Output Examples
 
 ### Minimal Output (--prompt-only)
-```
+```text
 🔍 CodeRabbit Review - AI Agent Mode
 
 CRITICAL (2):
@@ -360,7 +360,7 @@ Total: 10 issues
 ```
 
 ### Detailed Output (--plain)
-```
+```text
 🔍 CodeRabbit Review - Detailed Mode
 
 ════════════════════════════════════════
@@ -400,7 +400,7 @@ References:
 ## 🔄 Integration mit Projekt-Workflow
 
 ### Phase 4: Reviews (aus DEVELOPMENT_WORKFLOW.md)
-```
+```text
 1. Code-Reviewer Subagent dispatchen
    ↓
 2. CodeRabbit CLI starten (background)    ← Use --prompt-only

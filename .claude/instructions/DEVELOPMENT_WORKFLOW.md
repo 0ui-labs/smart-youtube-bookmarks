@@ -11,7 +11,7 @@
 
 **Skills wie `subagent-driven-development` sind TOOLS INNERHALB dieses Workflows:**
 
-```
+```text
 Phase 1: REF MCP Research (VOR Implementation!)
 Phase 2: Implementation ← HIER: subagent-driven-development Skill
 Phase 3: Verification (Evidence before claims)
@@ -157,7 +157,7 @@ echo "CodeRabbit version: $(coderabbit --version 2>&1 | head -1)"
 - Stelle sicher, dass RED-GREEN-REFACTOR befolgt wird
 
 **6. Implementation Subagent dispatchen**
-```
+```text
 Task (general-purpose):
   "Implement Task X from plan.
 
@@ -197,7 +197,7 @@ Task (general-purpose):
 ### Phase 4: Reviews (Multi-Tool Approach)
 
 **8. Code-Reviewer Subagent**
-```
+```text
 Task (superpowers:code-reviewer):
   "Review Task X implementation.
 
@@ -211,13 +211,13 @@ Task (superpowers:code-reviewer):
 **9. CodeRabbit CLI**
 ```bash
 # AI Agent Mode (token-efficient, optimiert für Claude Code)
-coderabbit --prompt-only --type committed
+coderabbit --prompt-only --type uncommitted
 
-# Alternative: Human-readable Output
-coderabbit --plain --type committed
+# Alternative: Human-readable Output (uses review subcommand)
+coderabbit review --plain
 
 # Mit spezifischem Base Branch
-coderabbit --prompt-only --base main --type committed
+coderabbit --prompt-only --type uncommitted --base main
 ```
 - **IMPORTANT:** Läuft im Hintergrund, kann 7-30+ Minuten dauern
 - **BEST PRACTICE:** Verwende `--prompt-only` für AI Agent Integration
@@ -496,11 +496,11 @@ coderabbit auth status
 
 **Nach Task-Implementation (Phase 4):**
 ```bash
-# Best Practice: AI Agent Mode
-coderabbit --prompt-only --type committed
-
-# Für uncommitted changes (vor Commit)
+# Best Practice: AI Agent Mode (für uncommitted changes)
 coderabbit --prompt-only --type uncommitted
+
+# Für bereits committed changes (nach Commit)
+coderabbit --prompt-only --type committed
 
 # Mit spezifischem Base Branch
 coderabbit --prompt-only --base main
@@ -564,8 +564,8 @@ semgrep login
 
 **Nach Task-Implementation (Phase 4):**
 ```bash
-# 1. CodeRabbit starten (Hintergrund)
-coderabbit --prompt-only --type committed &
+# 1. CodeRabbit starten (Hintergrund) - für uncommitted changes
+coderabbit --prompt-only --type uncommitted &
 
 # 2. Semgrep parallel (Vordergrund, schnell)
 semgrep scan \

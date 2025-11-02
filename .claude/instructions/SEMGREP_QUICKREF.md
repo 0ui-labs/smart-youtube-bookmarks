@@ -235,9 +235,9 @@ semgrep --version
 
 ## Resources
 
-- **Explore rules:** https://semgrep.dev/explore
-- **Documentation:** https://semgrep.dev/docs
-- **Custom rules syntax:** https://semgrep.dev/docs/writing-rules/overview
+- [Explore rules](https://semgrep.dev/explore)
+- [Documentation](https://semgrep.dev/docs)
+- [Custom rules syntax](https://semgrep.dev/docs/writing-rules/overview)
 
 ---
 
