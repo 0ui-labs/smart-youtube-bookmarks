@@ -5,19 +5,7 @@
  * Users can select multiple tags to filter videos.
  */
 import { create } from 'zustand';
-
-/**
- * Tag interface matching backend API response
- * Note: UUID fields are serialized as strings in JSON
- */
-export interface Tag {
-  id: string;
-  name: string;
-  color: string | null;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-}
+import type { Tag } from '@/types/tag';
 
 /**
  * Tag store state and actions
