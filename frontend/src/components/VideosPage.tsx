@@ -12,6 +12,10 @@ import { CSVUpload } from './CSVUpload'
 import { ProgressBar } from './ProgressBar'
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
+import { CollapsibleSidebar } from '@/components/CollapsibleSidebar'
+import { TagNavigation } from '@/components/TagNavigation'
+import { useTags } from '@/hooks/useTags'
+import { useTagStore } from '@/stores/tagStore'
 
 const columnHelper = createColumnHelper<VideoResponse>()
 
@@ -62,6 +66,18 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
   const { data: videos = [], isLoading, error } = useVideos(listId)
   const createVideo = useCreateVideo(listId)
   const deleteVideo = useDeleteVideo(listId)
+
+  // Tag integration
+  const { data: tags = [], isLoading: tagsLoading, error: tagsError } = useTags()
+  const { selectedTagIds, toggleTag, clearTags } = useTagStore()
+
+  // Compute selected tags (no useMemo - simple filter is fast enough per React docs)
+  const selectedTags = tags.filter(tag => selectedTagIds.includes(tag.id))
+
+  // Create tag placeholder handler
+  const handleCreateTag = () => {
+    console.log('Create tag clicked - will be implemented in later task')
+  }
 
   // WebSocket hook for real-time progress updates
   // TEMPORARILY DISABLED: Causes flicker due to heartbeat re-renders
@@ -227,17 +243,47 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <button
-            onClick={onBack}
-            className="text-blue-600 hover:text-blue-800 mb-2 text-sm"
-          >
-            ← Zurück zu Listen
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">Videos</h1>
-        </div>
+    <div className="flex h-screen">
+      {/* Sidebar with TagNavigation */}
+      <CollapsibleSidebar>
+        {tagsLoading ? (
+          <div className="p-4 text-sm text-gray-500">Tags werden geladen...</div>
+        ) : tagsError ? (
+          <div className="p-4 text-sm text-red-600">Fehler beim Laden der Tags</div>
+        ) : (
+          <TagNavigation
+            tags={tags}
+            selectedTagIds={selectedTagIds}
+            onTagSelect={toggleTag}
+            onTagCreate={handleCreateTag}
+          />
+        )}
+      </CollapsibleSidebar>
+
+      {/* Main content area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto p-8">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <button
+              onClick={onBack}
+              className="text-blue-600 hover:text-blue-800 mb-2 text-sm"
+            >
+              ← Zurück zu Listen
+            </button>
+            <h1 className="text-3xl font-bold text-gray-900">Videos</h1>
+            {selectedTags.length > 0 && (
+              <p className="text-sm text-gray-600 mt-1">
+                Gefiltert nach: {selectedTags.map(t => t.name).join(', ')}
+                <button
+                  onClick={clearTags}
+                  className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
+                >
+                  (Filter entfernen)
+                </button>
+              </p>
+            )}
+          </div>
         <div className="flex gap-2">
           <button
             onClick={handleExportCSV}
@@ -434,6 +480,8 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
           {videos.length} Video{videos.length !== 1 ? 's' : ''} in dieser Liste
         </div>
       )}
+        </div>
+      </div>
     </div>
   )
 }
