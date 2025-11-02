@@ -87,3 +87,6 @@ alembic/versions/*.py
 
 # Git worktrees
 .worktrees/
+
+# Code analysis results
+semgrep.json
