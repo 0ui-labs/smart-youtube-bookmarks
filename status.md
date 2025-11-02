@@ -1,6 +1,6 @@
 # Project Status & Task Protocol
 
-**Last Updated:** 2025-11-02 17:30 CET | **Branch:** main
+**Last Updated:** 2025-11-02 18:00 CET | **Branch:** main
 
 ---
 
@@ -59,6 +59,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 - Implementation: `docs/plans/2025-10-31-ID-05-ux-optimization-implementation-plan.md`
 - Security Hardening: `docs/plans/2025-11-02-security-hardening-implementation.md`
 - Latest Handoff: `docs/handoffs/2025-11-02-log-019-tag-navigation-integrated.md`
+- Latest Report: `docs/reports/2025-11-02-task-020-tag-filtering-integration.md`
 
 ---
 
@@ -89,7 +90,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 17. [x] Create TagNavigation component with tag list and multi-select (2025-11-02 13:40)
 18. [x] Create useTags React Query hook for API calls (2025-11-02 13:40)
 19. [x] Integrate TagNavigation into VideosPage with layout (2025-11-02 16:10)
-20. [ ] Connect tag filter state to useVideos hook
+20. [x] Connect tag filter state to useVideos hook (2025-11-02 17:51)
 21. [ ] Update App.tsx default route to /videos
 22. [ ] Hide Lists/Dashboard navigation from UI
 23. [ ] Remove "Back to List" link from VideosPage
@@ -206,3 +207,4 @@ This file maintains **two separate lists**: PLAN and LOG.
 6. 2025-11-02 [Plan #19] Integrate TagNavigation into VideosPage with CollapsibleSidebar - TDD approach, REF MCP validated, all reviews passed (Code-Reviewer 10/10, Semgrep 0, CodeRabbit 0)
 7. 2025-11-02 [Planning] Created Task #19 comprehensive report (REPORT-019) with full implementation details
 8. 2025-11-02 [Planning] Created comprehensive security hardening plan (Tasks #58-#98) based on Greptile code review
+9. 2025-11-02 [Plan #20] Connect tag filter state to useVideos hook - Full-stack implementation with REF MCP improvements (Query Key Factory, useShallow, func.lower), all reviews passed (Code-Reviewer A-, Semgrep 0, CodeRabbit 0)
