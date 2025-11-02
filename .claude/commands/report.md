@@ -1,0 +1,1 @@
+Bitte schreibe einen implementation report. verwende dieses Template  docs/templates/task-report-template.md und schreibe ihn in diesen Ordner docs/reports

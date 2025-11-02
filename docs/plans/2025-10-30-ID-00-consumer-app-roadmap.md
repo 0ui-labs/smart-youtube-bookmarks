@@ -2,7 +2,6 @@
 
 **Datum:** 2025-10-30
 **Status:** Planung
-**Gesamtaufwand:** 40-60 Stunden
 **Basiert auf:** `docs/pivot/product-vision-v2.md`
 
 ---
@@ -33,7 +32,6 @@ Diese Roadmap beschreibt die schrittweise Transformation von der aktuellen Found
 ## Phase 1: AI-Analyse aktivieren (FOUNDATION)
 
 **Ziel:** Gemini API mit Verarbeitungspipeline verbinden
-**Aufwand:** 2-3 Stunden
 **Priorität:** KRITISCH (Kern-Differenzierung)
 
 ### Aufgaben
@@ -81,7 +79,6 @@ Diese Roadmap beschreibt die schrittweise Transformation von der aktuellen Found
 ## Phase 2: Tag-System implementieren (FLEXIBLE ORGANISATION)
 
 **Ziel:** Von starren Listen zu flexiblen Tags wechseln
-**Aufwand:** 4-6 Stunden
 **Priorität:** HOCH (Foundation für UX)
 
 ### Aufgaben
@@ -136,7 +133,6 @@ Diese Roadmap beschreibt die schrittweise Transformation von der aktuellen Found
 ## Phase 3: YouTube-Grid Interface (MODERNE UX)
 
 **Ziel:** Von Tabelle zu YouTube-artiger Grid-Ansicht wechseln
-**Aufwand:** 5-7 Stunden
 **Priorität:** HOCH (User-facing Verbesserung)
 
 ### Aufgaben
@@ -191,7 +187,6 @@ Diese Roadmap beschreibt die schrittweise Transformation von der aktuellen Found
 ## Phase 4: Video-Import vereinfachen (EINSTIEGSHÜRDE SENKEN)
 
 **Ziel:** Mehrere Import-Methoden neben CSV
-**Aufwand:** 3-4 Stunden
 **Priorität:** MITTEL (Adoption-Verbesserung)
 
 ### Aufgaben
@@ -242,7 +237,6 @@ Diese Roadmap beschreibt die schrittweise Transformation von der aktuellen Found
 ## Phase 5: Onboarding-Flow (ERSTE EINDRUCK)
 
 **Ziel:** Geführter Start mit AI-Assistent
-**Aufwand:** 8-12 Stunden
 **Priorität:** KRITISCH (Adoption)
 
 ### Aufgaben
@@ -310,7 +304,6 @@ Diese Roadmap beschreibt die schrittweise Transformation von der aktuellen Found
 ## Phase 6: AI Chat-Interface (CONVERSATIONAL DISCOVERY)
 
 **Ziel:** Chat mit AI über die Video-Library
-**Aufwand:** 10-15 Stunden
 **Priorität:** MITTEL (Differenzierung)
 
 ### Aufgaben
@@ -370,7 +363,6 @@ Diese Roadmap beschreibt die schrittweise Transformation von der aktuellen Found
 ## Phase 7: Custom Analyses (USER-DEFINED FILTERS)
 
 **Ziel:** Nutzer können eigene Analyse-Aufgaben erstellen
-**Aufwand:** 8-12 Stunden
 **Priorität:** NIEDRIG (Power-User Feature)
 
 ### Aufgaben
@@ -489,15 +481,13 @@ Diese Roadmap beschreibt die schrittweise Transformation von der aktuellen Found
 
 ## Zeitplan (Schätzung)
 
-| Phase | Aufwand | Kumulative Zeit |
-|-------|---------|----------------|
-| Phase 1: AI-Analyse | 2-3h | 3h |
-| Phase 2: Tag-System | 4-6h | 9h |
-| Phase 3: YouTube-Grid | 5-7h | 16h |
-| Phase 4: Import | 3-4h | 20h |
-| Phase 5: Onboarding | 8-12h | 32h |
-| Phase 6: AI Chat | 10-15h | 47h |
-| Phase 7: Custom Analyses | 8-12h | 59h |
+| Phase 1: AI-Analyse 
+| Phase 2: Tag-System 
+| Phase 3: YouTube-Grid
+| Phase 4: Import
+| Phase 5: Onboarding
+| Phase 6: AI Chat
+| Phase 7: Custom Analyses
 
 **Total:** 40-60 Stunden für vollständige Vision
 
