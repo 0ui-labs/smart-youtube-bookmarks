@@ -5,6 +5,12 @@
 // Import jest-dom custom matchers for toBeInTheDocument, toHaveAttribute, etc.
 import '@testing-library/jest-dom/vitest';
 
+// Import vi from vitest for mocking
+import { vi } from 'vitest';
+
+// Auto-mock Zustand for test isolation (uses __mocks__/zustand.ts)
+vi.mock('zustand');
+
 // Mock localStorage for tests
 class LocalStorageMock {
   private store: Record<string, string> = {};
