@@ -66,7 +66,6 @@ export const TagNavigation = ({
             <button
               key={tag.id}
               onClick={() => onTagSelect(tag.id)}
-              role="button"
               aria-pressed={isSelected}
               aria-label={`Tag ${tag.name} ${isSelected ? 'abwählen' : 'auswählen'}`}
               className={cn(

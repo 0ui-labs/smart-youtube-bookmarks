@@ -216,7 +216,7 @@ export function useWebSocket(): UseWebSocketReturn {
 
         if (!response.ok) {
           const errorMsg = `Failed to load progress history for job ${jobId}`;
-          console.error(errorMsg, response.statusText);
+          console.error('Failed to load progress history:', { jobId, status: response.statusText });
           setHistoryError(errorMsg);
           continue;
         }
@@ -237,7 +237,7 @@ export function useWebSocket(): UseWebSocketReturn {
         }
       } catch (error) {
         const errorMsg = `Failed to load progress history for job ${jobId}`;
-        console.error(errorMsg, error);
+        console.error('Failed to load progress history:', { jobId, error });
         setHistoryError(errorMsg);
       }
     }

@@ -1,2 +1,2 @@
-Bitte schreibe einen implementation report. verwende dieses Template  docs/templates/task-report-template.md und schreibe ihn in diesen Ordner docs/reports 
-Wenn du den Bericht geschrieben un gespeichert hast dann aktualisiere die status.md Datei.
+Bitte schreibe einen Implementation Report. Verwende dieses Template docs/templates/task-report-template.md und schreibe ihn in diesen Ordner docs/reports.
+Wenn du den Bericht geschrieben und gespeichert hast, dann aktualisiere die status.md Datei.

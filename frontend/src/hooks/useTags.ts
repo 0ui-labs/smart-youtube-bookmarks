@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { TagsSchema, type Tag, type TagCreate } from '@/types/tag'
+import { TagsSchema, TagSchema, type Tag, type TagCreate } from '@/types/tag'
 
 /**
  * Query options factory for tags
@@ -63,7 +63,8 @@ export const useCreateTag = () => {
     mutationKey: ['createTag'],
     mutationFn: async (tagData: TagCreate) => {
       const { data } = await api.post<Tag>('/api/tags', tagData)
-      return data
+      // Validate response with Zod schema (consistent with tagsOptions)
+      return TagSchema.parse(data)
     },
     onError: (error) => {
       console.error('Failed to create tag:', error)

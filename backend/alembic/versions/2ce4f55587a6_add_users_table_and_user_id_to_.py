@@ -10,6 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 import uuid
 
 # revision identifiers, used by Alembic.
@@ -37,12 +38,18 @@ def upgrade() -> None:
     # Generate a UUID for the default user
     default_user_id = str(uuid.uuid4())
 
-    # Insert default test user
+    # Insert default test user using parameterized query
     op.execute(
-        f"""
-        INSERT INTO users (id, email, hashed_password, is_active)
-        VALUES ('{default_user_id}', 'test@example.com', '$2b$12$placeholder_hash', true)
-        """
+        text("""
+            INSERT INTO users (id, email, hashed_password, is_active)
+            VALUES (:user_id, :email, :password, :is_active)
+        """),
+        {
+            'user_id': default_user_id,
+            'email': 'test@example.com',
+            'password': '$2b$12$placeholder_hash',
+            'is_active': True
+        }
     )
 
     # Step 3: Add user_id column as nullable first
@@ -51,13 +58,14 @@ def upgrade() -> None:
         sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=True)
     )
 
-    # Step 4: Set default user_id for existing rows
+    # Step 4: Set default user_id for existing rows using parameterized query
     op.execute(
-        f"""
-        UPDATE bookmarks_lists
-        SET user_id = '{default_user_id}'
-        WHERE user_id IS NULL
-        """
+        text("""
+            UPDATE bookmarks_lists
+            SET user_id = :user_id
+            WHERE user_id IS NULL
+        """),
+        {'user_id': default_user_id}
     )
 
     # Step 5: Make user_id NOT NULL and add constraints
