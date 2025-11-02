@@ -292,13 +292,15 @@ async def add_video_to_list(
 @router.get("/lists/{list_id}/videos", response_model=List[VideoResponse])
 async def get_videos_in_list(
     list_id: UUID,
+    tags: Annotated[Optional[List[str]], Query(max_length=10)] = None,
     db: AsyncSession = Depends(get_db)
 ) -> List[Video]:
     """
-    Get all videos in a bookmark list.
+    Get all videos in a bookmark list with optional tag filtering.
 
     Args:
         list_id: UUID of the bookmark list
+        tags: Optional list of tag names for OR filtering (case-insensitive)
         db: Database session
 
     Returns:
@@ -306,6 +308,10 @@ async def get_videos_in_list(
 
     Raises:
         HTTPException 404: List not found
+
+    Examples:
+        - /api/lists/{id}/videos - All videos in list
+        - /api/lists/{id}/videos?tags=Python&tags=Tutorial - Videos with Python OR Tutorial tags
     """
     # Validate list exists
     result = await db.execute(
@@ -319,12 +325,25 @@ async def get_videos_in_list(
             detail=f"List with id {list_id} not found"
         )
 
-    # Get all videos
-    result = await db.execute(
-        select(Video)
-        .where(Video.list_id == list_id)
-        .order_by(Video.created_at)
-    )
+    # Build query for videos in list
+    stmt = select(Video).where(Video.list_id == list_id).order_by(Video.created_at)
+
+    # Apply tag filtering (OR logic) - case-insensitive exact match
+    if tags and len(tags) > 0:
+        # Normalize tag names: strip whitespace and lowercase
+        normalized_tags = [tag.strip().lower() for tag in tags if tag and tag.strip()]
+
+        if normalized_tags:
+            # Join to tags and filter by exact case-insensitive match using func.lower
+            # This is more robust than ILIKE (no wildcard interpretation) and index-friendly
+            stmt = (
+                stmt.join(Video.tags)
+                .where(func.lower(Tag.name).in_(normalized_tags))
+                .distinct()
+            )
+
+    # Execute query
+    result = await db.execute(stmt)
     videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
 
     if not videos:

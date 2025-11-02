@@ -16,6 +16,7 @@ import { CollapsibleSidebar } from '@/components/CollapsibleSidebar'
 import { TagNavigation } from '@/components/TagNavigation'
 import { useTags } from '@/hooks/useTags'
 import { useTagStore } from '@/stores/tagStore'
+import { useShallow } from 'zustand/react/shallow'
 
 const columnHelper = createColumnHelper<VideoResponse>()
 
@@ -63,16 +64,26 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
   const [urlError, setUrlError] = useState<string | null>(null)
   const [isUploadingCSV, setIsUploadingCSV] = useState(false)
 
-  const { data: videos = [], isLoading, error } = useVideos(listId)
-  const createVideo = useCreateVideo(listId)
-  const deleteVideo = useDeleteVideo(listId)
-
   // Tag integration
   const { data: tags = [], isLoading: tagsLoading, error: tagsError } = useTags()
-  const { selectedTagIds, toggleTag, clearTags } = useTagStore()
+  // Use useShallow to prevent re-renders when selectedTagIds array has same values
+  const selectedTagIds = useTagStore(useShallow((state) => state.selectedTagIds))
+  const toggleTag = useTagStore((state) => state.toggleTag)
+  const clearTags = useTagStore((state) => state.clearTags)
 
   // Compute selected tags (no useMemo - simple filter is fast enough per React docs)
   const selectedTags = tags.filter(tag => selectedTagIds.includes(tag.id))
+
+  // Extract tag names for API filtering
+  const selectedTagNames = selectedTags.map(tag => tag.name)
+
+  // Fetch videos filtered by selected tag names (OR logic)
+  const { data: videos = [], isLoading, error } = useVideos(
+    listId,
+    selectedTagNames.length > 0 ? selectedTagNames : undefined
+  )
+  const createVideo = useCreateVideo(listId)
+  const deleteVideo = useDeleteVideo(listId)
 
   // Create tag placeholder handler
   const handleCreateTag = () => {

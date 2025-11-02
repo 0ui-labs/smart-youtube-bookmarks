@@ -22,6 +22,38 @@ const VideoResponseSchema = z.object({
 })
 
 /**
+ * Query Key Factory for video-related queries
+ *
+ * Provides consistent, type-safe query keys for React Query.
+ * Follows TanStack Query best practices for key organization.
+ *
+ * @see https://tkdodo.eu/blog/effective-react-query-keys
+ *
+ * @example
+ * ```ts
+ * // Invalidate all video queries
+ * queryClient.invalidateQueries({ queryKey: videoKeys.all })
+ *
+ * // Invalidate queries for specific list
+ * queryClient.invalidateQueries({ queryKey: videoKeys.list(listId) })
+ *
+ * // Invalidate filtered queries only
+ * queryClient.invalidateQueries({ queryKey: videoKeys.filtered(listId, ['Python']) })
+ * ```
+ */
+export const videoKeys = {
+  /** Base key for all video queries */
+  all: ['videos'] as const,
+  /** Key factory for list-scoped queries */
+  lists: () => [...videoKeys.all, 'list'] as const,
+  /** Key for unfiltered videos in a specific list */
+  list: (listId: string) => [...videoKeys.lists(), listId] as const,
+  /** Key for tag-filtered videos in a specific list */
+  filtered: (listId: string, tagNames: string[]) =>
+    [...videoKeys.list(listId), { tags: tagNames }] as const,
+}
+
+/**
  * Represents a single failed video upload in a bulk operation
  */
 export interface BulkUploadFailure {
@@ -45,12 +77,46 @@ export interface BulkUploadResponse {
   failures: BulkUploadFailure[]
 }
 
-export const useVideos = (listId: string) => {
+/**
+ * Fetch videos for a list with optional tag filtering
+ *
+ * @param listId - UUID of the list to fetch videos from
+ * @param tagNames - Optional array of tag names for OR filtering (videos with ANY of the specified tags)
+ * @returns Query result with videos array
+ *
+ * @example
+ * ```tsx
+ * // All videos
+ * const { data: videos } = useVideos(listId)
+ *
+ * // Filter by tags (OR logic: videos with Python OR JavaScript)
+ * const { data: videos } = useVideos(listId, ['Python', 'JavaScript'])
+ * ```
+ */
+export const useVideos = (listId: string, tagNames?: string[]) => {
   return useQuery({
-    queryKey: ['videos', listId],
+    queryKey:
+      tagNames && tagNames.length > 0
+        ? videoKeys.filtered(listId, tagNames)
+        : videoKeys.list(listId),
     queryFn: async () => {
-      const { data } = await api.get<VideoResponse[]>(`/lists/${listId}/videos`)
-      return VideoResponseSchema.array().parse(data)
+      // Build query params for tag filtering
+      const params = new URLSearchParams()
+
+      // Add multiple 'tags' query params for OR filtering
+      // Backend expects: ?tags=Python&tags=JavaScript
+      if (tagNames && tagNames.length > 0) {
+        tagNames.forEach((tag) => params.append('tags', tag))
+      }
+
+      const queryString = params.toString()
+      const url = `/lists/${listId}/videos${queryString ? `?${queryString}` : ''}`
+
+      const { data } = await api.get<VideoResponse[]>(url)
+
+      // Defensive: Handle undefined/null from backend gracefully
+      const videos = data ?? []
+      return VideoResponseSchema.array().parse(videos)
     },
     // Prevent excessive refetching that causes UI flicker
     refetchOnWindowFocus: false,
@@ -72,8 +138,9 @@ export const useCreateVideo = (listId: string) => {
       return data
     },
     onSuccess: () => {
-      // Invalidate videos query to refetch
-      queryClient.invalidateQueries({ queryKey: ['videos', listId] })
+      // Invalidate ALL video queries for this list (filtered and unfiltered)
+      // React Query's partial matching invalidates all queries starting with this key
+      queryClient.invalidateQueries({ queryKey: videoKeys.list(listId) })
     },
   })
 }
@@ -87,10 +154,10 @@ export const useDeleteVideo = (listId: string) => {
     },
     // Optimistic update: immediately remove from UI
     onMutate: async (videoId) => {
-      await queryClient.cancelQueries({ queryKey: ['videos', listId] })
-      const previous = queryClient.getQueryData<VideoResponse[]>(['videos', listId])
+      await queryClient.cancelQueries({ queryKey: videoKeys.list(listId) })
+      const previous = queryClient.getQueryData<VideoResponse[]>(videoKeys.list(listId))
 
-      queryClient.setQueryData<VideoResponse[]>(['videos', listId], (old) =>
+      queryClient.setQueryData<VideoResponse[]>(videoKeys.list(listId), (old) =>
         old?.filter((video) => video.id !== videoId) ?? []
       )
 
@@ -100,12 +167,12 @@ export const useDeleteVideo = (listId: string) => {
     onError: (err, _videoId, context) => {
       console.error('Failed to delete video:', err)
       if (context?.previous) {
-        queryClient.setQueryData(['videos', listId], context.previous)
+        queryClient.setQueryData(videoKeys.list(listId), context.previous)
       }
     },
-    // Refetch to ensure consistency
+    // Refetch to ensure consistency - invalidates ALL queries for this list
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['videos', listId] })
+      queryClient.invalidateQueries({ queryKey: videoKeys.list(listId) })
     },
   })
 }
@@ -128,8 +195,8 @@ export const useBulkUploadVideos = (listId: string) => {
       return data
     },
     onSuccess: () => {
-      // Invalidate videos query to refetch
-      queryClient.invalidateQueries({ queryKey: ['videos', listId] })
+      // Invalidate ALL video queries for this list (filtered and unfiltered)
+      queryClient.invalidateQueries({ queryKey: videoKeys.list(listId) })
     },
   })
 }

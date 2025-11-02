@@ -518,3 +518,176 @@ async def test_get_videos_includes_tags(client: AsyncClient, test_db: AsyncSessi
     tag_names = [t["name"] for t in video["tags"]]
     assert "Python-test" in tag_names
     assert "Tutorial-test" in tag_names
+
+
+@pytest.mark.asyncio
+async def test_get_videos_filter_by_single_tag(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
+    """Test filtering videos by a single tag (OR logic)."""
+    # Create videos (using valid 11-character YouTube IDs)
+    video1_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc1"}
+    )
+    video2_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc2"}
+    )
+    video3_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc3"}
+    )
+    video1_id = video1_response.json()["id"]
+    video2_id = video2_response.json()["id"]
+    video3_id = video3_response.json()["id"]
+
+    # Create tags
+    python_tag = await client.post("/api/tags", json={"name": "Python", "color": "#3B82F6"})
+    js_tag = await client.post("/api/tags", json={"name": "JavaScript", "color": "#F59E0B"})
+    python_id = python_tag.json()["id"]
+    js_id = js_tag.json()["id"]
+
+    # Assign tags: video1=Python, video2=JavaScript, video3=both
+    await client.post(f"/api/videos/{video1_id}/tags", json={"tag_ids": [python_id]})
+    await client.post(f"/api/videos/{video2_id}/tags", json={"tag_ids": [js_id]})
+    await client.post(f"/api/videos/{video3_id}/tags", json={"tag_ids": [python_id, js_id]})
+
+    # Filter by Python tag
+    response = await client.get(f"/api/lists/{test_list.id}/videos?tags=Python")
+
+    assert response.status_code == 200
+    videos = response.json()
+    assert len(videos) == 2  # video1 and video3
+    video_ids = [v["id"] for v in videos]
+    assert video1_id in video_ids
+    assert video3_id in video_ids
+    assert video2_id not in video_ids
+
+
+@pytest.mark.asyncio
+async def test_get_videos_filter_by_multiple_tags_or_logic(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
+    """Test filtering videos by multiple tags with OR logic (videos with ANY of the tags)."""
+    # Create videos (using valid 11-character YouTube IDs)
+    video1_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc1"}
+    )
+    video2_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc2"}
+    )
+    video3_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc3"}
+    )
+    video4_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc4"}
+    )
+    video1_id = video1_response.json()["id"]
+    video2_id = video2_response.json()["id"]
+    video3_id = video3_response.json()["id"]
+    video4_id = video4_response.json()["id"]
+
+    # Create tags
+    python_tag = await client.post("/api/tags", json={"name": "Python", "color": "#3B82F6"})
+    tutorial_tag = await client.post("/api/tags", json={"name": "Tutorial", "color": "#10B981"})
+    advanced_tag = await client.post("/api/tags", json={"name": "Advanced", "color": "#EF4444"})
+    python_id = python_tag.json()["id"]
+    tutorial_id = tutorial_tag.json()["id"]
+    advanced_id = advanced_tag.json()["id"]
+
+    # Assign tags
+    await client.post(f"/api/videos/{video1_id}/tags", json={"tag_ids": [python_id]})
+    await client.post(f"/api/videos/{video2_id}/tags", json={"tag_ids": [tutorial_id]})
+    await client.post(f"/api/videos/{video3_id}/tags", json={"tag_ids": [python_id, tutorial_id]})
+    await client.post(f"/api/videos/{video4_id}/tags", json={"tag_ids": [advanced_id]})
+
+    # Filter by Python OR Tutorial (should return video1, video2, video3)
+    response = await client.get(f"/api/lists/{test_list.id}/videos?tags=Python&tags=Tutorial")
+
+    assert response.status_code == 200
+    videos = response.json()
+    assert len(videos) == 3
+    video_ids = [v["id"] for v in videos]
+    assert video1_id in video_ids
+    assert video2_id in video_ids
+    assert video3_id in video_ids
+    assert video4_id not in video_ids
+
+
+@pytest.mark.asyncio
+async def test_get_videos_filter_case_insensitive(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
+    """Test that tag filtering is case-insensitive."""
+    # Create video (using valid 11-character YouTube ID)
+    video_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc5"}
+    )
+    video_id = video_response.json()["id"]
+
+    # Create tag with mixed case
+    tag = await client.post("/api/tags", json={"name": "PyThOn", "color": "#3B82F6"})
+    tag_id = tag.json()["id"]
+
+    # Assign tag
+    await client.post(f"/api/videos/{video_id}/tags", json={"tag_ids": [tag_id]})
+
+    # Filter with different case variations
+    response1 = await client.get(f"/api/lists/{test_list.id}/videos?tags=python")
+    response2 = await client.get(f"/api/lists/{test_list.id}/videos?tags=PYTHON")
+    response3 = await client.get(f"/api/lists/{test_list.id}/videos?tags=PyThOn")
+
+    assert response1.status_code == 200
+    assert response2.status_code == 200
+    assert response3.status_code == 200
+    assert len(response1.json()) == 1
+    assert len(response2.json()) == 1
+    assert len(response3.json()) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_videos_filter_no_matching_tags(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
+    """Test that filtering by non-existent tag returns empty list."""
+    # Create video with tag
+    video_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=video1"}
+    )
+    video_id = video_response.json()["id"]
+
+    tag = await client.post("/api/tags", json={"name": "Python", "color": "#3B82F6"})
+    tag_id = tag.json()["id"]
+    await client.post(f"/api/videos/{video_id}/tags", json={"tag_ids": [tag_id]})
+
+    # Filter by non-existent tag
+    response = await client.get(f"/api/lists/{test_list.id}/videos?tags=NonExistent")
+
+    assert response.status_code == 200
+    videos = response.json()
+    assert len(videos) == 0
+
+
+@pytest.mark.asyncio
+async def test_get_videos_without_filter_returns_all(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
+    """Test that omitting tags parameter returns all videos."""
+    # Create videos with and without tags (using valid 11-character YouTube IDs)
+    video_with_tag_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc6"}
+    )
+    await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc7"}
+    )
+    video1_id = video_with_tag_response.json()["id"]
+
+    # Tag only first video
+    tag = await client.post("/api/tags", json={"name": "Python", "color": "#3B82F6"})
+    await client.post(f"/api/videos/{video1_id}/tags", json={"tag_ids": [tag.json()["id"]]})
+
+    # Get all videos without filter
+    response = await client.get(f"/api/lists/{test_list.id}/videos")
+
+    assert response.status_code == 200
+    videos = response.json()
+    assert len(videos) == 2  # Both videos returned
