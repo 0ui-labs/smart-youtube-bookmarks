@@ -1,6 +1,6 @@
 # Project Status & Task Protocol
 
-**Last Updated:** 2025-11-02 18:00 CET | **Branch:** main
+**Last Updated:** 2025-11-02 23:50 CET | **Branch:** main
 
 ---
 
@@ -58,25 +58,25 @@ This file maintains **two separate lists**: PLAN and LOG.
 - UX Design: `docs/plans/2025-10-31-ID-04-ux-optimization-tag-system-design.md`
 - Implementation: `docs/plans/2025-10-31-ID-05-ux-optimization-implementation-plan.md`
 - Security Hardening: `docs/plans/2025-11-02-security-hardening-implementation.md`
-- Latest Handoff: `docs/handoffs/2025-11-02-log-019-tag-navigation-integrated.md`
-- Latest Report: `docs/reports/2025-11-02-task-020-tag-filtering-integration.md`
+- Latest Handoff: `docs/handoffs/2025-11-02-log-021-react-router-migration.md`
+- Latest Report: `docs/reports/2025-11-02-task-025-report.md`
 
 ---
 
 ### Backend
 
-1. [x] Create tags and video_tags database schema (2025-11-01 14:00)
-2. [x] Implement Tag SQLAlchemy model with many-to-many (2025-11-01 14:30)
-3. [x] Create Tag Pydantic schemas with validation (2025-11-01 15:00)
-4. [x] Implement Tag CRUD API endpoints (2025-11-01 16:00)
-5. [x] Implement video-tag assignment endpoints (2025-11-01 17:00)
-6. [x] Add tag filtering to videos endpoint (OR/AND) (2025-11-01 18:00)
-7. [x] Optimize tag queries (case-insensitive, indexes) (2025-11-01 19:00)
-8. [x] Implement bulk tag assignment endpoint (2025-11-01 20:00)
+01. [x] Create tags and video_tags database schema (2025-11-01 14:00)
+02. [x] Implement Tag SQLAlchemy model with many-to-many (2025-11-01 14:30)
+03. [x] Create Tag Pydantic schemas with validation (2025-11-01 15:00)
+04. [x] Implement Tag CRUD API endpoints (2025-11-01 16:00)
+05. [x] Implement video-tag assignment endpoints (2025-11-01 17:00)
+06. [x] Add tag filtering to videos endpoint (OR/AND) (2025-11-01 18:00)
+07. [x] Optimize tag queries (case-insensitive, indexes) (2025-11-01 19:00)
+08. [x] Implement bulk tag assignment endpoint (2025-11-01 20:00)
 
 ### React Query Optimization
 
-9. [x] Apply best practices with queryOptions() helper (2025-11-02 00:30)
+09. [x] Apply best practices with queryOptions() helper (2025-11-02 00:30)
 10. [x] Change onSuccess to onSettled with async/await (2025-11-02 00:45)
 11. [x] Optimize QueryClient defaults (2025-11-02 01:00)
 12. [x] Add mutation keys to all mutations (2025-11-02 01:15)
@@ -91,14 +91,14 @@ This file maintains **two separate lists**: PLAN and LOG.
 18. [x] Create useTags React Query hook for API calls (2025-11-02 13:40)
 19. [x] Integrate TagNavigation into VideosPage with layout (2025-11-02 16:10)
 20. [x] Connect tag filter state to useVideos hook (2025-11-02 17:51)
-21. [ ] Update App.tsx default route to /videos
-22. [ ] Hide Lists/Dashboard navigation from UI
-23. [ ] Remove "Back to List" link from VideosPage
+21. [x] Migrate App.tsx to React Router v6 (2025-11-02 20:15)
+22. [x] Update App.tsx default route to /videos (2025-11-02 20:15)
+23. [x] Hide Lists/Dashboard navigation from UI (2025-11-02 20:15)
 
 ### UI Cleanup
 
-24. [ ] Add feature flags to hide Add Video, CSV Upload, CSV Export buttons
-25. [ ] Create table settings store with thumbnail size and column visibility
+24. [x] Add feature flags to hide Add Video, CSV Upload, CSV Export buttons (2025-11-02 23:50)
+25. [x] Create table settings store with thumbnail size and column visibility (2025-11-03 01:20)
 26. [ ] Implement TableSettingsDropdown component
 27. [ ] Replace Actions column with three-dot menu
 28. [ ] Make table rows clickable (except menu)
@@ -199,12 +199,22 @@ This file maintains **two separate lists**: PLAN and LOG.
 
 ## 📝 LOG (Chronological Implementation History)
 
-1. 2025-11-02 [Plan #16] Create Tag store with Zustand for multi-select filtering
-2. 2025-11-02 [Plan #17] Create TagNavigation component with useTags hook
-3. 2025-11-02 [Planning] Task #18 verified as complete (useTags hook already implemented in #17)
-4. 2025-11-02 [Planning] Created Task #19 plan: Integrate TagNavigation into VideosPage
-5. 2025-11-02 [Planning] Created Task #18 comprehensive report (REPORT-018)
-6. 2025-11-02 [Plan #19] Integrate TagNavigation into VideosPage with CollapsibleSidebar - TDD approach, REF MCP validated, all reviews passed (Code-Reviewer 10/10, Semgrep 0, CodeRabbit 0)
-7. 2025-11-02 [Planning] Created Task #19 comprehensive report (REPORT-019) with full implementation details
-8. 2025-11-02 [Planning] Created comprehensive security hardening plan (Tasks #58-#98) based on Greptile code review
-9. 2025-11-02 [Plan #20] Connect tag filter state to useVideos hook - Full-stack implementation with REF MCP improvements (Query Key Factory, useShallow, func.lower), all reviews passed (Code-Reviewer A-, Semgrep 0, CodeRabbit 0)
+01. 2025-11-02 [Plan #16] Create Tag store with Zustand for multi-select filtering
+02. 2025-11-02 [Plan #17] Create TagNavigation component with useTags hook
+03. 2025-11-02 [Planning] Task #18 verified as complete (useTags hook already implemented in #17)
+04. 2025-11-02 [Planning] Created Task #19 plan: Integrate TagNavigation into VideosPage
+05. 2025-11-02 [Planning] Created Task #18 comprehensive report (REPORT-018)
+06. 2025-11-02 [Plan #19] Integrate TagNavigation into VideosPage with CollapsibleSidebar - TDD approach, REF MCP validated, all reviews passed (Code-Reviewer 10/10, Semgrep 0, CodeRabbit 0)
+07. 2025-11-02 [Planning] Created Task #19 comprehensive report (REPORT-019) with full implementation details
+08. 2025-11-02 [Planning] Created comprehensive security hardening plan (Tasks #58-#98) based on Greptile code review
+09. 2025-11-02 [Plan #20] Connect tag filter state to useVideos hook - Full-stack implementation with REF MCP improvements (Query Key Factory, useShallow, func.lower), all reviews passed (Code-Reviewer A-, Semgrep 0, CodeRabbit 0)
+10. 2025-11-02 [Planning] Created Task #21 plan: Migrate App.tsx to React Router v6 (missing prerequisite discovered - Master Plan assumed React Router already set up, but codebase uses state-based routing)
+11. 2025-11-02 [Plan #21] Migrate App.tsx to React Router v6 - REF MCP validation with 6 improvements (Navigate component, Query Client isolation, German localization, NavLink styling, dynamic list resolution, 404 route), all tests passing (102/103)
+12. 2025-11-02 [Debug] Fixed 5 CodeRabbit issues: error serialization, bcrypt hash, markdown URLs, Windows timeout compatibility, datetime deprecation
+13. 2025-11-02 [Plan #22] Changed default route from /lists to /videos for single-list MVP
+14. 2025-11-02 [Plan #23] Hidden Lists/Dashboard navigation for single-list MVP (commented out NavLinks)
+15. 2025-11-02 [Planning] Created Task #24 plan: Feature Flags für Button-Visibility (MVP UI Cleanup) - Hide Add Video, CSV Upload, CSV Export buttons using feature flags with REF MCP validation
+16. 2025-11-02 [Plan #24] Implemented feature flags for button visibility - Created central featureFlags.ts config with environment variable support, conditionalized button container, added VideosPage.test.tsx (all 4 tests passing), all tests passing (106/107 - 1 pre-existing TagNavigation failure)
+17. 2025-11-02 [Planning] Created Task #25 plan: Table Settings Store with Thumbnail Size and Column Visibility - Zustand with persist middleware, localStorage for UI preferences, 9 comprehensive tests, REF MCP validated Zustand best practices 2024
+18. 2025-11-03 [Plan #25] Created Table Settings Store with localStorage persistence - Implemented tableSettingsStore.ts with 4 columns (not 6 as planned - discovered VideosPage only has thumbnail/title/duration/actions), 13 comprehensive tests (all passing), 5 REF MCP improvements (explicit createJSONStorage, persist API for tests, corrected column names, removed hardcoded pixels, added corrupted localStorage test), fixed 8 CodeRabbit issues (task-024-report.md wording, test_videos.py YouTube ID, App.tsx states, videos.py validation, VideosPage.integration.test.tsx import, security-hardening SECRET_KEY, tableSettingsStore.test.ts await)
+19. 2025-11-03 [Planning] Created Task #26 plan: Implement TableSettingsDropdown Component - shadcn/ui DropdownMenu with thumbnail size selector (3 radio options: Klein, Mittel, Groß) and column visibility toggles (4 checkboxes), integrated into VideosPage header next to Plus icon, REF MCP validated 4 patterns (shadcn/ui best practice, immediate apply UX, Zustand persist, ARIA accessibility), 14 implementation steps with TDD approach, comprehensive testing strategy (6 unit + 3 integration tests), design decisions documented (shadcn vs custom, immediate apply vs save button, 4 columns vs 6 columns), estimated 2-3 hours

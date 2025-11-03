@@ -217,7 +217,7 @@ const handleCreateTag = () => {
 - Test sidebar visibility on mobile/desktop
 
 **Manual Testing:**
-1. Open http://localhost:5173/videos
+1. Open [http://localhost:5173/videos](http://localhost:5173/videos)
 2. Desktop view (≥768px):
    - Verify sidebar visible
    - Click tag → title updates
@@ -306,7 +306,7 @@ const handleCreateTag = () => {
 - [ ] Git commit with clear message
 
 **Visual Validation:**
-```
+```text
 Desktop (≥768px):
 ┌─────────────┬──────────────────────────────┐
 │ Tags        │ Videos (or "Python, Tutorial")│
@@ -335,7 +335,7 @@ Mobile (<768px):
 
 ## 📝 Commit Message Template
 
-```
+```text
 feat: integrate TagNavigation into VideosPage with sidebar
 
 - Use CollapsibleSidebar for desktop/mobile layout

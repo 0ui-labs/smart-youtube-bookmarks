@@ -7,4 +7,4 @@ Bitte nutze REF MCP um den Plan noch mal zu überprüfen. z.b.
 * Ist der Plan im allgemeinen optimal durchdacht? 
 usw.
 
-Also vor der Ausführung erst einmal REF konsultieren, den Plan nach Rücksprache mit dem User anpassen. Bitte schreibe deine Verbersserungsvorschläge leicht verständlich, in ganzen Sätzen, mit Beispielen und begründe warum das besser ist und erkläre enwentuelle Nachteile.
+Also vor der Ausführung erst einmal REF konsultieren, den Plan nach Rücksprache mit dem User anpassen. Bitte schreibe deine Verbesserungsvorschläge leicht verständlich, in ganzen Sätzen, mit Beispielen und begründe, warum das besser ist, und erkläre eventuelle Nachteile.

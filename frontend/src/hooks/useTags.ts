@@ -20,7 +20,7 @@ export function tagsOptions() {
   return queryOptions({
     queryKey: ['tags'],
     queryFn: async () => {
-      const { data } = await api.get<Tag[]>('/api/tags')
+      const { data } = await api.get<Tag[]>('/tags')
       // Validate response with Zod schema
       return TagsSchema.parse(data)
     },
@@ -62,7 +62,7 @@ export const useCreateTag = () => {
   return useMutation({
     mutationKey: ['createTag'],
     mutationFn: async (tagData: TagCreate) => {
-      const { data } = await api.post<Tag>('/api/tags', tagData)
+      const { data } = await api.post<Tag>('/tags', tagData)
       // Validate response with Zod schema (consistent with tagsOptions)
       return TagSchema.parse(data)
     },

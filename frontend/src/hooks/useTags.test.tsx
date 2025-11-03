@@ -72,7 +72,7 @@ describe('useTags', () => {
     expect(result.current.data).toEqual(mockTags)
     expect(result.current.data).toHaveLength(2)
     expect(result.current.data![0].name).toBe('Python')
-    expect(api.get).toHaveBeenCalledWith('/api/tags')
+    expect(api.get).toHaveBeenCalledWith('/tags')
     expect(api.get).toHaveBeenCalledTimes(1)
   })
 
@@ -135,7 +135,7 @@ describe('useCreateTag', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
     expect(result.current.data).toEqual(newTag)
-    expect(api.post).toHaveBeenCalledWith('/api/tags', {
+    expect(api.post).toHaveBeenCalledWith('/tags', {
       name: 'JavaScript',
       color: '#F7DF1E',
     })
@@ -161,7 +161,7 @@ describe('useCreateTag', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
     expect(result.current.data).toEqual(newTag)
-    expect(api.post).toHaveBeenCalledWith('/api/tags', { name: 'TypeScript' })
+    expect(api.post).toHaveBeenCalledWith('/tags', { name: 'TypeScript' })
   })
 
   it('handles create error', async () => {

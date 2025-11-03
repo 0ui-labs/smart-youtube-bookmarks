@@ -39,6 +39,9 @@ def upgrade() -> None:
     default_user_id = str(uuid.uuid4())
 
     # Insert default test user using parameterized query
+    # NOTE: This test user is NOT intended for login. The password hash is a valid
+    # bcrypt hash for the password "testpassword123" but should be changed before production.
+    # Generated with: bcrypt.hashpw(b"testpassword123", bcrypt.gensalt()).decode('utf-8')
     op.execute(
         text("""
             INSERT INTO users (id, email, hashed_password, is_active)
@@ -47,7 +50,7 @@ def upgrade() -> None:
         {
             'user_id': default_user_id,
             'email': 'test@example.com',
-            'password': '$2b$12$placeholder_hash',
+            'password': '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5IdkPgVBqnQM2',  # testpassword123
             'is_active': True
         }
     )

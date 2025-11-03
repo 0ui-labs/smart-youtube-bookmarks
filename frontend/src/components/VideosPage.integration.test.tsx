@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { userEvent } from '@testing-library/user-event'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { VideosPage } from './VideosPage'
 import { useTagStore } from '@/stores/tagStore'
@@ -83,7 +83,7 @@ describe('VideosPage - TagNavigation Integration', () => {
   const renderVideosPage = () => {
     return render(
       <QueryClientProvider client={queryClient}>
-        <VideosPage listId="list-123" onBack={vi.fn()} />
+        <VideosPage listId="list-123" />
       </QueryClientProvider>
     )
   }
@@ -467,7 +467,7 @@ describe('VideosPage - TagNavigation Integration', () => {
 
       const { rerender } = render(
         <QueryClientProvider client={queryClient}>
-          <VideosPage listId="list-123" onBack={vi.fn()} />
+          <VideosPage listId="list-123" />
         </QueryClientProvider>
       )
 
@@ -485,7 +485,7 @@ describe('VideosPage - TagNavigation Integration', () => {
       // Force re-render to simulate React Query refetch
       rerender(
         <QueryClientProvider client={queryClient}>
-          <VideosPage listId="list-123" onBack={vi.fn()} />
+          <VideosPage listId="list-123" />
         </QueryClientProvider>
       )
 
@@ -523,7 +523,7 @@ describe('VideosPage - TagNavigation Integration', () => {
 
       const { rerender } = render(
         <QueryClientProvider client={queryClient}>
-          <VideosPage listId="list-123" onBack={vi.fn()} />
+          <VideosPage listId="list-123" />
         </QueryClientProvider>
       )
 
@@ -539,7 +539,7 @@ describe('VideosPage - TagNavigation Integration', () => {
       // Force re-render
       rerender(
         <QueryClientProvider client={queryClient}>
-          <VideosPage listId="list-123" onBack={vi.fn()} />
+          <VideosPage listId="list-123" />
         </QueryClientProvider>
       )
 
@@ -555,7 +555,7 @@ describe('VideosPage - TagNavigation Integration', () => {
       // Force re-render
       rerender(
         <QueryClientProvider client={queryClient}>
-          <VideosPage listId="list-123" onBack={vi.fn()} />
+          <VideosPage listId="list-123" />
         </QueryClientProvider>
       )
 
@@ -593,7 +593,7 @@ describe('VideosPage - TagNavigation Integration', () => {
 
       const { rerender } = render(
         <QueryClientProvider client={queryClient}>
-          <VideosPage listId="list-123" onBack={vi.fn()} />
+          <VideosPage listId="list-123" />
         </QueryClientProvider>
       )
 
@@ -609,7 +609,7 @@ describe('VideosPage - TagNavigation Integration', () => {
       // Force re-render
       rerender(
         <QueryClientProvider client={queryClient}>
-          <VideosPage listId="list-123" onBack={vi.fn()} />
+          <VideosPage listId="list-123" />
         </QueryClientProvider>
       )
 
@@ -642,7 +642,7 @@ describe('VideosPage - TagNavigation Integration', () => {
 
       const { rerender } = render(
         <QueryClientProvider client={queryClient}>
-          <VideosPage listId="list-123" onBack={vi.fn()} />
+          <VideosPage listId="list-123" />
         </QueryClientProvider>
       )
 
@@ -658,7 +658,7 @@ describe('VideosPage - TagNavigation Integration', () => {
       // Force re-render
       rerender(
         <QueryClientProvider client={queryClient}>
-          <VideosPage listId="list-123" onBack={vi.fn()} />
+          <VideosPage listId="list-123" />
         </QueryClientProvider>
       )
 

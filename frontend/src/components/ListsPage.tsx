@@ -5,16 +5,14 @@ import {
   flexRender,
   getCoreRowModel,
 } from '@tanstack/react-table'
+import { useNavigate } from 'react-router-dom'
 import { useLists, useCreateList, useDeleteList } from '@/hooks/useLists'
 import type { ListResponse } from '@/types/list'
 
 const columnHelper = createColumnHelper<ListResponse>()
 
-interface ListsPageProps {
-  onSelectList?: (listId: string) => void
-}
-
-export const ListsPage = ({ onSelectList }: ListsPageProps) => {
+export const ListsPage = () => {
+  const navigate = useNavigate()
   const [isCreating, setIsCreating] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [newListDescription, setNewListDescription] = useState('')
@@ -61,7 +59,7 @@ export const ListsPage = ({ onSelectList }: ListsPageProps) => {
         cell: (info) => (
           <div className="flex gap-2">
             <button
-              onClick={() => onSelectList?.(info.getValue())}
+              onClick={() => navigate('/videos')}
               className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
             >
               Videos
@@ -80,7 +78,7 @@ export const ListsPage = ({ onSelectList }: ListsPageProps) => {
         ),
       }),
     ],
-    [deleteList, onSelectList]
+    [deleteList, navigate]
   )
 
   const table = useReactTable({

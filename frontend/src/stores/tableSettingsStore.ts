@@ -1,0 +1,135 @@
+/**
+ * Table Settings Store - Zustand state management for video table preferences
+ *
+ * Manages thumbnail size and column visibility with localStorage persistence.
+ * User preferences persist across page reloads.
+ *
+ * @example
+ * ```tsx
+ * const { thumbnailSize, setThumbnailSize, visibleColumns, toggleColumn } = useTableSettingsStore();
+ * ```
+ */
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+
+/**
+ * Thumbnail size options for video thumbnails
+ * - small: Compact preview (current default)
+ * - medium: Balanced size for comfortable viewing
+ * - large: Larger preview for detailed inspection
+ *
+ * Actual pixel sizes are determined by the VideoTable component
+ * based on Tailwind classes (currently: small=w-32, medium=w-40, large=w-48)
+ */
+export type ThumbnailSize = 'small' | 'medium' | 'large';
+
+/**
+ * Column visibility configuration for video table
+ * Based on existing VideosPage table structure (4 columns as of Task #24)
+ *
+ * WHY only 4 columns:
+ * - Reflects ACTUAL current table structure (thumbnail, title, duration, actions)
+ * - Store should match reality, not future plans
+ * - Will be extended in Task #27 when status/created_at columns are added
+ */
+export interface VisibleColumns {
+  /** Video thumbnail/preview image */
+  thumbnail: boolean;
+  /** Video title (clickable YouTube link) */
+  title: boolean;
+  /** Video duration (when available) */
+  duration: boolean;
+  /** Action buttons (delete, etc.) */
+  actions: boolean;
+}
+
+/**
+ * Table settings store state and actions
+ */
+interface TableSettingsStore {
+  /** Current thumbnail size setting */
+  thumbnailSize: ThumbnailSize;
+
+  /** Column visibility configuration */
+  visibleColumns: VisibleColumns;
+
+  /** Update thumbnail size */
+  setThumbnailSize: (size: ThumbnailSize) => void;
+
+  /** Toggle visibility of a specific column */
+  toggleColumn: (column: keyof VisibleColumns) => void;
+}
+
+/**
+ * Default visible columns configuration
+ * Based on current VideosPage.tsx table structure (Task #24)
+ * All columns visible by default for full feature discovery
+ */
+const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = {
+  thumbnail: true,  // YouTube thumbnail (column id: 'thumbnail')
+  title: true,      // Video title with link (column id: 'title')
+  duration: true,   // Video duration (column id: 'duration')
+  actions: true,    // Delete button (column id: 'actions')
+} as const;
+
+/**
+ * Table settings store hook with localStorage persistence
+ *
+ * WHY persist middleware:
+ * - User preferences should survive page reloads
+ * - Better UX: Users don't need to reconfigure settings every visit
+ * - Standard pattern for UI settings (similar to theme preferences)
+ *
+ * WHY localStorage (not sessionStorage):
+ * - Settings should persist across browser sessions
+ * - Users expect UI preferences to be "sticky"
+ * - Aligns with user mental model (similar to YouTube's player settings)
+ *
+ * WHY createJSONStorage explicitly:
+ * - Best practice per Zustand docs (even though localStorage is default)
+ * - Makes intention clear for future maintainers
+ * - Future-proof for Zustand v5 migration
+ * - Explicit is better than implicit
+ *
+ * Storage key: 'video-table-settings'
+ * - Unique name to avoid conflicts with other stores
+ * - Descriptive for debugging localStorage contents
+ *
+ * @example
+ * ```tsx
+ * // Get current settings
+ * const { thumbnailSize, visibleColumns } = useTableSettingsStore();
+ *
+ * // Update thumbnail size
+ * const { setThumbnailSize } = useTableSettingsStore();
+ * setThumbnailSize('large');
+ *
+ * // Toggle column visibility
+ * const { toggleColumn } = useTableSettingsStore();
+ * toggleColumn('duration'); // Hide duration column
+ * ```
+ */
+export const useTableSettingsStore = create<TableSettingsStore>()(
+  persist(
+    (set) => ({
+      // State
+      thumbnailSize: 'small',
+      visibleColumns: DEFAULT_VISIBLE_COLUMNS,
+
+      // Actions
+      setThumbnailSize: (size) => set({ thumbnailSize: size }),
+
+      toggleColumn: (column) =>
+        set((state) => ({
+          visibleColumns: {
+            ...state.visibleColumns,
+            [column]: !state.visibleColumns[column],
+          },
+        })),
+    }),
+    {
+      name: 'video-table-settings', // localStorage key (must be unique)
+      storage: createJSONStorage(() => localStorage), // REF MCP #1: Explicit storage for clarity
+    }
+  )
+);

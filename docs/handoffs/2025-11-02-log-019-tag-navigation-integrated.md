@@ -11,7 +11,7 @@
 
 ```bash
 # 1. Navigate to repo
-cd "/Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks"
+cd <path-to-smart-youtube-bookmarks>
 
 # 2. Run automated thread start checks (MANDATORY!)
 ./.claude/thread-start-checks.sh
@@ -170,7 +170,7 @@ fab1707 refactor: use centralized Tag type from types/tag.ts
 
 **Base Branch:** `main` (4 commits ahead of origin/main)
 
-**GitHub:** Smart Youtube Bookmarks (private repo)
+**GitHub:** Smart YouTube Bookmarks (private repo)
 
 ---
 
@@ -632,7 +632,7 @@ npx shadcn-ui@latest add dialog
 
 ```
 □ cd in richtiges Verzeichnis
-  cd "/Users/philippbriese/Documents/dev/projects/by IDE/Claude Code/Smart Youtube Bookmarks"
+  cd <path-to-smart-youtube-bookmarks>
 
 □ Run automated thread start checks (MANDATORY!)
   ./.claude/thread-start-checks.sh
@@ -661,7 +661,7 @@ npx shadcn-ui@latest add dialog
 
 **Branch:** `main`
 **Last Commit:** 44922cb
-**GitHub:** Smart Youtube Bookmarks (private)
+**GitHub:** Smart YouTube Bookmarks (private)
 **Next Task:** Task #20 - Create Tag Dialog
 
 **Created:** 2025-11-02 15:51 CET

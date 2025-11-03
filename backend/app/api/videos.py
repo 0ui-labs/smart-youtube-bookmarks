@@ -292,7 +292,7 @@ async def add_video_to_list(
 @router.get("/lists/{list_id}/videos", response_model=List[VideoResponse])
 async def get_videos_in_list(
     list_id: UUID,
-    tags: Annotated[Optional[List[str]], Query(max_length=10)] = None,
+    tags: Annotated[Optional[List[str]], Query(max_items=10)] = None,
     db: AsyncSession = Depends(get_db)
 ) -> List[Video]:
     """
@@ -375,8 +375,8 @@ async def get_videos_in_list(
 
 @router.get("/videos", response_model=List[VideoResponse])
 async def list_all_videos(
-    tags: Annotated[Optional[List[str]], Query(max_length=10)] = None,
-    tags_all: Annotated[Optional[List[str]], Query(max_length=10)] = None,
+    tags: Annotated[Optional[List[str]], Query(max_items=10)] = None,
+    tags_all: Annotated[Optional[List[str]], Query(max_items=10)] = None,
     db: AsyncSession = Depends(get_db)
 ) -> List[Video]:
     """

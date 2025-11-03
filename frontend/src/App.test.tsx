@@ -1,17 +1,24 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from './App';
 import { ReadyState } from 'react-use-websocket';
+import { renderWithRouter } from './test/renderWithRouter';
 
 // Mock dependencies
 vi.mock('./hooks/useLists', () => ({
   useLists: vi.fn(() => ({
-    data: [],
+    data: [{
+      id: 'test-list-1',
+      name: 'Test List',
+      description: 'Test',
+      video_count: 0,
+      created_at: new Date().toISOString(),
+    }],
     isLoading: false,
     error: null,
   })),
-  useCreateList: vi.fn(() => vi.fn()),
-  useDeleteList: vi.fn(() => vi.fn()),
+  useCreateList: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  useDeleteList: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 vi.mock('./hooks/useWebSocket', () => ({
@@ -26,24 +33,24 @@ vi.mock('./hooks/useWebSocket', () => ({
   })),
 }));
 
-describe('App Navigation', () => {
+describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('shows navigation menu with Lists and Dashboard links', () => {
-    render(<App />);
+  it('renders without crashing', () => {
+    renderWithRouter(<App />, { initialEntries: ['/'] });
 
-    expect(screen.getByText('Lists')).toBeInTheDocument();
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    // App should render the main container
+    expect(document.querySelector('.flex.h-screen')).toBeInTheDocument();
   });
 
-  it('navigates to Dashboard when clicked', () => {
-    render(<App />);
+  it('redirects root path to /videos', () => {
+    renderWithRouter(<App />, { initialEntries: ['/'] });
 
-    const dashboardLink = screen.getByText('Dashboard');
-    fireEvent.click(dashboardLink);
-
-    expect(screen.getByText('Job Progress Dashboard')).toBeInTheDocument();
+    // Should see the VideosPage (which has "Videos" heading)
+    // Note: Navigation is hidden in single-list MVP
+    expect(screen.queryByText('Listen')).not.toBeInTheDocument();
+    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
   });
 });

@@ -190,7 +190,7 @@ describe('TagNavigation', () => {
     expect(screen.queryByRole('button', { name: /auswählen/i })).not.toBeInTheDocument()
   })
 
-  it('has proper keyboard navigation with role="button"', () => {
+  it('has proper keyboard navigation with accessible button', () => {
     render(
       <TagNavigation
         tags={[mockTags[0]]}
@@ -201,7 +201,8 @@ describe('TagNavigation', () => {
     )
 
     const tagButton = screen.getByRole('button', { name: /python auswählen/i })
-    expect(tagButton).toHaveAttribute('role', 'button')
+    expect(tagButton).toBeInTheDocument()
+    expect(tagButton).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('color indicator has aria-hidden for accessibility', () => {
