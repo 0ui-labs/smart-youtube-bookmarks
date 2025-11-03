@@ -141,19 +141,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           const row = info.row.original
           const title = info.getValue() || `Video ${row.youtube_id}`
           const channel = row.channel
-          const youtubeUrl = `https://www.youtube.com/watch?v=${row.youtube_id}`
 
           return (
             <div className="flex flex-col gap-1 min-w-[200px] max-w-[400px]">
-              <a
-                href={youtubeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-gray-900 hover:text-blue-600 hover:underline line-clamp-2 leading-tight"
+              <span
+                className="font-medium text-gray-900 line-clamp-2 leading-tight"
                 title={title}
               >
                 {title}
-              </a>
+              </span>
               {channel && (
                 <span className="text-sm text-gray-600 truncate">
                   {channel}
@@ -508,18 +504,41 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
               ))}
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-6 py-4">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {table.getRowModel().rows.map((row) => {
+                const video = row.original
+                const youtubeUrl = `https://www.youtube.com/watch?v=${video.youtube_id}`
+
+                const handleRowClick = () => {
+                  window.open(youtubeUrl, '_blank', 'noopener,noreferrer')
+                }
+
+                const handleKeyDown = (e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleRowClick()
+                  }
+                }
+
+                return (
+                  <tr
+                    key={row.id}
+                    onClick={handleRowClick}
+                    onKeyDown={handleKeyDown}
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer hover:bg-gray-50 transition-colors focus:outline-none focus:bg-gray-100"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-6 py-4">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
