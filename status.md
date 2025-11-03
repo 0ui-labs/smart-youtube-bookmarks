@@ -1,6 +1,6 @@
 # Project Status & Task Protocol
 
-**Last Updated:** 2025-11-03 15:15 CET | **Branch:** main
+**Last Updated:** 2025-11-03 20:50 CET | **Branch:** main
 
 ---
 
@@ -58,8 +58,8 @@ This file maintains **two separate lists**: PLAN and LOG.
 - UX Design: `docs/plans/2025-10-31-ID-04-ux-optimization-tag-system-design.md`
 - Implementation: `docs/plans/2025-10-31-ID-05-ux-optimization-implementation-plan.md`
 - Security Hardening: `docs/plans/2025-11-02-security-hardening-implementation.md`
-- Latest Handoff: `docs/handoffs/2025-11-02-log-021-react-router-migration.md`
-- Latest Report: `docs/reports/2025-11-03-task-027-report.md`
+- Latest Handoff: `docs/handoffs/2025-11-03-log-030-add-plus-icon.md`
+- Latest Report: `docs/reports/2025-11-03-task-030-report.md`
 
 ---
 
@@ -102,8 +102,8 @@ This file maintains **two separate lists**: PLAN and LOG.
 26. [x] Implement TableSettingsDropdown component (2025-11-03 12:30)
 27. [x] Replace Actions column with three-dot menu (2025-11-03 15:15)
 28. [x] Make table rows clickable (except menu) (2025-11-03 15:15)
-29. [ ] Create ConfirmDeleteModal component
-30. [ ] Add Plus icon to page header
+29. [x] Create ConfirmDeleteModal component (2025-11-03 17:30)
+30. [x] Add Plus icon to page header (2025-11-03 20:50)
 31. [ ] Implement thumbnail size CSS classes (small/medium/large)
 32. [ ] Create large thumbnail grid layout
 
@@ -221,3 +221,8 @@ This file maintains **two separate lists**: PLAN and LOG.
 20. 2025-11-03 [Plan #26] Implemented TableSettingsDropdown Component with Subagent-Driven Development - 6 sequential tasks (install shadcn/ui dropdown-menu, basic component TDD, thumbnail size RadioGroup TDD, column visibility CheckboxItems TDD, keyboard navigation tests, VideosPage integration), 7 REF MCP improvements applied (runtime validation + type narrowing instead of type casting, visual separator between sections, correct Radix UI API checked+onCheckedChange, test isolation beforeEach/afterEach, central store import from @/stores, keyboard navigation accessibility tests, responsive width max-w constraint), all 9/9 new tests passing, Code-Reviewer approval (APPROVED FOR PRODUCTION, 0 Critical/Important issues, 2 Minor nice-to-have), comprehensive report (REPORT-026) with full implementation details, architecture diagrams, and future considerations
 21. 2025-11-03 [Planning] Created Task #27 plan: Replace Actions Column with Three-Dot Menu - REF MCP validated (MoreVertical icon, stopPropagation on trigger+items, role="button" for clickable rows, window.open security flags, WAI-ARIA Menu Button pattern), comprehensive implementation steps (menu column replacement, clickable rows with keyboard support, 5 unit tests, manual testing checklist), design decisions documented (MoreVertical vs horizontal dots, defense-in-depth stopPropagation, role="button" for semantic HTML, noopener/noreferrer security, keep window.confirm for now), estimated 1-2 hours, ready for implementation
 22. 2025-11-03 [Plan #27] Implemented Three-Dot Menu & Clickable Rows with Subagent-Driven Development - REF MCP validation identified 7 critical improvements BEFORE implementation (prevented hallucinated 164-line custom dropdown, added stopPropagation on trigger+keyboard, tabIndex=-1 for better tab flow, removed title link, comprehensive tests), 3 commits (ed5c14b three-dot menu, 0c410de clickable rows, f3fa7ce docs), 10/13 tests passing (3 Radix UI portal issues documented), 2 code reviews APPROVED (no Critical/Important issues), production-ready with full WCAG compliance, comprehensive report (REPORT-027) with REF MCP analysis and technical decisions
+23. 2025-11-03 [Planning] Created Task #29 plan: Create ConfirmDeleteModal Component - REF MCP validation discovered AlertDialog vs Dialog distinction (AlertDialog for destructive actions), Dialog nesting pattern for DropdownMenu integration, controlled modal state pattern, 6 implementation tasks (install AlertDialog, create component TDD, button tests, VideosPage integration, integration tests, keyboard a11y tests), comprehensive design decisions documented (AlertDialog over Dialog, controlled state for videoId/title storage, close on success vs error, loading state UX), estimated 2-3 hours
+24. 2025-11-03 [Plan #29] Create ConfirmDeleteModal Component - REF MCP validation identified 5 critical improvements BEFORE implementation (modal={false} prevents portal conflicts, userEvent 2024 best practice, smart video title fallback chain, optimal onSuccess/onError pattern, improved preventDefault documentation), TDD approach with executing-plans skill, 4 commits in batches (install AlertDialog, create component with tests, VideosPage integration, verification), 5/5 tests passing with userEvent, TypeScript strict mode (zero any types), production-ready with comprehensive test coverage, 90 minutes actual vs 2 hours estimated, comprehensive report (REPORT-029) with full REF MCP analysis, technical decisions, TDD cycle documentation, and reusable patterns
+25. 2025-11-03 [Planning] Created Task #30 plan: Add Plus Icon to Page Header - REF MCP validation confirmed 5 best practices (aria-label on Button, ghost variant for headers, size="icon" for squares, Plus naming convention from lucide-react, alert placeholder pattern), user-approved decisions (Plus LEFT of Settings, alert "Coming soon", ghost styling), comprehensive plan with accessibility testing strategy (VoiceOver/NVDA), estimated 45 minutes, ready for implementation
+26. 2025-11-03 [Plan #30] Add Plus Icon to Page Header - REF MCP validation identified 5 critical improvements BEFORE implementation (shadcn/ui Button instead of inline SVG, lucide-react Plus h-4 w-4, feature flag SHOW_ADD_PLUS_ICON_BUTTON, positioned before TableSettingsDropdown not leftmost, setIsAdding(true) instead of alert()), executing-plans skill with 2 batches (setup: feature flag + imports + handler, implementation: JSX + TypeScript check + manual testing), 0 new TypeScript errors (3 pre-existing), 80 minutes actual vs 50 minutes estimated (+60% variance for comprehensive documentation), production-ready with full accessibility support (aria-label, keyboard navigation, focus ring), comprehensive report (REPORT-030) with 5 REF MCP improvements analysis and future enhancement TODO
+27. 2025-11-03 [Planning] Created Task #31 plan: Implement thumbnail size CSS classes (small/medium/large) - REF MCP validated Tailwind CSS best practices (aspect-video, object-cover, spacing scale w-32/w-40/w-64), 9 implementation steps with helper function, 5 design decisions documented (switch over object lookup, component-level hook, keep aspect ratio for all sizes), comprehensive testing strategy (4 unit tests, manual browser testing), estimated 1-1.5 hours, ready for implementation

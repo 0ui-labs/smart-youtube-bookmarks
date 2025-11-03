@@ -53,6 +53,15 @@ export const FEATURE_FLAGS = {
     import.meta.env.VITE_FEATURE_SHOW_CSV_EXPORT_BUTTON,
     false
   ),
+
+  /**
+   * Zeigt Plus Icon Button im Header an
+   * MVP: true (schneller Shortcut zum Hinzufügen von Videos - Task #30)
+   */
+  SHOW_ADD_PLUS_ICON_BUTTON: envToBool(
+    import.meta.env.VITE_FEATURE_SHOW_ADD_PLUS_ICON_BUTTON,
+    true
+  ),
 } as const
 
 export type FeatureFlags = typeof FEATURE_FLAGS
