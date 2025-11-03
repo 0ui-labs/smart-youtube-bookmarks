@@ -160,4 +160,58 @@ describe('TableSettingsDropdown', () => {
       expect(thumbnailCheckbox).toHaveAttribute('aria-checked', 'true');
     });
   });
+
+  describe('Keyboard Navigation (Accessibility)', () => {
+    // REF MCP Improvement #6: Test keyboard navigation
+    it('supports keyboard navigation with Enter and Arrow keys', async () => {
+      const setThumbnailSize = vi.fn();
+      vi.mocked(useTableSettingsStore).mockReturnValue({
+        thumbnailSize: 'small',
+        visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
+        setThumbnailSize,
+        toggleColumn: vi.fn(),
+      });
+
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      const trigger = screen.getByRole('button', { name: /einstellungen/i });
+
+      // Open dropdown with keyboard
+      trigger.focus();
+      await user.keyboard('{Enter}');
+
+      // Verify dropdown opened
+      expect(screen.getByText('Thumbnail-Größe')).toBeInTheDocument();
+
+      // Navigate with Arrow keys (Radix handles focus automatically)
+      await user.keyboard('{ArrowDown}');
+
+      // Select with Space (on first radio item "Klein")
+      await user.keyboard(' ');
+
+      // Close with Escape
+      await user.keyboard('{Escape}');
+
+      // Verify dropdown closed
+      expect(screen.queryByText('Thumbnail-Größe')).not.toBeInTheDocument();
+    });
+
+    it('closes dropdown with Escape key', async () => {
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      // Open dropdown
+      const trigger = screen.getByRole('button', { name: /einstellungen/i });
+      await user.click(trigger);
+
+      expect(screen.getByText('Thumbnail-Größe')).toBeInTheDocument();
+
+      // Press Escape
+      await user.keyboard('{Escape}');
+
+      // Verify dropdown closed
+      expect(screen.queryByText('Thumbnail-Größe')).not.toBeInTheDocument();
+    });
+  });
 });
