@@ -112,4 +112,33 @@ describe('VideosPage - Feature Flags (Task #24)', () => {
       expect(screen.getByRole('heading', { name: /Videos/i, level: 1 })).toBeInTheDocument()
     })
   })
+
+  describe('Three-dot Menu (Task #27)', () => {
+    it('renders three-dot menu button for each video', async () => {
+      // Mock useVideos to return test data
+      const { useVideos } = await import('@/hooks/useVideos')
+      vi.mocked(useVideos).mockReturnValue({
+        data: [
+          {
+            id: 'video-1',
+            youtube_id: 'dQw4w9WgXcQ',
+            title: 'Test Video',
+            channel: 'Test Channel',
+            duration: 210,
+            thumbnail_url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg',
+            processing_status: 'completed',
+            created_at: '2024-01-01T00:00:00Z',
+          },
+        ],
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Verify three-dot menu button exists
+      const menuButton = screen.getByLabelText('Aktionen')
+      expect(menuButton).toBeInTheDocument()
+    })
+  })
 })
