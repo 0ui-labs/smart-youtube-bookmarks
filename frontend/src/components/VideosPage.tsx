@@ -14,9 +14,11 @@ import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
 import { CollapsibleSidebar } from '@/components/CollapsibleSidebar'
 import { TagNavigation } from '@/components/TagNavigation'
+import { TableSettingsDropdown } from './TableSettingsDropdown'
 import { useTags } from '@/hooks/useTags'
 import { useTagStore } from '@/stores/tagStore'
 import { useShallow } from 'zustand/react/shallow'
+import { FEATURE_FLAGS } from '@/config/featureFlags'
 
 const columnHelper = createColumnHelper<VideoResponse>()
 
@@ -25,7 +27,6 @@ const YOUTUBE_URL_PATTERN = /^(https:\/\/(www\.|m\.)?youtube\.com\/watch\?v=[\w-
 
 interface VideosPageProps {
   listId: string
-  onBack: () => void
 }
 
 // VideoThumbnail component with React state for error handling
@@ -58,7 +59,7 @@ const VideoThumbnail = ({ url, title }: { url: string | null; title: string }) =
   )
 }
 
-export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
+export const VideosPage = ({ listId }: VideosPageProps) => {
   const [isAdding, setIsAdding] = useState(false)
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [urlError, setUrlError] = useState<string | null>(null)
@@ -276,12 +277,6 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
         <div className="max-w-7xl mx-auto p-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <button
-              onClick={onBack}
-              className="text-blue-600 hover:text-blue-800 mb-2 text-sm"
-            >
-              ← Zurück zu Listen
-            </button>
             <h1 className="text-3xl font-bold text-gray-900">Videos</h1>
             {selectedTags.length > 0 && (
               <p className="text-sm text-gray-600 mt-1">
@@ -295,29 +290,38 @@ export const VideosPage = ({ listId, onBack }: VideosPageProps) => {
               </p>
             )}
           </div>
+        {/* Action Buttons - Feature Flag Controlled (Task #24) */}
         <div className="flex gap-2">
-          <button
-            onClick={handleExportCSV}
-            disabled={videos.length === 0}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 transition-colors"
-            aria-label="Videos als CSV exportieren"
-          >
-            CSV Export
-          </button>
-          <button
-            onClick={() => setIsUploadingCSV(true)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-            aria-label="Videos per CSV hochladen"
-          >
-            CSV Upload
-          </button>
-          <button
-            onClick={() => setIsAdding(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            aria-label="Einzelnes Video hinzufügen"
-          >
-            Video hinzufügen
-          </button>
+          {FEATURE_FLAGS.SHOW_CSV_EXPORT_BUTTON && (
+            <button
+              onClick={handleExportCSV}
+              disabled={videos.length === 0}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 transition-colors"
+              aria-label="Videos als CSV exportieren"
+            >
+              CSV Export
+            </button>
+          )}
+          {FEATURE_FLAGS.SHOW_CSV_UPLOAD_BUTTON && (
+            <button
+              onClick={() => setIsUploadingCSV(true)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              aria-label="Videos per CSV hochladen"
+            >
+              CSV Upload
+            </button>
+          )}
+          {FEATURE_FLAGS.SHOW_ADD_VIDEO_BUTTON && (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              aria-label="Einzelnes Video hinzufügen"
+            >
+              Video hinzufügen
+            </button>
+          )}
+          {/* Table Settings Dropdown */}
+          <TableSettingsDropdown />
         </div>
       </div>
 
