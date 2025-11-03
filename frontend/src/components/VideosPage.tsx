@@ -18,8 +18,11 @@ import { TableSettingsDropdown } from './TableSettingsDropdown'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { useTags } from '@/hooks/useTags'
 import { useTagStore } from '@/stores/tagStore'
+import { useTableSettingsStore } from '@/stores/tableSettingsStore'
 import { useShallow } from 'zustand/react/shallow'
 import { FEATURE_FLAGS } from '@/config/featureFlags'
+import { Button } from '@/components/ui/button'
+import { Plus } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -37,12 +40,31 @@ interface VideosPageProps {
 }
 
 // VideoThumbnail component with React state for error handling
+// REF MCP Improvement #1: Use existing component (extend, not recreate)
+// REF MCP Improvement #3: Object mapping for Tailwind PurgeCSS compatibility
+// REF MCP Improvement #5: w-48 for large (not w-64) for smoother progression
+// REF MCP Improvement #6: Placeholder also scales dynamically
 const VideoThumbnail = ({ url, title }: { url: string | null; title: string }) => {
   const [hasError, setHasError] = useState(false)
+  const thumbnailSize = useTableSettingsStore((state) => state.thumbnailSize)
 
-  // Placeholder SVG component
+  // REF MCP Improvement #3: Full class strings for Tailwind PurgeCSS
+  // Object mapping ensures all classes are detected at build time (no dynamic concatenation)
+  const sizeClasses = {
+    small: 'w-32 aspect-video object-cover rounded shadow-sm',
+    medium: 'w-40 aspect-video object-cover rounded shadow-sm',
+    large: 'w-48 aspect-video object-cover rounded shadow-sm',
+  } as const
+
+  const placeholderSizeClasses = {
+    small: 'w-32 aspect-video bg-gray-100 rounded flex items-center justify-center',
+    medium: 'w-40 aspect-video bg-gray-100 rounded flex items-center justify-center',
+    large: 'w-48 aspect-video bg-gray-100 rounded flex items-center justify-center',
+  } as const
+
+  // Placeholder SVG component with dynamic sizing
   const Placeholder = () => (
-    <div className="w-32 aspect-video bg-gray-100 rounded flex items-center justify-center">
+    <div className={placeholderSizeClasses[thumbnailSize]}>
       <svg className="w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
       </svg>
@@ -60,7 +82,7 @@ const VideoThumbnail = ({ url, title }: { url: string | null; title: string }) =
       src={url}
       alt={title}
       loading="lazy"
-      className="w-32 aspect-video object-cover rounded shadow-sm"
+      className={sizeClasses[thumbnailSize]}
       onError={() => setHasError(true)}
     />
   )
@@ -303,6 +325,13 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     setDeleteModal({ open: false, videoId: null, videoTitle: null })
   }
 
+  // Quick add handler for Plus icon button
+  const handleQuickAdd = () => {
+    // TODO: Implement enhanced quick-add functionality (e.g., modal with minimal fields)
+    // For now, use existing add video form
+    setIsAdding(true)
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -386,6 +415,17 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
             >
               Video hinzufügen
             </button>
+          )}
+          {/* Plus Icon Button - Quick Add Shortcut (Task #30) */}
+          {FEATURE_FLAGS.SHOW_ADD_PLUS_ICON_BUTTON && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleQuickAdd}
+              aria-label="Video hinzufügen"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           )}
           {/* Table Settings Dropdown */}
           <TableSettingsDropdown />

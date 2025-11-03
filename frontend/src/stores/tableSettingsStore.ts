@@ -14,12 +14,17 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 
 /**
  * Thumbnail size options for video thumbnails
- * - small: Compact preview (current default)
- * - medium: Balanced size for comfortable viewing
- * - large: Larger preview for detailed inspection
+ * - small: Compact preview (w-32 = 128px) - current default
+ * - medium: Balanced size for comfortable viewing (w-40 = 160px) - +25% larger
+ * - large: Larger preview for detailed inspection (w-48 = 192px) - +50% larger
  *
- * Actual pixel sizes are determined by the VideoTable component
- * based on Tailwind classes (currently: small=w-32, medium=w-40, large=w-48)
+ * REF MCP Improvement #5: w-48 for large (not w-64) ensures:
+ * - Smooth size progression (128px → 160px → 192px)
+ * - More thumbnails fit per row (better table layout)
+ * - Consistent with YouTube's thumbnail size patterns
+ *
+ * Actual pixel sizes are implemented in VideosPage VideoThumbnail component
+ * using Tailwind classes with object mapping for PurgeCSS compatibility
  */
 export type ThumbnailSize = 'small' | 'medium' | 'large';
 
