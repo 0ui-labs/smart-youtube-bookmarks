@@ -15,6 +15,7 @@ import type { VideoResponse } from '@/types/video'
 import { CollapsibleSidebar } from '@/components/CollapsibleSidebar'
 import { TagNavigation } from '@/components/TagNavigation'
 import { TableSettingsDropdown } from './TableSettingsDropdown'
+import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { useTags } from '@/hooks/useTags'
 import { useTagStore } from '@/stores/tagStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -70,6 +71,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [urlError, setUrlError] = useState<string | null>(null)
   const [isUploadingCSV, setIsUploadingCSV] = useState(false)
+  const [deleteModal, setDeleteModal] = useState<{
+    open: boolean
+    videoId: string | null
+    videoTitle: string | null
+  }>({
+    open: false,
+    videoId: null,
+    videoTitle: null,
+  })
 
   // Tag integration
   const { data: tags = [], isLoading: tagsLoading, error: tagsError } = useTags()
@@ -179,7 +189,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         id: 'menu',
         header: '', // No header text - just icon column
         cell: (info) => (
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
@@ -201,9 +211,14 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
               <DropdownMenuItem
                 onClick={(e) => {
                   e.stopPropagation()
-                  if (window.confirm('Video wirklich löschen?')) {
-                    deleteVideo.mutate(info.getValue())
-                  }
+                  const row = info.row.original
+                  // REF MCP #3: Smart video title with fallback chain
+                  const videoTitle = row.title || `Video ${row.youtube_id}` || 'Unbekanntes Video'
+                  setDeleteModal({
+                    open: true,
+                    videoId: info.getValue() as string,
+                    videoTitle: videoTitle,
+                  })
                 }}
                 className="text-red-600 focus:text-red-700 cursor-pointer"
               >
@@ -265,6 +280,27 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         setUrlError('Fehler beim Hinzufügen des Videos. Bitte versuchen Sie es erneut.')
       }
     }
+  }
+
+  // Handle delete confirmation from modal
+  const handleDeleteConfirm = () => {
+    if (!deleteModal.videoId) return
+
+    deleteVideo.mutate(deleteModal.videoId, {
+      onSuccess: () => {
+        // Close modal after successful delete
+        setDeleteModal({ open: false, videoId: null, videoTitle: null })
+      },
+      onError: (error) => {
+        // Keep modal open on error, user can retry or cancel
+        console.error('Failed to delete video:', error)
+        // TODO: Add toast notification here
+      },
+    })
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteModal({ open: false, videoId: null, videoTitle: null })
   }
 
   if (isLoading) {
@@ -549,6 +585,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           {videos.length} Video{videos.length !== 1 ? 's' : ''} in dieser Liste
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        open={deleteModal.open}
+        videoTitle={deleteModal.videoTitle}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        isLoading={deleteVideo.isPending}
+      />
         </div>
       </div>
     </div>
