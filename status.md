@@ -58,7 +58,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 - UX Design: `docs/plans/2025-10-31-ID-04-ux-optimization-tag-system-design.md`
 - Implementation: `docs/plans/2025-10-31-ID-05-ux-optimization-implementation-plan.md`
 - Security Hardening: `docs/plans/2025-11-02-security-hardening-implementation.md`
-- Latest Handoff: `docs/handoffs/2025-11-03-log-030-add-plus-icon.md`
+- Latest Handoff: `docs/handoffs/2025-11-03-log-031-thumbnail-size-css.md`
 - Latest Report: `docs/reports/2025-11-03-task-031-report.md`
 
 ---
