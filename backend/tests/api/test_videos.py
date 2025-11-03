@@ -653,7 +653,7 @@ async def test_get_videos_filter_no_matching_tags(client: AsyncClient, test_db: 
         f"/api/lists/{test_list.id}/videos",
         json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
     )
-    assert video_response.status_code == 200
+    assert video_response.status_code == 201
     video_id = video_response.json()["id"]
 
     tag = await client.post("/api/tags", json={"name": "Python", "color": "#3B82F6"})
