@@ -1,6 +1,6 @@
 # Project Status & Task Protocol
 
-**Last Updated:** 2025-11-02 23:50 CET | **Branch:** main
+**Last Updated:** 2025-11-03 15:15 CET | **Branch:** main
 
 ---
 
@@ -59,7 +59,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 - Implementation: `docs/plans/2025-10-31-ID-05-ux-optimization-implementation-plan.md`
 - Security Hardening: `docs/plans/2025-11-02-security-hardening-implementation.md`
 - Latest Handoff: `docs/handoffs/2025-11-02-log-021-react-router-migration.md`
-- Latest Report: `docs/reports/2025-11-03-task-026-report.md`
+- Latest Report: `docs/reports/2025-11-03-task-027-report.md`
 
 ---
 
@@ -100,8 +100,8 @@ This file maintains **two separate lists**: PLAN and LOG.
 24. [x] Add feature flags to hide Add Video, CSV Upload, CSV Export buttons (2025-11-02 23:50)
 25. [x] Create table settings store with thumbnail size and column visibility (2025-11-03 01:20)
 26. [x] Implement TableSettingsDropdown component (2025-11-03 12:30)
-27. [ ] Replace Actions column with three-dot menu
-28. [ ] Make table rows clickable (except menu)
+27. [x] Replace Actions column with three-dot menu (2025-11-03 15:15)
+28. [x] Make table rows clickable (except menu) (2025-11-03 15:15)
 29. [ ] Create ConfirmDeleteModal component
 30. [ ] Add Plus icon to page header
 31. [ ] Implement thumbnail size CSS classes (small/medium/large)
@@ -219,3 +219,5 @@ This file maintains **two separate lists**: PLAN and LOG.
 18. 2025-11-03 [Plan #25] Created Table Settings Store with localStorage persistence - Implemented tableSettingsStore.ts with 4 columns (not 6 as planned - discovered VideosPage only has thumbnail/title/duration/actions), 13 comprehensive tests (all passing), 5 REF MCP improvements (explicit createJSONStorage, persist API for tests, corrected column names, removed hardcoded pixels, added corrupted localStorage test), fixed 8 CodeRabbit issues (task-024-report.md wording, test_videos.py YouTube ID, App.tsx states, videos.py validation, VideosPage.integration.test.tsx import, security-hardening SECRET_KEY, tableSettingsStore.test.ts await)
 19. 2025-11-03 [Planning] Created Task #26 plan: Implement TableSettingsDropdown Component - shadcn/ui DropdownMenu with thumbnail size selector (3 radio options: Klein, Mittel, Groß) and column visibility toggles (4 checkboxes), integrated into VideosPage header next to Plus icon, REF MCP validated 4 patterns (shadcn/ui best practice, immediate apply UX, Zustand persist, ARIA accessibility), 14 implementation steps with TDD approach, comprehensive testing strategy (6 unit + 3 integration tests), design decisions documented (shadcn vs custom, immediate apply vs save button, 4 columns vs 6 columns), estimated 2-3 hours
 20. 2025-11-03 [Plan #26] Implemented TableSettingsDropdown Component with Subagent-Driven Development - 6 sequential tasks (install shadcn/ui dropdown-menu, basic component TDD, thumbnail size RadioGroup TDD, column visibility CheckboxItems TDD, keyboard navigation tests, VideosPage integration), 7 REF MCP improvements applied (runtime validation + type narrowing instead of type casting, visual separator between sections, correct Radix UI API checked+onCheckedChange, test isolation beforeEach/afterEach, central store import from @/stores, keyboard navigation accessibility tests, responsive width max-w constraint), all 9/9 new tests passing, Code-Reviewer approval (APPROVED FOR PRODUCTION, 0 Critical/Important issues, 2 Minor nice-to-have), comprehensive report (REPORT-026) with full implementation details, architecture diagrams, and future considerations
+21. 2025-11-03 [Planning] Created Task #27 plan: Replace Actions Column with Three-Dot Menu - REF MCP validated (MoreVertical icon, stopPropagation on trigger+items, role="button" for clickable rows, window.open security flags, WAI-ARIA Menu Button pattern), comprehensive implementation steps (menu column replacement, clickable rows with keyboard support, 5 unit tests, manual testing checklist), design decisions documented (MoreVertical vs horizontal dots, defense-in-depth stopPropagation, role="button" for semantic HTML, noopener/noreferrer security, keep window.confirm for now), estimated 1-2 hours, ready for implementation
+22. 2025-11-03 [Plan #27] Implemented Three-Dot Menu & Clickable Rows with Subagent-Driven Development - REF MCP validation identified 7 critical improvements BEFORE implementation (prevented hallucinated 164-line custom dropdown, added stopPropagation on trigger+keyboard, tabIndex=-1 for better tab flow, removed title link, comprehensive tests), 3 commits (ed5c14b three-dot menu, 0c410de clickable rows, f3fa7ce docs), 10/13 tests passing (3 Radix UI portal issues documented), 2 code reviews APPROVED (no Critical/Important issues), production-ready with full WCAG compliance, comprehensive report (REPORT-027) with REF MCP analysis and technical decisions
