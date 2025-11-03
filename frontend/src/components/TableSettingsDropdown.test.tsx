@@ -97,4 +97,67 @@ describe('TableSettingsDropdown', () => {
       expect(largeOption).toHaveAttribute('aria-checked', 'true');
     });
   });
+
+  describe('Column Visibility', () => {
+    it('shows column visibility checkboxes when opened', async () => {
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      await user.click(screen.getByRole('button', { name: /einstellungen/i }));
+
+      // Verify section label
+      expect(screen.getByText('Sichtbare Spalten')).toBeInTheDocument();
+
+      // Verify 4 column checkboxes exist
+      expect(screen.getByRole('menuitemcheckbox', { name: /thumbnail/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitemcheckbox', { name: /titel/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitemcheckbox', { name: /dauer/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitemcheckbox', { name: /aktionen/i })).toBeInTheDocument();
+    });
+
+    it('calls toggleColumn when checkbox clicked', async () => {
+      const toggleColumn = vi.fn();
+      vi.mocked(useTableSettingsStore).mockReturnValue({
+        thumbnailSize: 'small',
+        visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
+        setThumbnailSize: vi.fn(),
+        toggleColumn,
+      });
+
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      await user.click(screen.getByRole('button', { name: /einstellungen/i }));
+      await user.click(screen.getByRole('menuitemcheckbox', { name: /dauer/i }));
+
+      expect(toggleColumn).toHaveBeenCalledWith('duration');
+    });
+
+    it('shows current column visibility state', async () => {
+      vi.mocked(useTableSettingsStore).mockReturnValue({
+        thumbnailSize: 'small',
+        visibleColumns: {
+          thumbnail: true,
+          title: false, // Hidden
+          duration: true,
+          actions: true
+        },
+        setThumbnailSize: vi.fn(),
+        toggleColumn: vi.fn(),
+      });
+
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      await user.click(screen.getByRole('button', { name: /einstellungen/i }));
+
+      // Verify title checkbox is unchecked
+      const titleCheckbox = screen.getByRole('menuitemcheckbox', { name: /titel/i });
+      expect(titleCheckbox).toHaveAttribute('aria-checked', 'false');
+
+      // Verify thumbnail checkbox is checked
+      const thumbnailCheckbox = screen.getByRole('menuitemcheckbox', { name: /thumbnail/i });
+      expect(thumbnailCheckbox).toHaveAttribute('aria-checked', 'true');
+    });
+  });
 });

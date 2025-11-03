@@ -16,17 +16,19 @@ import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useTableSettingsStore } from '@/stores'; // REF MCP Improvement #5: Central import
 import type { ThumbnailSize } from '@/stores'; // Import type
 
 export const TableSettingsDropdown = () => {
-  const { thumbnailSize, setThumbnailSize } = useTableSettingsStore();
+  const { thumbnailSize, setThumbnailSize, visibleColumns, toggleColumn } = useTableSettingsStore();
 
   // REF MCP Improvement #1: Runtime validation + Type narrowing (NO type casting!)
   const handleThumbnailSizeChange = (value: string) => {
@@ -57,6 +59,41 @@ export const TableSettingsDropdown = () => {
           <DropdownMenuRadioItem value="medium">Mittel</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="large">Groß</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
+
+        {/* REF MCP Improvement #2: Visual separator between sections */}
+        <DropdownMenuSeparator />
+
+        {/* Column Visibility Section */}
+        <DropdownMenuLabel>Sichtbare Spalten</DropdownMenuLabel>
+
+        {/* REF MCP Improvement #3: Correct Radix API - checked prop + onCheckedChange */}
+        <DropdownMenuCheckboxItem
+          checked={visibleColumns.thumbnail}
+          onCheckedChange={() => toggleColumn('thumbnail')}
+        >
+          Thumbnail
+        </DropdownMenuCheckboxItem>
+
+        <DropdownMenuCheckboxItem
+          checked={visibleColumns.title}
+          onCheckedChange={() => toggleColumn('title')}
+        >
+          Titel
+        </DropdownMenuCheckboxItem>
+
+        <DropdownMenuCheckboxItem
+          checked={visibleColumns.duration}
+          onCheckedChange={() => toggleColumn('duration')}
+        >
+          Dauer
+        </DropdownMenuCheckboxItem>
+
+        <DropdownMenuCheckboxItem
+          checked={visibleColumns.actions}
+          onCheckedChange={() => toggleColumn('actions')}
+        >
+          Aktionen
+        </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
