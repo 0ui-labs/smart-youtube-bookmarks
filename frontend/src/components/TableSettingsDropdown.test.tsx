@@ -14,9 +14,11 @@ describe('TableSettingsDropdown', () => {
     // Reset ALL mocks before each test
     vi.clearAllMocks();
 
-    // Setup default mock implementation
-    vi.mocked(useTableSettingsStore).mockReturnValue({
+    // Setup default mock implementation with selector pattern
+    const mockStore = {
       thumbnailSize: 'small',
+      viewMode: 'list',
+      gridColumns: 3,
       visibleColumns: {
         thumbnail: true,
         title: true,
@@ -24,7 +26,17 @@ describe('TableSettingsDropdown', () => {
         actions: true,
       },
       setThumbnailSize: vi.fn(),
+      setViewMode: vi.fn(),
+      setGridColumns: vi.fn(),
       toggleColumn: vi.fn(),
+    };
+
+    // Mock to handle selector calls
+    vi.mocked(useTableSettingsStore).mockImplementation((selector: any) => {
+      if (typeof selector === 'function') {
+        return selector(mockStore);
+      }
+      return mockStore;
     });
   });
 
@@ -61,12 +73,19 @@ describe('TableSettingsDropdown', () => {
 
     it('calls setThumbnailSize when size option clicked', async () => {
       const setThumbnailSize = vi.fn();
-      vi.mocked(useTableSettingsStore).mockReturnValue({
+      const mockStore = {
         thumbnailSize: 'small',
+        viewMode: 'list',
+        gridColumns: 3,
         visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
         setThumbnailSize,
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
         toggleColumn: vi.fn(),
-      });
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
 
       const user = userEvent.setup();
       render(<TableSettingsDropdown />);
@@ -80,12 +99,19 @@ describe('TableSettingsDropdown', () => {
     });
 
     it('shows current thumbnail size as selected', async () => {
-      vi.mocked(useTableSettingsStore).mockReturnValue({
+      const mockStore = {
         thumbnailSize: 'large', // Set to large
+        viewMode: 'list',
+        gridColumns: 3,
         visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
         setThumbnailSize: vi.fn(),
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
         toggleColumn: vi.fn(),
-      });
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
 
       const user = userEvent.setup();
       render(<TableSettingsDropdown />);
@@ -117,12 +143,19 @@ describe('TableSettingsDropdown', () => {
 
     it('calls toggleColumn when checkbox clicked', async () => {
       const toggleColumn = vi.fn();
-      vi.mocked(useTableSettingsStore).mockReturnValue({
+      const mockStore = {
         thumbnailSize: 'small',
+        viewMode: 'list',
+        gridColumns: 3,
         visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
         setThumbnailSize: vi.fn(),
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
         toggleColumn,
-      });
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
 
       const user = userEvent.setup();
       render(<TableSettingsDropdown />);
@@ -134,8 +167,10 @@ describe('TableSettingsDropdown', () => {
     });
 
     it('shows current column visibility state', async () => {
-      vi.mocked(useTableSettingsStore).mockReturnValue({
+      const mockStore = {
         thumbnailSize: 'small',
+        viewMode: 'list',
+        gridColumns: 3,
         visibleColumns: {
           thumbnail: true,
           title: false, // Hidden
@@ -143,8 +178,13 @@ describe('TableSettingsDropdown', () => {
           actions: true
         },
         setThumbnailSize: vi.fn(),
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
         toggleColumn: vi.fn(),
-      });
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
 
       const user = userEvent.setup();
       render(<TableSettingsDropdown />);
@@ -165,12 +205,19 @@ describe('TableSettingsDropdown', () => {
     // REF MCP Improvement #6: Test keyboard navigation
     it('supports keyboard navigation with Enter and Arrow keys', async () => {
       const setThumbnailSize = vi.fn();
-      vi.mocked(useTableSettingsStore).mockReturnValue({
+      const mockStore = {
         thumbnailSize: 'small',
+        viewMode: 'list',
+        gridColumns: 3,
         visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
         setThumbnailSize,
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
         toggleColumn: vi.fn(),
-      });
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
 
       const user = userEvent.setup();
       render(<TableSettingsDropdown />);
@@ -212,6 +259,150 @@ describe('TableSettingsDropdown', () => {
 
       // Verify dropdown closed
       expect(screen.queryByText('Thumbnail-Größe')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Grid Column Control (Task #34)', () => {
+    it('does not show grid column control when viewMode is list', async () => {
+      const mockStore = {
+        thumbnailSize: 'small',
+        viewMode: 'list',
+        gridColumns: 3,
+        visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
+        setThumbnailSize: vi.fn(),
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
+        toggleColumn: vi.fn(),
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
+
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      // Open dropdown
+      const trigger = screen.getByRole('button', { name: /einstellungen/i });
+      await user.click(trigger);
+
+      // Should NOT show Spaltenanzahl section
+      expect(screen.queryByText('Spaltenanzahl')).not.toBeInTheDocument();
+      expect(screen.queryByText('2 Spalten (Breit)')).not.toBeInTheDocument();
+    });
+
+    it('shows grid column control when viewMode is grid', async () => {
+      const mockStore = {
+        thumbnailSize: 'small',
+        viewMode: 'grid',
+        gridColumns: 3,
+        visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
+        setThumbnailSize: vi.fn(),
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
+        toggleColumn: vi.fn(),
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
+
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      // Open dropdown
+      const trigger = screen.getByRole('button', { name: /einstellungen/i });
+      await user.click(trigger);
+
+      // Should show Spaltenanzahl section with 4 options
+      expect(screen.getByText('Spaltenanzahl')).toBeInTheDocument();
+      expect(screen.getByRole('menuitemradio', { name: /2 Spalten \(Breit\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitemradio', { name: /3 Spalten \(Standard\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitemradio', { name: /4 Spalten \(Kompakt\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitemradio', { name: /5 Spalten \(Dicht\)/i })).toBeInTheDocument();
+    });
+
+    it('calls setGridColumns with number when option clicked', async () => {
+      const setGridColumns = vi.fn();
+      const mockStore = {
+        thumbnailSize: 'small',
+        viewMode: 'grid',
+        gridColumns: 3,
+        visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
+        setThumbnailSize: vi.fn(),
+        setViewMode: vi.fn(),
+        setGridColumns,
+        toggleColumn: vi.fn(),
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
+
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      // Open dropdown
+      await user.click(screen.getByRole('button', { name: /einstellungen/i }));
+
+      // Click 5 columns option
+      const option5 = screen.getByRole('menuitemradio', { name: /5 Spalten \(Dicht\)/i });
+      await user.click(option5);
+
+      // Verify store was updated with number 5 (not string "5")
+      expect(setGridColumns).toHaveBeenCalledWith(5);
+      expect(setGridColumns).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows current gridColumns value as checked', async () => {
+      const mockStore = {
+        thumbnailSize: 'small',
+        viewMode: 'grid',
+        gridColumns: 4, // Current value is 4
+        visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
+        setThumbnailSize: vi.fn(),
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
+        toggleColumn: vi.fn(),
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
+
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      // Open dropdown
+      await user.click(screen.getByRole('button', { name: /einstellungen/i }));
+
+      // Find radio item for 4 columns
+      const option4 = screen.getByRole('menuitemradio', { name: /4 Spalten \(Kompakt\)/i });
+
+      // Should have checked state
+      expect(option4).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('has accessible aria-label on RadioGroup', async () => {
+      const mockStore = {
+        thumbnailSize: 'small',
+        viewMode: 'grid',
+        gridColumns: 3,
+        visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
+        setThumbnailSize: vi.fn(),
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
+        toggleColumn: vi.fn(),
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
+
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      // Open dropdown
+      await user.click(screen.getByRole('button', { name: /einstellungen/i }));
+
+      // RadioGroup should have aria-label
+      const radioGroup = screen.getByRole('group', { name: /spaltenanzahl für grid-ansicht/i });
+      expect(radioGroup).toBeInTheDocument();
     });
   });
 });

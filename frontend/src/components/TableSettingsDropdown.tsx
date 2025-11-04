@@ -25,10 +25,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useTableSettingsStore } from '@/stores'; // REF MCP Improvement #5: Central import
-import type { ThumbnailSize } from '@/stores'; // Import type
 
 export const TableSettingsDropdown = () => {
-  const { thumbnailSize, setThumbnailSize, visibleColumns, toggleColumn } = useTableSettingsStore();
+  // REF MCP Improvement #1: Use separate selectors (NOT useShallow object pattern)
+  const viewMode = useTableSettingsStore((state) => state.viewMode);
+  const thumbnailSize = useTableSettingsStore((state) => state.thumbnailSize);
+  const setThumbnailSize = useTableSettingsStore((state) => state.setThumbnailSize);
+  const gridColumns = useTableSettingsStore((state) => state.gridColumns);
+  const setGridColumns = useTableSettingsStore((state) => state.setGridColumns);
+  const visibleColumns = useTableSettingsStore((state) => state.visibleColumns);
+  const toggleColumn = useTableSettingsStore((state) => state.toggleColumn);
 
   // REF MCP Improvement #1: Runtime validation + Type narrowing (NO type casting!)
   const handleThumbnailSizeChange = (value: string) => {
@@ -37,6 +43,17 @@ export const TableSettingsDropdown = () => {
       setThumbnailSize(value); // TypeScript knows value is ThumbnailSize here
     } else {
       console.warn(`Invalid thumbnail size value: ${value}`);
+    }
+  };
+
+  // Task #34: Runtime validation for GridColumnCount
+  const handleGridColumnsChange = (value: string) => {
+    const parsed = parseInt(value, 10);
+    // Type guard - TypeScript narrows type automatically
+    if (parsed === 2 || parsed === 3 || parsed === 4 || parsed === 5) {
+      setGridColumns(parsed); // TypeScript knows parsed is GridColumnCount here
+    } else {
+      console.warn(`Invalid grid column count: ${value}`);
     }
   };
 
@@ -60,6 +77,32 @@ export const TableSettingsDropdown = () => {
           <DropdownMenuRadioItem value="large">Groß</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="xlarge">YouTube Größe (500x280)</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
+
+        {/* Grid Column Count Section - Only visible in grid view (Task #34) */}
+        {viewMode === 'grid' && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Spaltenanzahl</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={String(gridColumns)} // Convert number to string for Radix API
+              onValueChange={handleGridColumnsChange}
+              aria-label="Spaltenanzahl für Grid-Ansicht"
+            >
+              <DropdownMenuRadioItem value="2">
+                2 Spalten (Breit)
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="3">
+                3 Spalten (Standard)
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="4">
+                4 Spalten (Kompakt)
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="5">
+                5 Spalten (Dicht)
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </>
+        )}
 
         {/* REF MCP Improvement #2: Visual separator between sections */}
         <DropdownMenuSeparator />
