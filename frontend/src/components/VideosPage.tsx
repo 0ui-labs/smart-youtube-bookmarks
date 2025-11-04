@@ -531,6 +531,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           )}
           {/* View Mode Toggle - Task #32 */}
           <ViewModeToggle viewMode={viewMode} onToggle={setViewMode} />
+          {/* Table Settings Dropdown - Task #35 (moved to header for both grid/list access) */}
+          <TableSettingsDropdown />
         </div>
       </div>
 
@@ -696,10 +698,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                           )}
                     </th>
                   ))}
-                  {/* Settings icon in header row - aligned right */}
-                  <th className="px-6 py-3 text-right">
-                    <TableSettingsDropdown />
-                  </th>
                 </tr>
               ))}
             </thead>

@@ -399,4 +399,128 @@ describe('VideosPage - Grid View Integration (Task #32)', () => {
       })
     })
   })
+
+  describe('GridColumnControl integration with VideoGrid (Task #35)', () => {
+    // REF IMPROVEMENT #4: Use real store with cleanup (not mocks)
+    beforeEach(async () => {
+      // Reset localStorage to ensure clean state
+      localStorage.clear()
+
+      // Reset Zustand store to default state
+      useTableSettingsStore.setState({
+        viewMode: 'list',
+        gridColumns: 3,
+        thumbnailSize: 'medium',
+        visibleColumns: {
+          thumbnail: true,
+          title: true,
+          duration: true,
+          actions: true,
+        },
+      })
+
+      // Restore default mock with videos
+      const { useVideos } = await import('@/hooks/useVideos')
+      vi.mocked(useVideos).mockReturnValue({
+        data: mockVideos,
+        isLoading: false,
+        error: null,
+      } as any)
+    })
+
+    it('updates VideoGrid classes when column count changes', async () => {
+      const user = userEvent.setup()
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Switch to grid view
+      const gridButton = screen.getByRole('button', { name: /Grid-Ansicht anzeigen/i })
+      await user.click(gridButton)
+
+      // Verify default 3 columns
+      let grid = document.querySelector('.video-grid')
+      expect(grid).toHaveClass('lg:grid-cols-3')
+
+      // Open TableSettingsDropdown
+      const settingsButton = screen.getByRole('button', { name: /einstellungen/i })
+      await user.click(settingsButton)
+
+      // Change to 5 columns
+      const button5 = screen.getByRole('menuitemradio', { name: /5 spalten/i })
+      await user.click(button5)
+
+      // Verify grid classes updated (REF IMPROVEMENT #2: md:grid-cols-2 for 5 cols)
+      grid = document.querySelector('.video-grid')
+      expect(grid).toHaveClass('lg:grid-cols-5')
+      expect(grid).toHaveClass('md:grid-cols-2') // Tablet: 2 cols (not 3)
+      expect(grid).not.toHaveClass('lg:grid-cols-3')
+    })
+
+    it('preserves gridColumns when switching between list and grid views', async () => {
+      const user = userEvent.setup()
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Switch to grid view
+      const gridButton = screen.getByRole('button', { name: /Grid-Ansicht anzeigen/i })
+      await user.click(gridButton)
+
+      // Open settings and change to 4 columns
+      const settingsButton = screen.getByRole('button', { name: /einstellungen/i })
+      await user.click(settingsButton)
+
+      const button4 = screen.getByRole('menuitemradio', { name: /4 spalten/i })
+      await user.click(button4)
+
+      // Close dropdown
+      await user.keyboard('{Escape}')
+
+      // Switch to list view (button shows "Listen-Ansicht anzeigen" when in grid)
+      const listButton = screen.getByRole('button', { name: /Listen-Ansicht anzeigen/i })
+      await user.click(listButton)
+
+      // Switch back to grid view (need to find the button again with new label)
+      const gridButtonAgain = screen.getByRole('button', { name: /Grid-Ansicht anzeigen/i })
+      await user.click(gridButtonAgain)
+
+      // Should still be 4 columns (setting preserved via localStorage)
+      const grid = document.querySelector('.video-grid')
+      expect(grid).toHaveClass('lg:grid-cols-4')
+
+      // Verify in store
+      const state = useTableSettingsStore.getState()
+      expect(state.gridColumns).toBe(4)
+    })
+
+    it('persists gridColumns setting across page reloads', async () => {
+      const user = userEvent.setup()
+
+      // Set up initial state
+      const { unmount } = renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Switch to grid and set 5 columns
+      const gridButton = screen.getByRole('button', { name: /Grid-Ansicht anzeigen/i })
+      await user.click(gridButton)
+
+      const settingsButton = screen.getByRole('button', { name: /einstellungen/i })
+      await user.click(settingsButton)
+
+      const button5 = screen.getByRole('menuitemradio', { name: /5 spalten/i })
+      await user.click(button5)
+
+      // Unmount component (simulates page navigation)
+      unmount()
+
+      // Re-render component (simulates page reload)
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Verify setting persisted (localStorage + Zustand persist middleware)
+      const state = useTableSettingsStore.getState()
+      expect(state.gridColumns).toBe(5)
+      expect(state.viewMode).toBe('grid') // viewMode also persisted
+
+      // Grid view should already be active (persisted via localStorage)
+      // No need to click toggle - just verify the grid classes
+      const grid = document.querySelector('.video-grid')
+      expect(grid).toHaveClass('lg:grid-cols-5')
+    })
+  })
 })
