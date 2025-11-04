@@ -499,19 +499,17 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
               Video hinzufügen
             </button>
           )}
-          {/* Plus Icon Button - Quick Add Shortcut (Task #30) */}
+          {/* YouTube-style Add Button - Quick Add Shortcut (Task #30) */}
           {FEATURE_FLAGS.SHOW_ADD_PLUS_ICON_BUTTON && (
-            <Button
-              variant="ghost"
-              size="icon"
+            <button
               onClick={handleQuickAdd}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-full transition-colors font-medium"
               aria-label="Video hinzufügen"
             >
-              <Plus className="h-4 w-4" />
-            </Button>
+              <Plus className="h-5 w-5" strokeWidth={2.5} />
+              <span>Add</span>
+            </button>
           )}
-          {/* Table Settings Dropdown */}
-          <TableSettingsDropdown />
         </div>
       </div>
 
@@ -659,6 +657,10 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                           )}
                     </th>
                   ))}
+                  {/* Settings icon in header row - aligned right */}
+                  <th className="px-6 py-3 text-right">
+                    <TableSettingsDropdown />
+                  </th>
                 </tr>
               ))}
             </thead>

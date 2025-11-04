@@ -181,4 +181,61 @@ describe('useTableSettingsStore', () => {
       expect(columnNames).not.toContain('created_at');
     });
   });
+
+  // Task #32 - Step 1.1: TDD tests for viewMode state
+  describe('View Mode (Task #32)', () => {
+    it('defaults to list view', () => {
+      const { result } = renderHook(() => useTableSettingsStore())
+      expect(result.current.viewMode).toBe('list')
+    })
+
+    it('toggles between list and grid view', () => {
+      const { result } = renderHook(() => useTableSettingsStore())
+
+      act(() => {
+        result.current.setViewMode('grid')
+      })
+
+      expect(result.current.viewMode).toBe('grid')
+
+      act(() => {
+        result.current.setViewMode('list')
+      })
+
+      expect(result.current.viewMode).toBe('list')
+    })
+
+    it('persists viewMode to localStorage', () => {
+      const { result } = renderHook(() => useTableSettingsStore())
+
+      act(() => {
+        result.current.setViewMode('grid')
+      })
+
+      // Unmount and remount to test persistence
+      const { result: result2 } = renderHook(() => useTableSettingsStore())
+      expect(result2.current.viewMode).toBe('grid')
+    })
+
+    it('works independently from thumbnailSize', () => {
+      const { result } = renderHook(() => useTableSettingsStore())
+
+      // Set grid view with small thumbnails
+      act(() => {
+        result.current.setViewMode('grid')
+        result.current.setThumbnailSize('small')
+      })
+
+      expect(result.current.viewMode).toBe('grid')
+      expect(result.current.thumbnailSize).toBe('small')
+
+      // Change to large thumbnails, view stays grid
+      act(() => {
+        result.current.setThumbnailSize('large')
+      })
+
+      expect(result.current.viewMode).toBe('grid')
+      expect(result.current.thumbnailSize).toBe('large')
+    })
+  })
 });

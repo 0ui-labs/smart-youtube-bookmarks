@@ -31,6 +31,16 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 export type ThumbnailSize = 'small' | 'medium' | 'large' | 'xlarge';
 
 /**
+ * View mode for video display (Task #32)
+ * - list: Table view with rows (default, current implementation)
+ * - grid: Grid view with cards (responsive columns, Task #32)
+ *
+ * REF MCP Improvement #1: Separate from thumbnailSize for independent control
+ * User can choose Grid with small thumbnails OR Table with large thumbnails
+ */
+export type ViewMode = 'list' | 'grid';
+
+/**
  * Column visibility configuration for video table
  * Based on existing VideosPage table structure (4 columns as of Task #24)
  *
@@ -60,11 +70,17 @@ interface TableSettingsStore {
   /** Column visibility configuration */
   visibleColumns: VisibleColumns;
 
+  /** Current view mode (Task #32) */
+  viewMode: ViewMode;
+
   /** Update thumbnail size */
   setThumbnailSize: (size: ThumbnailSize) => void;
 
   /** Toggle visibility of a specific column */
   toggleColumn: (column: keyof VisibleColumns) => void;
+
+  /** Update view mode (Task #32) */
+  setViewMode: (mode: ViewMode) => void;
 }
 
 /**
@@ -122,6 +138,7 @@ export const useTableSettingsStore = create<TableSettingsStore>()(
       // State
       thumbnailSize: 'small',
       visibleColumns: DEFAULT_VISIBLE_COLUMNS,
+      viewMode: 'list', // Task #32: Default to list view (preserves current behavior)
 
       // Actions
       setThumbnailSize: (size) => set({ thumbnailSize: size }),
@@ -133,6 +150,8 @@ export const useTableSettingsStore = create<TableSettingsStore>()(
             [column]: !state.visibleColumns[column],
           },
         })),
+
+      setViewMode: (mode) => set({ viewMode: mode }), // Task #32: Set view mode
     }),
     {
       name: 'video-table-settings', // localStorage key (must be unique)
