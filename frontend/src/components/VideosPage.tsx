@@ -730,3 +730,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     </div>
   )
 }
+
+// Export VideoThumbnail for reuse in VideoCard (Task #32)
+export { VideoThumbnail }
