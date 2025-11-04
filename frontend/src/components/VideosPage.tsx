@@ -209,12 +209,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const visibleColumns = useTableSettingsStore((state) => state.visibleColumns)
 
   // Get viewMode from store (REF MCP #1: independent from thumbnailSize)
-  const { viewMode, setViewMode } = useTableSettingsStore(
-    useShallow((state) => ({
-      viewMode: state.viewMode,
-      setViewMode: state.setViewMode,
-    }))
-  )
+  // REF Improvement #1 (Task #35): Use separate selectors for optimal re-render prevention
+  const viewMode = useTableSettingsStore((state) => state.viewMode)
+  const setViewMode = useTableSettingsStore((state) => state.setViewMode)
 
   // Get gridColumns from store (Task #35: Dynamic grid column count)
   const gridColumns = useTableSettingsStore((state) => state.gridColumns)
