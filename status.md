@@ -1,6 +1,6 @@
 # Project Status & Task Protocol
 
-**Last Updated:** 2025-11-03 22:00 CET | **Branch:** main
+**Last Updated:** 2025-11-04 14:30 CET | **Branch:** main
 
 ---
 
@@ -58,8 +58,8 @@ This file maintains **two separate lists**: PLAN and LOG.
 - UX Design: `docs/plans/2025-10-31-ID-04-ux-optimization-tag-system-design.md`
 - Implementation: `docs/plans/2025-10-31-ID-05-ux-optimization-implementation-plan.md`
 - Security Hardening: `docs/plans/2025-11-02-security-hardening-implementation.md`
-- Latest Handoff: `docs/handoffs/2025-11-03-log-031-thumbnail-size-css.md`
-- Latest Report: `docs/reports/2025-11-03-task-031-report.md`
+- Latest Handoff: `docs/handoffs/2025-11-04-log-032-grid-layout.md`
+- Latest Report: `docs/reports/2025-11-04-task-032-report.md`
 
 ---
 
@@ -105,96 +105,97 @@ This file maintains **two separate lists**: PLAN and LOG.
 29. [x] Create ConfirmDeleteModal component (2025-11-03 17:30)
 30. [x] Add Plus icon to page header (2025-11-03 20:50)
 31. [x] Implement thumbnail size CSS classes (small/medium/large) (2025-11-03 22:00)
-32. [ ] Create large thumbnail grid layout
+32. [x] Create large thumbnail grid layout (2025-11-04 14:30)
+
+### Grid View Enhancement
+
+33. [ ] Add independent grid column control (2, 3, 4, 5 columns)
+34. [ ] Create GridColumnControl component
+35. [ ] Separate grid/list view settings (gridColumns vs thumbnailSize)
 
 ### Advanced Features
 
-33. [ ] Implement smart CSV import with field detection
-34. [ ] Add batch video existence check to YouTube client
-35. [ ] Extend CSV export to include all fields
-36. [ ] Create SmartDropZone for URLs and CSV files
-37. [ ] Implement drag & drop for YouTube URLs
-38. [ ] Implement drag & drop for CSV files
-39. [ ] Add auto-tagging on upload based on selected tags
-40. [ ] Implement column visibility toggles with TanStack Table
-41. [ ] Create TagChips component for video tags
-42. [ ] Add export filtered/all videos to settings
+36. [ ] Implement smart CSV import with field detection
+37. [ ] Add batch video existence check to YouTube client
+38. [ ] Extend CSV export to include all fields
+39. [ ] Create SmartDropZone for URLs and CSV files
+40. [ ] Implement drag & drop for YouTube URLs
+41. [ ] Implement drag & drop for CSV files
+42. [ ] Add auto-tagging on upload based on selected tags
+43. [ ] Implement column visibility toggles with TanStack Table
+44. [ ] Create TagChips component for video tags
+45. [ ] Add export filtered/all videos to settings
 
 ### AI Integration
 
-43. [ ] Create hardcoded analysis schema (clickbait, difficulty, category, tags)
-44. [ ] Connect Gemini client to ARQ worker pipeline
-45. [ ] Populate extracted_data JSONB field with results
-46. [ ] Display AI-analyzed data in video cards
-47. [ ] Show AI status badges on thumbnails
-48. [ ] Implement clickbait warning badges
+46. [ ] Create hardcoded analysis schema (clickbait, difficulty, category, tags)
+47. [ ] Connect Gemini client to ARQ worker pipeline
+48. [ ] Populate extracted_data JSONB field with results
+49. [ ] Display AI-analyzed data in video cards
+50. [ ] Show AI status badges on thumbnails
+51. [ ] Implement clickbait warning badges
 
 ### YouTube Grid
 
-49. [ ] Create responsive grid layout (3-6 columns)
-50. [ ] Implement video card component with thumbnails
-51. [ ] Add video duration overlay
-52. [ ] Implement hover effects and play overlay
-53. [ ] Create search bar with debouncing
-54. [ ] Add view toggle (grid/list) with localStorage
-55. [ ] Implement skeleton loaders
-56. [ ] Add sparkle animation when AI analysis completes
-57. [ ] Enable live card updates via WebSocket
+52. [ ] Create search bar with debouncing
+53. [ ] Implement skeleton loaders
+54. [ ] Add sparkle animation when AI analysis completes
+55. [ ] Enable live card updates via WebSocket
 
 ### Security Hardening (P0-P3)
 
 **P0 - Critical Security (Must Fix Before Production)**
 
-58. [ ] Task 1: JWT Authentication System - Implement auth endpoints (login/register)
-59. [ ] Task 1: JWT Authentication System - Create security utilities (password hashing, JWT)
-60. [ ] Task 1: JWT Authentication System - Add get_current_user dependency
-61. [ ] Task 1: JWT Authentication System - Protect all API endpoints with authentication
-62. [ ] Task 1: JWT Authentication System - Add user ownership to VideoList and Video models
-63. [ ] Task 1: JWT Authentication System - Create Alembic migration for user relationships
-64. [ ] Task 2: Secure Default Credentials - Create secret generation script
-65. [ ] Task 2: Secure Default Credentials - Update docker-compose.yml to use env vars
-66. [ ] Task 2: Secure Default Credentials - Add secret validation to Config class
-67. [ ] Task 2: Secure Default Credentials - Create secrets setup documentation
-68. [ ] Task 3: Environment-Aware Configuration - Implement Environment enum and Settings
-69. [ ] Task 3: Environment-Aware Configuration - Add environment-aware CORS helpers
-70. [ ] Task 3: Environment-Aware Configuration - Update main.py with env-aware CORS
-71. [ ] Task 3: Environment-Aware Configuration - Create .env.development and .env.production.example
+56. [ ] Task 1: JWT Authentication System - Implement auth endpoints (login/register)
+57. [ ] Task 1: JWT Authentication System - Create security utilities (password hashing, JWT)
+58. [ ] Task 1: JWT Authentication System - Add get_current_user dependency
+59. [ ] Task 1: JWT Authentication System - Protect all API endpoints with authentication
+60. [ ] Task 1: JWT Authentication System - Add user ownership to VideoList and Video models
+61. [ ] Task 1: JWT Authentication System - Create Alembic migration for user relationships
+62. [ ] Task 2: Secure Default Credentials - Create secret generation script
+63. [ ] Task 2: Secure Default Credentials - Update docker-compose.yml to use env vars
+64. [ ] Task 2: Secure Default Credentials - Add secret validation to Config class
+65. [ ] Task 2: Secure Default Credentials - Create secrets setup documentation
+66. [ ] Task 3: Environment-Aware Configuration - Implement Environment enum and Settings
+67. [ ] Task 3: Environment-Aware Configuration - Add environment-aware CORS helpers
+68. [ ] Task 3: Environment-Aware Configuration - Update main.py with env-aware CORS
+69. [ ] Task 3: Environment-Aware Configuration - Create .env.development and .env.production.example
 
 **P1 - High Security**
 
-72. [ ] Task 4: API Rate Limiting - Add slowapi dependency
-73. [ ] Task 4: API Rate Limiting - Implement rate limiting utilities
-74. [ ] Task 4: API Rate Limiting - Add rate limiting to FastAPI app
-75. [ ] Task 4: API Rate Limiting - Apply rate limits to auth endpoints (5/min)
-76. [ ] Task 4: API Rate Limiting - Apply rate limits to sensitive endpoints (100/min)
-77. [ ] Task 5: Input Validation & ReDoS Protection - Implement validation utilities with timeout
-78. [ ] Task 5: Input Validation & ReDoS Protection - Add YouTube URL validation with length limits
-79. [ ] Task 5: Input Validation & ReDoS Protection - Add sanitize_string for all text inputs
-80. [ ] Task 5: Input Validation & ReDoS Protection - Update schemas with validation
-81. [ ] Task 6: CORS Security - Verify environment-aware CORS works correctly
-82. [ ] Task 6: CORS Security - Add CORS integration tests
-83. [ ] Task 6: CORS Security - Create CORS setup documentation
+70. [ ] Task 4: API Rate Limiting - Add slowapi dependency
+71. [ ] Task 4: API Rate Limiting - Implement rate limiting utilities
+72. [ ] Task 4: API Rate Limiting - Add rate limiting to FastAPI app
+73. [ ] Task 4: API Rate Limiting - Apply rate limits to auth endpoints (5/min)
+74. [ ] Task 4: API Rate Limiting - Apply rate limits to sensitive endpoints (100/min)
+75. [ ] Task 5: Input Validation & ReDoS Protection - Implement validation utilities with timeout
+76. [ ] Task 5: Input Validation & ReDoS Protection - Add YouTube URL validation with length limits
+77. [ ] Task 5: Input Validation & ReDoS Protection - Add sanitize_string for all text inputs
+78. [ ] Task 5: Input Validation & ReDoS Protection - Update schemas with validation
+79. [ ] Task 6: CORS Security - Verify environment-aware CORS works correctly
+80. [ ] Task 6: CORS Security - Add CORS integration tests
+81. [ ] Task 6: CORS Security - Create CORS setup documentation
 
 **P2 - Operational Excellence**
 
-84. [ ] Task 7: Structured Logging - Add structlog dependency
-85. [ ] Task 7: Structured Logging - Implement logging configuration
-86. [ ] Task 7: Structured Logging - Add HTTP request logging middleware
-87. [ ] Task 7: Structured Logging - Replace all string logs with structured events
-88. [ ] Task 8: Comprehensive Health Checks - Create health check API endpoints
-89. [ ] Task 8: Comprehensive Health Checks - Implement database connectivity check
-90. [ ] Task 8: Comprehensive Health Checks - Implement Redis connectivity check
-91. [ ] Task 8: Comprehensive Health Checks - Add Kubernetes liveness/readiness probes
-92. [ ] Task 9: Database Constraints - Create Alembic migration for constraints
-93. [ ] Task 9: Database Constraints - Add youtube_id length and format checks
-94. [ ] Task 9: Database Constraints - Add unique constraint for (user_id, youtube_id)
-95. [ ] Task 9: Database Constraints - Add NOT NULL checks for names
+82. [ ] Task 7: Structured Logging - Add structlog dependency
+83. [ ] Task 7: Structured Logging - Implement logging configuration
+84. [ ] Task 7: Structured Logging - Add HTTP request logging middleware
+85. [ ] Task 7: Structured Logging - Replace all string logs with structured events
+86. [ ] Task 8: Comprehensive Health Checks - Create health check API endpoints
+87. [ ] Task 8: Comprehensive Health Checks - Implement database connectivity check
+88. [ ] Task 8: Comprehensive Health Checks - Implement Redis connectivity check
+89. [ ] Task 8: Comprehensive Health Checks - Add Kubernetes liveness/readiness probes
+90. [ ] Task 9: Database Constraints - Create Alembic migration for constraints
+91. [ ] Task 9: Database Constraints - Add youtube_id length and format checks
+92. [ ] Task 9: Database Constraints - Add unique constraint for (user_id, youtube_id)
+93. [ ] Task 9: Database Constraints - Add NOT NULL checks for names
 
 **P3 - Future Improvements**
 
-96. [ ] Task 10: Secret Management - Create documentation for Vault integration
-97. [ ] Task 10: Secret Management - Document secret rotation strategy
-98. [ ] Task 10: Secret Management - Create security compliance checklist
+94. [ ] Task 10: Secret Management - Create documentation for Vault integration
+95. [ ] Task 10: Secret Management - Document secret rotation strategy
+96. [ ] Task 10: Secret Management - Create security compliance checklist
 ---
 
 ## 📝 LOG (Chronological Implementation History)
@@ -228,3 +229,5 @@ This file maintains **two separate lists**: PLAN and LOG.
 27. 2025-11-03 [Planning] Created Task #31 plan: Implement thumbnail size CSS classes (small/medium/large) - REF MCP validated Tailwind CSS best practices (aspect-video, object-cover, spacing scale w-32/w-40/w-64), 9 implementation steps with helper function, 5 design decisions documented (switch over object lookup, component-level hook, keep aspect ratio for all sizes), comprehensive testing strategy (4 unit tests, manual browser testing), estimated 1-1.5 hours, ready for implementation
 28. 2025-11-03 [Plan #31] Implement thumbnail size CSS classes with REF MCP validation - REF MCP validation identified 6 critical improvements BEFORE implementation (reuse existing tableSettingsStore/TableSettingsDropdown, backend thumbnails already optimized, object mapping for PurgeCSS compatibility, extend existing VideoThumbnail component, w-48 not w-64 for large, placeholder scales dynamically), implemented object mapping pattern (sizeClasses const with complete className strings, no template literals), size progression w-32/w-40/w-48 (128px→160px→192px), 10/10 tests passing (Thumbnail Size Classes, PurgeCSS Compatibility, Store Integration, Aspect Ratio regression, Lazy Loading regression), 0 new TypeScript errors (3 pre-existing), 90 minutes actual vs 60-90 minutes estimated, production-ready with comprehensive test coverage, comprehensive report (REPORT-031) with full REF MCP analysis, technical decisions, Tailwind PurgeCSS documentation, and reusable patterns
 29. 2025-11-04 [Planning] Created Task #32 plan: Create Large Thumbnail Grid Layout with Manual List/Grid Toggle - REF MCP validated 6 patterns (Tailwind responsive grid grid-cols-2/3/4, native lazy loading, Card component best practices, manual view mode toggle with icons, PurgeCSS compatibility, YouTube card design), comprehensive implementation plan with ViewMode state in tableSettingsStore ('list' | 'grid' with localStorage), ViewModeToggle button component (4 tests: icon display, toggle behavior, accessibility), VideoCard component (8 tests: thumbnail sizing, title truncation, channel styling, duration, tags, click handlers, stopPropagation, hover effects), VideoGrid component (4 tests: responsive columns, card rendering, empty state, gap spacing), conditional rendering in VideosPage (viewMode === 'grid' → Grid, viewMode === 'list' → Table), 5 integration tests (store persistence, toggle button, table view, grid view, view switching), manual testing checklist (10 scenarios), 5 design decisions documented (UPDATED: manual toggle per user request instead of automatic switch, responsive breakpoints 2-3-4, menu position top-right overlay, native lazy loading, PurgeCSS safety strategy), estimated 3-4 hours, production-ready plan with user feedback incorporated
+30. 2025-11-04 [Plan #32] Create Large Thumbnail Grid Layout - REF MCP validation identified 7 critical improvements BEFORE implementation (independent viewMode/thumbnailSize, reuse VideoThumbnail component, complete keyboard navigation, duration overlay positioning, enhanced empty state, responsive gap spacing, Radix UI asChild pattern), plan completely rewritten (1565 lines) with all improvements incorporated, Subagent-Driven Development workflow (6 tasks with dedicated subagent + code review after each: tableSettingsStore extension, ViewModeToggle component, VideoCard component, VideoGrid component, VideosPage integration, integration tests), 33/33 tests passing (4 store + 5 toggle + 11 card + 4 grid + 9 integration), 0 new TypeScript errors (7 pre-existing documented), WCAG 2.1 Level AA compliant (complete keyboard navigation, ARIA labels, focus management), 6/6 code reviews APPROVED (0 Critical/Important issues, 3 Minor observations all nice-to-have), production-ready with non-breaking change (default: list view), localStorage persistence, PurgeCSS-safe Tailwind patterns, comprehensive report (REPORT-032) with full implementation details, 5.5 hours actual vs 3-4 hours estimated (+38% variance for REF MCP validation + plan rewrite, offset by prevented bugs)
+31. 2025-11-04 [Planning] Created Task #33-35 plan: Add Independent Grid Column Control - Brainstorming skill phase (6 phases: Understanding requirements, Exploration of 3 approaches, Design validation in sections, Design documentation, Worktree setup skipped, Planning handoff with writing-plans skill), Design decisions (separate grid/list settings in single tableSettingsStore with view-scoped fields, GridColumnControl near ViewModeToggle for context proximity, responsive behavior mobile 1→tablet 2-3→desktop user choice, auto-adapting thumbnails via CSS), Implementation plan created (7 tasks: extend store with gridColumns, create GridColumnControl component, update VideoGrid with prop, integrate into VideosPage, manual testing, update CLAUDE.md, create handoff log), comprehensive design document (docs/plans/2025-11-04-grid-column-control-design.md) with architecture, technical spec, testing strategy, migration notes, comprehensive implementation plan (docs/plans/2025-11-04-grid-column-control-implementation.md) ready for execution with TDD approach and bite-sized steps (9 commits planned)
