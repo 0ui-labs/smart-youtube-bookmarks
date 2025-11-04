@@ -1,9 +1,11 @@
 import { LayoutGrid } from 'lucide-react'
 import { VideoCard } from './VideoCard'
 import type { VideoResponse } from '@/types/video'
+import type { GridColumnCount } from '@/stores/tableSettingsStore'
 
 interface VideoGridProps {
   videos: VideoResponse[]
+  gridColumns: GridColumnCount  // NEW: Dynamic column count from store
   onVideoClick: (video: VideoResponse) => void
   onDelete: (videoId: string) => void
 }
@@ -15,17 +17,28 @@ interface VideoGridProps {
  * #5 - Enhanced empty state (icon + headline + description)
  * #6 - Responsive gap spacing (gap-4 mobile, gap-6 desktop)
  *
- * Grid Pattern:
- * - Tailwind responsive grid: grid-cols-2 (mobile) → md:grid-cols-3 (tablet) → lg:grid-cols-4 (desktop)
+ * Grid Pattern (Task #35):
+ * - Dynamic columns: User can select 2, 3, 4, or 5 columns
+ * - Responsive behavior: mobile 1-2 cols, tablet 2 cols, desktop user choice (2-5)
  * - Standard Tailwind breakpoints: sm: 640px, md: 768px, lg: 1024px, xl: 1280px
  * - Responsive gap: gap-4 (16px mobile) → md:gap-6 (24px desktop)
  * - Empty state with centered message when no videos
  *
  * PurgeCSS Safety:
- * - All Tailwind classes explicitly written (no template literals)
- * - grid-cols-2, md:grid-cols-3, lg:grid-cols-4 are all scanned by PurgeCSS
+ * - All Tailwind classes explicitly written in object (no template literals)
+ * - Pattern from Task #31 (proven working with thumbnailSize)
  */
-export const VideoGrid = ({ videos, onVideoClick, onDelete }: VideoGridProps) => {
+export const VideoGrid = ({ videos, gridColumns, onVideoClick, onDelete }: VideoGridProps) => {
+  // PurgeCSS-safe: All classes explicitly written in object (no template literals)
+  // Responsive behavior: mobile 1-2, tablet 2, desktop user choice (2-5)
+  // Pattern from Task #31 (proven working with thumbnailSize)
+  // REF IMPROVEMENT #2: 5 cols uses md:grid-cols-2 instead of md:grid-cols-3 for better Tablet UX
+  const gridColumnClasses = {
+    2: 'grid-cols-1 md:grid-cols-2',
+    3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
+    4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
+    5: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-5', // Changed from md:grid-cols-3
+  } as const
   // REF MCP #5: Enhanced empty state with icon and headline
   if (videos.length === 0) {
     return (
@@ -43,7 +56,7 @@ export const VideoGrid = ({ videos, onVideoClick, onDelete }: VideoGridProps) =>
 
   return (
     <div
-      className="video-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6"
+      className={`video-grid grid ${gridColumnClasses[gridColumns]} gap-4 md:gap-6`}
       role="list"
       aria-label="Video Grid"
     >

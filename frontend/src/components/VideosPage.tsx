@@ -216,6 +216,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     }))
   )
 
+  // Get gridColumns from store (Task #35: Dynamic grid column count)
+  const gridColumns = useTableSettingsStore((state) => state.gridColumns)
+
   const columns = useMemo(
     () => {
       const allColumns = [
@@ -660,9 +663,10 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           </p>
         </div>
       ) : viewMode === 'grid' ? (
-        // Grid View - Task #32
+        // Grid View - Task #32, Task #35 (gridColumns)
         <VideoGrid
           videos={videos}
+          gridColumns={gridColumns}
           onVideoClick={handleVideoClick}
           onDelete={(videoId) => {
             const video = videos.find((v) => v.id === videoId)
