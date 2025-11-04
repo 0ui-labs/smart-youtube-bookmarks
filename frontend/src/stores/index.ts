@@ -13,7 +13,7 @@
 
 // Table Settings Store
 export { useTableSettingsStore } from './tableSettingsStore';
-export type { ThumbnailSize, VisibleColumns } from './tableSettingsStore';
+export type { ThumbnailSize, VisibleColumns, ViewMode, GridColumnCount } from './tableSettingsStore';
 
 // Tag Store
 export { useTagStore } from './tagStore';

@@ -41,6 +41,25 @@ export type ThumbnailSize = 'small' | 'medium' | 'large' | 'xlarge';
 export type ViewMode = 'list' | 'grid';
 
 /**
+ * Grid column count options for grid view layout
+ * Controls number of columns displayed in VideoGrid component
+ *
+ * - 2: Wide cards, maximum detail visibility
+ * - 3: Balanced layout (DEFAULT - matches YouTube grid default)
+ * - 4: Compact, more content visible (matches current lg: breakpoint)
+ * - 5: Maximum density, advanced users
+ *
+ * RESPONSIVE BEHAVIOR (implemented in Task #35):
+ * - Mobile (<768px): Always 1-2 cols (CSS override)
+ * - Tablet (768-1024px): Max 3 cols (CSS override)
+ * - Desktop (>1024px): User's full choice (2-5)
+ *
+ * REF MCP Validation: Union type preferred over number with runtime validation
+ * (compile-time safety, matches existing ThumbnailSize pattern)
+ */
+export type GridColumnCount = 2 | 3 | 4 | 5;
+
+/**
  * Column visibility configuration for video table
  * Based on existing VideosPage table structure (4 columns as of Task #24)
  *
@@ -73,6 +92,9 @@ interface TableSettingsStore {
   /** Current view mode (Task #32) */
   viewMode: ViewMode;
 
+  /** Grid column count (grid view only, Task #33) */
+  gridColumns: GridColumnCount;
+
   /** Update thumbnail size */
   setThumbnailSize: (size: ThumbnailSize) => void;
 
@@ -81,6 +103,9 @@ interface TableSettingsStore {
 
   /** Update view mode (Task #32) */
   setViewMode: (mode: ViewMode) => void;
+
+  /** Update grid column count (Task #33) */
+  setGridColumns: (count: GridColumnCount) => void;
 }
 
 /**
@@ -139,6 +164,7 @@ export const useTableSettingsStore = create<TableSettingsStore>()(
       thumbnailSize: 'small',
       visibleColumns: DEFAULT_VISIBLE_COLUMNS,
       viewMode: 'list', // Task #32: Default to list view (preserves current behavior)
+      gridColumns: 3, // Task #33: Default to 3 columns (balanced, matches YouTube)
 
       // Actions
       setThumbnailSize: (size) => set({ thumbnailSize: size }),
@@ -152,6 +178,7 @@ export const useTableSettingsStore = create<TableSettingsStore>()(
         })),
 
       setViewMode: (mode) => set({ viewMode: mode }), // Task #32: Set view mode
+      setGridColumns: (count) => set({ gridColumns: count }), // Task #33
     }),
     {
       name: 'video-table-settings', // localStorage key (must be unique)

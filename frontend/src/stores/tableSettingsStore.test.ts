@@ -238,4 +238,70 @@ describe('useTableSettingsStore', () => {
       expect(result.current.thumbnailSize).toBe('large')
     })
   })
+
+  // Task #33: TDD tests for gridColumns state
+  describe('Grid Columns (Task #33)', () => {
+    it('defaults to 3 columns (balanced layout)', () => {
+      const { result } = renderHook(() => useTableSettingsStore())
+      expect(result.current.gridColumns).toBe(3)
+    })
+
+    it('changes grid columns via setGridColumns', () => {
+      const { result } = renderHook(() => useTableSettingsStore())
+
+      // Test all valid values (2, 3, 4, 5)
+      act(() => {
+        result.current.setGridColumns(5)
+      })
+      expect(result.current.gridColumns).toBe(5)
+
+      act(() => {
+        result.current.setGridColumns(2)
+      })
+      expect(result.current.gridColumns).toBe(2)
+
+      act(() => {
+        result.current.setGridColumns(4)
+      })
+      expect(result.current.gridColumns).toBe(4)
+    })
+
+    it('persists gridColumns to localStorage', () => {
+      const { result } = renderHook(() => useTableSettingsStore())
+
+      act(() => {
+        result.current.setGridColumns(4)
+      })
+
+      // Unmount and remount to test persistence (simulates page reload)
+      const { result: result2 } = renderHook(() => useTableSettingsStore())
+      expect(result2.current.gridColumns).toBe(4)
+    })
+
+    it('works independently with all other settings (regression test)', () => {
+      const { result } = renderHook(() => useTableSettingsStore())
+
+      // Set multiple fields including gridColumns
+      act(() => {
+        result.current.setGridColumns(5)
+        result.current.setViewMode('grid')
+        result.current.setThumbnailSize('large')
+        result.current.toggleColumn('duration')
+      })
+
+      // Verify ALL fields updated correctly
+      expect(result.current.gridColumns).toBe(5)
+      expect(result.current.viewMode).toBe('grid')
+      expect(result.current.thumbnailSize).toBe('large')
+      expect(result.current.visibleColumns.duration).toBe(false)
+      expect(result.current.visibleColumns.title).toBe(true) // Unchanged
+
+      // Verify localStorage persisted ALL fields
+      const stored = JSON.parse(localStorage.getItem('video-table-settings') || '{}')
+      expect(stored.state.gridColumns).toBe(5)
+      expect(stored.state.viewMode).toBe('grid')
+      expect(stored.state.thumbnailSize).toBe('large')
+      expect(stored.state.visibleColumns.duration).toBe(false)
+    })
+  })
 });
