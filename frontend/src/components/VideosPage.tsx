@@ -18,6 +18,8 @@ import { TagNavigation } from '@/components/TagNavigation'
 import { TableSettingsDropdown } from './TableSettingsDropdown'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { CreateTagDialog } from './CreateTagDialog'
+import { ViewModeToggle } from './ViewModeToggle'
+import { VideoGrid } from './VideoGrid'
 import { useTags } from '@/hooks/useTags'
 import { useTagStore } from '@/stores/tagStore'
 import { useTableSettingsStore } from '@/stores/tableSettingsStore'
@@ -205,6 +207,14 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // Get column visibility settings from store
   const visibleColumns = useTableSettingsStore((state) => state.visibleColumns)
+
+  // Get viewMode from store (REF MCP #1: independent from thumbnailSize)
+  const { viewMode, setViewMode } = useTableSettingsStore(
+    useShallow((state) => ({
+      viewMode: state.viewMode,
+      setViewMode: state.setViewMode,
+    }))
+  )
 
   const columns = useMemo(
     () => {
@@ -405,6 +415,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     setDeleteModal({ open: false, videoId: null, videoTitle: null })
   }
 
+  // Handle video click - opens YouTube in new tab (Task #32)
+  const handleVideoClick = (video: VideoResponse) => {
+    window.open(
+      `https://www.youtube.com/watch?v=${video.youtube_id}`,
+      '_blank',
+      'noopener,noreferrer'
+    )
+  }
+
   // Quick add handler for Plus icon button
   const handleQuickAdd = () => {
     // TODO: Implement enhanced quick-add functionality (e.g., modal with minimal fields)
@@ -510,6 +529,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
               <span>Add</span>
             </button>
           )}
+          {/* View Mode Toggle - Task #32 */}
+          <ViewModeToggle viewMode={viewMode} onToggle={setViewMode} />
         </div>
       </div>
 
@@ -638,7 +659,24 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
             Noch keine Videos in dieser Liste. Fügen Sie Ihr erstes Video hinzu!
           </p>
         </div>
+      ) : viewMode === 'grid' ? (
+        // Grid View - Task #32
+        <VideoGrid
+          videos={videos}
+          onVideoClick={handleVideoClick}
+          onDelete={(videoId) => {
+            const video = videos.find((v) => v.id === videoId)
+            if (video) {
+              setDeleteModal({
+                open: true,
+                videoId: video.id,
+                videoTitle: video.title,
+              })
+            }
+          }}
+        />
       ) : (
+        // Table View (existing implementation)
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
