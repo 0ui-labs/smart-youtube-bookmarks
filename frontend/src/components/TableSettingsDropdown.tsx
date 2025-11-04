@@ -66,22 +66,26 @@ export const TableSettingsDropdown = () => {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-2rem)]">
-        {/* Thumbnail Size Section */}
-        <DropdownMenuLabel>Thumbnail-Größe</DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={thumbnailSize}
-          onValueChange={handleThumbnailSizeChange} // Use type-safe handler
-        >
-          <DropdownMenuRadioItem value="small">Klein</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="medium">Mittel</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="large">Groß</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="xlarge">YouTube Größe (500x280)</DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
+        {/* Thumbnail Size Section - Only visible in list view (Task #35 Fix) */}
+        {viewMode === 'list' && (
+          <>
+            <DropdownMenuLabel>Thumbnail-Größe</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={thumbnailSize}
+              onValueChange={handleThumbnailSizeChange} // Use type-safe handler
+            >
+              <DropdownMenuRadioItem value="small">Klein</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="medium">Mittel</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="large">Groß</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="xlarge">YouTube Größe (500x280)</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+          </>
+        )}
 
         {/* Grid Column Count Section - Only visible in grid view (Task #34) */}
         {viewMode === 'grid' && (
           <>
-            <DropdownMenuSeparator />
             <DropdownMenuLabel>Spaltenanzahl</DropdownMenuLabel>
             <DropdownMenuRadioGroup
               value={String(gridColumns)} // Convert number to string for Radix API
@@ -101,11 +105,9 @@ export const TableSettingsDropdown = () => {
                 5 Spalten (Dicht)
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
           </>
         )}
-
-        {/* REF MCP Improvement #2: Visual separator between sections */}
-        <DropdownMenuSeparator />
 
         {/* Column Visibility Section */}
         <DropdownMenuLabel>Sichtbare Spalten</DropdownMenuLabel>

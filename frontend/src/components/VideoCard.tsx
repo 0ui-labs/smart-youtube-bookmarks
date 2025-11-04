@@ -81,7 +81,8 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
       {/* Thumbnail Container with Duration Overlay */}
       <div className="relative">
         {/* REF MCP #2: Reuse VideoThumbnail with correct API (url, title) */}
-        <VideoThumbnail url={video.thumbnail_url} title={video.title || 'Untitled'} />
+        {/* Task #35 Fix: Use useFullWidth={true} for Grid mode (container-adapted sizing) */}
+        <VideoThumbnail url={video.thumbnail_url} title={video.title || 'Untitled'} useFullWidth={true} />
 
         {/* Duration Overlay (bottom-right corner) */}
         {/* REF MCP #4: Enhanced readability with shadow-lg and border */}
