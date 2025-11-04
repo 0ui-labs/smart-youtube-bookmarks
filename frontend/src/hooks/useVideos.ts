@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import { api } from '@/lib/api'
 import type { VideoResponse, VideoCreate } from '@/types/video'
+import { TagSchema } from '@/types/tag'
 
 const VideoResponseSchema = z.object({
   id: z.string().uuid(),
@@ -14,6 +15,9 @@ const VideoResponseSchema = z.object({
   thumbnail_url: z.string().nullable(),
   duration: z.number().nullable(),
   published_at: z.string().nullable(),
+
+  // Tags (many-to-many relationship)
+  tags: z.array(TagSchema).default([]),
 
   processing_status: z.enum(['pending', 'processing', 'completed', 'failed']),
   error_message: z.string().nullable(),
@@ -50,7 +54,8 @@ export const videoKeys = {
   list: (listId: string) => [...videoKeys.lists(), listId] as const,
   /** Key for tag-filtered videos in a specific list */
   filtered: (listId: string, tagNames: string[]) =>
-    [...videoKeys.list(listId), { tags: tagNames }] as const,
+    // Sort tagNames alphabetically for consistent cache keys regardless of selection order
+    [...videoKeys.list(listId), { tags: [...tagNames].sort() }] as const,
 }
 
 /**
@@ -82,6 +87,7 @@ export interface BulkUploadResponse {
  *
  * @param listId - UUID of the list to fetch videos from
  * @param tagNames - Optional array of tag names for OR filtering (videos with ANY of the specified tags)
+ * @param options - Optional query options (refetchInterval, etc.)
  * @returns Query result with videos array
  *
  * @example
@@ -91,9 +97,16 @@ export interface BulkUploadResponse {
  *
  * // Filter by tags (OR logic: videos with Python OR JavaScript)
  * const { data: videos } = useVideos(listId, ['Python', 'JavaScript'])
+ *
+ * // With auto-refetch for live updates
+ * const { data: videos } = useVideos(listId, undefined, { refetchInterval: 2000 })
  * ```
  */
-export const useVideos = (listId: string, tagNames?: string[]) => {
+export const useVideos = (
+  listId: string,
+  tagNames?: string[],
+  options?: { refetchInterval?: number; refetchIntervalInBackground?: boolean }
+) => {
   return useQuery({
     queryKey:
       tagNames && tagNames.length > 0
@@ -120,9 +133,11 @@ export const useVideos = (listId: string, tagNames?: string[]) => {
     },
     // Prevent excessive refetching that causes UI flicker
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: true, // Refetch on mount to get latest data including tags
     refetchOnReconnect: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+    staleTime: options?.refetchInterval ? 0 : 5 * 60 * 1000, // 5 minutes - allow periodic updates
+    // Allow custom refetch interval for live updates
+    ...options,
   })
 }
 
@@ -137,10 +152,34 @@ export const useCreateVideo = (listId: string) => {
       )
       return data
     },
-    onSuccess: () => {
-      // Invalidate ALL video queries for this list (filtered and unfiltered)
-      // React Query's partial matching invalidates all queries starting with this key
-      queryClient.invalidateQueries({ queryKey: videoKeys.list(listId) })
+    // Optimistic update: add new video immediately to cache
+    onSuccess: (newVideo) => {
+      // Update cache directly instead of invalidating (prevents re-fetch flicker)
+      queryClient.setQueryData<VideoResponse[]>(
+        videoKeys.list(listId),
+        (old = []) => {
+          // Check if video already exists (prevent duplicates)
+          const exists = old?.some(v => v.id === newVideo.id)
+          if (exists) return old
+          return [...(old || []), newVideo]
+        }
+      )
+
+      // Also update filtered queries if they exist
+      const queryCache = queryClient.getQueryCache()
+      queryCache.findAll({ queryKey: videoKeys.lists() }).forEach((query) => {
+        if (query.queryKey.length >= 3 && query.queryKey[1] === 'list' && query.queryKey[2] === listId) {
+          queryClient.setQueryData<VideoResponse[]>(
+            query.queryKey as any,
+            (old = []) => {
+              // Check if video already exists (prevent duplicates)
+              const exists = old?.some(v => v.id === newVideo.id)
+              if (exists) return old
+              return [...(old || []), newVideo]
+            }
+          )
+        }
+      })
     },
   })
 }
@@ -228,3 +267,33 @@ export const exportVideosCSV = async (listId: string) => {
   link.remove()
   window.URL.revokeObjectURL(url)
 }
+
+/**
+ * Hook to assign tags to a video
+ *
+ * @param videoId - The UUID of the video to assign tags to
+ * @returns Mutation hook for assigning tags
+ *
+ * @example
+ * ```tsx
+ * const assignTags = useAssignTags()
+ * assignTags.mutate({ videoId: 'uuid', tagIds: ['tag-uuid-1', 'tag-uuid-2'] })
+ * ```
+ */
+export const useAssignTags = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ videoId, tagIds }: { videoId: string; tagIds: string[] }) => {
+      const { data } = await api.post(`/videos/${videoId}/tags`, {
+        tag_ids: tagIds
+      })
+      return data
+    },
+    onSuccess: () => {
+      // Invalidate all video queries to refetch with updated tags
+      queryClient.invalidateQueries({ queryKey: videoKeys.all })
+    },
+  })
+}
+

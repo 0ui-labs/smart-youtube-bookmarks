@@ -33,7 +33,7 @@ export const TableSettingsDropdown = () => {
   // REF MCP Improvement #1: Runtime validation + Type narrowing (NO type casting!)
   const handleThumbnailSizeChange = (value: string) => {
     // Type guard function - TypeScript narrows the type automatically
-    if (value === 'small' || value === 'medium' || value === 'large') {
+    if (value === 'small' || value === 'medium' || value === 'large' || value === 'xlarge') {
       setThumbnailSize(value); // TypeScript knows value is ThumbnailSize here
     } else {
       console.warn(`Invalid thumbnail size value: ${value}`);
@@ -58,6 +58,7 @@ export const TableSettingsDropdown = () => {
           <DropdownMenuRadioItem value="small">Klein</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="medium">Mittel</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="large">Groß</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="xlarge">YouTube Größe (500x280)</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
 
         {/* REF MCP Improvement #2: Visual separator between sections */}

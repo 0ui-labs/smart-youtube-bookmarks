@@ -16,7 +16,6 @@ interface TagNavigationProps {
  * Displays a list of tags with multi-select functionality.
  * Features:
  * - Visual selection state with background color
- * - Color indicators for tags
  * - Plus icon for creating new tags
  * - Full accessibility with ARIA attributes
  * - Keyboard navigation support
@@ -74,14 +73,6 @@ export const TagNavigation = ({
                 isSelected && 'bg-accent font-medium'
               )}
             >
-              {/* Color indicator (hidden from screen readers) */}
-              {tag.color && (
-                <div
-                  className="w-3 h-3 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: tag.color }}
-                  aria-hidden="true"
-                />
-              )}
               {/* Tag name */}
               <span className="flex-1 text-left">{tag.name}</span>
             </button>

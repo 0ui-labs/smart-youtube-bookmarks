@@ -17,16 +17,18 @@ import { persist, createJSONStorage } from 'zustand/middleware';
  * - small: Compact preview (w-32 = 128px) - current default
  * - medium: Balanced size for comfortable viewing (w-40 = 160px) - +25% larger
  * - large: Larger preview for detailed inspection (w-48 = 192px) - +50% larger
+ * - xlarge: YouTube list view size (500x280 = aspect-ratio preserved)
  *
  * REF MCP Improvement #5: w-48 for large (not w-64) ensures:
- * - Smooth size progression (128px → 160px → 192px)
+ * - Smooth size progression (128px → 160px → 192px → 500px)
  * - More thumbnails fit per row (better table layout)
  * - Consistent with YouTube's thumbnail size patterns
+ * - xlarge matches YouTube's standard list view thumbnail dimensions
  *
  * Actual pixel sizes are implemented in VideosPage VideoThumbnail component
  * using Tailwind classes with object mapping for PurgeCSS compatibility
  */
-export type ThumbnailSize = 'small' | 'medium' | 'large';
+export type ThumbnailSize = 'small' | 'medium' | 'large' | 'xlarge';
 
 /**
  * Column visibility configuration for video table

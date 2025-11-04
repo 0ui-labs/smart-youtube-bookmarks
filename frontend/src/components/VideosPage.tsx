@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   useReactTable,
   createColumnHelper,
@@ -6,9 +7,9 @@ import {
   getCoreRowModel,
 } from '@tanstack/react-table'
 import axios from 'axios'
-import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV } from '@/hooks/useVideos'
+import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV, useAssignTags } from '@/hooks/useVideos'
 import { CSVUpload } from './CSVUpload'
-// import { useWebSocket } from '@/hooks/useWebSocket' // Temporarily commented for Task 1.7
+import { useWebSocket } from '@/hooks/useWebSocket'
 import { ProgressBar } from './ProgressBar'
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
@@ -16,6 +17,7 @@ import { CollapsibleSidebar } from '@/components/CollapsibleSidebar'
 import { TagNavigation } from '@/components/TagNavigation'
 import { TableSettingsDropdown } from './TableSettingsDropdown'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
+import { CreateTagDialog } from './CreateTagDialog'
 import { useTags } from '@/hooks/useTags'
 import { useTagStore } from '@/stores/tagStore'
 import { useTableSettingsStore } from '@/stores/tableSettingsStore'
@@ -50,16 +52,19 @@ const VideoThumbnail = ({ url, title }: { url: string | null; title: string }) =
 
   // REF MCP Improvement #3: Full class strings for Tailwind PurgeCSS
   // Object mapping ensures all classes are detected at build time (no dynamic concatenation)
+  // xlarge uses w-[500px] for YouTube's standard list view thumbnail size (500x280)
   const sizeClasses = {
     small: 'w-32 aspect-video object-cover rounded shadow-sm',
     medium: 'w-40 aspect-video object-cover rounded shadow-sm',
     large: 'w-48 aspect-video object-cover rounded shadow-sm',
+    xlarge: 'w-[500px] aspect-video object-cover rounded shadow-sm',
   } as const
 
   const placeholderSizeClasses = {
     small: 'w-32 aspect-video bg-gray-100 rounded flex items-center justify-center',
     medium: 'w-40 aspect-video bg-gray-100 rounded flex items-center justify-center',
     large: 'w-48 aspect-video bg-gray-100 rounded flex items-center justify-center',
+    xlarge: 'w-[500px] aspect-video bg-gray-100 rounded flex items-center justify-center',
   } as const
 
   // Placeholder SVG component with dynamic sizing
@@ -89,6 +94,7 @@ const VideoThumbnail = ({ url, title }: { url: string | null; title: string }) =
 }
 
 export const VideosPage = ({ listId }: VideosPageProps) => {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [isAdding, setIsAdding] = useState(false)
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [urlError, setUrlError] = useState<string | null>(null)
@@ -102,6 +108,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     videoId: null,
     videoTitle: null,
   })
+  const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
 
   // Tag integration
   const { data: tags = [], isLoading: tagsLoading, error: tagsError } = useTags()
@@ -109,6 +116,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const selectedTagIds = useTagStore(useShallow((state) => state.selectedTagIds))
   const toggleTag = useTagStore((state) => state.toggleTag)
   const clearTags = useTagStore((state) => state.clearTags)
+  const setSelectedTagIds = useTagStore((state) => state.setSelectedTagIds)
 
   // Compute selected tags (no useMemo - simple filter is fast enough per React docs)
   const selectedTags = tags.filter(tag => selectedTagIds.includes(tag.id))
@@ -117,25 +125,70 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const selectedTagNames = selectedTags.map(tag => tag.name)
 
   // Fetch videos filtered by selected tag names (OR logic)
-  const { data: videos = [], isLoading, error } = useVideos(
+  // No polling needed - single videos get metadata synchronously
+  // Bulk uploads use WebSocket for live updates
+  const { data: videos = [], isLoading, error, refetch } = useVideos(
     listId,
     selectedTagNames.length > 0 ? selectedTagNames : undefined
   )
   const createVideo = useCreateVideo(listId)
-  const deleteVideo = useDeleteVideo(listId)
+  const assignTags = useAssignTags()
 
-  // Create tag placeholder handler
-  const handleCreateTag = () => {
-    console.log('Create tag clicked - will be implemented in later task')
-  }
-
-  // WebSocket hook for real-time progress updates
-  // TEMPORARILY DISABLED: Causes flicker due to heartbeat re-renders
-  // Will be re-enabled when background jobs are implemented (Task 8/9)
+  // WebSocket for bulk upload progress (optional - bulk uploads now work without it too)
+  // Disabled for now to prevent unnecessary re-renders
   // const { jobProgress, reconnecting, historyError } = useWebSocket()
   const jobProgress = new Map()
   const reconnecting = false
   const historyError = null
+
+  const deleteVideo = useDeleteVideo(listId)
+
+  // URL Sync: Parse tag names from URL on mount and sync to store
+  useEffect(() => {
+    const urlTagNames = searchParams.get('tags')
+    if (!urlTagNames || tags.length === 0) return
+
+    // Parse comma-separated tag names from URL
+    const tagNamesFromUrl = urlTagNames.split(',').map(name => name.trim()).filter(Boolean)
+
+    // Find tag IDs that match the names from URL
+    const tagIdsFromUrl = tags
+      .filter(tag => tagNamesFromUrl.includes(tag.name))
+      .map(tag => tag.id)
+
+    // Only update if different from current selection
+    const currentIds = [...selectedTagIds].sort().join(',')
+    const urlIds = [...tagIdsFromUrl].sort().join(',')
+
+    if (currentIds !== urlIds && tagIdsFromUrl.length > 0) {
+      setSelectedTagIds(tagIdsFromUrl)
+    }
+  }, [searchParams, tags]) // Run when URL changes or tags are loaded
+
+  // URL Sync: Update URL when selected tags change
+  useEffect(() => {
+    if (selectedTags.length === 0) {
+      // Remove tags param if no tags selected
+      if (searchParams.has('tags')) {
+        searchParams.delete('tags')
+        setSearchParams(searchParams, { replace: true })
+      }
+    } else {
+      // Set tags param with comma-separated tag names
+      const tagNames = selectedTags.map(tag => tag.name).sort().join(',')
+      const currentTagsParam = searchParams.get('tags')
+
+      if (currentTagsParam !== tagNames) {
+        searchParams.set('tags', tagNames)
+        setSearchParams(searchParams, { replace: true })
+      }
+    }
+  }, [selectedTags]) // Run when selected tags change
+
+  // Create tag handler - opens dialog
+  const handleCreateTag = () => {
+    setIsCreateTagDialogOpen(true)
+  }
 
   const handleExportCSV = async () => {
     try {
@@ -150,115 +203,132 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     }
   }
 
+  // Get column visibility settings from store
+  const visibleColumns = useTableSettingsStore((state) => state.visibleColumns)
+
   const columns = useMemo(
-    () => [
-      // Column 1: Thumbnail (with Aspect Ratio + Loading State)
-      columnHelper.accessor('thumbnail_url', {
-        id: 'thumbnail',
-        header: 'Vorschau',
-        cell: (info) => {
-          const thumbnailUrl = info.getValue()
-          const row = info.row.original
-          const title = row.title || `Video ${row.youtube_id}`
+    () => {
+      const allColumns = [
+        // Column 1: Thumbnail (with Aspect Ratio + Loading State)
+        columnHelper.accessor('thumbnail_url', {
+          id: 'thumbnail',
+          header: 'Vorschau',
+          cell: (info) => {
+            const thumbnailUrl = info.getValue()
+            const row = info.row.original
+            const title = row.title || `Video ${row.youtube_id}`
 
-          return <VideoThumbnail url={thumbnailUrl} title={title} />
-        },
-      }),
+            return <VideoThumbnail url={thumbnailUrl} title={title} />
+          },
+        }),
 
-      // Column 2: Title + Channel
-      columnHelper.accessor('title', {
-        id: 'title',
-        header: 'Titel',
-        cell: (info) => {
-          const row = info.row.original
-          const title = info.getValue() || `Video ${row.youtube_id}`
-          const channel = row.channel
+        // Column 2: Title + Channel
+        columnHelper.accessor('title', {
+          id: 'title',
+          header: 'Titel',
+          cell: (info) => {
+            const row = info.row.original
+            const title = info.getValue() || `Video ${row.youtube_id}`
+            const channel = row.channel
 
-          return (
-            <div className="flex flex-col gap-1 min-w-[200px] max-w-[400px]">
-              <span
-                className="font-medium text-gray-900 line-clamp-2 leading-tight"
-                title={title}
-              >
-                {title}
-              </span>
-              {channel && (
-                <span className="text-sm text-gray-600 truncate">
-                  {channel}
+            return (
+              <div className="flex flex-col gap-1 min-w-[200px] max-w-[400px]">
+                <span
+                  className="font-medium text-gray-900 line-clamp-2 leading-tight"
+                  title={title}
+                >
+                  {title}
                 </span>
-              )}
-            </div>
-          )
-        },
-      }),
+                {channel && (
+                  <span className="text-sm text-gray-600 truncate">
+                    {channel}
+                  </span>
+                )}
+              </div>
+            )
+          },
+        }),
 
-      // Column 3: Duration
-      columnHelper.accessor('duration', {
-        id: 'duration',
-        header: 'Dauer',
-        cell: (info) => {
-          const duration = info.getValue()
-          return (
-            <span className="text-sm text-gray-700 font-mono tabular-nums">
-              {formatDuration(duration)}
-            </span>
-          )
-        },
-      }),
+        // Column 3: Duration
+        columnHelper.accessor('duration', {
+          id: 'duration',
+          header: 'Dauer',
+          cell: (info) => {
+            const duration = info.getValue()
+            return (
+              <span className="text-sm text-gray-700 font-mono tabular-nums">
+                {formatDuration(duration)}
+              </span>
+            )
+          },
+        }),
 
-      // Column 4: Three-dot menu
-      columnHelper.accessor('id', {
-        id: 'menu',
-        header: '', // No header text - just icon column
-        cell: (info) => (
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.stopPropagation()
-                }
-              }}
-              tabIndex={-1}
-              className="inline-flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-              aria-label="Aktionen"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="12" cy="5" r="2" />
-                <circle cx="12" cy="12" r="2" />
-                <circle cx="12" cy="19" r="2" />
-              </svg>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const row = info.row.original
-                  // REF MCP #3: Smart video title with fallback chain
-                  const videoTitle = row.title || `Video ${row.youtube_id}` || 'Unbekanntes Video'
-                  setDeleteModal({
-                    open: true,
-                    videoId: info.getValue() as string,
-                    videoTitle: videoTitle,
-                  })
+        // Column 4: Three-dot menu
+        columnHelper.accessor('id', {
+          id: 'menu',
+          header: '', // No header text - just icon column
+          cell: (info) => (
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation()
+                  }
                 }}
-                className="text-red-600 focus:text-red-700 cursor-pointer"
+                tabIndex={-1}
+                className="inline-flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                aria-label="Aktionen"
               >
-                <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                  <line x1="10" y1="11" x2="10" y2="17" />
-                  <line x1="14" y1="11" x2="14" y2="17" />
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="12" cy="19" r="2" />
                 </svg>
-                Löschen
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-      }),
-    ],
-    [deleteVideo]
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const row = info.row.original
+                    // REF MCP #3: Smart video title with fallback chain
+                    const videoTitle = row.title || `Video ${row.youtube_id}` || 'Unbekanntes Video'
+                    setDeleteModal({
+                      open: true,
+                      videoId: info.getValue() as string,
+                      videoTitle: videoTitle,
+                    })
+                  }}
+                  className="text-red-600 focus:text-red-700 cursor-pointer"
+                >
+                  <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                  Löschen
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ),
+        }),
+      ]
+
+      // Filter columns based on visibility settings
+      return allColumns.filter((column) => {
+        const columnId = column.id as 'thumbnail' | 'title' | 'duration' | 'menu'
+
+        // Map 'menu' column id to 'actions' in store
+        if (columnId === 'menu') {
+          return visibleColumns.actions
+        }
+
+        return visibleColumns[columnId]
+      })
+    },
+    [visibleColumns]
   )
 
   const table = useReactTable({
@@ -288,7 +358,17 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     }
 
     try {
-      await createVideo.mutateAsync({ url: newVideoUrl })
+      // Create video
+      const newVideo = await createVideo.mutateAsync({ url: newVideoUrl })
+
+      // If tags are currently selected (filtered view), auto-assign them to the new video
+      if (selectedTagIds.length > 0) {
+        await assignTags.mutateAsync({
+          videoId: newVideo.id,
+          tagIds: selectedTagIds
+        })
+      }
+
       setNewVideoUrl('')
       setIsAdding(false)
       setUrlError(null)
@@ -373,17 +453,20 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         <div className="max-w-7xl mx-auto p-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Videos</h1>
-            {selectedTags.length > 0 && (
-              <p className="text-sm text-gray-600 mt-1">
-                Gefiltert nach: {selectedTags.map(t => t.name).join(', ')}
+            {selectedTags.length > 0 ? (
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {selectedTags.map(t => t.name).join(', ')}
+                </h1>
                 <button
                   onClick={clearTags}
-                  className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
+                  className="mt-1 text-sm text-blue-600 hover:text-blue-800"
                 >
-                  (Filter entfernen)
+                  Alle Videos anzeigen
                 </button>
-              </p>
+              </div>
+            ) : (
+              <h1 className="text-3xl font-bold text-gray-900">Alle Videos</h1>
             )}
           </div>
         {/* Action Buttons - Feature Flag Controlled (Task #24) */}
@@ -633,6 +716,12 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
         isLoading={deleteVideo.isPending}
+      />
+
+      {/* Create Tag Dialog */}
+      <CreateTagDialog
+        open={isCreateTagDialogOpen}
+        onOpenChange={setIsCreateTagDialogOpen}
       />
         </div>
       </div>

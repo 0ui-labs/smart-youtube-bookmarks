@@ -226,13 +226,62 @@ async def add_video_to_list(
             detail=str(e)
         )
 
-    # Create video with PENDING status (metadata will be fetched by ARQ worker)
-    new_video = Video(
-        list_id=list_id,
-        youtube_id=youtube_id,
-        processing_status="pending"  # Option B: Queue background task
+    # HYBRID APPROACH: Fetch metadata SYNCHRONOUSLY for single videos (fast!)
+    # For bulk uploads, we'll use ARQ workers instead
+    redis = await get_redis_client()
+    youtube_client = YouTubeClient(
+        api_key=settings.youtube_api_key,
+        redis_client=redis
     )
 
+    try:
+        # Fetch YouTube metadata immediately (200-500ms)
+        metadata = await youtube_client.get_video_metadata(youtube_id)
+
+        # Parse duration from ISO 8601 to seconds
+        duration_seconds = None
+        if metadata.get("duration"):
+            try:
+                from isodate import parse_duration as parse_iso_duration
+                duration_obj = parse_iso_duration(metadata["duration"])
+                duration_seconds = int(duration_obj.total_seconds())
+            except Exception:
+                pass
+
+        # Parse published_at
+        published_at = None
+        if metadata.get("published_at"):
+            try:
+                from datetime import datetime
+                published_at = datetime.fromisoformat(
+                    metadata["published_at"].replace('Z', '+00:00')
+                )
+            except (ValueError, AttributeError):
+                pass
+
+        # Create video with COMPLETE metadata (instant!)
+        new_video = Video(
+            list_id=list_id,
+            youtube_id=youtube_id,
+            title=metadata.get("title"),
+            channel=metadata.get("channel"),
+            thumbnail_url=metadata.get("thumbnail_url"),
+            duration=duration_seconds,
+            published_at=published_at,
+            processing_status="completed"  # Already have all data!
+        )
+
+    except Exception as e:
+        # Fallback: Create with pending status if YouTube API fails
+        logger.warning(f"Failed to fetch YouTube metadata for {youtube_id}: {e}")
+        new_video = Video(
+            list_id=list_id,
+            youtube_id=youtube_id,
+            processing_status="failed",
+            error_message=f"Could not fetch video metadata: {str(e)}"
+        )
+
+    # Save to database
     try:
         db.add(new_video)
         await db.flush()
@@ -244,43 +293,6 @@ async def add_video_to_list(
             status_code=status.HTTP_409_CONFLICT,
             detail="Video already exists in this list"
         )
-
-    # Queue ARQ background task for metadata fetching
-    try:
-        arq_pool = await get_arq_pool()
-
-        # Fetch schema for Gemini extraction (if list has schema)
-        schema_fields = {}
-        if bookmark_list.schema_id:
-            from app.models.schema import Schema
-            schema_result = await db.execute(
-                select(Schema).where(Schema.id == bookmark_list.schema_id)
-            )
-            schema = schema_result.scalar_one_or_none()
-            if schema:
-                schema_fields = schema.fields  # JSONB dict
-
-        # Enqueue background task (non-blocking)
-        await arq_pool.enqueue_job(
-            'process_video',
-            str(new_video.id),
-            str(list_id),
-            schema_fields
-        )
-        logger.info(f"Queued video {new_video.id} for background processing")
-    except Exception as e:
-        # CRITICAL FIX: Mark video as failed if queue fails
-        # Prevents video from being stuck in "pending" state forever
-        logger.error(f"Failed to queue ARQ task for video {new_video.id}: {e}")
-
-        try:
-            new_video.processing_status = "failed"
-            new_video.error_message = f"Failed to queue processing: {e}"
-            await db.commit()
-        except Exception as commit_error:
-            # If commit fails, rollback but don't fail the response
-            await db.rollback()
-            logger.error(f"Failed to mark video as failed: {commit_error}")
 
     # Set tags to empty list to avoid async relationship loading issues
     # (newly created video has no tags assigned yet)

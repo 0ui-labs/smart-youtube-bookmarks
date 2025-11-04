@@ -3,8 +3,10 @@
  *
  * Manages multi-select tag filtering with OR logic.
  * Users can select multiple tags to filter videos.
+ * Selected tags are persisted in localStorage.
  */
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Tag } from '@/types/tag';
 
 /**
@@ -20,6 +22,9 @@ interface TagStore {
   /** Set all available tags (populated from API) */
   setTags: (tags: Tag[]) => void;
 
+  /** Set selected tag IDs (for URL sync) */
+  setSelectedTagIds: (tagIds: string[]) => void;
+
   /** Toggle tag selection (add if not selected, remove if selected) */
   toggleTag: (tagId: string) => void;
 
@@ -28,25 +33,40 @@ interface TagStore {
 }
 
 /**
- * Tag store hook
+ * Tag store hook with localStorage persistence
+ *
+ * Persists selectedTagIds so tag filters survive page reloads.
+ * Note: tags array is NOT persisted (always loaded fresh from API)
  *
  * @example
  * ```tsx
  * const { tags, selectedTagIds, toggleTag, clearTags } = useTagStore();
  * ```
  */
-export const useTagStore = create<TagStore>((set) => ({
-  tags: [],
-  selectedTagIds: [],
+export const useTagStore = create<TagStore>()(
+  persist(
+    (set) => ({
+      tags: [],
+      selectedTagIds: [],
 
-  setTags: (tags) => set({ tags }),
+      setTags: (tags) => set({ tags }),
 
-  toggleTag: (tagId) =>
-    set((state) => ({
-      selectedTagIds: state.selectedTagIds.includes(tagId)
-        ? state.selectedTagIds.filter((id) => id !== tagId)
-        : [...state.selectedTagIds, tagId],
-    })),
+      setSelectedTagIds: (tagIds) => set({ selectedTagIds: tagIds }),
 
-  clearTags: () => set({ selectedTagIds: [] }),
-}));
+      toggleTag: (tagId) =>
+        set((state) => ({
+          selectedTagIds: state.selectedTagIds.includes(tagId)
+            ? state.selectedTagIds.filter((id) => id !== tagId)
+            : [...state.selectedTagIds, tagId],
+        })),
+
+      clearTags: () => set({ selectedTagIds: [] }),
+    }),
+    {
+      name: 'tag-filter-selection', // localStorage key
+      storage: createJSONStorage(() => localStorage),
+      // Only persist selectedTagIds, not the full tags array
+      partialize: (state) => ({ selectedTagIds: state.selectedTagIds }),
+    }
+  )
+);

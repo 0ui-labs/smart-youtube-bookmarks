@@ -1,3 +1,5 @@
+import type { Tag } from './tag'
+
 export interface VideoResponse {
   id: string
   list_id: string
@@ -9,6 +11,9 @@ export interface VideoResponse {
   thumbnail_url: string | null
   duration: number | null  // Seconds
   published_at: string | null  // ISO 8601
+
+  // Tags (many-to-many relationship)
+  tags: Tag[]
 
   processing_status: 'pending' | 'processing' | 'completed' | 'failed'
   created_at: string

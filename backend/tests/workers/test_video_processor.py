@@ -1,6 +1,7 @@
 """Tests for ARQ video processor worker."""
 import pytest
-from app.models import Video, BookmarkList
+from uuid import uuid4
+from app.models import Video, BookmarkList, ProcessingJob
 from app.workers.video_processor import process_video
 
 
@@ -17,6 +18,16 @@ async def test_process_video_updates_status_to_processing(arq_context, test_db, 
     await test_db.commit()
     await test_db.refresh(bookmark_list)
 
+    # Arrange: Create processing job
+    processing_job = ProcessingJob(
+        list_id=bookmark_list.id,
+        total_videos=1,
+        status="running"
+    )
+    test_db.add(processing_job)
+    await test_db.commit()
+    await test_db.refresh(processing_job)
+
     # Arrange: Create test video
     video = Video(
         list_id=bookmark_list.id,
@@ -26,12 +37,13 @@ async def test_process_video_updates_status_to_processing(arq_context, test_db, 
     test_db.add(video)
     await test_db.commit()
 
-    # Act: Process video (will fail until implemented)
+    # Act: Process video
     result = await process_video(
         arq_context,
         str(video.id),
         str(video.list_id),
-        {}
+        {},
+        str(processing_job.id)
     )
 
     # Assert: Status changed
@@ -53,6 +65,16 @@ async def test_process_video_idempotency(arq_context, test_db, test_user):
     await test_db.commit()
     await test_db.refresh(bookmark_list)
 
+    # Arrange: Create processing job
+    processing_job = ProcessingJob(
+        list_id=bookmark_list.id,
+        total_videos=1,
+        status="running"
+    )
+    test_db.add(processing_job)
+    await test_db.commit()
+    await test_db.refresh(processing_job)
+
     # Arrange: Video already completed
     video = Video(
         list_id=bookmark_list.id,
@@ -68,7 +90,8 @@ async def test_process_video_idempotency(arq_context, test_db, test_user):
         arq_context,
         str(video.id),
         str(video.list_id),
-        {}
+        {},
+        str(processing_job.id)
     )
 
     # Assert: Returns early, no changes
@@ -90,6 +113,16 @@ async def test_process_video_marks_failed_on_exception(arq_context, test_db, tes
     await test_db.commit()
     await test_db.refresh(bookmark_list)
 
+    # Arrange: Create processing job
+    processing_job = ProcessingJob(
+        list_id=bookmark_list.id,
+        total_videos=1,
+        status="running"
+    )
+    test_db.add(processing_job)
+    await test_db.commit()
+    await test_db.refresh(processing_job)
+
     video = Video(
         list_id=bookmark_list.id,
         youtube_id="dQw4w9WgXcQ",
@@ -105,5 +138,57 @@ async def test_process_video_marks_failed_on_exception(arq_context, test_db, tes
             arq_context,
             "invalid-uuid-format",  # Will cause ValueError
             str(bookmark_list.id),
-            {}
+            {},
+            str(processing_job.id)
         )
+
+
+@pytest.mark.asyncio
+async def test_process_video_fetches_youtube_metadata(arq_context, test_db, test_user):
+    """Test video processing fetches and stores YouTube metadata."""
+    # Arrange: Create test list
+    bookmark_list = BookmarkList(
+        name="Test List",
+        description="Test description",
+        user_id=test_user.id
+    )
+    test_db.add(bookmark_list)
+    await test_db.commit()
+    await test_db.refresh(bookmark_list)
+
+    # Arrange: Create processing job
+    processing_job = ProcessingJob(
+        list_id=bookmark_list.id,
+        total_videos=1,
+        status="running"
+    )
+    test_db.add(processing_job)
+    await test_db.commit()
+    await test_db.refresh(processing_job)
+
+    # Arrange: Create test video with pending status
+    video = Video(
+        list_id=bookmark_list.id,
+        youtube_id="dQw4w9WgXcQ",
+        processing_status="pending"
+    )
+    test_db.add(video)
+    await test_db.commit()
+    await test_db.refresh(video)
+
+    # Act: Process video
+    result = await process_video(
+        arq_context,
+        str(video.id),
+        str(video.list_id),
+        {},
+        str(processing_job.id)
+    )
+
+    # Assert: Video has YouTube metadata
+    await test_db.refresh(video)
+    assert video.processing_status == "completed"
+    assert video.title is not None, "Title should be fetched from YouTube API"
+    assert video.channel is not None, "Channel should be fetched from YouTube API"
+    assert video.thumbnail_url is not None, "Thumbnail URL should be fetched from YouTube API"
+    assert result['status'] == 'success'

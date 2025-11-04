@@ -104,12 +104,23 @@ class YouTubeClient:
                 snippet = item["snippet"]
                 content_details = item["contentDetails"]
 
+                # Get highest quality thumbnail available
+                # YouTube provides: maxres (1280x720), standard (640x480), high (480x360), medium (320x180), default (120x90)
+                thumbnails = snippet["thumbnails"]
+                thumbnail_url = (
+                    thumbnails.get("maxres", {}).get("url") or
+                    thumbnails.get("standard", {}).get("url") or
+                    thumbnails.get("high", {}).get("url") or
+                    thumbnails.get("medium", {}).get("url") or
+                    thumbnails.get("default", {}).get("url")
+                )
+
                 metadata: VideoMetadata = {
                     "video_id": video_id,
                     "title": snippet["title"],
                     "channel": snippet["channelTitle"],
                     "published_at": snippet["publishedAt"],
-                    "thumbnail_url": snippet["thumbnails"]["default"]["url"],
+                    "thumbnail_url": thumbnail_url,
                     "duration": content_details["duration"]
                 }
 
@@ -282,6 +293,16 @@ class YouTubeClient:
                         snippet = item.get("snippet", {})
                         content_details = item.get("contentDetails", {})
 
+                        # Get highest quality thumbnail available (same as get_video_metadata)
+                        thumbnails = snippet.get("thumbnails", {})
+                        thumbnail_url = (
+                            thumbnails.get("maxres", {}).get("url") or
+                            thumbnails.get("standard", {}).get("url") or
+                            thumbnails.get("high", {}).get("url") or
+                            thumbnails.get("medium", {}).get("url") or
+                            thumbnails.get("default", {}).get("url", "")
+                        )
+
                         metadata = {
                             "youtube_id": video_id,
                             "title": snippet.get("title", "Unknown Title"),
@@ -289,9 +310,7 @@ class YouTubeClient:
                             "description": snippet.get("description", ""),
                             "published_at": snippet.get("publishedAt"),
                             "duration": content_details.get("duration", "PT0S"),
-                            "thumbnail_url": snippet.get("thumbnails", {})
-                                .get("high", {})
-                                .get("url", ""),
+                            "thumbnail_url": thumbnail_url,
                         }
 
                         # Cache for 7 days (same as get_video_metadata)

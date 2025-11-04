@@ -4,9 +4,37 @@ from arq import Retry
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models import Video, ProcessingJob
+from app.clients.youtube import YouTubeClient
+from app.core.config import settings
+from app.core.redis import get_redis_client
+from datetime import datetime
+from isodate import parse_duration
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_duration(iso_duration: str | None) -> int | None:
+    """Parse ISO 8601 duration to seconds."""
+    if not iso_duration:
+        return None
+    try:
+        duration_obj = parse_duration(iso_duration)
+        return int(duration_obj.total_seconds())
+    except Exception as e:
+        logger.debug(f"Invalid duration format '{iso_duration}': {e}")
+        return None
+
+
+def _parse_timestamp(timestamp: str | None) -> datetime | None:
+    """Parse YouTube API timestamp to timezone-aware datetime."""
+    if not timestamp:
+        return None
+    try:
+        return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+    except (ValueError, AttributeError) as e:
+        logger.debug(f"Invalid timestamp format '{timestamp}': {e}")
+        return None
 
 
 async def process_video(
@@ -53,14 +81,35 @@ async def process_video(
         video.processing_status = "processing"
         await db.flush()
 
-        # TODO: Implement actual processing
-        # - Fetch YouTube metadata
-        # - Get transcript
-        # - Extract via Gemini
-        # For now, just mark as completed (stub)
+        # Fetch YouTube metadata
+        redis_client = await get_redis_client()
+        youtube_client = YouTubeClient(
+            api_key=settings.youtube_api_key,
+            redis_client=redis_client
+        )
 
-        video.processing_status = "completed"
-        await db.flush()
+        try:
+            metadata = await youtube_client.get_video_metadata(video.youtube_id)
+
+            # Update video with metadata
+            video.title = metadata.get("title")
+            video.channel = metadata.get("channel")
+            video.thumbnail_url = metadata.get("thumbnail_url")
+            video.duration = _parse_duration(metadata.get("duration"))
+            video.published_at = _parse_timestamp(metadata.get("published_at"))
+
+            # TODO: Get transcript and extract via Gemini
+            # For now, just store YouTube metadata
+
+            video.processing_status = "completed"
+            await db.flush()
+
+            # Publish WebSocket update for instant UI refresh
+            await _publish_video_update(redis_client, video, job_id)
+
+        except Exception as e:
+            logger.error(f"Failed to fetch YouTube metadata for video {video_id}: {e}")
+            raise
 
         # Update parent job progress (successful processing)
         await _update_job_progress(db, job_id, success=True)
@@ -82,6 +131,119 @@ async def process_video(
         await _update_job_progress(db, job_id, success=False)
 
         raise
+
+
+async def process_video_list(
+    ctx: dict,
+    job_id: str,
+    list_id: str,
+    video_ids: list[str],
+    schema: dict
+) -> dict:
+    """
+    Process a list of videos in batch (for CSV bulk upload).
+
+    This worker processes multiple videos sequentially, calling process_video
+    for each one. It's designed for bulk CSV uploads.
+
+    Args:
+        ctx: ARQ job context (contains db session)
+        job_id: UUID of ProcessingJob for progress tracking
+        list_id: UUID of parent list
+        video_ids: List of video UUIDs to process
+        schema: Extraction schema for Gemini
+
+    Returns:
+        dict: Processing result with status and counts
+    """
+    db: AsyncSession = ctx['db']
+
+    logger.info(f"Processing video list job {job_id} with {len(video_ids)} videos")
+
+    processed_count = 0
+    failed_count = 0
+
+    for video_id in video_ids:
+        try:
+            # Process each video individually
+            result = await process_video(
+                ctx,
+                video_id,
+                list_id,
+                schema,
+                job_id
+            )
+
+            if result['status'] == 'success':
+                processed_count += 1
+            else:
+                failed_count += 1
+
+        except Exception as e:
+            logger.error(f"Failed to process video {video_id} in batch: {e}")
+            failed_count += 1
+            # Continue processing other videos
+
+    logger.info(
+        f"Batch job {job_id} completed: {processed_count} succeeded, "
+        f"{failed_count} failed out of {len(video_ids)} total"
+    )
+
+    return {
+        "status": "success",
+        "processed": processed_count,
+        "failed": failed_count,
+        "total": len(video_ids)
+    }
+
+
+async def _publish_video_update(redis_client, video, job_id: str) -> None:
+    """
+    Publish WebSocket update when video processing completes.
+
+    Sends instant notification to frontend via Redis Pub/Sub.
+
+    Args:
+        redis_client: Redis client instance
+        video: Processed Video object
+        job_id: UUID of parent ProcessingJob
+    """
+    try:
+        import json
+
+        # Get user_id from video's list
+        from sqlalchemy import select
+        from app.models.list import BookmarkList
+
+        db = video._sa_instance_state.session
+        result = await db.execute(
+            select(BookmarkList.user_id).where(BookmarkList.id == video.list_id)
+        )
+        user_id = result.scalar_one_or_none()
+
+        if not user_id:
+            logger.warning(f"Cannot publish update: no user_id for video {video.id}")
+            return
+
+        # Prepare progress update message
+        update_message = {
+            "job_id": job_id,
+            "video_id": str(video.id),
+            "status": video.processing_status,
+            "title": video.title,
+            "channel": video.channel,
+            "thumbnail_url": video.thumbnail_url,
+            "message": f"Video '{video.title}' processed successfully"
+        }
+
+        # Publish to user-specific channel
+        channel = f"progress:user:{user_id}"
+        await redis_client.publish(channel, json.dumps(update_message))
+        logger.info(f"Published WebSocket update for video {video.id} to {channel}")
+
+    except Exception as e:
+        # Don't fail processing if WebSocket publish fails
+        logger.error(f"Failed to publish WebSocket update: {e}")
 
 
 async def _update_job_progress(db: AsyncSession, job_id: str, success: bool) -> None:

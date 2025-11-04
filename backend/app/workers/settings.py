@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.workers.db_manager import sessionmanager, db_session_context
-from app.workers.video_processor import process_video
+from app.workers.video_processor import process_video, process_video_list
 import logging
 
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ class WorkerSettings:
     )
 
     # Worker functions
-    functions = [process_video]
+    functions = [process_video, process_video_list]
 
     # Worker configuration
     max_jobs = 10
