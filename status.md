@@ -1,6 +1,6 @@
 # Project Status & Task Protocol
 
-**Last Updated:** 2025-11-05 01:45 CET | **Branch:** main
+**Last Updated:** 2025-11-05 13:15 CET | **Branch:** main
 
 ---
 
@@ -59,7 +59,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 - Implementation: `docs/plans/2025-10-31-ID-05-ux-optimization-implementation-plan.md`
 - Security Hardening: `docs/plans/2025-11-02-security-hardening-implementation.md`
 - Latest Handoff: `docs/handoffs/2025-11-04-log-037-grid-list-thumbnail-separation.md`
-- Latest Report: `docs/reports/2025-11-05-ui-polish-report.md`
+- Latest Report: `docs/reports/2025-11-05-grid-menu-merge-report.md`
 
 ---
 
@@ -75,7 +75,9 @@ This file maintains **two separate lists**: PLAN and LOG.
 | #35 Fix Report | 2025-11-04 23:20 | 2025-11-04 23:55 | 35 | REPORT-035-FIX documentation |
 | UI Polish | 2025-11-05 00:30 | 2025-11-05 01:40 | 70 | Tag carousel & alignment fixes |
 | UI Polish Report | 2025-11-05 01:40 | 2025-11-05 01:45 | 5 | REPORT-036 documentation |
-| **TOTAL** | | | **355 min** | **5 hours 55 minutes** |
+| Grid Menu Merge | 2025-11-05 12:00 | 2025-11-05 13:05 | 65 | Merge feature branch, resolve conflicts |
+| Grid Menu Merge Report | 2025-11-05 13:05 | 2025-11-05 13:15 | 10 | REPORT-037 documentation |
+| **TOTAL** | | | **430 min** | **7 hours 10 minutes** |
 
 ---
 
@@ -128,90 +130,92 @@ This file maintains **two separate lists**: PLAN and LOG.
 33. [x] Add independent grid column control (2, 3, 4, 5 columns) (2025-11-04 15:10)
 34. [x] Create GridColumnControl component (2025-11-04 17:30)
 35. [x] Separate grid/list view settings (gridColumns vs thumbnailSize) (2025-11-04 18:45 - 19:15)
+36. [x] Add three-dot menu to Grid View cards (Thread #12) (2025-11-05)
+37. [x] Merge grid-view-three-dot-menu feature branch to main (2025-11-05 12:00)
 
 ### Advanced Features
 
-36. [ ] Implement smart CSV import with field detection
-37. [ ] Add batch video existence check to YouTube client
-38. [ ] Extend CSV export to include all fields
-39. [ ] Create SmartDropZone for URLs and CSV files
-40. [ ] Implement drag & drop for YouTube URLs
-41. [ ] Implement drag & drop for CSV files
-42. [ ] Add auto-tagging on upload based on selected tags
-43. [ ] Implement column visibility toggles with TanStack Table
-44. [ ] Create TagChips component for video tags
-45. [ ] Add export filtered/all videos to settings
+38. [ ] Implement smart CSV import with field detection
+39. [ ] Add batch video existence check to YouTube client
+40. [ ] Extend CSV export to include all fields
+41. [ ] Create SmartDropZone for URLs and CSV files
+42. [ ] Implement drag & drop for YouTube URLs
+43. [ ] Implement drag & drop for CSV files
+44. [ ] Add auto-tagging on upload based on selected tags
+45. [ ] Implement column visibility toggles with TanStack Table
+46. [ ] Create TagChips component for video tags
+47. [ ] Add export filtered/all videos to settings
 
 ### AI Integration
 
-46. [ ] Create hardcoded analysis schema (clickbait, difficulty, category, tags)
-47. [ ] Connect Gemini client to ARQ worker pipeline
-48. [ ] Populate extracted_data JSONB field with results
-49. [ ] Display AI-analyzed data in video cards
-50. [ ] Show AI status badges on thumbnails
-51. [ ] Implement clickbait warning badges
+48. [ ] Create hardcoded analysis schema (clickbait, difficulty, category, tags)
+49. [ ] Connect Gemini client to ARQ worker pipeline
+50. [ ] Populate extracted_data JSONB field with results
+51. [ ] Display AI-analyzed data in video cards
+52. [ ] Show AI status badges on thumbnails
+53. [ ] Implement clickbait warning badges
 
 ### YouTube Grid
 
-52. [ ] Create search bar with debouncing
-53. [ ] Implement skeleton loaders
-54. [ ] Add sparkle animation when AI analysis completes
-55. [ ] Enable live card updates via WebSocket
+54. [ ] Create search bar with debouncing
+55. [ ] Implement skeleton loaders
+56. [ ] Add sparkle animation when AI analysis completes
+57. [ ] Enable live card updates via WebSocket
 
 ### Security Hardening (P0-P3)
 
 **P0 - Critical Security (Must Fix Before Production)**
 
-56. [ ] Task 1: JWT Authentication System - Implement auth endpoints (login/register)
-57. [ ] Task 1: JWT Authentication System - Create security utilities (password hashing, JWT)
-58. [ ] Task 1: JWT Authentication System - Add get_current_user dependency
-59. [ ] Task 1: JWT Authentication System - Protect all API endpoints with authentication
-60. [ ] Task 1: JWT Authentication System - Add user ownership to VideoList and Video models
-61. [ ] Task 1: JWT Authentication System - Create Alembic migration for user relationships
-62. [ ] Task 2: Secure Default Credentials - Create secret generation script
-63. [ ] Task 2: Secure Default Credentials - Update docker-compose.yml to use env vars
-64. [ ] Task 2: Secure Default Credentials - Add secret validation to Config class
-65. [ ] Task 2: Secure Default Credentials - Create secrets setup documentation
-66. [ ] Task 3: Environment-Aware Configuration - Implement Environment enum and Settings
-67. [ ] Task 3: Environment-Aware Configuration - Add environment-aware CORS helpers
-68. [ ] Task 3: Environment-Aware Configuration - Update main.py with env-aware CORS
-69. [ ] Task 3: Environment-Aware Configuration - Create .env.development and .env.production.example
+58. [ ] Task 1: JWT Authentication System - Implement auth endpoints (login/register)
+59. [ ] Task 1: JWT Authentication System - Create security utilities (password hashing, JWT)
+60. [ ] Task 1: JWT Authentication System - Add get_current_user dependency
+61. [ ] Task 1: JWT Authentication System - Protect all API endpoints with authentication
+62. [ ] Task 1: JWT Authentication System - Add user ownership to VideoList and Video models
+63. [ ] Task 1: JWT Authentication System - Create Alembic migration for user relationships
+64. [ ] Task 2: Secure Default Credentials - Create secret generation script
+65. [ ] Task 2: Secure Default Credentials - Update docker-compose.yml to use env vars
+66. [ ] Task 2: Secure Default Credentials - Add secret validation to Config class
+67. [ ] Task 2: Secure Default Credentials - Create secrets setup documentation
+68. [ ] Task 3: Environment-Aware Configuration - Implement Environment enum and Settings
+69. [ ] Task 3: Environment-Aware Configuration - Add environment-aware CORS helpers
+70. [ ] Task 3: Environment-Aware Configuration - Update main.py with env-aware CORS
+71. [ ] Task 3: Environment-Aware Configuration - Create .env.development and .env.production.example
 
 **P1 - High Security**
 
-70. [ ] Task 4: API Rate Limiting - Add slowapi dependency
-71. [ ] Task 4: API Rate Limiting - Implement rate limiting utilities
-72. [ ] Task 4: API Rate Limiting - Add rate limiting to FastAPI app
-73. [ ] Task 4: API Rate Limiting - Apply rate limits to auth endpoints (5/min)
-74. [ ] Task 4: API Rate Limiting - Apply rate limits to sensitive endpoints (100/min)
-75. [ ] Task 5: Input Validation & ReDoS Protection - Implement validation utilities with timeout
-76. [ ] Task 5: Input Validation & ReDoS Protection - Add YouTube URL validation with length limits
-77. [ ] Task 5: Input Validation & ReDoS Protection - Add sanitize_string for all text inputs
-78. [ ] Task 5: Input Validation & ReDoS Protection - Update schemas with validation
-79. [ ] Task 6: CORS Security - Verify environment-aware CORS works correctly
-80. [ ] Task 6: CORS Security - Add CORS integration tests
-81. [ ] Task 6: CORS Security - Create CORS setup documentation
+72. [ ] Task 4: API Rate Limiting - Add slowapi dependency
+73. [ ] Task 4: API Rate Limiting - Implement rate limiting utilities
+74. [ ] Task 4: API Rate Limiting - Add rate limiting to FastAPI app
+75. [ ] Task 4: API Rate Limiting - Apply rate limits to auth endpoints (5/min)
+76. [ ] Task 4: API Rate Limiting - Apply rate limits to sensitive endpoints (100/min)
+77. [ ] Task 5: Input Validation & ReDoS Protection - Implement validation utilities with timeout
+78. [ ] Task 5: Input Validation & ReDoS Protection - Add YouTube URL validation with length limits
+79. [ ] Task 5: Input Validation & ReDoS Protection - Add sanitize_string for all text inputs
+80. [ ] Task 5: Input Validation & ReDoS Protection - Update schemas with validation
+81. [ ] Task 6: CORS Security - Verify environment-aware CORS works correctly
+82. [ ] Task 6: CORS Security - Add CORS integration tests
+83. [ ] Task 6: CORS Security - Create CORS setup documentation
 
 **P2 - Operational Excellence**
 
-82. [ ] Task 7: Structured Logging - Add structlog dependency
-83. [ ] Task 7: Structured Logging - Implement logging configuration
-84. [ ] Task 7: Structured Logging - Add HTTP request logging middleware
-85. [ ] Task 7: Structured Logging - Replace all string logs with structured events
-86. [ ] Task 8: Comprehensive Health Checks - Create health check API endpoints
-87. [ ] Task 8: Comprehensive Health Checks - Implement database connectivity check
-88. [ ] Task 8: Comprehensive Health Checks - Implement Redis connectivity check
-89. [ ] Task 8: Comprehensive Health Checks - Add Kubernetes liveness/readiness probes
-90. [ ] Task 9: Database Constraints - Create Alembic migration for constraints
-91. [ ] Task 9: Database Constraints - Add youtube_id length and format checks
-92. [ ] Task 9: Database Constraints - Add unique constraint for (user_id, youtube_id)
-93. [ ] Task 9: Database Constraints - Add NOT NULL checks for names
+84. [ ] Task 7: Structured Logging - Add structlog dependency
+85. [ ] Task 7: Structured Logging - Implement logging configuration
+86. [ ] Task 7: Structured Logging - Add HTTP request logging middleware
+87. [ ] Task 7: Structured Logging - Replace all string logs with structured events
+88. [ ] Task 8: Comprehensive Health Checks - Create health check API endpoints
+89. [ ] Task 8: Comprehensive Health Checks - Implement database connectivity check
+90. [ ] Task 8: Comprehensive Health Checks - Implement Redis connectivity check
+91. [ ] Task 8: Comprehensive Health Checks - Add Kubernetes liveness/readiness probes
+92. [ ] Task 9: Database Constraints - Create Alembic migration for constraints
+93. [ ] Task 9: Database Constraints - Add youtube_id length and format checks
+94. [ ] Task 9: Database Constraints - Add unique constraint for (user_id, youtube_id)
+95. [ ] Task 9: Database Constraints - Add NOT NULL checks for names
 
 **P3 - Future Improvements**
 
-94. [ ] Task 10: Secret Management - Create documentation for Vault integration
-95. [ ] Task 10: Secret Management - Document secret rotation strategy
-96. [ ] Task 10: Secret Management - Create security compliance checklist
+96. [ ] Task 10: Secret Management - Create documentation for Vault integration
+97. [ ] Task 10: Secret Management - Document secret rotation strategy
+98. [ ] Task 10: Secret Management - Create security compliance checklist
 ---
 
 ## 📝 LOG (Chronological Implementation History)
@@ -254,3 +258,4 @@ This file maintains **two separate lists**: PLAN and LOG.
 36. 2025-11-04 [Plan #35] Implement dynamic grid columns with ALL 5 REF MCP improvements - REF MCP validation BEFORE implementation (consulted Tailwind, Zustand, Vitest docs to verify plan correctness), 5 improvements applied: #1 separate selektoren (VideosPage viewMode refactor), #2 md:grid-cols-2 for 5-col tablet UX, #3 tests use toHaveClass() AND toContain(), #4 integration tests with real store (DEFERRED - TableSettingsDropdown DOM rendering issue), #5 NO safelist needed (production build verified), VideoGrid dynamic class mapping with object literal (grid-cols-1 to -5, md:grid-cols-2/3, lg:grid-cols-3/4/5 all present in built CSS), 9/9 VideoGrid unit tests passing, 3 commits (2dac5df core implementation, e21688a viewMode selector fix, 4bf630b final), production build successful (Vite) - all grid-cols classes generated without safelist confirming Task #31 pattern, 90 minutes actual (18:45-19:15 with REF validation) vs 45-60 minutes estimated (+50% for REF MCP consultation + plan improvements but prevented bugs), Steps 1-5+7 production-ready, Step 6 integration tests deferred (known issue: TableSettingsDropdown button not in test DOM needs investigation)
 37. 2025-11-04 [Hotfix] Task #35 Fix - Separate Grid/List Thumbnail Sizing - User reported bug: thumbnailSize setting from List mode affecting Grid mode, implemented useFullWidth prop pattern for VideoThumbnail (Grid: w-full container-adapted, List: fixed sizes from store), VideoCard passes useFullWidth={true} for Grid mode, TableSettingsDropdown conditional rendering (Thumbnail-Größe only in List mode, Spaltenanzahl only in Grid mode), 3 files modified (+23/-11 lines), 34/34 tests passing (VideoGrid 9, VideoCard 11, TableSettingsDropdown 14), 0 new TypeScript errors (6 pre-existing), PurgeCSS-safe w-full explicit string, commit 43c8c89, 20 minutes actual (23:00-23:20 implementation+tests+commit) + 35 minutes report, comprehensive report (REPORT-035-FIX) with useFullWidth prop pattern, conditional settings UI best practices, production-ready hotfix
 38. 2025-11-05 [UI Polish] Tag Filter Carousel & Alignment Fixes - User-driven iterative polish session: installed shadcn/ui Carousel with embla-carousel-react dependency, created TagCarousel component with conditional arrow display (canScrollPrev/canScrollNext state tracking via embla API, arrows only show when scrollable), alignment fixes across interface (items-center on button containers, px-3 on TagNavigation header, gap-1 tightening on all button groups, mb-4 header spacing reduction), consistent rounded-full styling on all icon buttons (ViewModeToggle, TableSettingsDropdown), max-w-[calc(100vw-400px)] constraint prevents view controls from being pushed off-screen, 12 dummy tags for preview (Python, JavaScript, React, ML, etc.), slidesToScroll: 3 for efficient navigation, 11 files modified (+258/-115 lines), production-ready UI polish with YouTube-style tag filtering UX, 75 minutes actual (00:30-01:45 implementation+fixes+iterations) + 5 minutes report, comprehensive report (REPORT-036) with complete TagCarousel implementation, technical decisions (shadcn/ui Carousel rationale, conditional arrows, width constraints, rounded-full consistency), reusable patterns documented, ready for dynamic tag integration
+39. 2025-11-05 [Plan #37] Merge Grid View Three-Dot Menu Feature Branch - Thread #13 continuation: merged feature/grid-view-three-dot-menu branch (13 commits from Thread #12) into main, resolved 5 merge conflicts caused by concurrent UI polish work (commit cb16199), conflict resolution in VideoCard.tsx (added DropdownMenu imports + onDelete prop), VideoCard.test.tsx (removed duplicate test), VideoGrid.tsx (added onDeleteVideo prop), VideoGrid.test.tsx (added prop to 5 test cases), VideosPage.tsx (wired onDeleteVideo to handleGridDeleteClick), merge commit df97a41 with comprehensive message documenting all changes and conflict resolution, pushed to remote origin/main, cleaned up worktree (.worktrees/grid-menu removed), deleted feature branch (feature/grid-view-three-dot-menu), all 25/25 feature tests passing (VideoCard 14/14, VideoGrid 10/10, Integration 1/1), production-ready with full Grid View parity to List View delete functionality, 65 minutes actual (12:00-13:05 merge+resolution+push+cleanup) + 10 minutes report, comprehensive report (REPORT-037) with full merge process, conflict resolution strategy, technical decisions (manual resolution rationale, commit-before-merge pattern, immediate cleanup), ready for next development cycle
