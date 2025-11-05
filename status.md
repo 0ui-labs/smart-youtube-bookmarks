@@ -1,6 +1,6 @@
 # Project Status & Task Protocol
 
-**Last Updated:** 2025-11-05 13:15 CET | **Branch:** main
+**Last Updated:** 2025-11-05 14:45 CET | **Branch:** main
 
 ---
 
@@ -162,60 +162,126 @@ This file maintains **two separate lists**: PLAN and LOG.
 56. [ ] Add sparkle animation when AI analysis completes
 57. [ ] Enable live card updates via WebSocket
 
+### Custom Fields System (Design: 2025-11-05-custom-fields-system-design.md)
+
+**Phase 1: MVP - Backend (Database + Models + API)**
+
+58. [ ] Create Alembic migration for 4 new tables (custom_fields, field_schemas, schema_fields, video_field_values)
+59. [ ] Create CustomField SQLAlchemy model with field_type enum and JSONB config
+60. [ ] Create FieldSchema SQLAlchemy model
+61. [ ] Create SchemaField join table model with display_order and show_on_card
+62. [ ] Create VideoFieldValue model with typed value columns (text, numeric, boolean)
+63. [ ] Extend Tag model with schema_id foreign key
+64. [ ] Create CustomField Pydantic schemas (Create, Update, Response)
+65. [ ] Create FieldSchema Pydantic schemas (Create, Update, Response with fields)
+66. [ ] Implement custom fields CRUD endpoints (GET, POST, PUT, DELETE)
+67. [ ] Implement duplicate field check endpoint (POST /custom-fields/check-duplicate)
+68. [ ] Implement field schemas CRUD endpoints (GET, POST, PUT, DELETE)
+69. [ ] Implement schema-fields endpoints (add/remove fields to schema)
+70. [ ] Extend Tag endpoints with schema_id support (PUT /tags/{id})
+71. [ ] Extend Video GET endpoint to include field_values with union logic
+72. [ ] Implement video field values batch update endpoint (PUT /videos/{id}/fields)
+73. [ ] Add field value validation logic (type checks, rating range, select options)
+74. [ ] Implement multi-tag field union query with conflict resolution
+75. [ ] Add database indexes for performance (field_id+value_numeric, video_id+field_id)
+76. [ ] Write backend unit tests (duplicate check, validation, union logic, conflict resolution)
+77. [ ] Write backend integration tests (create tag+schema+field flow, cascade deletes)
+
+**Phase 1: MVP - Frontend (Components + UI)**
+
+78. [ ] Create FieldType TypeScript types and interfaces
+79. [ ] Create useCustomFields React Query hook
+80. [ ] Create useSchemas React Query hook
+81. [ ] Create useVideoFieldValues React Query hook with mutations
+82. [ ] Extend TagEditDialog with SchemaSelector component
+83. [ ] Create SchemaEditor component for inline schema creation
+84. [ ] Create FieldSelector component (multi-select from existing fields)
+85. [ ] Create NewFieldForm component with type selector and config editor
+86. [ ] Create FieldConfigEditor sub-components (rating max, select options)
+87. [ ] Create DuplicateWarning component with real-time check
+88. [ ] Create FieldOrderManager component (drag-drop + show_on_card toggles)
+89. [ ] Create CustomFieldsPreview component for VideoCard (max 3 fields)
+90. [ ] Create FieldDisplay component with type-specific renderers (Rating, Select, Boolean, Text)
+91. [ ] Implement inline editing in CustomFieldsPreview
+92. [ ] Create VideoDetailsModal component
+93. [ ] Add CustomFieldsSection to VideoDetailsModal with schema grouping
+94. [ ] Create FieldEditor component for modal field editing
+95. [ ] Write frontend component tests (TagEditDialog extension, CustomFieldsPreview, FieldDisplay)
+96. [ ] Write integration test (create tag+schema+field+set value flow)
+
+**Phase 2: Settings & Management UI**
+
+97. [ ] Create SettingsPage component at /settings/schemas
+98. [ ] Create SchemasList component with SchemaCard items
+99. [ ] Add schema actions (edit, delete, duplicate, usage stats)
+100. [ ] Create FieldsList component for global field overview
+101. [ ] Add field actions (edit, delete, show usage count)
+102. [ ] Implement schema templates (predefined common schemas)
+103. [ ] Add bulk operations (apply schema to multiple tags)
+104. [ ] Create analytics views (most-used fields, unused schemas)
+
+**Phase 3: Advanced Features**
+
+105. [ ] Implement AI-powered duplicate detection (Levenshtein + semantic similarity)
+106. [ ] Add field-based filtering to video list UI
+107. [ ] Implement field-based sorting
+108. [ ] Extend CSV export to include custom field values
+109. [ ] Implement CSV import for field values
+
 ### Security Hardening (P0-P3)
 
 **P0 - Critical Security (Must Fix Before Production)**
 
-58. [ ] Task 1: JWT Authentication System - Implement auth endpoints (login/register)
-59. [ ] Task 1: JWT Authentication System - Create security utilities (password hashing, JWT)
-60. [ ] Task 1: JWT Authentication System - Add get_current_user dependency
-61. [ ] Task 1: JWT Authentication System - Protect all API endpoints with authentication
-62. [ ] Task 1: JWT Authentication System - Add user ownership to VideoList and Video models
-63. [ ] Task 1: JWT Authentication System - Create Alembic migration for user relationships
-64. [ ] Task 2: Secure Default Credentials - Create secret generation script
-65. [ ] Task 2: Secure Default Credentials - Update docker-compose.yml to use env vars
-66. [ ] Task 2: Secure Default Credentials - Add secret validation to Config class
-67. [ ] Task 2: Secure Default Credentials - Create secrets setup documentation
-68. [ ] Task 3: Environment-Aware Configuration - Implement Environment enum and Settings
-69. [ ] Task 3: Environment-Aware Configuration - Add environment-aware CORS helpers
-70. [ ] Task 3: Environment-Aware Configuration - Update main.py with env-aware CORS
-71. [ ] Task 3: Environment-Aware Configuration - Create .env.development and .env.production.example
+110. [ ] Task 1: JWT Authentication System - Implement auth endpoints (login/register)
+111. [ ] Task 1: JWT Authentication System - Create security utilities (password hashing, JWT)
+112. [ ] Task 1: JWT Authentication System - Add get_current_user dependency
+113. [ ] Task 1: JWT Authentication System - Protect all API endpoints with authentication
+114. [ ] Task 1: JWT Authentication System - Add user ownership to VideoList and Video models
+115. [ ] Task 1: JWT Authentication System - Create Alembic migration for user relationships
+116. [ ] Task 2: Secure Default Credentials - Create secret generation script
+117. [ ] Task 2: Secure Default Credentials - Update docker-compose.yml to use env vars
+118. [ ] Task 2: Secure Default Credentials - Add secret validation to Config class
+119. [ ] Task 2: Secure Default Credentials - Create secrets setup documentation
+120. [ ] Task 3: Environment-Aware Configuration - Implement Environment enum and Settings
+121. [ ] Task 3: Environment-Aware Configuration - Add environment-aware CORS helpers
+122. [ ] Task 3: Environment-Aware Configuration - Update main.py with env-aware CORS
+123. [ ] Task 3: Environment-Aware Configuration - Create .env.development and .env.production.example
 
 **P1 - High Security**
 
-72. [ ] Task 4: API Rate Limiting - Add slowapi dependency
-73. [ ] Task 4: API Rate Limiting - Implement rate limiting utilities
-74. [ ] Task 4: API Rate Limiting - Add rate limiting to FastAPI app
-75. [ ] Task 4: API Rate Limiting - Apply rate limits to auth endpoints (5/min)
-76. [ ] Task 4: API Rate Limiting - Apply rate limits to sensitive endpoints (100/min)
-77. [ ] Task 5: Input Validation & ReDoS Protection - Implement validation utilities with timeout
-78. [ ] Task 5: Input Validation & ReDoS Protection - Add YouTube URL validation with length limits
-79. [ ] Task 5: Input Validation & ReDoS Protection - Add sanitize_string for all text inputs
-80. [ ] Task 5: Input Validation & ReDoS Protection - Update schemas with validation
-81. [ ] Task 6: CORS Security - Verify environment-aware CORS works correctly
-82. [ ] Task 6: CORS Security - Add CORS integration tests
-83. [ ] Task 6: CORS Security - Create CORS setup documentation
+124. [ ] Task 4: API Rate Limiting - Add slowapi dependency
+125. [ ] Task 4: API Rate Limiting - Implement rate limiting utilities
+126. [ ] Task 4: API Rate Limiting - Add rate limiting to FastAPI app
+127. [ ] Task 4: API Rate Limiting - Apply rate limits to auth endpoints (5/min)
+128. [ ] Task 4: API Rate Limiting - Apply rate limits to sensitive endpoints (100/min)
+129. [ ] Task 5: Input Validation & ReDoS Protection - Implement validation utilities with timeout
+130. [ ] Task 5: Input Validation & ReDoS Protection - Add YouTube URL validation with length limits
+131. [ ] Task 5: Input Validation & ReDoS Protection - Add sanitize_string for all text inputs
+132. [ ] Task 5: Input Validation & ReDoS Protection - Update schemas with validation
+133. [ ] Task 6: CORS Security - Verify environment-aware CORS works correctly
+134. [ ] Task 6: CORS Security - Add CORS integration tests
+135. [ ] Task 6: CORS Security - Create CORS setup documentation
 
 **P2 - Operational Excellence**
 
-84. [ ] Task 7: Structured Logging - Add structlog dependency
-85. [ ] Task 7: Structured Logging - Implement logging configuration
-86. [ ] Task 7: Structured Logging - Add HTTP request logging middleware
-87. [ ] Task 7: Structured Logging - Replace all string logs with structured events
-88. [ ] Task 8: Comprehensive Health Checks - Create health check API endpoints
-89. [ ] Task 8: Comprehensive Health Checks - Implement database connectivity check
-90. [ ] Task 8: Comprehensive Health Checks - Implement Redis connectivity check
-91. [ ] Task 8: Comprehensive Health Checks - Add Kubernetes liveness/readiness probes
-92. [ ] Task 9: Database Constraints - Create Alembic migration for constraints
-93. [ ] Task 9: Database Constraints - Add youtube_id length and format checks
-94. [ ] Task 9: Database Constraints - Add unique constraint for (user_id, youtube_id)
-95. [ ] Task 9: Database Constraints - Add NOT NULL checks for names
+136. [ ] Task 7: Structured Logging - Add structlog dependency
+137. [ ] Task 7: Structured Logging - Implement logging configuration
+138. [ ] Task 7: Structured Logging - Add HTTP request logging middleware
+139. [ ] Task 7: Structured Logging - Replace all string logs with structured events
+140. [ ] Task 8: Comprehensive Health Checks - Create health check API endpoints
+141. [ ] Task 8: Comprehensive Health Checks - Implement database connectivity check
+142. [ ] Task 8: Comprehensive Health Checks - Implement Redis connectivity check
+143. [ ] Task 8: Comprehensive Health Checks - Add Kubernetes liveness/readiness probes
+144. [ ] Task 9: Database Constraints - Create Alembic migration for constraints
+145. [ ] Task 9: Database Constraints - Add youtube_id length and format checks
+146. [ ] Task 9: Database Constraints - Add unique constraint for (user_id, youtube_id)
+147. [ ] Task 9: Database Constraints - Add NOT NULL checks for names
 
 **P3 - Future Improvements**
 
-96. [ ] Task 10: Secret Management - Create documentation for Vault integration
-97. [ ] Task 10: Secret Management - Document secret rotation strategy
-98. [ ] Task 10: Secret Management - Create security compliance checklist
+148. [ ] Task 10: Secret Management - Create documentation for Vault integration
+149. [ ] Task 10: Secret Management - Document secret rotation strategy
+150. [ ] Task 10: Secret Management - Create security compliance checklist
 ---
 
 ## 📝 LOG (Chronological Implementation History)
@@ -259,3 +325,4 @@ This file maintains **two separate lists**: PLAN and LOG.
 37. 2025-11-04 [Hotfix] Task #35 Fix - Separate Grid/List Thumbnail Sizing - User reported bug: thumbnailSize setting from List mode affecting Grid mode, implemented useFullWidth prop pattern for VideoThumbnail (Grid: w-full container-adapted, List: fixed sizes from store), VideoCard passes useFullWidth={true} for Grid mode, TableSettingsDropdown conditional rendering (Thumbnail-Größe only in List mode, Spaltenanzahl only in Grid mode), 3 files modified (+23/-11 lines), 34/34 tests passing (VideoGrid 9, VideoCard 11, TableSettingsDropdown 14), 0 new TypeScript errors (6 pre-existing), PurgeCSS-safe w-full explicit string, commit 43c8c89, 20 minutes actual (23:00-23:20 implementation+tests+commit) + 35 minutes report, comprehensive report (REPORT-035-FIX) with useFullWidth prop pattern, conditional settings UI best practices, production-ready hotfix
 38. 2025-11-05 [UI Polish] Tag Filter Carousel & Alignment Fixes - User-driven iterative polish session: installed shadcn/ui Carousel with embla-carousel-react dependency, created TagCarousel component with conditional arrow display (canScrollPrev/canScrollNext state tracking via embla API, arrows only show when scrollable), alignment fixes across interface (items-center on button containers, px-3 on TagNavigation header, gap-1 tightening on all button groups, mb-4 header spacing reduction), consistent rounded-full styling on all icon buttons (ViewModeToggle, TableSettingsDropdown), max-w-[calc(100vw-400px)] constraint prevents view controls from being pushed off-screen, 12 dummy tags for preview (Python, JavaScript, React, ML, etc.), slidesToScroll: 3 for efficient navigation, 11 files modified (+258/-115 lines), production-ready UI polish with YouTube-style tag filtering UX, 75 minutes actual (00:30-01:45 implementation+fixes+iterations) + 5 minutes report, comprehensive report (REPORT-036) with complete TagCarousel implementation, technical decisions (shadcn/ui Carousel rationale, conditional arrows, width constraints, rounded-full consistency), reusable patterns documented, ready for dynamic tag integration
 39. 2025-11-05 [Plan #37] Merge Grid View Three-Dot Menu Feature Branch - Thread #13 continuation: merged feature/grid-view-three-dot-menu branch (13 commits from Thread #12) into main, resolved 5 merge conflicts caused by concurrent UI polish work (commit cb16199), conflict resolution in VideoCard.tsx (added DropdownMenu imports + onDelete prop), VideoCard.test.tsx (removed duplicate test), VideoGrid.tsx (added onDeleteVideo prop), VideoGrid.test.tsx (added prop to 5 test cases), VideosPage.tsx (wired onDeleteVideo to handleGridDeleteClick), merge commit df97a41 with comprehensive message documenting all changes and conflict resolution, pushed to remote origin/main, cleaned up worktree (.worktrees/grid-menu removed), deleted feature branch (feature/grid-view-three-dot-menu), all 25/25 feature tests passing (VideoCard 14/14, VideoGrid 10/10, Integration 1/1), production-ready with full Grid View parity to List View delete functionality, 65 minutes actual (12:00-13:05 merge+resolution+push+cleanup) + 10 minutes report, comprehensive report (REPORT-037) with full merge process, conflict resolution strategy, technical decisions (manual resolution rationale, commit-before-merge pattern, immediate cleanup), ready for next development cycle
+40. 2025-11-05 [Planning] Created Custom Fields System Design - Brainstorming skill workflow (6 phases: Understanding, Exploration, Design Presentation, Design Documentation, Worktree Setup skipped, Planning Handoff skipped), comprehensive design document (docs/plans/2025-11-05-custom-fields-system-design.md, 1029 lines) with relational database architecture (4 new tables: custom_fields, field_schemas, schema_fields, video_field_values), tag-bound schemas with multi-tag field union support, 4 field types (Select, Rating 1-5, Text, Boolean), duplicate prevention (case-insensitive check), inline editing UI (max 3 fields on cards), VideoDetailsModal for all fields, 3 implementation phases (Phase 1 MVP 5-7 days, Phase 2 Settings UI 3-4 days, Phase 3 Advanced Features 4-5 days), performance-optimized with typed columns and indexes for filtering, REF MCP validated Tailwind/React Query/Zustand best practices, comprehensive testing strategy (unit + integration), added 52 new tasks to status.md PLAN section (#58-#109: Backend 20 tasks, Frontend 19 tasks, Settings UI 8 tasks, Advanced Features 5 tasks), all Security Hardening tasks renumbered (#110-#150)
