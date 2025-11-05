@@ -132,5 +132,23 @@ describe('VideoCard', () => {
       const menuButton = screen.getByLabelText('Aktionen')
       expect(menuButton).toBeInTheDocument()
     })
+
+    it('calls onDelete when delete menu item clicked', async () => {
+      const onDelete = vi.fn()
+      const user = userEvent.setup()
+
+      render(<VideoCard video={mockVideo} onDelete={onDelete} />)
+
+      // Open dropdown
+      const menuButton = screen.getByLabelText('Aktionen')
+      await user.click(menuButton)
+
+      // Click delete
+      const deleteItem = screen.getByText('Löschen')
+      await user.click(deleteItem)
+
+      expect(onDelete).toHaveBeenCalledTimes(1)
+      expect(onDelete).toHaveBeenCalledWith(mockVideo)
+    })
   })
 })
