@@ -472,6 +472,21 @@ Migration wird indirekt getestet durch:
 - `backend/app/models/video.py` - Will extend with `field_values` relationship
 - `backend/app/models/list.py` - Custom fields will reference `list_id`
 
+**IMPORTANT for Task #59-62 (Model Creation):**
+- When defining SQLAlchemy relationships for CASCADE foreign keys, use `passive_deletes=True`
+- Example for CustomField model:
+  ```python
+  video_field_values = relationship(
+      'VideoFieldValue',
+      back_populates='field',
+      cascade='all, delete',      # ORM-level cascade
+      passive_deletes=True         # Trust DB CASCADE (REF MCP validated)
+  )
+  ```
+- **Why:** Prevents unnecessary SELECT queries when deleting (database CASCADE handles it)
+- **REF MCP Source:** SQLAlchemy 2.0 Docs - "Using foreign key ON DELETE cascade with ORM relationships"
+- **Performance Benefit:** Database CASCADE is significantly faster than ORM-level deletion for large collections
+
 ### Design Decisions
 
 #### Decision 1: Typed Columns vs JSONB for Field Values
@@ -624,6 +639,26 @@ psql -U your_user -d your_db -c "SELECT version();"
 - Description: snake_case, keine Spaces
 - Beispiel: `abc123def456_add_custom_fields_system.py`
 
+### Constraint Naming Conventions (REF MCP Validated)
+
+**Project Standard** (analysiert aus `a1b2c3d4e5f6_add_tags_system.py`):
+
+- **UNIQUE Constraints:** `uq_<table>_<col1>_<col2>` oder `uq_<table>_<description>`
+  - Beispiel bestehend: `uq_tags_name_user_id`, `uq_video_tags_video_tag`
+  - Beispiel dieser Plan: `uq_custom_fields_list_name` ✅
+
+- **Indexes:** `idx_<table>_<column(s)>`
+  - Beispiel bestehend: `idx_video_tags_video_id`, `idx_video_tags_tag_id`
+  - Beispiel dieser Plan: `idx_custom_fields_list_id`, `idx_video_field_values_field_numeric` ✅
+
+- **CHECK Constraints:** `ck_<table>_<column>` oder `ck_<table>_<description>` (neu, keine bestehenden)
+  - Beispiel dieser Plan: `ck_custom_fields_field_type` ✅
+
+- **Composite Primary Keys:** `pk_<table>` (nur wenn explizite Benennung nötig)
+  - Beispiel dieser Plan: `pk_schema_fields` ✅
+
+**Validation Status:** Alle Constraint-Namen in diesem Plan sind konsistent mit Project-Standard.
+
 ### Testing with Fresh Database
 ```bash
 # Option 1: Drop and recreate DB
@@ -650,5 +685,14 @@ depends_on = None
 ---
 
 **Plan Created:** 2025-11-05
+**REF MCP Validated:** 2025-11-05 15:10 CET
 **Author:** Claude Code (Task Planning Agent)
-**Status:** Ready for Implementation
+**Status:** Ready for Implementation - REF MCP Approved ✅
+
+**Validation Results:**
+- ✅ SQLAlchemy 2.0 Foreign Key CASCADE patterns verified
+- ✅ PostgreSQL JSONB vs JSON usage confirmed optimal
+- ✅ Composite index column order validated for query patterns
+- ✅ Constraint naming conventions checked against existing migrations
+- ✅ `passive_deletes=True` best practice documented for future tasks
+- ✅ No hallucinated APIs or libraries detected
