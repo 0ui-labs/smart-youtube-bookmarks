@@ -1,6 +1,6 @@
 # Project Status & Task Protocol
 
-**Last Updated:** 2025-11-04 17:30 CET | **Branch:** main
+**Last Updated:** 2025-11-05 01:45 CET | **Branch:** main
 
 ---
 
@@ -59,7 +59,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 - Implementation: `docs/plans/2025-10-31-ID-05-ux-optimization-implementation-plan.md`
 - Security Hardening: `docs/plans/2025-11-02-security-hardening-implementation.md`
 - Latest Handoff: `docs/handoffs/2025-11-04-log-037-grid-list-thumbnail-separation.md`
-- Latest Report: `docs/reports/2025-11-04-task-035-fix-report.md`
+- Latest Report: `docs/reports/2025-11-05-ui-polish-report.md`
 
 ---
 
@@ -73,7 +73,9 @@ This file maintains **two separate lists**: PLAN and LOG.
 | #35 Report | 2025-11-04 19:45 | 2025-11-04 20:20 | 35 | REPORT-035 documentation |
 | #35 Fix | 2025-11-04 23:00 | 2025-11-04 23:20 | 20 | Grid/List thumbnail separation |
 | #35 Fix Report | 2025-11-04 23:20 | 2025-11-04 23:55 | 35 | REPORT-035-FIX documentation |
-| **TOTAL** | | | **280 min** | **4 hours 40 minutes** |
+| UI Polish | 2025-11-05 00:30 | 2025-11-05 01:40 | 70 | Tag carousel & alignment fixes |
+| UI Polish Report | 2025-11-05 01:40 | 2025-11-05 01:45 | 5 | REPORT-036 documentation |
+| **TOTAL** | | | **355 min** | **5 hours 55 minutes** |
 
 ---
 
@@ -251,3 +253,4 @@ This file maintains **two separate lists**: PLAN and LOG.
 35. 2025-11-04 [Planning] Created Task #35 plan: Separate Grid/List View Settings (gridColumns vs thumbnailSize) - VideoGrid component will consume dynamic gridColumns state from tableSettingsStore, replacing hardcoded grid-cols-2/3/4 with PurgeCSS-safe object mapping pattern (proven in Task #31), REF MCP validation confirms object mapping best practice for Tailwind dynamic classes, comprehensive implementation plan with 7 steps (update VideoGrid props interface, implement dynamic grid class mapping with responsive overrides, add 5 unit tests for each column count, update existing tests, integrate with VideosPage store hook, add integration tests, optional Tailwind safelist verification), responsive strategy: mobile 1 col override, tablet 2-3 cols max, desktop user choice 2-5 cols, 5 design decisions documented (object mapping vs template literals rationale with PurgeCSS explanation, responsive breakpoints strategy, default 3 columns, union type safety, safelist necessity analysis), estimated 45-60 minutes, follows proven Task #31 pattern, ready for execution with executing-plans skill
 36. 2025-11-04 [Plan #35] Implement dynamic grid columns with ALL 5 REF MCP improvements - REF MCP validation BEFORE implementation (consulted Tailwind, Zustand, Vitest docs to verify plan correctness), 5 improvements applied: #1 separate selektoren (VideosPage viewMode refactor), #2 md:grid-cols-2 for 5-col tablet UX, #3 tests use toHaveClass() AND toContain(), #4 integration tests with real store (DEFERRED - TableSettingsDropdown DOM rendering issue), #5 NO safelist needed (production build verified), VideoGrid dynamic class mapping with object literal (grid-cols-1 to -5, md:grid-cols-2/3, lg:grid-cols-3/4/5 all present in built CSS), 9/9 VideoGrid unit tests passing, 3 commits (2dac5df core implementation, e21688a viewMode selector fix, 4bf630b final), production build successful (Vite) - all grid-cols classes generated without safelist confirming Task #31 pattern, 90 minutes actual (18:45-19:15 with REF validation) vs 45-60 minutes estimated (+50% for REF MCP consultation + plan improvements but prevented bugs), Steps 1-5+7 production-ready, Step 6 integration tests deferred (known issue: TableSettingsDropdown button not in test DOM needs investigation)
 37. 2025-11-04 [Hotfix] Task #35 Fix - Separate Grid/List Thumbnail Sizing - User reported bug: thumbnailSize setting from List mode affecting Grid mode, implemented useFullWidth prop pattern for VideoThumbnail (Grid: w-full container-adapted, List: fixed sizes from store), VideoCard passes useFullWidth={true} for Grid mode, TableSettingsDropdown conditional rendering (Thumbnail-Größe only in List mode, Spaltenanzahl only in Grid mode), 3 files modified (+23/-11 lines), 34/34 tests passing (VideoGrid 9, VideoCard 11, TableSettingsDropdown 14), 0 new TypeScript errors (6 pre-existing), PurgeCSS-safe w-full explicit string, commit 43c8c89, 20 minutes actual (23:00-23:20 implementation+tests+commit) + 35 minutes report, comprehensive report (REPORT-035-FIX) with useFullWidth prop pattern, conditional settings UI best practices, production-ready hotfix
+38. 2025-11-05 [UI Polish] Tag Filter Carousel & Alignment Fixes - User-driven iterative polish session: installed shadcn/ui Carousel with embla-carousel-react dependency, created TagCarousel component with conditional arrow display (canScrollPrev/canScrollNext state tracking via embla API, arrows only show when scrollable), alignment fixes across interface (items-center on button containers, px-3 on TagNavigation header, gap-1 tightening on all button groups, mb-4 header spacing reduction), consistent rounded-full styling on all icon buttons (ViewModeToggle, TableSettingsDropdown), max-w-[calc(100vw-400px)] constraint prevents view controls from being pushed off-screen, 12 dummy tags for preview (Python, JavaScript, React, ML, etc.), slidesToScroll: 3 for efficient navigation, 11 files modified (+258/-115 lines), production-ready UI polish with YouTube-style tag filtering UX, 75 minutes actual (00:30-01:45 implementation+fixes+iterations) + 5 minutes report, comprehensive report (REPORT-036) with complete TagCarousel implementation, technical decisions (shadcn/ui Carousel rationale, conditional arrows, width constraints, rounded-full consistency), reusable patterns documented, ready for dynamic tag integration

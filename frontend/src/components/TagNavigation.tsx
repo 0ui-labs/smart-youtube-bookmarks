@@ -44,7 +44,7 @@ export const TagNavigation = ({
   return (
     <div className="tag-navigation p-4">
       {/* Header with title and create button */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 px-3 gap-1">
         <h2 className="text-lg font-semibold">Tags</h2>
         <Button
           variant="ghost"

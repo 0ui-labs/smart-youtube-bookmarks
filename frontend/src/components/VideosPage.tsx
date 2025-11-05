@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   useReactTable,
@@ -33,8 +33,71 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel'
 
 const columnHelper = createColumnHelper<VideoResponse>()
+
+// Tag Carousel Component with conditional arrow display
+const TagCarousel = () => {
+  const dummyTags = ['Python', 'JavaScript', 'React', 'Machine Learning', 'Web Development', 'Tutorial', 'Backend', 'Database', 'API', 'DevOps', 'Security', 'Testing']
+  const [api, setApi] = React.useState<any>()
+  const [canScrollPrev, setCanScrollPrev] = React.useState(false)
+  const [canScrollNext, setCanScrollNext] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!api) return
+
+    const updateScrollState = () => {
+      setCanScrollPrev(api.canScrollPrev())
+      setCanScrollNext(api.canScrollNext())
+    }
+
+    updateScrollState()
+    api.on('select', updateScrollState)
+    api.on('reInit', updateScrollState)
+
+    return () => {
+      api.off('select', updateScrollState)
+    }
+  }, [api])
+
+  return (
+    <Carousel
+      setApi={setApi}
+      opts={{
+        align: "start",
+        slidesToScroll: 3,
+      }}
+      className="w-full max-w-[calc(100vw-400px)]"
+    >
+      <div className="flex items-center gap-2">
+        {canScrollPrev && (
+          <CarouselPrevious className="static translate-y-0 h-8 w-8 flex-shrink-0" />
+        )}
+        <CarouselContent className="-ml-2">
+          {dummyTags.map((tag) => (
+            <CarouselItem key={tag} className="pl-2 basis-auto">
+              <button
+                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors whitespace-nowrap"
+              >
+                {tag}
+              </button>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        {canScrollNext && (
+          <CarouselNext className="static translate-y-0 h-8 w-8 flex-shrink-0" />
+        )}
+      </div>
+    </Carousel>
+  )
+}
 
 // YouTube URL validation regex
 const YOUTUBE_URL_PATTERN = /^(https:\/\/(www\.|m\.)?youtube\.com\/watch\?v=[\w-]{11}|https:\/\/youtu\.be\/[\w-]{11}|https:\/\/(www\.)?youtube\.com\/embed\/[\w-]{11})$/
@@ -475,9 +538,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       </CollapsibleSidebar>
 
       {/* Main content area */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
         <div className="max-w-7xl mx-auto p-8">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-4">
           <div>
             {selectedTags.length > 0 ? (
               <div>
@@ -496,7 +559,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
             )}
           </div>
         {/* Action Buttons - Feature Flag Controlled (Task #24) */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           {FEATURE_FLAGS.SHOW_CSV_EXPORT_BUTTON && (
             <button
               onClick={handleExportCSV}
@@ -536,9 +599,21 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
               <span>Add</span>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Filter and View Controls Bar */}
+      <div className="flex items-center gap-4 mb-6">
+        {/* Left side - Tag filters with carousel */}
+        <div className="flex-1 min-w-0">
+          <TagCarousel />
+        </div>
+
+        {/* Right side - View controls */}
+        <div className="flex gap-1 items-center flex-shrink-0 ml-auto">
           {/* View Mode Toggle - Task #32 */}
           <ViewModeToggle viewMode={viewMode} onToggle={setViewMode} />
-          {/* Table Settings Dropdown - Task #35 (moved to header for both grid/list access) */}
+          {/* Table Settings Dropdown - Task #35 */}
           <TableSettingsDropdown />
         </div>
       </div>
@@ -674,40 +749,11 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           videos={videos}
           gridColumns={gridColumns}
           onVideoClick={handleVideoClick}
-          onDelete={(videoId) => {
-            const video = videos.find((v) => v.id === videoId)
-            if (video) {
-              setDeleteModal({
-                open: true,
-                videoId: video.id,
-                videoTitle: video.title,
-              })
-            }
-          }}
         />
       ) : (
         // Table View (existing implementation)
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {table.getRowModel().rows.map((row) => {
                 const video = row.original

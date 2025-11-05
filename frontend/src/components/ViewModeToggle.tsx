@@ -27,6 +27,7 @@ export const ViewModeToggle = ({ viewMode, onToggle }: ViewModeToggleProps) => {
       variant="ghost"
       size="icon"
       onClick={handleToggle}
+      className="rounded-full"
       aria-label={
         viewMode === 'list' ? 'Grid-Ansicht anzeigen' : 'Listen-Ansicht anzeigen'
       }

@@ -60,7 +60,7 @@ export const TableSettingsDropdown = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Einstellungen">
+        <Button variant="ghost" size="icon" className="rounded-full" aria-label="Einstellungen">
           <Settings className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>

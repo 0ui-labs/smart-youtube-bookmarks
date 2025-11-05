@@ -24,14 +24,14 @@ const mockVideo: VideoResponse = {
 
 describe('VideoCard', () => {
   it('renders video thumbnail with VideoThumbnail component', () => {
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} />)
+    render(<VideoCard video={mockVideo} />)
 
     const img = screen.getByRole('img', { name: /Test Video/i })
     expect(img).toBeInTheDocument()
   })
 
   it('renders video title truncated to 2 lines', () => {
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} />)
+    render(<VideoCard video={mockVideo} />)
 
     const title = screen.getByText(/Test Video Title/)
     expect(title).toBeInTheDocument()
@@ -39,14 +39,14 @@ describe('VideoCard', () => {
   })
 
   it('renders channel name in muted color', () => {
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} />)
+    render(<VideoCard video={mockVideo} />)
 
     const channel = screen.getByText('Test Channel')
     expect(channel).toHaveClass('text-muted-foreground')
   })
 
   it('renders formatted duration with enhanced overlay', () => {
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} />)
+    render(<VideoCard video={mockVideo} />)
 
     const duration = screen.getByText('4:00')
     expect(duration).toBeInTheDocument()
@@ -56,7 +56,7 @@ describe('VideoCard', () => {
   })
 
   it('renders tags as chips with color indicators', () => {
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} />)
+    render(<VideoCard video={mockVideo} />)
 
     expect(screen.getByText('Python')).toBeInTheDocument()
     expect(screen.getByText('Tutorial')).toBeInTheDocument()
@@ -65,7 +65,7 @@ describe('VideoCard', () => {
   it('calls onClick when card is clicked', async () => {
     const onClick = vi.fn()
     const user = userEvent.setup()
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} onClick={onClick} />)
+    render(<VideoCard video={mockVideo} onClick={onClick} />)
 
     const card = screen.getByRole('button', { name: /Test Video/i })
     await user.click(card)
@@ -73,19 +73,8 @@ describe('VideoCard', () => {
     expect(onClick).toHaveBeenCalledWith(mockVideo)
   })
 
-  it('does not call onClick when three-dot menu is clicked', async () => {
-    const onClick = vi.fn()
-    const user = userEvent.setup()
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} onClick={onClick} />)
-
-    const menuButton = screen.getByLabelText('Video-Aktionen')
-    await user.click(menuButton)
-
-    expect(onClick).not.toHaveBeenCalled()
-  })
-
   it('shows hover effects on card hover', () => {
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} />)
+    render(<VideoCard video={mockVideo} />)
 
     const card = screen.getByRole('button', { name: /Test Video/i })
     expect(card).toHaveClass('hover:shadow-lg')
@@ -95,7 +84,7 @@ describe('VideoCard', () => {
   it('responds to Enter key press', async () => {
     const onClick = vi.fn()
     const user = userEvent.setup()
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} onClick={onClick} />)
+    render(<VideoCard video={mockVideo} onClick={onClick} />)
 
     const card = screen.getByRole('button', { name: /Test Video/i })
     card.focus()
@@ -107,7 +96,7 @@ describe('VideoCard', () => {
   it('responds to Space key press', async () => {
     const onClick = vi.fn()
     const user = userEvent.setup()
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} onClick={onClick} />)
+    render(<VideoCard video={mockVideo} onClick={onClick} />)
 
     const card = screen.getByRole('button', { name: /Test Video/i })
     card.focus()
@@ -117,7 +106,7 @@ describe('VideoCard', () => {
   })
 
   it('has aria-label with channel name for screen readers', () => {
-    render(<VideoCard video={mockVideo} onDelete={vi.fn()} />)
+    render(<VideoCard video={mockVideo} />)
 
     const card = screen.getByRole('button', {
       name: 'Video: Test Video Title That Is Very Long And Should Be Truncated von Test Channel'

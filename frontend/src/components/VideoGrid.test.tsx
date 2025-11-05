@@ -103,8 +103,7 @@ describe('grid column configuration', () => {
         videos={mockVideos}
         gridColumns={2}
         onVideoClick={vi.fn()}
-        onDelete={vi.fn()}
-      />
+             />
     )
 
     const grid = container.querySelector('.video-grid')
@@ -124,8 +123,7 @@ describe('grid column configuration', () => {
         videos={mockVideos}
         gridColumns={3}
         onVideoClick={vi.fn()}
-        onDelete={vi.fn()}
-      />
+             />
     )
 
     const grid = container.querySelector('.video-grid')
@@ -143,8 +141,7 @@ describe('grid column configuration', () => {
         videos={mockVideos}
         gridColumns={4}
         onVideoClick={vi.fn()}
-        onDelete={vi.fn()}
-      />
+             />
     )
 
     const grid = container.querySelector('.video-grid')
@@ -162,8 +159,7 @@ describe('grid column configuration', () => {
         videos={mockVideos}
         gridColumns={5}
         onVideoClick={vi.fn()}
-        onDelete={vi.fn()}
-      />
+             />
     )
 
     const grid = container.querySelector('.video-grid')
@@ -184,8 +180,7 @@ describe('grid column configuration', () => {
         videos={[]}
         gridColumns={5}
         onVideoClick={vi.fn()}
-        onDelete={vi.fn()}
-      />
+             />
     )
 
     expect(screen.getByText('Keine Videos im Grid')).toBeInTheDocument()

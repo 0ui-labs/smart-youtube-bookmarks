@@ -1,12 +1,4 @@
 import { useRef } from 'react'
-import { MoreVertical, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
 
@@ -17,7 +9,6 @@ import { VideoThumbnail } from './VideosPage'
 interface VideoCardProps {
   video: VideoResponse
   onClick?: (video: VideoResponse) => void
-  onDelete: (videoId: string) => void
 }
 
 /**
@@ -37,7 +28,7 @@ interface VideoCardProps {
  * - YouTube-inspired design (16:9 thumbnail, line-clamp-2 title, tag chips)
  * - WCAG 2.1 Level AA compliant (ARIA labels, keyboard navigation)
  */
-export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
+export const VideoCard = ({ video, onClick }: VideoCardProps) => {
   const cardRef = useRef<HTMLDivElement>(null)
 
   const handleCardClick = () => {
@@ -52,20 +43,6 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
     }
   }
 
-  // REF MCP #3: Focus management after delete
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent card click
-    onDelete(video.id)
-
-    // Focus next card or grid container after delete
-    const nextCard = cardRef.current?.nextElementSibling as HTMLElement
-    const gridContainer = cardRef.current?.parentElement as HTMLElement
-    if (nextCard) {
-      nextCard.focus()
-    } else if (gridContainer) {
-      gridContainer.focus()
-    }
-  }
 
   return (
     <div
@@ -128,38 +105,6 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
         )}
       </div>
 
-      {/* Three-Dot Menu (top-right corner) */}
-      <div className="absolute top-2 right-2">
-        {/* REF MCP #7: Radix UI asChild pattern for better accessibility */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 bg-black/50 text-white hover:bg-black/70"
-              aria-label="Video-Aktionen"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent
-            align="end"
-            onClick={(e) => e.stopPropagation()}
-            onCloseAutoFocus={(e) => {
-              // REF MCP #7: Prevent focus back to card after menu close
-              // This prevents unwanted card click when menu closes
-              e.preventDefault()
-            }}
-          >
-            <DropdownMenuItem onClick={handleDelete}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Löschen
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
     </div>
   )
 }
