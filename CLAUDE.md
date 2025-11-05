@@ -127,12 +127,12 @@ docker-compose logs -f postgres redis
 **Database Models (SQLAlchemy 2.0 async):**
 - `app/models/list.py` - BookmarkList
 - `app/models/video.py` - Video
-- `app/models/tag.py` - Tag, VideoTag (many-to-many)
+- `app/models/tag.py` - Tag (extended with schema_id), VideoTag (many-to-many)
 - `app/models/job.py` - ProcessingJob
 - `app/models/job_progress.py` - JobProgress (for history)
 - `app/models/user.py` - User (not yet implemented)
 - `app/models/custom_field.py` - CustomField (Task #59)
-- `app/models/field_schema.py` - FieldSchema (Task #60, placeholder)
+- `app/models/field_schema.py` - FieldSchema (Task #60)
 - `app/models/schema_field.py` - SchemaField (Task #61, placeholder)
 - `app/models/video_field_value.py` - VideoFieldValue (Task #62, placeholder)
 
