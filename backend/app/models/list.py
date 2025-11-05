@@ -42,6 +42,12 @@ class BookmarkList(BaseModel):
         back_populates="list",
         cascade="all, delete-orphan"
     )
+    custom_fields: Mapped[list["CustomField"]] = relationship(
+        "CustomField",
+        back_populates="list",
+        cascade="all, delete-orphan",  # Deleting list deletes all custom fields
+        passive_deletes=True  # Trust DB CASCADE (REF MCP)
+    )
 
     def __repr__(self) -> str:
         return f"<BookmarkList(id={self.id}, name={self.name!r})>"

@@ -43,6 +43,12 @@ class Video(BaseModel):
         secondary=video_tags,
         back_populates="videos"
     )
+    field_values: Mapped[list["VideoFieldValue"]] = relationship(
+        "VideoFieldValue",
+        back_populates="video",
+        cascade="all, delete-orphan",
+        passive_deletes=True  # Trust DB CASCADE (REF MCP, consistent with CustomField)
+    )
 
     __table_args__ = (
         Index("idx_videos_list_id", "list_id"),
