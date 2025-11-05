@@ -17,7 +17,7 @@ import { VideoThumbnail } from './VideosPage'
 interface VideoCardProps {
   video: VideoResponse
   onClick?: (video: VideoResponse) => void
-  onDelete: (videoId: string) => void
+  onDelete?: (video: VideoResponse) => void
 }
 
 /**
@@ -55,7 +55,7 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
   // REF MCP #3: Focus management after delete
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent card click
-    onDelete(video.id)
+    onDelete?.(video)
 
     // Focus next card or grid container after delete
     const nextCard = cardRef.current?.nextElementSibling as HTMLElement
