@@ -230,6 +230,30 @@ docker-compose logs -f postgres redis
 5. **Query Invalidation:** After mutations, invalidate relevant TanStack Query keys to refresh UI
 6. **Feature Flags:** Check `frontend/src/config/featureFlags.ts` before showing/hiding UI elements
 
+## Database Migrations
+
+### Custom Fields System (2025-11-05)
+
+Added support for custom rating fields:
+- 4 new tables: `custom_fields`, `field_schemas`, `schema_fields`, `video_field_values`
+- Extended `tags` table with `schema_id` foreign key
+- Performance indexes for field value filtering
+
+Migration ID: `1a6e18578c31_add_custom_fields_system`
+
+To apply:
+```bash
+cd backend
+alembic upgrade head
+```
+
+To rollback:
+```bash
+alembic downgrade -1
+```
+
+**Production Note:** This migration is backward-compatible. Existing tags without schemas will continue to work normally. The migration adds nullable foreign key constraints and creates new tables without modifying existing data.
+
 ## Documentation
 
 - Task plans: `docs/plans/tasks/`
