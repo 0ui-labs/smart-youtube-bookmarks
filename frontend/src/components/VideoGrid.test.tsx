@@ -36,7 +36,7 @@ const mockVideos: VideoResponse[] = [
 describe('VideoGrid', () => {
   it('renders grid with responsive columns', () => {
     const { container } = render(
-      <VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDelete={vi.fn()} />
+      <VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />
     )
 
     const grid = container.querySelector('.video-grid')
@@ -49,7 +49,7 @@ describe('VideoGrid', () => {
   // REF MCP #6: Responsive gap spacing
   it('uses responsive gap spacing (gap-4 on mobile, gap-6 on desktop)', () => {
     const { container } = render(
-      <VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDelete={vi.fn()} />
+      <VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />
     )
 
     const grid = container.querySelector('.video-grid')
@@ -58,7 +58,7 @@ describe('VideoGrid', () => {
   })
 
   it('renders VideoCard for each video', () => {
-    render(<VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDelete={vi.fn()} />)
+    render(<VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />)
 
     expect(screen.getByText('Video 1')).toBeInTheDocument()
     expect(screen.getByText('Video 2')).toBeInTheDocument()
@@ -67,7 +67,7 @@ describe('VideoGrid', () => {
   // REF MCP #5: Enhanced empty state
   it('shows enhanced empty state when no videos', () => {
     const { container } = render(
-      <VideoGrid videos={[]} gridColumns={3} onVideoClick={vi.fn()} onDelete={vi.fn()} />
+      <VideoGrid videos={[]} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />
     )
 
     expect(screen.getByText('Keine Videos im Grid')).toBeInTheDocument()
@@ -77,6 +77,22 @@ describe('VideoGrid', () => {
     const icon = container.querySelector('svg[aria-hidden="true"]')
     expect(icon).toBeInTheDocument()
     expect(icon).toHaveClass('lucide-layout-grid')
+  })
+
+  it('passes onDeleteVideo prop to VideoCard', () => {
+    const onDeleteVideo = vi.fn()
+
+    render(
+      <VideoGrid
+        videos={mockVideos}
+        gridColumns={3}
+        onDeleteVideo={onDeleteVideo}
+      />
+    )
+
+    // VideoCard should receive onDeleteVideo prop
+    // (Implicit test - no errors means prop was accepted)
+    expect(screen.getAllByRole('button', { name: /Video:/i })).toHaveLength(mockVideos.length)
   })
 })
 
@@ -103,7 +119,8 @@ describe('grid column configuration', () => {
         videos={mockVideos}
         gridColumns={2}
         onVideoClick={vi.fn()}
-             />
+        onDeleteVideo={vi.fn()}
+      />
     )
 
     const grid = container.querySelector('.video-grid')
@@ -123,7 +140,8 @@ describe('grid column configuration', () => {
         videos={mockVideos}
         gridColumns={3}
         onVideoClick={vi.fn()}
-             />
+        onDeleteVideo={vi.fn()}
+      />
     )
 
     const grid = container.querySelector('.video-grid')
@@ -141,7 +159,8 @@ describe('grid column configuration', () => {
         videos={mockVideos}
         gridColumns={4}
         onVideoClick={vi.fn()}
-             />
+        onDeleteVideo={vi.fn()}
+      />
     )
 
     const grid = container.querySelector('.video-grid')
@@ -159,7 +178,8 @@ describe('grid column configuration', () => {
         videos={mockVideos}
         gridColumns={5}
         onVideoClick={vi.fn()}
-             />
+        onDeleteVideo={vi.fn()}
+      />
     )
 
     const grid = container.querySelector('.video-grid')
@@ -180,7 +200,8 @@ describe('grid column configuration', () => {
         videos={[]}
         gridColumns={5}
         onVideoClick={vi.fn()}
-             />
+        onDeleteVideo={vi.fn()}
+      />
     )
 
     expect(screen.getByText('Keine Videos im Grid')).toBeInTheDocument()

@@ -113,4 +113,46 @@ describe('VideoCard', () => {
     })
     expect(card).toBeInTheDocument()
   })
+
+  describe('Three-dot menu', () => {
+    it('renders three-dot menu button', () => {
+      render(<VideoCard video={mockVideo} />)
+
+      const menuButton = screen.getByLabelText('Aktionen')
+      expect(menuButton).toBeInTheDocument()
+    })
+
+    it('calls onDelete when delete menu item clicked', async () => {
+      const onDelete = vi.fn()
+      const user = userEvent.setup()
+
+      render(<VideoCard video={mockVideo} onDelete={onDelete} />)
+
+      // Open dropdown
+      const menuButton = screen.getByLabelText('Aktionen')
+      await user.click(menuButton)
+
+      // Click delete
+      const deleteItem = screen.getByText('Löschen')
+      await user.click(deleteItem)
+
+      expect(onDelete).toHaveBeenCalledTimes(1)
+      expect(onDelete).toHaveBeenCalledWith(mockVideo)
+    })
+
+    it('prevents video click when menu button clicked', async () => {
+      const onClick = vi.fn()
+      const onDelete = vi.fn()
+      const user = userEvent.setup()
+
+      render(<VideoCard video={mockVideo} onClick={onClick} onDelete={onDelete} />)
+
+      // Click menu button
+      const menuButton = screen.getByLabelText('Aktionen')
+      await user.click(menuButton)
+
+      // Video onClick should NOT be called
+      expect(onClick).not.toHaveBeenCalled()
+    })
+  })
 })

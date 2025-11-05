@@ -21,36 +21,26 @@ import { VideosPage } from './VideosPage'
 import { useTableSettingsStore } from '@/stores/tableSettingsStore'
 import type { VideoResponse } from '@/types/video'
 
+// Helper function to create mock videos
+const createMockVideo = (id: string): VideoResponse => ({
+  id,
+  list_id: 'test-list-123',
+  youtube_id: `yt-${id}`,
+  title: `Test Video ${id}`,
+  channel: `Test Channel ${id}`,
+  duration: 210,
+  thumbnail_url: `https://i.ytimg.com/vi/yt-${id}/default.jpg`,
+  processing_status: 'completed',
+  error_message: null,
+  created_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z',
+  published_at: '2024-01-01T00:00:00Z',
+})
+
 // Mock data for tests
 const mockVideos: VideoResponse[] = [
-  {
-    id: 'video-1',
-    list_id: 'test-list-123',
-    youtube_id: 'dQw4w9WgXcQ',
-    title: 'Test Video 1',
-    channel: 'Test Channel 1',
-    duration: 210,
-    thumbnail_url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg',
-    processing_status: 'completed',
-    error_message: null,
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
-    published_at: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: 'video-2',
-    list_id: 'test-list-123',
-    youtube_id: 'abc123xyz',
-    title: 'Test Video 2',
-    channel: 'Test Channel 2',
-    duration: 180,
-    thumbnail_url: 'https://i.ytimg.com/vi/abc123xyz/default.jpg',
-    processing_status: 'completed',
-    error_message: null,
-    created_at: '2024-01-02T00:00:00Z',
-    updated_at: '2024-01-02T00:00:00Z',
-    published_at: '2024-01-02T00:00:00Z',
-  },
+  createMockVideo('1'),
+  createMockVideo('2'),
 ]
 
 // Mock hooks
@@ -521,6 +511,59 @@ describe('VideosPage - Grid View Integration (Task #32)', () => {
       // No need to click toggle - just verify the grid classes
       const grid = document.querySelector('.video-grid')
       expect(grid).toHaveClass('lg:grid-cols-5')
+    })
+  })
+
+  describe('Grid view delete flow', () => {
+    it('deletes video from grid view via three-dot menu', async () => {
+      const user = userEvent.setup()
+      const testVideos = [createMockVideo('1'), createMockVideo('2')]
+
+      // Mock useVideos to return test videos
+      const { useVideos } = await import('@/hooks/useVideos')
+      vi.mocked(useVideos).mockReturnValue({
+        data: testVideos,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      } as any)
+
+      // Mock delete mutation
+      const mockMutate = vi.fn()
+      const { useDeleteVideo } = await import('@/hooks/useVideos')
+      vi.mocked(useDeleteVideo).mockReturnValue({
+        mutate: mockMutate,
+        isPending: false,
+      } as any)
+
+      renderWithRouter(<VideosPage listId="test-list" />)
+
+      // Switch to grid view
+      const gridButton = screen.getByRole('button', { name: /Grid-Ansicht anzeigen/i })
+      await user.click(gridButton)
+
+      // Wait for grid to render
+      await waitFor(() => {
+        expect(screen.getByRole('list', { name: 'Video Grid' })).toBeInTheDocument()
+      })
+
+      // Open three-dot menu on first video
+      const menuButtons = screen.getAllByLabelText('Aktionen')
+      await user.click(menuButtons[0])
+
+      // Click delete
+      const deleteButton = screen.getByText('Löschen')
+      await user.click(deleteButton)
+
+      // Verify modal opened
+      expect(screen.getByText(/Möchten Sie das Video.*wirklich löschen/i)).toBeInTheDocument()
+
+      // Confirm delete
+      const confirmButton = screen.getByRole('button', { name: /^löschen$/i })
+      await user.click(confirmButton)
+
+      // Verify delete was called
+      expect(mockMutate).toHaveBeenCalledWith('1', expect.anything())
     })
   })
 })
