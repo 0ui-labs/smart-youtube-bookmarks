@@ -422,6 +422,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     setDeleteModal({ open: false, videoId: null, videoTitle: null })
   }
 
+  // Handle delete click from Grid View
+  const handleGridDeleteClick = (video: VideoResponse) => {
+    setDeleteModal({
+      open: true,
+      videoId: video.id,
+      videoTitle: video.title || `Video ${video.youtube_id}` || 'Unbekanntes Video'
+    })
+  }
+
   // Handle video click - opens YouTube in new tab (Task #32)
   const handleVideoClick = (video: VideoResponse) => {
     window.open(
@@ -674,16 +683,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           videos={videos}
           gridColumns={gridColumns}
           onVideoClick={handleVideoClick}
-          onDelete={(videoId) => {
-            const video = videos.find((v) => v.id === videoId)
-            if (video) {
-              setDeleteModal({
-                open: true,
-                videoId: video.id,
-                videoTitle: video.title,
-              })
-            }
-          }}
+          onDeleteVideo={handleGridDeleteClick}
         />
       ) : (
         // Table View (existing implementation)
