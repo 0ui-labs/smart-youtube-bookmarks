@@ -166,7 +166,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 
 **Phase 1: MVP - Backend (Database + Models + API)**
 
-58. [ ] Create Alembic migration for 4 new tables (custom_fields, field_schemas, schema_fields, video_field_values) (Started: 2025-11-05 14:55)
+58. [x] Create Alembic migration for 4 new tables (custom_fields, field_schemas, schema_fields, video_field_values) (2025-11-05 14:55-15:33)
 59. [ ] Create CustomField SQLAlchemy model with field_type enum and JSONB config
 60. [ ] Create FieldSchema SQLAlchemy model
 61. [ ] Create SchemaField join table model with display_order and show_on_card
