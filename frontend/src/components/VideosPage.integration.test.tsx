@@ -556,10 +556,10 @@ describe('VideosPage - Grid View Integration (Task #32)', () => {
       await user.click(deleteButton)
 
       // Verify modal opened
-      expect(screen.getByText(/Möchten Sie dieses Video wirklich löschen/i)).toBeInTheDocument()
+      expect(screen.getByText(/Möchten Sie das Video.*wirklich löschen/i)).toBeInTheDocument()
 
       // Confirm delete
-      const confirmButton = screen.getByRole('button', { name: /löschen/i })
+      const confirmButton = screen.getByRole('button', { name: /^löschen$/i })
       await user.click(confirmButton)
 
       // Verify delete was called
