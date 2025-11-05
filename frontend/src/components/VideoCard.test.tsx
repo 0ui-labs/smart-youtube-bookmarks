@@ -150,5 +150,20 @@ describe('VideoCard', () => {
       expect(onDelete).toHaveBeenCalledTimes(1)
       expect(onDelete).toHaveBeenCalledWith(mockVideo)
     })
+
+    it('prevents video click when menu button clicked', async () => {
+      const onClick = vi.fn()
+      const onDelete = vi.fn()
+      const user = userEvent.setup()
+
+      render(<VideoCard video={mockVideo} onClick={onClick} onDelete={onDelete} />)
+
+      // Click menu button
+      const menuButton = screen.getByLabelText('Aktionen')
+      await user.click(menuButton)
+
+      // Video onClick should NOT be called
+      expect(onClick).not.toHaveBeenCalled()
+    })
   })
 })
