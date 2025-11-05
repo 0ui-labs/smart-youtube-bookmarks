@@ -1,6 +1,4 @@
 import { useRef } from 'react'
-import { MoreVertical, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -95,10 +93,13 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
 
       {/* Card Content */}
       <div className="p-3 space-y-2">
-        {/* Title (max 2 lines) */}
-        <h3 className="text-sm font-semibold line-clamp-2 leading-tight">
-          {video.title}
-        </h3>
+        {/* Header: Title + Menu */}
+        <div className="flex items-start gap-2">
+          <h3 className="flex-1 text-sm font-semibold line-clamp-2 leading-tight">
+            {video.title}
+          </h3>
+          {/* Menu button will go here in next task */}
+        </div>
 
         {/* Channel Name */}
         {video.channel && (
@@ -126,39 +127,6 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Three-Dot Menu (top-right corner) */}
-      <div className="absolute top-2 right-2">
-        {/* REF MCP #7: Radix UI asChild pattern for better accessibility */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 bg-black/50 text-white hover:bg-black/70"
-              aria-label="Video-Aktionen"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent
-            align="end"
-            onClick={(e) => e.stopPropagation()}
-            onCloseAutoFocus={(e) => {
-              // REF MCP #7: Prevent focus back to card after menu close
-              // This prevents unwanted card click when menu closes
-              e.preventDefault()
-            }}
-          >
-            <DropdownMenuItem onClick={handleDelete}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Löschen
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   )
