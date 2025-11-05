@@ -78,7 +78,7 @@ describe('VideoCard', () => {
     const user = userEvent.setup()
     render(<VideoCard video={mockVideo} onDelete={vi.fn()} onClick={onClick} />)
 
-    const menuButton = screen.getByLabelText('Video-Aktionen')
+    const menuButton = screen.getByLabelText('Aktionen')
     await user.click(menuButton)
 
     expect(onClick).not.toHaveBeenCalled()
@@ -123,5 +123,14 @@ describe('VideoCard', () => {
       name: 'Video: Test Video Title That Is Very Long And Should Be Truncated von Test Channel'
     })
     expect(card).toBeInTheDocument()
+  })
+
+  describe('Three-dot menu', () => {
+    it('renders three-dot menu button', () => {
+      render(<VideoCard video={mockVideo} />)
+
+      const menuButton = screen.getByLabelText('Aktionen')
+      expect(menuButton).toBeInTheDocument()
+    })
   })
 })
