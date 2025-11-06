@@ -126,7 +126,7 @@ docker-compose logs -f postgres redis
 
 **Database Models (SQLAlchemy 2.0 async):**
 - `app/models/list.py` - BookmarkList
-- `app/models/video.py` - Video
+- `app/models/video.py` - Video (extended with field_values relationship)
 - `app/models/tag.py` - Tag (extended with schema_id), VideoTag (many-to-many)
 - `app/models/job.py` - ProcessingJob
 - `app/models/job_progress.py` - JobProgress (for history)
@@ -134,7 +134,7 @@ docker-compose logs -f postgres redis
 - `app/models/custom_field.py` - CustomField (Task #59)
 - `app/models/field_schema.py` - FieldSchema (Task #60)
 - `app/models/schema_field.py` - SchemaField (Task #61)
-- `app/models/video_field_value.py` - VideoFieldValue (Task #62, placeholder)
+- `app/models/video_field_value.py` - VideoFieldValue (Task #62)
 
 **ARQ Workers:**
 - `app/workers/video_processor.py` - Main video processing worker
@@ -144,6 +144,23 @@ docker-compose logs -f postgres redis
 **External API Clients:**
 - `app/clients/youtube.py` - YouTube Data API v3
 - `app/clients/gemini.py` - Google Gemini API (for transcript analysis)
+
+### Custom Fields System (Tasks #59-#62)
+
+**VideoFieldValue Model (Task #62):**
+- Stores actual field values for videos with typed columns
+- Inherits from BaseModel (has auto-generated UUID id and updated_at)
+- IMPORTANT: Migration omits created_at column (only id and updated_at)
+- Typed columns: value_text (TEXT), value_numeric (NUMERIC), value_boolean (BOOLEAN)
+- UNIQUE constraint: (video_id, field_id) - one value per field per video
+- Foreign keys: video_id → videos(id) CASCADE, field_id → custom_fields(id) CASCADE
+- Performance indexes: (field_id, value_numeric), (field_id, value_text) for filtering
+- Relationships: video (Video), field (CustomField) with passive_deletes=True
+
+**Why Typed Columns?**
+- Performance: Enables efficient filtering via composite indexes
+- Example: "Show videos where Rating >= 4" uses idx_video_field_values_field_numeric
+- Alternative (JSONB) would require slower JSON path queries
 
 ### Testing Patterns
 
