@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING
-from sqlalchemy import ForeignKey, Integer, Boolean, text
+from sqlalchemy import ForeignKey, Integer, Boolean, text, PrimaryKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from uuid import UUID as PyUUID
@@ -15,40 +15,53 @@ class SchemaField(Base):
     """
     Join table for many-to-many relationship between FieldSchema and CustomField.
 
+    Enables schemas to contain multiple fields with display ordering and visibility control.
     Uses composite primary key (schema_id, field_id) without separate id column.
-    This is the standard pattern for join tables and matches the migration schema.
-
-    NOTE: This is a placeholder for Task #61. Full implementation coming soon.
     """
     __tablename__ = "schema_fields"
 
-    # Composite primary key (defined in migration)
+    # Composite primary key constraint (must match migration name)
+    __table_args__ = (
+        PrimaryKeyConstraint('schema_id', 'field_id', name='pk_schema_fields'),
+    )
+
+    # Foreign Keys (both are part of composite PK)
     schema_id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("field_schemas.id", ondelete="CASCADE"),
         primary_key=True,
         nullable=False
+        # Note: idx_schema_fields_schema_id exists in migration for FK lookups
     )
     field_id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("custom_fields.id", ondelete="CASCADE"),
         primary_key=True,
         nullable=False
+        # Note: idx_schema_fields_field_id exists in migration for FK lookups
     )
+
+    # Metadata fields
     display_order: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
-        server_default=text('0')  # ← Match migration (REF MCP 2025-11-05)
+        server_default=text('0')  # SQL expression for CREATE TABLE (prevents type coercion issues)
     )
     show_on_card: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        server_default=text('false')  # ← Match migration (REF MCP 2025-11-05)
+        server_default=text('false')  # SQL expression for CREATE TABLE (prevents type coercion issues)
     )
 
-    # Relationships (placeholder)
-    schema: Mapped["FieldSchema"] = relationship("FieldSchema", back_populates="schema_fields")
-    field: Mapped["CustomField"] = relationship("CustomField", back_populates="schema_fields")
+    # Relationships
+    schema: Mapped["FieldSchema"] = relationship(
+        "FieldSchema",
+        back_populates="schema_fields"
+    )
+    field: Mapped["CustomField"] = relationship(
+        "CustomField",
+        back_populates="schema_fields"
+    )
 
     def __repr__(self) -> str:
-        return f"<SchemaField(schema_id={self.schema_id}, field_id={self.field_id})>"
+        return f"<SchemaField(schema_id={self.schema_id}, field_id={self.field_id}, order={self.display_order})>"

@@ -133,7 +133,7 @@ docker-compose logs -f postgres redis
 - `app/models/user.py` - User (not yet implemented)
 - `app/models/custom_field.py` - CustomField (Task #59)
 - `app/models/field_schema.py` - FieldSchema (Task #60)
-- `app/models/schema_field.py` - SchemaField (Task #61, placeholder)
+- `app/models/schema_field.py` - SchemaField (Task #61)
 - `app/models/video_field_value.py` - VideoFieldValue (Task #62, placeholder)
 
 **ARQ Workers:**
