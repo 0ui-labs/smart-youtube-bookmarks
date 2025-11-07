@@ -11,3 +11,4 @@ Also vor der Ausführung erst einmal REF konsultieren, den Plan nach Rücksprach
 
 Bitte verwende dein Subagent driven Apporach (skill) 
 Bevor du irgendetwas machst, bitte trage die aktuelle Uhrzeit als Beginn der Arbeit an diesem Task und trage es in status.md ein. (hinter dem Task)
+Wenn du fertig bist schreibe hinter den Task den Tomestamp für die Fertigstellung, dann trage es in dei Tabelle ein und rechne die Dauer aus
