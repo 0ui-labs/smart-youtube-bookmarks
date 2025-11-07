@@ -9,6 +9,13 @@ from .custom_field import (
     DuplicateCheckRequest,
     DuplicateCheckResponse,
 )
+from .field_schema import (
+    SchemaFieldItem,
+    FieldSchemaCreate,
+    FieldSchemaUpdate,
+    SchemaFieldResponse,
+    FieldSchemaResponse,
+)
 
 __all__ = [
     "ListCreate",
@@ -27,4 +34,10 @@ __all__ = [
     "CustomFieldResponse",
     "DuplicateCheckRequest",
     "DuplicateCheckResponse",
+    # Field Schema schemas
+    "SchemaFieldItem",
+    "FieldSchemaCreate",
+    "FieldSchemaUpdate",
+    "SchemaFieldResponse",
+    "FieldSchemaResponse",
 ]
