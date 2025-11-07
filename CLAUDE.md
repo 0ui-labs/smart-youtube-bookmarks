@@ -136,6 +136,18 @@ docker-compose logs -f postgres redis
 - `app/models/schema_field.py` - SchemaField (Task #61)
 - `app/models/video_field_value.py` - VideoFieldValue (Task #62)
 
+**Pydantic Schemas (Validation & API):**
+- `app/schemas/list.py` - ListCreate, ListUpdate, ListResponse
+- `app/schemas/tag.py` - TagBase, TagCreate, TagUpdate, TagResponse
+- `app/schemas/custom_field.py` - CustomField schemas (Task #64):
+  - CustomFieldBase: Shared validation logic with field_type/config validation
+  - CustomFieldCreate: Create new field (inherits Base)
+  - CustomFieldUpdate: Partial update support (all fields optional)
+  - CustomFieldResponse: API responses with ORM conversion
+  - DuplicateCheckRequest/Response: Case-insensitive name checking
+  - Supports 4 field types: 'select', 'rating', 'text', 'boolean'
+  - DRY principle: Shared `_validate_config_for_type()` helper function
+
 **ARQ Workers:**
 - `app/workers/video_processor.py` - Main video processing worker
 - `app/workers/db_manager.py` - Database session management
