@@ -200,7 +200,7 @@ async def update_custom_field(
     field_id: UUID,
     field_update: CustomFieldUpdate,
     db: AsyncSession = Depends(get_db)
-) -> CustomField:
+) -> CustomFieldResponse:
     """
     Update an existing custom field.
 
