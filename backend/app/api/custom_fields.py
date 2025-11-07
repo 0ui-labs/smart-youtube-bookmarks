@@ -188,3 +188,105 @@ async def create_custom_field(
     await db.refresh(new_field)
 
     return new_field
+
+
+@router.put(
+    "/{list_id}/custom-fields/{field_id}",
+    response_model=CustomFieldResponse,
+    status_code=status.HTTP_200_OK
+)
+async def update_custom_field(
+    list_id: UUID,
+    field_id: UUID,
+    field_update: CustomFieldUpdate,
+    db: AsyncSession = Depends(get_db)
+) -> CustomField:
+    """
+    Update an existing custom field.
+
+    Supports partial updates (all fields optional). When updating name,
+    performs case-insensitive duplicate check. Config validation is
+    delegated to Pydantic schema (Task #64).
+
+    Args:
+        list_id: UUID of the bookmark list
+        field_id: UUID of the field to update
+        field_update: CustomFieldUpdate schema (all fields optional)
+        db: Database session
+
+    Returns:
+        CustomFieldResponse: Updated field with new timestamps
+
+    Raises:
+        HTTPException 404: List or field not found
+        HTTPException 409: New field name already exists (case-insensitive)
+        HTTPException 422: Pydantic validation errors (auto-generated)
+
+    Example Request (partial update):
+        PUT /api/lists/{list_id}/custom-fields/{field_id}
+        {"name": "Updated Field Name"}
+
+    Example Request (full update):
+        PUT /api/lists/{list_id}/custom-fields/{field_id}
+        {
+            "name": "Overall Rating",
+            "field_type": "rating",
+            "config": {"max_rating": 10}
+        }
+
+    Note: Changing field_type on fields with existing values may cause
+    data inconsistencies. Frontend should warn users before allowing this.
+    """
+    # Validate list exists
+    result = await db.execute(
+        select(BookmarkList).where(BookmarkList.id == list_id)
+    )
+    bookmark_list = result.scalar_one_or_none()
+
+    if not bookmark_list:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"List with id {list_id} not found"
+        )
+
+    # Validate field exists and belongs to this list
+    stmt = select(CustomField).where(
+        CustomField.id == field_id,
+        CustomField.list_id == list_id
+    )
+    result = await db.execute(stmt)
+    field = result.scalar_one_or_none()
+
+    if not field:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Field with id {field_id} not found in list {list_id}"
+        )
+
+    # Check for duplicate name if name is being updated (case-insensitive)
+    if field_update.name is not None and field_update.name.lower() != field.name.lower():
+        duplicate_check = select(CustomField).where(
+            CustomField.list_id == list_id,
+            func.lower(CustomField.name) == field_update.name.lower(),
+            CustomField.id != field_id  # Exclude current field
+        )
+        duplicate_result = await db.execute(duplicate_check)
+        existing = duplicate_result.scalar_one_or_none()
+
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Field '{field_update.name}' already exists in this list"
+            )
+
+    # Update fields using Pydantic's exclude_unset (only updates provided fields)
+    # REF MCP: model_dump(exclude_unset=True) returns only fields explicitly set in request
+    # This is more compact and maintainable than manual if-chains
+    update_data = field_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(field, key, value)
+
+    await db.commit()
+    await db.refresh(field)
+
+    return field
