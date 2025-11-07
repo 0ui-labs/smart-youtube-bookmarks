@@ -116,7 +116,7 @@ async def create_custom_field(
     list_id: UUID,
     field_data: CustomFieldCreate,
     db: AsyncSession = Depends(get_db)
-) -> CustomField:
+) -> CustomFieldResponse:
     """
     Create a new custom field in a bookmark list.
 
