@@ -105,3 +105,86 @@ async def list_custom_fields(
     fields = result.scalars().all()
 
     return list(fields)
+
+
+@router.post(
+    "/{list_id}/custom-fields",
+    response_model=CustomFieldResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def create_custom_field(
+    list_id: UUID,
+    field_data: CustomFieldCreate,
+    db: AsyncSession = Depends(get_db)
+) -> CustomField:
+    """
+    Create a new custom field in a bookmark list.
+
+    Validates that:
+    - List exists (404 if not found)
+    - Field name is unique within list (case-insensitive, 409 if duplicate)
+    - Config matches field_type requirements (delegated to Pydantic schema)
+
+    Args:
+        list_id: UUID of the bookmark list
+        field_data: CustomFieldCreate schema with name, field_type, config
+        db: Database session
+
+    Returns:
+        CustomFieldResponse: Created field with generated ID and timestamps
+
+    Raises:
+        HTTPException 404: List not found
+        HTTPException 409: Field name already exists (case-insensitive)
+        HTTPException 422: Pydantic validation errors (auto-generated)
+
+    Example Request:
+        POST /api/lists/{list_id}/custom-fields
+        {
+            "name": "Presentation Quality",
+            "field_type": "select",
+            "config": {
+                "options": ["bad", "all over the place", "confusing", "great"]
+            }
+        }
+    """
+    # Validate list exists
+    result = await db.execute(
+        select(BookmarkList).where(BookmarkList.id == list_id)
+    )
+    bookmark_list = result.scalar_one_or_none()
+
+    if not bookmark_list:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"List with id {list_id} not found"
+        )
+
+    # Check for duplicate name (case-insensitive)
+    # Uses SQL LOWER() for proper case-insensitive comparison
+    stmt = select(CustomField).where(
+        CustomField.list_id == list_id,
+        func.lower(CustomField.name) == field_data.name.lower()
+    )
+    result = await db.execute(stmt)
+    existing_field = result.scalar_one_or_none()
+
+    if existing_field:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Field '{field_data.name}' already exists in this list"
+        )
+
+    # Create new field
+    # Note: Pydantic schema (Task #64) already validated config matches field_type
+    new_field = CustomField(
+        list_id=list_id,
+        name=field_data.name,
+        field_type=field_data.field_type,
+        config=field_data.config
+    )
+    db.add(new_field)
+    await db.commit()
+    await db.refresh(new_field)
+
+    return new_field
