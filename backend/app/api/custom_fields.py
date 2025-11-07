@@ -42,7 +42,7 @@ router = APIRouter(prefix="/api/lists", tags=["custom-fields"])
 async def list_custom_fields(
     list_id: UUID,
     db: AsyncSession = Depends(get_db)
-) -> List[CustomField]:
+) -> list[CustomFieldResponse]:
     """
     List all custom fields for a bookmark list.
 
