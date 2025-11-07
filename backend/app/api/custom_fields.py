@@ -290,3 +290,90 @@ async def update_custom_field(
     await db.refresh(field)
 
     return field
+
+
+@router.delete(
+    "/{list_id}/custom-fields/{field_id}",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_custom_field(
+    list_id: UUID,
+    field_id: UUID,
+    db: AsyncSession = Depends(get_db)
+) -> None:
+    """
+    Delete a custom field from a bookmark list.
+
+    Validates that field is not used in any schema before deletion.
+    If field is used in schemas, returns 409 Conflict with usage count.
+
+    Cascade behavior:
+    - Deletes all VideoFieldValue records (CASCADE via ORM)
+    - Does NOT delete SchemaField associations (must be removed first)
+
+    Args:
+        list_id: UUID of the bookmark list
+        field_id: UUID of the field to delete
+        db: Database session
+
+    Returns:
+        None (204 No Content on success)
+
+    Raises:
+        HTTPException 404: List or field not found
+        HTTPException 409: Field is used in one or more schemas
+
+    Example Success:
+        DELETE /api/lists/{list_id}/custom-fields/{field_id}
+        Response: 204 No Content
+
+    Example Failure (field in use):
+        DELETE /api/lists/{list_id}/custom-fields/{field_id}
+        Response: 409 Conflict
+        {
+            "detail": "Cannot delete field 'Overall Rating' - used in 2 schema(s). Remove field from schemas first."
+        }
+    """
+    # Validate list exists
+    result = await db.execute(
+        select(BookmarkList).where(BookmarkList.id == list_id)
+    )
+    bookmark_list = result.scalar_one_or_none()
+
+    if not bookmark_list:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"List with id {list_id} not found"
+        )
+
+    # Validate field exists and belongs to this list
+    stmt = select(CustomField).where(
+        CustomField.id == field_id,
+        CustomField.list_id == list_id
+    )
+    result = await db.execute(stmt)
+    field = result.scalar_one_or_none()
+
+    if not field:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Field with id {field_id} not found in list {list_id}"
+        )
+
+    # Check if field is used in any schema (via SchemaField join table)
+    usage_stmt = select(func.count()).select_from(SchemaField).where(
+        SchemaField.field_id == field_id
+    )
+    usage_count = await db.scalar(usage_stmt)
+
+    if usage_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot delete field '{field.name}' - used in {usage_count} schema(s). Remove field from schemas first."
+        )
+
+    # Delete field (CASCADE will delete VideoFieldValue records)
+    await db.delete(field)
+    await db.commit()
+
+    return None
