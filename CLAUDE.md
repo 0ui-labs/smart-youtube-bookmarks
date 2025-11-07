@@ -147,6 +147,14 @@ docker-compose logs -f postgres redis
   - DuplicateCheckRequest/Response: Case-insensitive name checking
   - Supports 4 field types: 'select', 'rating', 'text', 'boolean'
   - DRY principle: Shared `_validate_config_for_type()` helper function
+- `app/schemas/field_schema.py` - FieldSchema schemas (Task #65):
+  - SchemaFieldItem: Field association for creation (field_id, display_order, show_on_card)
+  - FieldSchemaCreate: Create schema with fields (3 validators: show_on_card_limit max 3, no duplicate display_order, no duplicate field_ids)
+  - FieldSchemaUpdate: Partial updates (name/description only, not field associations)
+  - SchemaFieldResponse: Nested field data with full CustomFieldResponse (eliminates N+1 queries)
+  - FieldSchemaResponse: Complete schema with nested schema_fields list
+  - REF MCP improvements: Better error messages with truncated UUIDs, duplicate validation
+  - 21 unit tests with 100% code coverage
 
 **ARQ Workers:**
 - `app/workers/video_processor.py` - Main video processing worker
