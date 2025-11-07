@@ -104,11 +104,21 @@ async def process_video(
             video.processing_status = "completed"
             await db.flush()
 
+            # Get user_id for WebSocket publishing
+            from app.models.list import BookmarkList
+            list_result = await db.execute(
+                select(BookmarkList.user_id).where(BookmarkList.id == video.list_id)
+            )
+            user_id = list_result.scalar_one_or_none()
+
             # Publish WebSocket update for instant UI refresh
-            await _publish_video_update(redis_client, video, job_id)
+            if user_id:
+                await _publish_video_update(redis_client, video, job_id, str(user_id))
+            else:
+                logger.warning(f"Cannot publish update: no user_id for video {video.id}")
 
         except Exception as e:
-            logger.error(f"Failed to fetch YouTube metadata for video {video_id}: {e}")
+            logger.exception(f"Failed to fetch YouTube metadata for video {video_id}")
             raise
 
         # Update parent job progress (successful processing)
@@ -180,7 +190,7 @@ async def process_video_list(
                 failed_count += 1
 
         except Exception as e:
-            logger.error(f"Failed to process video {video_id} in batch: {e}")
+            logger.exception(f"Failed to process video {video_id} in batch")
             failed_count += 1
             # Continue processing other videos
 
@@ -197,7 +207,7 @@ async def process_video_list(
     }
 
 
-async def _publish_video_update(redis_client, video, job_id: str) -> None:
+async def _publish_video_update(redis_client, video, job_id: str, user_id: str) -> None:
     """
     Publish WebSocket update when video processing completes.
 
@@ -207,23 +217,10 @@ async def _publish_video_update(redis_client, video, job_id: str) -> None:
         redis_client: Redis client instance
         video: Processed Video object
         job_id: UUID of parent ProcessingJob
+        user_id: UUID of user who owns the video's list
     """
     try:
         import json
-
-        # Get user_id from video's list
-        from sqlalchemy import select
-        from app.models.list import BookmarkList
-
-        db = video._sa_instance_state.session
-        result = await db.execute(
-            select(BookmarkList.user_id).where(BookmarkList.id == video.list_id)
-        )
-        user_id = result.scalar_one_or_none()
-
-        if not user_id:
-            logger.warning(f"Cannot publish update: no user_id for video {video.id}")
-            return
 
         # Prepare progress update message
         update_message = {
@@ -243,7 +240,7 @@ async def _publish_video_update(redis_client, video, job_id: str) -> None:
 
     except Exception as e:
         # Don't fail processing if WebSocket publish fails
-        logger.error(f"Failed to publish WebSocket update: {e}")
+        logger.exception("Failed to publish WebSocket update")
 
 
 async def _update_job_progress(db: AsyncSession, job_id: str, success: bool) -> None:

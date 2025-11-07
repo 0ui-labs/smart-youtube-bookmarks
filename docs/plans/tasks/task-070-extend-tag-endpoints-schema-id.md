@@ -76,7 +76,7 @@ class TagUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     color: str | None = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
     schema_id: UUID | None = Field(
-        default=...,  # Use ellipsis to distinguish "not provided" from None
+        default=None,
         description="FieldSchema UUID to bind (or null to unbind)"
     )
 

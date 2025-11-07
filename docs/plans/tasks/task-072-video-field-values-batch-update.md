@@ -250,15 +250,19 @@ class BatchUpdateFieldValuesResponse(BaseModel):
 **Code:**
 ```python
 # Add imports at top of file
+from uuid import UUID
+from fastapi import Depends, HTTPException, status
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.schemas.video_field_value import (
     BatchUpdateFieldValuesRequest,
     BatchUpdateFieldValuesResponse,
     VideoFieldValueResponse
 )
+from app.models.video import Video
 from app.models.video_field_value import VideoFieldValue
 from app.models.custom_field import CustomField
-from sqlalchemy import select, delete
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 
 # Add endpoint after existing video endpoints (around line 950)
@@ -425,7 +429,7 @@ async def batch_update_video_field_values(
     # Use ON CONFLICT DO UPDATE for idempotent upsert
     stmt = pg_insert(VideoFieldValue).values(upsert_data)
     stmt = stmt.on_conflict_do_update(
-        constraint='uq_video_field_values',  # UNIQUE(video_id, field_id)
+        constraint='uq_video_field_values_video_field',  # UNIQUE(video_id, field_id)
         set_={
             'value_text': stmt.excluded.value_text,
             'value_numeric': stmt.excluded.value_numeric,

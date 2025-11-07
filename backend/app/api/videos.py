@@ -238,26 +238,9 @@ async def add_video_to_list(
         # Fetch YouTube metadata immediately (200-500ms)
         metadata = await youtube_client.get_video_metadata(youtube_id)
 
-        # Parse duration from ISO 8601 to seconds
-        duration_seconds = None
-        if metadata.get("duration"):
-            try:
-                from isodate import parse_duration as parse_iso_duration
-                duration_obj = parse_iso_duration(metadata["duration"])
-                duration_seconds = int(duration_obj.total_seconds())
-            except Exception:
-                pass
-
-        # Parse published_at
-        published_at = None
-        if metadata.get("published_at"):
-            try:
-                from datetime import datetime
-                published_at = datetime.fromisoformat(
-                    metadata["published_at"].replace('Z', '+00:00')
-                )
-            except (ValueError, AttributeError):
-                pass
+        # Parse duration and timestamp using helper functions
+        duration_seconds = parse_youtube_duration(metadata.get("duration"))
+        published_at = parse_youtube_timestamp(metadata.get("published_at"))
 
         # Create video with COMPLETE metadata (instant!)
         new_video = Video(

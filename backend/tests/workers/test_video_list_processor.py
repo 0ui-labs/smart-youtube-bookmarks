@@ -1,6 +1,5 @@
 """Tests for process_video_list ARQ worker (bulk processing)."""
 import pytest
-from uuid import uuid4
 from app.models import Video, BookmarkList, ProcessingJob
 from app.workers.video_processor import process_video_list
 

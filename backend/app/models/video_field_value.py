@@ -1,5 +1,5 @@
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Numeric, Boolean, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import String, Numeric, Boolean, ForeignKey, Text, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from uuid import UUID as PyUUID
@@ -105,6 +105,10 @@ class VideoFieldValue(BaseModel):
     # Constraints and Indexes
     __table_args__ = (
         UniqueConstraint('video_id', 'field_id', name='uq_video_field_values_video_field'),
+        CheckConstraint(
+            "((value_text IS NOT NULL)::int + (value_numeric IS NOT NULL)::int + (value_boolean IS NOT NULL)::int) = 1",
+            name="ck_video_field_values_exactly_one_value"
+        ),
         # Note: Performance indexes defined in migration (lines 93-99):
         # - idx_video_field_values_field_numeric: (field_id, value_numeric)
         # - idx_video_field_values_field_text: (field_id, value_text)

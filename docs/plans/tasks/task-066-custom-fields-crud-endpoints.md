@@ -414,14 +414,13 @@ async def update_custom_field(
                 detail=f"Field '{field_update.name}' already exists in this list"
             )
     
-    # Update fields (only if provided in request)
-    if field_update.name is not None:
-        field.name = field_update.name
-    if field_update.field_type is not None:
-        field.field_type = field_update.field_type
-    if field_update.config is not None:
-        field.config = field_update.config
-    
+    # Update fields using Pydantic's exclude_unset (only updates provided fields)
+    # REF MCP: model_dump(exclude_unset=True) returns only fields explicitly set in request
+    # This is more compact and maintainable than manual if-chains
+    update_data = field_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(field, key, value)
+
     await db.commit()
     await db.refresh(field)
     
@@ -433,6 +432,16 @@ async def update_custom_field(
 - **Rationale:** Simpler for clients (single endpoint for partial/full updates)
 - **REF MCP:** Common FastAPI pattern, avoids duplicate endpoint logic
 - **Alternative:** Separate PUT (full replace) and PATCH (partial update) endpoints
+
+**Design Decision: model_dump(exclude_unset=True) vs Manual If-Chains**
+- **Chosen:** Use `model_dump(exclude_unset=True)` with setattr loop
+- **Rationale:**
+  - More compact (5 lines vs 7 lines)
+  - DRY principle - no repetition for each field
+  - Future-proof: new fields automatically supported
+  - Pydantic v2 best practice for partial updates
+- **REF MCP:** Pydantic v2 Migration Guide recommends this pattern
+- **Trade-off:** Slightly less explicit than manual if-chains, but only 3 fields (acceptable)
 
 ---
 
@@ -1525,6 +1534,12 @@ app/api/custom_fields.py    95%    (missing: 3 lines - error edge cases)
 - `response_model=CustomFieldResponse` for automatic serialization
 - `model_config = {"from_attributes": True}` for ORM conversion
 - **Applied:** All endpoints use response models (defined in Task #64)
+
+**Query 6: Pydantic v2 partial updates (REF MCP 2025-11-07)**
+- `model_dump(exclude_unset=True)` returns only fields explicitly set in request
+- Best practice for partial updates in PUT/PATCH endpoints
+- More maintainable than manual if-chains for each field
+- **Applied:** PUT endpoint uses this pattern for field updates
 
 ---
 

@@ -109,7 +109,7 @@ class CustomFieldResponse(BaseModel):
     list_id: UUID
     name: str
     field_type: str  # 'select' | 'rating' | 'text' | 'boolean'
-    config: dict[str, any] = Field(default_factory=dict)  # JSONB config
+    config: dict[str, Any] = Field(default_factory=dict)  # JSONB config
     created_at: datetime
     updated_at: datetime
 

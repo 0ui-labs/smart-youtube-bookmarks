@@ -32,3 +32,76 @@ from app.schemas.custom_field import (
 )
 
 router = APIRouter(prefix="/api/lists", tags=["custom-fields"])
+
+
+@router.get(
+    "/{list_id}/custom-fields",
+    response_model=List[CustomFieldResponse],
+    status_code=status.HTTP_200_OK
+)
+async def list_custom_fields(
+    list_id: UUID,
+    db: AsyncSession = Depends(get_db)
+) -> List[CustomField]:
+    """
+    List all custom fields for a bookmark list.
+
+    Returns all field definitions ordered by creation date (newest first).
+    Fields are list-scoped and can be reused across multiple schemas.
+
+    Args:
+        list_id: UUID of the bookmark list
+        db: Database session
+
+    Returns:
+        List[CustomFieldResponse]: All custom fields in the list
+
+    Raises:
+        HTTPException 404: List not found
+
+    Example Response:
+        [
+            {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "list_id": "987fcdeb-51a2-43d1-9012-345678901234",
+                "name": "Presentation Quality",
+                "field_type": "select",
+                "config": {
+                    "options": ["bad", "all over the place", "confusing", "great"]
+                },
+                "created_at": "2025-11-06T10:30:00Z",
+                "updated_at": "2025-11-06T10:30:00Z"
+            },
+            {
+                "id": "234e5678-e89b-12d3-a456-426614174001",
+                "list_id": "987fcdeb-51a2-43d1-9012-345678901234",
+                "name": "Overall Rating",
+                "field_type": "rating",
+                "config": {"max_rating": 5},
+                "created_at": "2025-11-06T10:25:00Z",
+                "updated_at": "2025-11-06T10:25:00Z"
+            }
+        ]
+    """
+    # Validate list exists
+    result = await db.execute(
+        select(BookmarkList).where(BookmarkList.id == list_id)
+    )
+    bookmark_list = result.scalar_one_or_none()
+
+    if not bookmark_list:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"List with id {list_id} not found"
+        )
+
+    # Query all fields for this list (ordered by created_at DESC)
+    stmt = (
+        select(CustomField)
+        .where(CustomField.list_id == list_id)
+        .order_by(CustomField.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    fields = result.scalars().all()
+
+    return list(fields)

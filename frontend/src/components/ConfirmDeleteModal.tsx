@@ -31,7 +31,7 @@ export const ConfirmDeleteModal = ({
         <AlertDialogHeader>
           <AlertDialogTitle>Video löschen?</AlertDialogTitle>
           <AlertDialogDescription>
-            Möchten Sie das Video "{videoTitle}" wirklich löschen? Diese Aktion kann nicht
+            Möchten Sie {videoTitle ? `das Video "${videoTitle}"` : 'dieses Video'} wirklich löschen? Diese Aktion kann nicht
             rückgängig gemacht werden.
           </AlertDialogDescription>
         </AlertDialogHeader>

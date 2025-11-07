@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import lists, videos, processing, websocket, tags
+from app.api import lists, videos, processing, websocket, tags, custom_fields
 from app.core.redis import close_redis_client, close_arq_pool, get_arq_pool
 
 
@@ -45,6 +45,7 @@ app.include_router(videos.router)
 app.include_router(processing.router)
 app.include_router(websocket.router, prefix="/api", tags=["websocket"])
 app.include_router(tags.router)
+app.include_router(custom_fields.router)
 
 
 @app.get("/api/health")

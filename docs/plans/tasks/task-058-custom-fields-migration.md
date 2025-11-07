@@ -65,7 +65,7 @@ def upgrade():
         sa.Column('list_id', UUID(as_uuid=True), sa.ForeignKey('bookmarks_lists.id', ondelete='CASCADE'), nullable=False),
         sa.Column('name', sa.String(255), nullable=False),
         sa.Column('field_type', sa.String(50), nullable=False),
-        sa.Column('config', JSONB, nullable=False, server_default='{}'),
+        sa.Column('config', JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now()),
     )
@@ -304,7 +304,7 @@ psql -U your_user -d your_db -c "\d custom_fields"
 **Common Issues:**
 - **"relation already exists"** → Run `alembic downgrade -1` first, dann `upgrade head`
 - **"foreign key violation"** → Check ob `bookmarks_lists` table existiert (should from initial migration)
-- **"gen_random_uuid() does not exist"** → PostgreSQL version < 13 (use `uuid_generate_v4()` instead, requires `pgcrypto` extension)
+- **"gen_random_uuid() does not exist"** → Extension `pgcrypto` fehlt. Alternative: `uuid_generate_v4()` (erfordert Extension `uuid-ossp`)
 
 ---
 

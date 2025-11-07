@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import type { KeyboardEvent } from 'react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +16,7 @@ import { VideoThumbnail } from './VideosPage'
 interface VideoCardProps {
   video: VideoResponse
   onClick?: (video: VideoResponse) => void
-  onDelete?: (video: VideoResponse) => void
+  onDelete?: (videoId: string) => void
 }
 
 /**
@@ -43,7 +44,7 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
   }
 
   // REF MCP #3: Complete keyboard navigation (Enter, Space)
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       handleCardClick()
@@ -56,7 +57,7 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
       role="button"
       tabIndex={0}
       // REF MCP #3: ARIA label with channel name for screen readers
-      aria-label={`Video: ${video.title} von ${video.channel || 'Unbekannt'}`}
+      aria-label={`Video: ${video.title} von ${(video as any).channel_name || video.channel || 'Unbekannt'}`}
       onClick={handleCardClick}
       onKeyDown={handleKeyDown}
       className="video-card group cursor-pointer rounded-lg border bg-card transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
@@ -105,7 +106,7 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
               <DropdownMenuItem
                 onClick={(e) => {
                   e.stopPropagation()
-                  onDelete?.(video)
+                  onDelete?.(video.id)
                 }}
                 className="text-red-600 focus:text-red-700 cursor-pointer"
               >
@@ -123,9 +124,9 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
         </div>
 
         {/* Channel Name */}
-        {video.channel && (
+        {((video as any).channel_name || video.channel) && (
           <p className="text-xs text-muted-foreground truncate">
-            {video.channel}
+            {(video as any).channel_name || video.channel}
           </p>
         )}
 
