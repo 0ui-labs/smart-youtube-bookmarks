@@ -1,66 +1,163 @@
 """
 Pydantic schemas for Field Schema API endpoints.
 
-Field schemas define collections of custom fields that can be assigned to tags.
-This enables consistent evaluation across multiple videos (e.g., all videos in
-a "Tutorial" tag can be evaluated using a "Video Quality" schema).
+Field schemas are collections of custom fields that can be bound to tags,
+enabling reusable evaluation templates (e.g., "Video Quality" schema containing
+presentation, rating, and content fields).
+
+Schema-field associations are managed via the SchemaField join table, which
+tracks display_order and show_on_card settings for each field in a schema.
 """
 
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-# Direct import - CustomFieldResponse already exists (REF MCP Improvement #1)
-from .custom_field import CustomFieldResponse
+from pydantic import BaseModel, Field
 
 
-class SchemaFieldItem(BaseModel):
+# ============================================================================
+# Nested Schema for SchemaField (Join Table Data)
+# ============================================================================
+
+class SchemaFieldInResponse(BaseModel):
     """
-    Represents a field within a schema during creation.
+    Nested schema for schema_fields relationship in FieldSchemaResponse.
 
-    Used in POST /schemas to define which custom fields belong to the schema
-    and their display configuration.
+    Represents a single field within a schema, including metadata from the
+    SchemaField join table (display_order, show_on_card) and full field details
+    from the CustomField model.
 
     Example:
         {
-            "field_id": "uuid-presentation",
+            "field_id": "123e4567-e89b-12d3-a456-426614174000",
+            "display_order": 0,
+            "show_on_card": true,
+            "field": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "name": "Presentation Quality",
+                "field_type": "select",
+                "config": {"options": ["bad", "good", "great"]},
+                ...
+            }
+        }
+    """
+    field_id: UUID = Field(..., description="ID of the custom field")
+    display_order: int = Field(..., description="Display order within schema (0-indexed)")
+    show_on_card: bool = Field(..., description="Whether to show field on video card")
+
+    # Nested CustomField details (populated via eager loading)
+    # Note: This will be populated by SQLAlchemy relationship loading
+    # We'll access it via schemafield.field in the ORM model
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
+class FieldInSchemaResponse(BaseModel):
+    """
+    Full custom field details for display in schema response.
+
+    Includes all CustomField attributes for rich display in frontend.
+    Matches CustomFieldResponse structure from Task #64.
+    """
+    id: UUID
+    list_id: UUID
+    name: str
+    field_type: str  # 'select' | 'rating' | 'text' | 'boolean'
+    config: dict  # Type-specific configuration
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
+class SchemaFieldResponse(BaseModel):
+    """
+    Combined schema field data with full custom field details.
+
+    This is the main nested object in FieldSchemaResponse, combining
+    join table metadata (display_order, show_on_card) with full field data.
+    """
+    field_id: UUID
+    schema_id: UUID
+    display_order: int
+    show_on_card: bool
+    field: FieldInSchemaResponse  # Full nested field details
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
+# ============================================================================
+# Schema Field Input (for POST /schemas with initial fields)
+# ============================================================================
+
+class SchemaFieldInput(BaseModel):
+    """
+    Input schema for adding a field to a schema during creation.
+
+    Used in FieldSchemaCreate.fields array to specify initial fields
+    when creating a schema.
+
+    Example:
+        {
+            "field_id": "123e4567-e89b-12d3-a456-426614174000",
             "display_order": 0,
             "show_on_card": true
         }
     """
-    field_id: UUID = Field(
-        ...,
-        description="ID of the CustomField to include in this schema"
-    )
-    display_order: int = Field(
-        ...,
-        ge=0,
-        description="Display order (0-based, lower numbers appear first)"
-    )
-    show_on_card: bool = Field(
-        default=False,
-        description="Whether this field should be visible on video cards (max 3 per schema)"
-    )
+    field_id: UUID = Field(..., description="ID of existing custom field to add")
+    display_order: int = Field(..., ge=0, description="Display order (0-indexed)")
+    show_on_card: bool = Field(True, description="Show field on video cards")
 
 
-class FieldSchemaCreate(BaseModel):
+# ============================================================================
+# Main FieldSchema Schemas
+# ============================================================================
+
+class FieldSchemaBase(BaseModel):
     """
-    Schema for creating a new FieldSchema.
+    Base schema for field schema with shared attributes.
 
-    Validates:
-    - Name is required (1-255 chars)
-    - Description is optional
-    - Fields array with field_id, display_order, show_on_card
-    - Max 3 fields can have show_on_card=true
-    - No duplicate display_order values (REF MCP Improvement #3)
-    - No duplicate field_id values (REF MCP Improvement #4)
+    Contains common fields used in create and response operations.
+    """
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Schema name (e.g., 'Video Quality', 'Tutorial Metrics')"
+    )
+    description: Optional[str] = Field(
+        None,
+        max_length=1000,
+        description="Optional explanation of what this schema evaluates"
+    )
 
-    Example Request:
+
+class FieldSchemaCreate(FieldSchemaBase):
+    """
+    Schema for creating a new field schema.
+
+    Used in: POST /api/lists/{list_id}/schemas
+
+    Optionally accepts an array of fields to add to the schema during creation.
+    If provided, all field_ids must exist in the same list as the schema.
+
+    Example (minimal):
         {
             "name": "Video Quality",
-            "description": "Standard video quality metrics",
+            "description": "Standard quality metrics"
+        }
+
+    Example (with fields):
+        {
+            "name": "Video Quality",
+            "description": "Standard quality metrics",
             "fields": [
                 {
                     "field_id": "uuid-presentation",
@@ -75,212 +172,108 @@ class FieldSchemaCreate(BaseModel):
             ]
         }
     """
-    name: str = Field(
-        ...,
-        min_length=1,
-        max_length=255,
-        description="Human-readable schema name (e.g., 'Video Quality')"
-    )
-    description: Optional[str] = Field(
+    fields: Optional[list[SchemaFieldInput]] = Field(
         None,
-        description="Optional explanation of what this schema evaluates"
+        description="Optional array of fields to add to schema during creation"
     )
-    fields: list[SchemaFieldItem] = Field(
-        default_factory=list,
-        description="List of custom fields to include in this schema"
-    )
-
-    @field_validator('fields')
-    @classmethod
-    def validate_show_on_card_limit(cls, fields: list[SchemaFieldItem]) -> list[SchemaFieldItem]:
-        """
-        Validate that at most 3 fields have show_on_card=true.
-
-        REF MCP Improvement #2: Better error messages with field_ids.
-
-        This constraint ensures the UI doesn't become cluttered with too many
-        fields displayed on video cards. Users can still define more fields,
-        but only 3 will be prominently displayed.
-
-        Raises:
-            ValueError: If more than 3 fields have show_on_card=true
-        """
-        show_on_card_fields = [f for f in fields if f.show_on_card]
-        if len(show_on_card_fields) > 3:
-            # Show first 5 field_ids (truncated) to help identify which fields need fixing
-            field_ids_str = ", ".join(str(f.field_id)[:8] + "..." for f in show_on_card_fields[:5])
-            raise ValueError(
-                f"At most 3 fields can have show_on_card=true, but {len(show_on_card_fields)} fields are marked. "
-                f"Please set show_on_card=false for {len(show_on_card_fields) - 3} of these fields: {field_ids_str}"
-            )
-        return fields
-
-    @field_validator('fields')
-    @classmethod
-    def validate_no_duplicate_display_orders(cls, fields: list[SchemaFieldItem]) -> list[SchemaFieldItem]:
-        """
-        Validate that all display_order values are unique.
-
-        REF MCP Improvement #3: Validate no duplicate display_order.
-
-        Each field must have a unique display_order to ensure consistent
-        rendering order in the UI. Duplicate orders create ambiguity about
-        which field should appear first.
-
-        Raises:
-            ValueError: If duplicate display_order values are found
-        """
-        display_orders = [f.display_order for f in fields]
-        if len(display_orders) != len(set(display_orders)):
-            # Find which orders are duplicated
-            duplicates = [order for order in display_orders if display_orders.count(order) > 1]
-            raise ValueError(
-                f"Duplicate display_order values found: {set(duplicates)}. "
-                f"Each field must have a unique display_order."
-            )
-        return fields
-
-    @field_validator('fields')
-    @classmethod
-    def validate_no_duplicate_field_ids(cls, fields: list[SchemaFieldItem]) -> list[SchemaFieldItem]:
-        """
-        Validate that all field_id values are unique.
-
-        REF MCP Improvement #4: Validate no duplicate field_ids.
-
-        Each field can only be added once to a schema. Duplicate field_ids
-        would create confusion and violate the database unique constraint on
-        (schema_id, field_id).
-
-        Raises:
-            ValueError: If duplicate field_id values are found
-        """
-        field_ids = [f.field_id for f in fields]
-        if len(field_ids) != len(set(field_ids)):
-            # Find which field_ids are duplicated
-            duplicates = [fid for fid in field_ids if field_ids.count(fid) > 1]
-            # Show truncated UUIDs for readability
-            duplicates_str = ", ".join(str(fid)[:8] + "..." for fid in set(duplicates))
-            raise ValueError(
-                f"Duplicate field_id values found: {duplicates_str}. "
-                f"Each field can only be added once to a schema."
-            )
-        return fields
 
 
 class FieldSchemaUpdate(BaseModel):
     """
-    Schema for updating an existing FieldSchema.
+    Schema for updating field schema metadata.
 
-    Only allows updating name and description. Field associations are managed
-    through separate endpoints (POST/PUT/DELETE /schemas/{id}/fields/{field_id}).
+    Used in: PUT /api/lists/{list_id}/schemas/{schema_id}
+
+    Only updates name and/or description. Field management (adding/removing
+    fields from schema) is handled by separate endpoints in Task #69.
 
     All fields are optional to support partial updates.
 
-    Example Request:
+    Example (update name only):
+        {"name": "Updated Video Quality"}
+
+    Example (update both):
         {
-            "name": "Updated Video Quality",
-            "description": "Updated description"
+            "name": "Tutorial Evaluation",
+            "description": "Comprehensive tutorial assessment criteria"
         }
     """
     name: Optional[str] = Field(
         None,
         min_length=1,
         max_length=255,
-        description="Updated schema name"
+        description="Schema name"
     )
     description: Optional[str] = Field(
         None,
-        description="Updated schema description"
+        max_length=1000,
+        description="Schema description"
     )
 
 
-class SchemaFieldResponse(BaseModel):
+class FieldSchemaResponse(FieldSchemaBase):
     """
-    Represents a field within a schema in API responses.
+    Schema for field schema response from API.
 
-    Includes full CustomField data to avoid N+1 queries. This enables the
-    frontend to display all field details without making additional API calls.
+    Includes all database fields plus eager-loaded schema_fields relationship.
+    The schema_fields array contains full CustomField details for each field,
+    enabling rich display in the frontend without additional queries.
+
+    Used in:
+    - GET /api/lists/{list_id}/schemas (list)
+    - POST /api/lists/{list_id}/schemas (single)
+    - PUT /api/lists/{list_id}/schemas/{schema_id} (single)
+    - GET /api/lists/{list_id}/schemas/{schema_id} (single)
 
     Example:
         {
-            "field_id": "uuid",
-            "field": {
-                "id": "uuid",
-                "name": "Presentation Quality",
-                "field_type": "select",
-                "config": {"options": ["bad", "good", "great"]},
-                "created_at": "2025-11-05T10:00:00Z",
-                "updated_at": "2025-11-05T10:00:00Z"
-            },
-            "display_order": 0,
-            "show_on_card": true
-        }
-    """
-    model_config = ConfigDict(from_attributes=True)
-
-    field_id: UUID = Field(
-        ...,
-        description="ID of the CustomField"
-    )
-    field: CustomFieldResponse = Field(
-        ...,
-        description="Full CustomField definition with name, type, config"
-    )
-    display_order: int = Field(
-        ...,
-        description="Display order (0-based)"
-    )
-    show_on_card: bool = Field(
-        ...,
-        description="Whether this field is shown on video cards"
-    )
-
-
-class FieldSchemaResponse(BaseModel):
-    """
-    Schema for FieldSchema API responses.
-
-    Includes full nested field data via SchemaFieldResponse. This rich response
-    format eliminates the need for the frontend to make separate API calls to
-    fetch CustomField details.
-
-    The schema_fields list is ordered by display_order (handled by SQLAlchemy
-    relationship ordering in the model).
-
-    Example Response:
-        {
-            "id": "uuid",
-            "list_id": "uuid",
+            "id": "schema-uuid",
+            "list_id": "list-uuid",
             "name": "Video Quality",
             "description": "Standard quality metrics",
             "schema_fields": [
                 {
-                    "field_id": "uuid-1",
-                    "field": {...CustomField...},
+                    "field_id": "field-uuid-1",
+                    "schema_id": "schema-uuid",
                     "display_order": 0,
-                    "show_on_card": true
+                    "show_on_card": true,
+                    "field": {
+                        "id": "field-uuid-1",
+                        "list_id": "list-uuid",
+                        "name": "Presentation Quality",
+                        "field_type": "select",
+                        "config": {"options": ["bad", "good", "great"]},
+                        "created_at": "2025-11-06T10:00:00Z",
+                        "updated_at": "2025-11-06T10:00:00Z"
+                    }
                 },
                 {
-                    "field_id": "uuid-2",
-                    "field": {...CustomField...},
+                    "field_id": "field-uuid-2",
+                    "schema_id": "schema-uuid",
                     "display_order": 1,
-                    "show_on_card": false
+                    "show_on_card": true,
+                    "field": {
+                        "id": "field-uuid-2",
+                        "name": "Overall Rating",
+                        "field_type": "rating",
+                        "config": {"max_rating": 5},
+                        ...
+                    }
                 }
             ],
-            "created_at": "2025-11-05T10:00:00Z",
-            "updated_at": "2025-11-05T10:00:00Z"
+            "created_at": "2025-11-06T09:00:00Z",
+            "updated_at": "2025-11-06T09:00:00Z"
         }
     """
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    list_id: UUID
-    name: str
-    description: Optional[str]
+    id: UUID = Field(..., description="Unique schema identifier")
+    list_id: UUID = Field(..., description="Parent list identifier")
     schema_fields: list[SchemaFieldResponse] = Field(
         default_factory=list,
-        description="Ordered list of fields in this schema"
+        description="Fields in this schema (ordered by display_order)"
     )
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+
+    model_config = {
+        "from_attributes": True
+    }
