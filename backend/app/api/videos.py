@@ -16,7 +16,7 @@ Includes:
 
 from uuid import UUID
 import re
-from typing import List, Sequence, Optional, Annotated
+from typing import List, Sequence, Optional, Annotated, Dict, Tuple, Set
 import csv
 import io
 from datetime import datetime, timezone
@@ -40,6 +40,10 @@ from app.models.list import BookmarkList
 from app.models.video import Video
 from app.models.job import ProcessingJob
 from app.models.tag import Tag, video_tags
+from app.models.schema_field import SchemaField
+from app.models.field_schema import FieldSchema
+from app.models.custom_field import CustomField
+from app.models.video_field_value import VideoFieldValue
 from app.schemas.video import VideoAdd, VideoResponse, BulkUploadResponse, BulkUploadFailure
 from app.schemas.tag import TagResponse
 from pydantic import BaseModel
@@ -281,7 +285,169 @@ async def add_video_to_list(
     # (newly created video has no tags assigned yet)
     new_video.__dict__['tags'] = []
 
+    # Set field_values to empty list (no tags → no applicable fields)
+    new_video.__dict__['field_values'] = []
+
     return new_video
+
+
+async def _batch_load_applicable_fields(
+    videos: List[Video],
+    db: AsyncSession
+) -> Dict[UUID, List[Tuple[CustomField, str | None, int, bool]]]:
+    """
+    Batch-load applicable fields for ALL videos in a single query.
+
+    REF MCP Improvement #1: Single query for all videos (not N queries).
+    REF MCP Improvement #2: Nested selectinload prevents MissingGreenlet.
+    REF MCP Improvement #4: Conflict resolution handles 3+ tag edge cases.
+
+    Returns:
+        Dict mapping video_id → list of (field, schema_name_or_none, display_order, show_on_card)
+    """
+    # Step 1: Collect ALL unique schema_ids from ALL videos
+    all_schema_ids: Set[UUID] = set()
+    video_schemas: Dict[UUID, List[UUID]] = {}  # video_id → [schema_ids]
+
+    for video in videos:
+        schema_ids = [tag.schema_id for tag in video.tags if tag.schema_id is not None]
+        if schema_ids:
+            video_schemas[video.id] = schema_ids
+            all_schema_ids.update(schema_ids)
+
+    if not all_schema_ids:
+        # No schemas → no fields for any video
+        return {video.id: [] for video in videos}
+
+    # Step 2: Batch-load ALL SchemaFields for ALL schemas in ONE query
+    # ✅ REF #1: Single query instead of N queries
+    # ✅ REF #2: Nested selectinload prevents MissingGreenlet
+    stmt = (
+        select(SchemaField, FieldSchema.name)
+        .join(SchemaField.schema)  # Join to get schema name
+        .options(
+            selectinload(SchemaField.field)  # Eager load CustomField
+            # Note: If CustomField has relationships (e.g., to list), add:
+            # .selectinload(CustomField.list)  # Prevent nested MissingGreenlet
+        )
+        .where(SchemaField.schema_id.in_(all_schema_ids))
+        .order_by(SchemaField.display_order)  # Preserve display order
+    )
+
+    result = await db.execute(stmt)
+    all_schema_fields = result.all()  # List of (SchemaField, schema_name) tuples
+
+    # Step 3: Group SchemaFields by schema_id
+    fields_by_schema: Dict[UUID, List[Tuple[SchemaField, str]]] = {}
+    for schema_field, schema_name in all_schema_fields:
+        if schema_field.schema_id not in fields_by_schema:
+            fields_by_schema[schema_field.schema_id] = []
+        fields_by_schema[schema_field.schema_id].append((schema_field, schema_name))
+
+    # Step 4: Compute applicable fields for each video (pure logic, no DB access)
+    result_by_video: Dict[UUID, List[Tuple[CustomField, str | None, int, bool]]] = {}
+
+    for video in videos:
+        if video.id not in video_schemas:
+            # Video has no schemas → empty list
+            result_by_video[video.id] = []
+            continue
+
+        schema_ids = video_schemas[video.id]
+        applicable_fields = _compute_field_union_with_conflicts(
+            schema_ids, fields_by_schema
+        )
+        result_by_video[video.id] = applicable_fields
+
+    return result_by_video
+
+
+def _compute_field_union_with_conflicts(
+    schema_ids: List[UUID],
+    fields_by_schema: Dict[UUID, List[Tuple[SchemaField, str]]]
+) -> List[Tuple[CustomField, str | None, int, bool]]:
+    """
+    Compute union of fields from multiple schemas with conflict resolution.
+
+    REF MCP Improvement #4: Two-pass algorithm correctly handles all edge cases.
+
+    Algorithm:
+    Pass 1: Detect conflicts (same name, different types)
+    Pass 2: Build registry with appropriate schema prefixes
+
+    Returns:
+        List of (field, schema_name_or_none, display_order, show_on_card)
+    """
+
+    # PASS 1: Detect conflicts
+    # Build mapping: field_name_lower → set of field_types
+    field_types_by_name: Dict[str, Set[str]] = {}
+
+    for schema_id in schema_ids:
+        if schema_id not in fields_by_schema:
+            continue
+
+        for schema_field, schema_name in fields_by_schema[schema_id]:
+            field = schema_field.field
+            field_key = field.name.lower()
+
+            if field_key not in field_types_by_name:
+                field_types_by_name[field_key] = set()
+            field_types_by_name[field_key].add(field.field_type)
+
+    # Identify conflicting field names (multiple types)
+    conflicting_names = {
+        name for name, types in field_types_by_name.items()
+        if len(types) > 1
+    }
+
+    # PASS 2: Build registry with conflict resolution
+    field_registry: Dict[str, Dict] = {}
+
+    for schema_id in schema_ids:
+        if schema_id not in fields_by_schema:
+            continue
+
+        for schema_field, schema_name in fields_by_schema[schema_id]:
+            field = schema_field.field
+            field_key = field.name.lower()
+            is_conflicting = field_key in conflicting_names
+
+            if is_conflicting:
+                # This field name has type conflicts → use schema prefix
+                registry_key = f"{schema_name}:{field.name}".lower()
+            else:
+                # No conflict → use original name
+                registry_key = field_key
+
+            if registry_key in field_registry:
+                # Already have this exact field (same name, same type, same schema)
+                # This can happen if a field appears multiple times
+                # Skip duplicates (first wins)
+                continue
+
+            # Add to registry
+            field_registry[registry_key] = {
+                'field': field,
+                'schema_name': schema_name if is_conflicting else None,
+                'display_order': schema_field.display_order,
+                'show_on_card': schema_field.show_on_card
+            }
+
+    # Build result list
+    result = []
+    for entry in field_registry.values():
+        result.append((
+            entry['field'],
+            entry['schema_name'],
+            entry['display_order'],
+            entry['show_on_card']
+        ))
+
+    # Sort by display_order (preserve schema ordering)
+    result.sort(key=lambda x: x[2])
+
+    return result
 
 
 @router.get("/lists/{list_id}/videos", response_model=List[VideoResponse])
@@ -344,26 +510,106 @@ async def get_videos_in_list(
     if not videos:
         return []
 
-    # Load all tags for all videos in a single query (prevents N+1)
-    # This is more explicit than selectinload and works better with FastAPI response models
+    # Load all tags for all videos in two queries (prevents N+1)
+    # First, get video-tag associations
     video_ids = [video.id for video in videos]
-    tags_stmt = (
-        select(video_tags.c.video_id, Tag)
-        .join(Tag, video_tags.c.tag_id == Tag.id)
-        .where(video_tags.c.video_id.in_(video_ids))
-    )
-    tags_result = await db.execute(tags_stmt)
+    associations_stmt = select(video_tags).where(video_tags.c.video_id.in_(video_ids))
+    associations_result = await db.execute(associations_stmt)
+    associations = associations_result.all()
+
+    # Get all unique tag IDs
+    tag_ids = list(set(assoc.tag_id for assoc in associations))
+
+    # Load all tags with schema relationship eagerly loaded
+    if tag_ids:
+        tags_stmt = (
+            select(Tag)
+            .options(selectinload(Tag.schema))  # Eager load schema for FieldSchema relationship
+            .where(Tag.id.in_(tag_ids))
+        )
+        tags_result = await db.execute(tags_stmt)
+        tags_by_id = {tag.id: tag for tag in tags_result.scalars().all()}
+    else:
+        tags_by_id = {}
 
     # Group tags by video_id
     tags_by_video: dict = {}
-    for video_id, tag in tags_result:
+    for assoc in associations:
+        video_id = assoc.video_id
+        tag_id = assoc.tag_id
         if video_id not in tags_by_video:
             tags_by_video[video_id] = []
-        tags_by_video[video_id].append(tag)
+        if tag_id in tags_by_id:
+            tags_by_video[video_id].append(tags_by_id[tag_id])
 
     # Assign tags to videos
     for video in videos:
         video.__dict__['tags'] = tags_by_video.get(video.id, [])
+
+    # === NEW: Batch-load applicable fields for ALL videos ===
+    # ✅ REF #1: Single query for all videos
+    applicable_fields_by_video = await _batch_load_applicable_fields(videos, db)
+
+    # === NEW: Batch load field values ===
+    if video_ids:
+        # Fetch all field values for all videos in one query
+        field_values_stmt = (
+            select(VideoFieldValue)
+            .options(
+                selectinload(VideoFieldValue.field)  # Eager load CustomField
+            )
+            .where(VideoFieldValue.video_id.in_(video_ids))
+        )
+        field_values_result = await db.execute(field_values_stmt)
+        all_field_values = field_values_result.scalars().all()
+
+        # Group field values by video_id
+        field_values_by_video: Dict[UUID, List[VideoFieldValue]] = {}
+        for fv in all_field_values:
+            if fv.video_id not in field_values_by_video:
+                field_values_by_video[fv.video_id] = []
+            field_values_by_video[fv.video_id].append(fv)
+
+        # Build field_values response for each video
+        for video in videos:
+            # Get applicable fields (from batch-loaded data)
+            applicable_fields = applicable_fields_by_video.get(video.id, [])
+
+            # Get actual field values for this video
+            video_field_values = field_values_by_video.get(video.id, [])
+            values_by_field_id = {fv.field_id: fv for fv in video_field_values}
+
+            # Build response list: applicable fields + their values (if set)
+            field_values_response = []
+            for field, schema_name, display_order, show_on_card in applicable_fields:
+                field_value = values_by_field_id.get(field.id)
+
+                # ✅ REF #3: Extract value based on field type (float not int)
+                value = None
+                if field_value:
+                    if field.field_type == 'rating':
+                        value = field_value.value_numeric  # Can be float
+                    elif field.field_type in ('select', 'text'):
+                        value = field_value.value_text
+                    elif field.field_type == 'boolean':
+                        value = field_value.value_boolean
+
+                # Create response dict (Pydantic will serialize)
+                field_values_response.append({
+                    'field_id': field.id,
+                    'field': field,  # CustomField ORM object
+                    'value': value,
+                    'schema_name': schema_name,
+                    'show_on_card': show_on_card,
+                    'display_order': display_order
+                })
+
+            # Assign to video (FastAPI will serialize via VideoResponse schema)
+            video.__dict__['field_values'] = field_values_response
+    else:
+        # No videos → no field values needed
+        for video in videos:
+            video.__dict__['field_values'] = []
 
     return list(videos)
 

@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload  # ADD THIS
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from app.core.database import get_db
 from app.models.tag import Tag
 from app.models.user import User
+from app.models.field_schema import FieldSchema  # ADD THIS
 from app.schemas.tag import TagCreate, TagUpdate, TagResponse
 
 router = APIRouter(prefix="/api/tags", tags=["tags"])
@@ -62,7 +64,15 @@ async def list_tags(db: AsyncSession = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=400, detail="No user found")
 
-    stmt = select(Tag).where(Tag.user_id == current_user.id).order_by(Tag.name)
+    # Eager load schema relationships (including nested schema_fields)
+    stmt = (
+        select(Tag)
+        .options(
+            selectinload(Tag.schema).selectinload(FieldSchema.schema_fields)
+        )
+        .where(Tag.user_id == current_user.id)
+        .order_by(Tag.name)
+    )
     result = await db.execute(stmt)
     tags = result.scalars().all()
     return list(tags)
@@ -78,7 +88,14 @@ async def get_tag(tag_id: UUID, db: AsyncSession = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=400, detail="No user found")
 
-    stmt = select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)
+    # Eager load schema relationship (including nested schema_fields)
+    stmt = (
+        select(Tag)
+        .options(
+            selectinload(Tag.schema).selectinload(FieldSchema.schema_fields)
+        )
+        .where(Tag.id == tag_id, Tag.user_id == current_user.id)
+    )
     result = await db.execute(stmt)
     tag = result.scalar_one_or_none()
 
@@ -94,7 +111,7 @@ async def update_tag(
     tag_update: TagUpdate,
     db: AsyncSession = Depends(get_db)
 ):
-    """Update a tag (rename or change color)."""
+    """Update a tag (rename, change color, or bind/unbind schema)."""
     # Get first user (for testing - in production, use get_current_user dependency)
     user_result = await db.execute(select(User))
     current_user = user_result.scalars().first()
@@ -102,7 +119,11 @@ async def update_tag(
     if not current_user:
         raise HTTPException(status_code=400, detail="No user found")
 
-    stmt = select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)
+    # Fetch tag with eager loaded schema (for response)
+    stmt = select(Tag).options(selectinload(Tag.schema)).where(
+        Tag.id == tag_id,
+        Tag.user_id == current_user.id
+    )
     result = await db.execute(stmt)
     tag = result.scalar_one_or_none()
 
@@ -124,14 +145,57 @@ async def update_tag(
                 detail=f"Tag '{tag_update.name}' already exists"
             )
 
+    # Validate schema_id if provided (check field exists in update)
+    # Note: tag_update.model_dump(exclude_unset=True) distinguishes null from missing
+    update_data = tag_update.model_dump(exclude_unset=True)
+
+    if "schema_id" in update_data:
+        schema_id_value = update_data["schema_id"]
+
+        if schema_id_value is not None:
+            # REF MCP Improvement #3: Validate schema exists AND belongs to user's list in ONE query
+            from app.models.list import BookmarkList
+
+            schema_stmt = (
+                select(FieldSchema)
+                .join(BookmarkList, FieldSchema.list_id == BookmarkList.id)
+                .where(
+                    FieldSchema.id == schema_id_value,
+                    BookmarkList.user_id == current_user.id
+                )
+            )
+            schema = (await db.execute(schema_stmt)).scalar_one_or_none()
+
+            if not schema:
+                # Combined error: schema not found OR doesn't belong to user's list
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Schema mit ID '{str(schema_id_value)[:8]}...' nicht gefunden oder gehört zu anderer Liste"
+                )
+        # If schema_id_value is None, we're unbinding (allow this)
+
     # Update fields
     if tag_update.name is not None:
         tag.name = tag_update.name
     if tag_update.color is not None:
         tag.color = tag_update.color
+    if "schema_id" in update_data:
+        # Set to new value (could be UUID or None for unbinding)
+        tag.schema_id = update_data["schema_id"]
 
     await db.commit()
-    await db.refresh(tag)
+
+    # REF MCP Improvement #4: Re-query with selectinload (no refresh needed)
+    # Load nested schema_fields to avoid lazy loading issues
+    stmt = (
+        select(Tag)
+        .options(
+            selectinload(Tag.schema).selectinload(FieldSchema.schema_fields)
+        )
+        .where(Tag.id == tag_id)
+    )
+    tag = (await db.execute(stmt)).scalar_one_or_none()
+
     return tag
 
 

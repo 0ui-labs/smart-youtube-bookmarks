@@ -182,6 +182,65 @@ docker-compose logs -f postgres redis
 - Example: "Show videos where Rating >= 4" uses idx_video_field_values_field_numeric
 - Alternative (JSONB) would require slower JSON path queries
 
+### Video GET Endpoint with Custom Field Values (Task #71)
+
+**Endpoint:** `GET /api/lists/{list_id}/videos`
+
+Videos now include custom field values based on their tags' schemas:
+
+```json
+{
+  "id": "video-uuid",
+  "title": "How to Apply Eyeliner",
+  "tags": [...],
+  "field_values": [
+    {
+      "field_id": "uuid",
+      "field": {
+        "id": "uuid",
+        "name": "Overall Rating",
+        "field_type": "rating",
+        "config": {"max_rating": 5},
+        "list_id": "list-uuid",
+        "created_at": "2025-11-08T...",
+        "updated_at": "2025-11-08T..."
+      },
+      "value": 4.5,
+      "schema_name": null,
+      "show_on_card": true,
+      "display_order": 0
+    }
+  ]
+}
+```
+
+**REF MCP Improvements Applied (2025-11-08):**
+1. **Batch Loading**: Single query for all videos' applicable fields (not N queries)
+2. **Nested Selectinload**: Prevents MissingGreenlet errors with `selectinload(SchemaField.field)`
+3. **Type Safety**: `value` field uses `float` (not `int`) for PostgreSQL NUMERIC compatibility
+4. **Conflict Resolution**: Two-pass algorithm handles 3+ tag edge cases correctly
+5. **DRY Principle**: Reuses `CustomFieldResponse` from Task #64
+
+**Performance Pattern:**
+- 4 queries total: videos, tags, field_values, applicable_fields (batch)
+- Query count independent of video count (no N+1)
+- Follows SQLAlchemy 2.0 `selectinload()` best practice
+
+**Multi-Tag Field Union Logic:**
+- Videos with multiple tags get union of all fields from all schemas
+- Conflict resolution: same name + different type → `schema_name` prefix added to ALL occurrences
+- Same name + same type → shown once (first schema wins)
+- Unset fields included with `value: null` (frontend can show empty state)
+
+**Helper Functions:**
+- `_batch_load_applicable_fields(videos, db)`: Batch-loads SchemaFields for all videos in 1 query
+- `_compute_field_union_with_conflicts(schema_ids, fields_by_schema)`: Two-pass conflict resolution
+
+**Files:**
+- Implementation: `backend/app/api/videos.py` (lines 291-595)
+- Schemas: `backend/app/schemas/video.py` (VideoFieldValueResponse)
+- Tests: `backend/tests/api/test_videos.py` (test_get_videos_field_values_*)
+
 ### Testing Patterns
 
 **Frontend (Vitest):**
@@ -194,6 +253,7 @@ docker-compose logs -f postgres redis
 - Unit tests: `tests/api/`, `tests/models/`, `tests/workers/`
 - Integration tests: `tests/integration/` (real database via fixture)
 - Fixtures in `tests/conftest.py` (db session, test client, async support)
+- **Known Issue**: Test session sharing can cause field_values tests to fail (session cache/transaction isolation)
 
 ## Known Patterns & Conventions
 

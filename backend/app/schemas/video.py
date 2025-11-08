@@ -10,12 +10,15 @@ from uuid import UUID
 from urllib.parse import urlparse
 import re
 
-from pydantic import BaseModel, Field, AfterValidator
+from pydantic import BaseModel, Field, AfterValidator, ConfigDict
 
 # Import for circular dependency resolution (TYPE_CHECKING)
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .tag import TagResponse
+
+# Import existing CustomFieldResponse from Task #64 (REF #5: DRY principle)
+from .custom_field import CustomFieldResponse
 
 
 def validate_youtube_url(url: str) -> str:
@@ -72,6 +75,26 @@ class VideoAdd(BaseModel):
     ]
 
 
+class VideoFieldValueResponse(BaseModel):
+    """
+    Response model for a video's custom field value.
+
+    Includes the field definition, current value, and schema context
+    for frontend grouping and conflict resolution display.
+
+    REF MCP Improvement #3: value uses float (not int) for PostgreSQL NUMERIC compatibility.
+    REF MCP Improvement #5: Reuses existing CustomFieldResponse from Task #64.
+    """
+    field_id: UUID
+    field: CustomFieldResponse  # Nested field definition (from Task #64)
+    value: str | float | bool | None = None  # REF #3: float not int
+    schema_name: str | None = None  # For multi-tag conflict resolution
+    show_on_card: bool = False  # From schema_fields.show_on_card
+    display_order: int = 0  # From schema_fields.display_order
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class VideoResponse(BaseModel):
     """
     Schema for video response.
@@ -92,6 +115,9 @@ class VideoResponse(BaseModel):
 
     # Tags (many-to-many relationship)
     tags: list["TagResponse"] = Field(default_factory=list)
+
+    # Field values (custom fields from tag schemas)
+    field_values: list[VideoFieldValueResponse] = Field(default_factory=list)
 
     processing_status: str
     error_message: str | None = None

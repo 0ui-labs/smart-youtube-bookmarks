@@ -75,10 +75,7 @@ class TagCreate(TagBase):
 class TagUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     color: str | None = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
-    schema_id: UUID | None = Field(
-        default=None,
-        description="FieldSchema UUID to bind (or null to unbind)"
-    )
+    schema_id: UUID | None = None  # REF MCP: Simplified from Field(default=None)
 
 
 class TagResponse(TagBase):
@@ -91,50 +88,27 @@ class TagResponse(TagBase):
         from_attributes = True
 ```
 
-**Why:** 
-- `UUID | None` allows both valid UUID and explicit `null` value
-- `default=...` (ellipsis) makes field truly optional - if not provided, Pydantic won't include it in parsed data
-- This enables distinction between "unbind schema" (`null`) and "don't change schema" (field missing from request)
-- Follows FastAPI best practice for partial updates (see REF MCP findings)
-
----
-
-### Step 2: Create FieldSchemaResponse (Minimal Version)
-
-**Files:** `backend/app/schemas/tag.py`
-
-**Action:** Add minimal FieldSchemaResponse class for nested schema data in TagResponse
-
-**Code:**
-```python
-# Add after TagUpdate, before TagResponse
-
-class FieldSchemaResponse(BaseModel):
-    """Minimal FieldSchema data for Tag responses."""
-    id: UUID
-    name: str
-    description: str | None
-    
-    class Config:
-        from_attributes = True
-```
-
 **Why:**
-- TagResponse needs to return schema data when tag has a bound schema
-- Minimal version includes only essential fields (id, name, description)
-- Full FieldSchemaResponse with fields will be created in Task #65
-- Avoids circular import issues (Tag schema doesn't need to know about SchemaField)
+- `UUID | None = None` is the FastAPI convention for optional fields (simpler than Field())
+- `exclude_unset=True` enables distinction between "unbind schema" (`null`) and "don't change schema" (field missing from request)
+- Follows FastAPI tutorial pattern from official docs (body-updates.md)
+- Consistent with existing codebase style in tag.py
 
 ---
 
-### Step 3: Update TagResponse with Schema Field
+### Step 2: Update TagResponse with Schema Field and Import
 
 **Files:** `backend/app/schemas/tag.py`
 
-**Action:** Add optional `schema` field to TagResponse to return bound schema data
+**Action:** Import existing `FieldSchemaResponse` from field_schema module and add optional `schema` field to TagResponse
 
 **Code:**
 ```python
+# At top of file, add import
+from app.schemas.field_schema import FieldSchemaResponse
+
+# ... existing code ...
+
 class TagResponse(TagBase):
     id: UUID
     user_id: UUID
@@ -147,14 +121,18 @@ class TagResponse(TagBase):
         from_attributes = True
 ```
 
-**Why:**
-- Frontend needs both `schema_id` (for quick checks) and full `schema` object (for displaying schema name)
-- `| None` indicates field is optional (tags without schemas return null)
+**Why (REF MCP Improvement #2):**
+- **Reuse existing schema:** FieldSchemaResponse already exists from Task #65/68 (backend/app/schemas/field_schema.py)
+- **DRY principle:** Single source of truth - no duplicate class definition
+- **Consistency:** All endpoints return the same FieldSchemaResponse format
+- **No circular imports:** tag.py can safely import from field_schema.py (not vice versa)
+- **Full schema data:** The existing FieldSchemaResponse includes `schema_fields: list[SchemaFieldResponse]` which is useful for frontend
+- Frontend needs both `schema_id` (for quick checks) and full `schema` object (for displaying schema details)
 - Pydantic automatically populates from SQLAlchemy relationship when eager loaded
 
 ---
 
-### Step 4: Update PUT /tags/{tag_id} Endpoint - Add Imports
+### Step 3: Update PUT /tags/{tag_id} Endpoint - Add Imports
 
 **Files:** `backend/app/api/tags.py`
 
@@ -181,7 +159,7 @@ from app.schemas.tag import TagCreate, TagUpdate, TagResponse
 
 ---
 
-### Step 5: Update PUT /tags/{tag_id} Endpoint - Schema Validation Logic
+### Step 4: Update PUT /tags/{tag_id} Endpoint - Schema Validation Logic
 
 **Files:** `backend/app/api/tags.py`
 
@@ -232,47 +210,29 @@ async def update_tag(
     # Validate schema_id if provided (check field exists in update)
     # Note: tag_update.model_dump(exclude_unset=True) distinguishes null from missing
     update_data = tag_update.model_dump(exclude_unset=True)
-    
+
     if "schema_id" in update_data:
         schema_id_value = update_data["schema_id"]
-        
+
         if schema_id_value is not None:
-            # Validate schema exists
-            schema_stmt = select(FieldSchema).where(FieldSchema.id == schema_id_value)
-            schema_result = await db.execute(schema_stmt)
-            schema = schema_result.scalar_one_or_none()
-            
+            # REF MCP Improvement #3: Validate schema exists AND belongs to user's list in ONE query
+            from app.models.list import BookmarkList
+
+            schema_stmt = (
+                select(FieldSchema)
+                .join(BookmarkList, FieldSchema.list_id == BookmarkList.id)
+                .where(
+                    FieldSchema.id == schema_id_value,
+                    BookmarkList.user_id == current_user.id
+                )
+            )
+            schema = (await db.execute(schema_stmt)).scalar_one_or_none()
+
             if not schema:
+                # Combined error: schema not found OR doesn't belong to user's list
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Schema mit ID '{schema_id_value}' nicht gefunden"
-                )
-            
-            # Validate schema belongs to tag's list (prevent cross-list binding)
-            # Tags are user-scoped, schemas are list-scoped - need to find tag's list first
-            # For MVP: Tags don't have list_id yet, so we skip this validation
-            # TODO: When list_id added to tags, validate schema.list_id == tag.list_id
-            # For now, validate schema belongs to same user (safer than no check)
-            # Actually, FieldSchema has list_id, and tags have user_id
-            # We need to check if user owns the list that owns the schema
-            
-            # Get the list that owns this schema
-            from app.models.list import BookmarkList
-            list_stmt = select(BookmarkList).where(BookmarkList.id == schema.list_id)
-            list_result = await db.execute(list_stmt)
-            schema_list = list_result.scalar_one_or_none()
-            
-            if not schema_list:
-                # Schema references non-existent list (shouldn't happen due to FK)
-                raise HTTPException(
-                    status_code=500,
-                    detail="Schema referenziert ungültige Liste"
-                )
-            
-            if schema_list.user_id != current_user.id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Schema '{schema.name}' gehört zu einer anderen Liste und kann nicht verwendet werden"
+                    detail=f"Schema mit ID '{str(schema_id_value)[:8]}...' nicht gefunden oder gehört zu anderer Liste"
                 )
         # If schema_id_value is None, we're unbinding (allow this)
 
@@ -286,27 +246,25 @@ async def update_tag(
         tag.schema_id = update_data["schema_id"]
 
     await db.commit()
-    await db.refresh(tag)
-    
-    # Reload with schema relationship (refresh doesn't reload relationships)
+
+    # REF MCP Improvement #4: Re-query with selectinload (no refresh needed)
     stmt = select(Tag).options(selectinload(Tag.schema)).where(Tag.id == tag_id)
-    result = await db.execute(stmt)
-    tag = result.scalar_one_or_none()
-    
+    tag = (await db.execute(stmt)).scalar_one_or_none()
+
     return tag
 ```
 
 **Why:**
 - `selectinload(Tag.schema)` eager loads schema relationship to avoid N+1 queries
 - `tag_update.model_dump(exclude_unset=True)` is FastAPI best practice for distinguishing null from missing field
-- Schema existence check prevents binding to non-existent schema
-- List ownership validation prevents users from binding schemas from other users' lists
+- **REF MCP Improvement #3:** JOIN-based validation (1 query instead of 2) - combines schema existence + ownership check
+- **REF MCP Improvement #4:** Re-query with selectinload (removes redundant refresh() call)
+- Combined error message prevents information disclosure (security best practice)
 - German error messages match existing codebase style
-- Refresh + reload ensures response includes updated schema data
 
 ---
 
-### Step 6: Update GET /tags/{tag_id} Endpoint - Eager Load Schema
+### Step 5: Update GET /tags/{tag_id} Endpoint - Eager Load Schema
 
 **Files:** `backend/app/api/tags.py`
 
@@ -345,7 +303,7 @@ async def get_tag(tag_id: UUID, db: AsyncSession = Depends(get_db)):
 
 ---
 
-### Step 7: Update GET /tags Endpoint - Eager Load Schemas
+### Step 6: Update GET /tags Endpoint - Eager Load Schemas
 
 **Files:** `backend/app/api/tags.py`
 
@@ -902,6 +860,59 @@ raise HTTPException(
 
 ---
 
+## 📝 REF MCP Plan Improvements (2025-11-08)
+
+After REF MCP validation against FastAPI, SQLAlchemy 2.0, and Pydantic v2 docs, **5 improvements** were applied to the original plan:
+
+### ✅ Improvement #1: Simplified `schema_id` Default Value
+**Changed:** `schema_id: UUID | None = Field(default=None)` → `schema_id: UUID | None = None`
+**Reason:** FastAPI convention for optional fields - simpler and consistent with existing codebase
+**Location:** Step 1 (TagUpdate schema)
+
+### ✅ Improvement #2: Reuse Existing `FieldSchemaResponse`
+**Changed:** Create new minimal FieldSchemaResponse → Import from `app.schemas.field_schema`
+**Reason:** DRY principle - avoid duplicate class definitions, single source of truth
+**Impact:** Removed entire Step 2, combined with Step 3
+**Location:** Step 2 (now imports existing schema)
+
+### ✅ Improvement #3: JOIN-Based Schema Validation
+**Changed:** 2 queries (schema existence + list ownership) → 1 query with JOIN
+**Reason:** Performance optimization - 50% fewer database queries
+**Code:**
+```python
+# Before: 2 queries
+schema = await db.execute(select(FieldSchema).where(id == schema_id))
+schema_list = await db.execute(select(BookmarkList).where(id == schema.list_id))
+
+# After: 1 query with JOIN
+schema = await db.execute(
+    select(FieldSchema)
+    .join(BookmarkList, FieldSchema.list_id == BookmarkList.id)
+    .where(FieldSchema.id == schema_id, BookmarkList.user_id == current_user.id)
+)
+```
+**Location:** Step 4 (PUT endpoint validation)
+
+### ✅ Improvement #4: Remove Redundant `refresh()` Call
+**Changed:** `commit()` → `refresh()` → `re-query` → Just `commit()` → `re-query`
+**Reason:** `refresh()` doesn't load relationships, so it was redundant
+**Impact:** Saves 1 unnecessary database query
+**Location:** Step 4 (PUT endpoint response)
+
+### ✅ Improvement #5: Step Renumbering
+**Changed:** Steps 2-7 → Steps 2-6 (removed one step due to schema reuse)
+**Reason:** Maintain sequential step numbering after combining Steps 2+3
+
+**Total Impact:**
+- **Code Quality:** ✅ DRY principle, single source of truth
+- **Performance:** ✅ 2 fewer queries per PUT request (33% reduction: 6 → 4 queries)
+- **Maintainability:** ✅ One FieldSchemaResponse definition to update
+- **Consistency:** ✅ Follows FastAPI/SQLAlchemy 2.0 best practices
+
+**Plan Status:** ✅ Validated and optimized - ready for implementation
+
+---
+
 ## ✅ Pre-Implementation Checklist
 
 Before starting implementation, verify:
@@ -913,10 +924,10 @@ Before starting implementation, verify:
 - [x] Backend dependencies installed (SQLAlchemy 2.0, Pydantic v2)
 - [x] REF MCP findings reviewed (partial update patterns, FK validation)
 
-**Estimated Implementation Time:** 45-60 minutes
-- Step 1-3 (Pydantic schemas): 10-15 min
-- Step 4-5 (PUT endpoint validation): 20-25 min
-- Step 6-7 (GET endpoints eager loading): 10 min
+**Estimated Implementation Time:** 40-55 minutes (reduced from 45-60 due to optimizations)
+- Step 1-2 (Pydantic schemas + import): 10 min
+- Step 3-4 (Imports + PUT endpoint with optimized validation): 20 min
+- Step 5-6 (GET endpoints eager loading): 10 min
 - Testing (pytest + manual): 15-20 min
 
 ---

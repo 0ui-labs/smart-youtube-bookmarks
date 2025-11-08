@@ -692,3 +692,211 @@ async def test_get_videos_without_filter_returns_all(client: AsyncClient, test_d
     assert response.status_code == 200
     videos = response.json()
     assert len(videos) == 2  # Both videos returned
+
+
+@pytest.mark.asyncio
+async def test_get_videos_field_values_empty_when_no_tags(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
+    """Test that field_values is empty list when video has no tags."""
+    # Create video without tags
+    video_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc8"}
+    )
+    assert video_response.status_code == 201
+
+    # Get videos
+    response = await client.get(f"/api/lists/{test_list.id}/videos")
+
+    assert response.status_code == 200
+    videos = response.json()
+    assert len(videos) == 1
+
+    # Verify field_values is empty list
+    video = videos[0]
+    assert "field_values" in video
+    assert video["field_values"] == []
+
+
+@pytest.mark.asyncio
+async def test_get_videos_field_values_union_from_multiple_schemas(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
+    """Test field union when video has tags from multiple schemas."""
+    # Create two different custom fields
+    field1_response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields",
+        json={
+            "name": "Overall Rating",
+            "field_type": "rating",
+            "config": {"max_rating": 5}
+        }
+    )
+    field1_id = field1_response.json()["id"]
+
+    field2_response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields",
+        json={
+            "name": "Presentation Quality",  # Different name to avoid conflict
+            "field_type": "select",
+            "config": {"options": ["bad", "good", "great"]}
+        }
+    )
+    field2_id = field2_response.json()["id"]
+
+    # Create schema1 with rating field
+    schema1_response = await client.post(
+        f"/api/lists/{test_list.id}/schemas",
+        json={
+            "name": "Schema A",
+            "description": "First schema with rating",
+            "fields": [
+                {"field_id": field1_id, "display_order": 1, "show_on_card": True}
+            ]
+        }
+    )
+    schema1_id = schema1_response.json()["id"]
+
+    # Create schema2 with select field
+    schema2_response = await client.post(
+        f"/api/lists/{test_list.id}/schemas",
+        json={
+            "name": "Schema B",
+            "description": "Second schema with select",
+            "fields": [
+                {"field_id": field2_id, "display_order": 1, "show_on_card": False}
+            ]
+        }
+    )
+    schema2_id = schema2_response.json()["id"]
+
+    # Create tag1 with schema1
+    tag1_response = await client.post(
+        "/api/tags",
+        json={"name": "Tag1", "color": "#3B82F6"}
+    )
+    tag1_id = tag1_response.json()["id"]
+    await client.put(f"/api/tags/{tag1_id}", json={"schema_id": schema1_id})
+
+    # Create tag2 with schema2
+    tag2_response = await client.post(
+        "/api/tags",
+        json={"name": "Tag2", "color": "#10B981"}
+    )
+    tag2_id = tag2_response.json()["id"]
+    await client.put(f"/api/tags/{tag2_id}", json={"schema_id": schema2_id})
+
+    # Create video with both tags
+    video_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc9"}
+    )
+    video_id = video_response.json()["id"]
+
+    await client.post(
+        f"/api/videos/{video_id}/tags",
+        json={"tag_ids": [tag1_id, tag2_id]}
+    )
+
+    # Get videos
+    response = await client.get(f"/api/lists/{test_list.id}/videos")
+
+    assert response.status_code == 200
+    videos = response.json()
+    assert len(videos) == 1
+
+    # Verify field union from both schemas
+    video = videos[0]
+    assert "field_values" in video
+    field_values = video["field_values"]
+
+    # Should have 2 fields (union from both schemas)
+    assert len(field_values) == 2
+
+    # Verify field names and types
+    field_names = {fv["field"]["name"] for fv in field_values}
+    assert "Overall Rating" in field_names
+    assert "Presentation Quality" in field_names
+
+    field_types = [fv["field"]["field_type"] for fv in field_values]
+    assert "rating" in field_types
+    assert "select" in field_types
+
+
+@pytest.mark.asyncio
+async def test_get_videos_field_values_rating_accepts_float(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
+    """Test that rating field accepts and returns float values (e.g., 4.5)."""
+    # Create rating field
+    field_response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields",
+        json={
+            "name": "Quality Rating",
+            "field_type": "rating",
+            "config": {"max_rating": 5}
+        }
+    )
+    field_id = field_response.json()["id"]
+
+    # Create schema with rating field (use correct endpoint: /api/lists/{list_id}/schemas)
+    schema_response = await client.post(
+        f"/api/lists/{test_list.id}/schemas",
+        json={
+            "name": "Quality Schema",
+            "description": "Schema with rating",
+            "fields": [
+                {"field_id": field_id, "display_order": 1, "show_on_card": True}
+            ]
+        }
+    )
+    schema_id = schema_response.json()["id"]
+
+    # Create tag with schema
+    tag_response = await client.post(
+        "/api/tags",
+        json={"name": "Rated", "color": "#F59E0B"}
+    )
+    tag_id = tag_response.json()["id"]
+    await client.put(f"/api/tags/{tag_id}", json={"schema_id": schema_id})
+
+    # Create video with tag
+    video_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgX10"}
+    )
+    video_id = video_response.json()["id"]
+
+    await client.post(
+        f"/api/videos/{video_id}/tags",
+        json={"tag_ids": [tag_id]}
+    )
+
+    # Set rating value to 4.5 (decimal)
+    # Note: This requires VideoFieldValue endpoint to exist
+    # For now, we'll create the value directly in the database
+    from app.models.video_field_value import VideoFieldValue
+    from uuid import UUID
+
+    value = VideoFieldValue(
+        video_id=UUID(video_id),
+        field_id=UUID(field_id),
+        value_numeric=4.5
+    )
+    test_db.add(value)
+    await test_db.commit()
+    await test_db.refresh(value)  # Ensure committed
+
+    # Get videos
+    response = await client.get(f"/api/lists/{test_list.id}/videos")
+
+    assert response.status_code == 200
+    videos = response.json()
+    assert len(videos) == 1
+
+    # Verify field value is 4.5 (float, not 4)
+    video = videos[0]
+    assert "field_values" in video
+    field_values = video["field_values"]
+
+    assert len(field_values) == 1
+    field_value = field_values[0]
+
+    # Verify the value is exactly 4.5 (float)
+    assert field_value["value"] == 4.5
+    assert isinstance(field_value["value"], float)

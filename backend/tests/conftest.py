@@ -131,6 +131,22 @@ async def mock_session_factory(test_engine):
 
 
 @pytest.fixture
+async def test_schema(test_db: AsyncSession, test_list: BookmarkList):
+    """Create a test field schema."""
+    from app.models.field_schema import FieldSchema
+
+    schema = FieldSchema(
+        list_id=test_list.id,
+        name="Test Schema",
+        description="Test schema for integration tests"
+    )
+    test_db.add(schema)
+    await test_db.commit()
+    await test_db.refresh(schema)
+    return schema
+
+
+@pytest.fixture
 async def user_factory(test_db: AsyncSession):
     """
     Factory fixture for creating multiple test users.
