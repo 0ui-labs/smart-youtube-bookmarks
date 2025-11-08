@@ -240,11 +240,18 @@ async def add_field_to_schema(
     )
     db.add(new_schema_field)
     await db.commit()
-    
-    # Refresh with relationship data
-    await db.refresh(new_schema_field, ["field"])
-    
-    return new_schema_field
+
+    # Re-query with eager loading (refresh() doesn't work reliably for relationships)
+    stmt = (
+        select(SchemaField)
+        .where(
+            SchemaField.schema_id == schema_id,
+            SchemaField.field_id == schema_field.field_id
+        )
+        .options(selectinload(SchemaField.field))
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one()
 ```
 
 **Design Decision:** Auto-calculate display_order as max+1 when not provided. This appends new fields to end of list, allowing user to reorder later with PUT. Security validation ensures field and schema belong to same list.
@@ -302,20 +309,28 @@ async def update_schema_field(
         if schema_field_update.show_on_card and not schema_field.show_on_card:
             # Toggling from False -> True, check constraint
             await validate_max_show_on_card(db, schema_id, exclude_field_id=field_id)
-    
-    # Update fields
-    if schema_field_update.display_order is not None:
-        schema_field.display_order = schema_field_update.display_order
-    if schema_field_update.show_on_card is not None:
-        schema_field.show_on_card = schema_field_update.show_on_card
-    
+
+    # Update fields using exclude_unset pattern (Pydantic v2 best practice)
+    update_data = schema_field_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(schema_field, field, value)
+
     await db.commit()
-    await db.refresh(schema_field, ["field"])
-    
-    return schema_field
+
+    # Re-query with eager loading (refresh() doesn't work reliably for relationships)
+    stmt = (
+        select(SchemaField)
+        .where(
+            SchemaField.schema_id == schema_id,
+            SchemaField.field_id == field_id
+        )
+        .options(selectinload(SchemaField.field))
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one()
 ```
 
-**REF MCP Validation:** FastAPI body updates documentation confirms using Pydantic's `exclude_unset` pattern for partial updates. All fields optional in SchemaFieldUpdate schema.
+**REF MCP Validation (2025-11-08):** FastAPI body updates documentation confirms using Pydantic's `exclude_unset` pattern for partial updates. All fields optional in SchemaFieldUpdate schema. Using `model_dump(exclude_unset=True)` with setattr() is the Pydantic v2 best practice for partial updates - more maintainable than manual if-checks per field.
 
 ### 6. Implement DELETE /schemas/{schema_id}/fields/{field_id} endpoint
 

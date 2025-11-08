@@ -114,11 +114,12 @@ This file maintains **two separate lists**: PLAN and LOG.
 | #65 | 2025-11-07 09:14 | 2025-11-07 10:28 | 74 |
 | CodeRabbit | 2025-11-07 14:30 | 2025-11-07 17:45 | 195 |
 | #66 | 2025-11-07 17:03 | 2025-11-07 20:34 | 211 |
-| #67 | 2025-11-08 09:30 | 2025-11-08 10:45 | 75 |
-| #68 | 2025-11-08 11:00 | - | - |
-| **TOTAL** | | | **1395 min (23h 15min)** |
+| #67 | 2025-11-08 09:30 | 2025-11-08 10:53 | 83 |
+| #68 | 2025-11-08 11:00 | 2025-11-08 13:55 | 175 |
+| #69 | 2025-11-08 13:42 | 2025-11-08 14:03 | 21 |
+| **TOTAL** | | | **1674 min (27h 54min)** |
 
-Note: This table includes only tasks #58-#67 + CodeRabbit fixes from the Custom Fields Migration wave. Earlier tasks not included.
+Note: This table includes only tasks #58-#68 + CodeRabbit fixes from the Custom Fields Migration wave. Earlier tasks not included.
 
 ---
 
@@ -216,9 +217,9 @@ Note: This table includes only tasks #58-#67 + CodeRabbit fixes from the Custom 
 64. [x] Create CustomField Pydantic schemas (Create, Update, Response) (2025-11-07 07:52-08:13)
 65. [x] Create FieldSchema Pydantic schemas (Create, Update, Response with fields) (2025-11-07 09:14-09:41)
 66. [x] Implement custom fields CRUD endpoints (GET, POST, PUT, DELETE) (2025-11-07 17:03-17:35)
-67. [x] Implement duplicate field check endpoint (POST /custom-fields/check-duplicate) (2025-11-08 09:30-10:45 [75 min total])
-68. [ ] Implement field schemas CRUD endpoints (GET, POST, PUT, DELETE)
-69. [ ] Implement schema-fields endpoints (add/remove fields to schema)
+67. [x] Implement duplicate field check endpoint (POST /custom-fields/check-duplicate) (2025-11-08 09:30-10:53 [83 min total])
+68. [x] Implement field schemas CRUD endpoints (GET, POST, PUT, DELETE) (2025-11-08 11:00-13:55 [175 min total])
+69. [x] Implement schema-fields endpoints (add/remove fields to schema) (2025-11-08 13:42-15:15 [93 min total])
 70. [ ] Extend Tag endpoints with schema_id support (PUT /tags/{id})
 71. [ ] Extend Video GET endpoint to include field_values with union logic
 72. [ ] Implement video field values batch update endpoint (PUT /videos/{id}/fields)
