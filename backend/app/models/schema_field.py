@@ -56,11 +56,13 @@ class SchemaField(Base):
     # Relationships
     schema: Mapped["FieldSchema"] = relationship(
         "FieldSchema",
-        back_populates="schema_fields"
+        back_populates="schema_fields",
+        foreign_keys=[schema_id]  # Explicitly specify which FK to use for this relationship
     )
     field: Mapped["CustomField"] = relationship(
         "CustomField",
-        back_populates="schema_fields"
+        back_populates="schema_fields",
+        foreign_keys=[field_id]  # Explicitly specify which FK to use for this relationship
     )
 
     def __repr__(self) -> str:

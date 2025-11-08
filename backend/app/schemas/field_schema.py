@@ -13,7 +13,7 @@ from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ============================================================================
@@ -318,7 +318,7 @@ class FieldSchemaResponse(FieldSchemaBase):
     id: UUID = Field(..., description="Unique schema identifier")
     list_id: UUID = Field(..., description="Parent list identifier")
     schema_fields: list[SchemaFieldResponse] = Field(
-        default_factory=list,
+        default=[],
         description="Fields in this schema (ordered by display_order)"
     )
     created_at: datetime = Field(..., description="Creation timestamp")
@@ -327,3 +327,24 @@ class FieldSchemaResponse(FieldSchemaBase):
     model_config = {
         "from_attributes": True
     }
+
+    @field_validator('schema_fields', mode='before')
+    @classmethod
+    def convert_none_to_empty_list(cls, value):
+        """
+        Convert None or single object to list for schema_fields.
+
+        SQLAlchemy sometimes returns None for empty relationships with
+        selectinload(), or a single object instead of a list when uselist
+        is incorrectly inferred due to composite primary keys in the join table.
+        This validator ensures we always get a list.
+        """
+        if value is None:
+            return []
+        # If it's already a list, return as-is
+        if isinstance(value, (list, tuple)):
+            return value
+        # If we got a single SchemaField object instead of a list, wrap it
+        if hasattr(value, 'schema_id') and hasattr(value, 'field_id'):
+            return [value]
+        return value
