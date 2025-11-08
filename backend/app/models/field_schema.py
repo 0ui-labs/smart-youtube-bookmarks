@@ -88,8 +88,10 @@ class FieldSchema(BaseModel):
         back_populates="field_schemas"
     )
 
-    schema_fields: Mapped[list["SchemaField"]] = relationship(
+    schema_fields = relationship(
         "SchemaField",
+        primaryjoin="FieldSchema.id==SchemaField.schema_id",  # Explicit join for composite PK
+        uselist=True,  # Override inference (composite PK makes SQLAlchemy think one-to-one)
         back_populates="schema",
         cascade="all, delete-orphan",  # Deleting schema removes from join table
         passive_deletes=True  # Trust DB CASCADE for performance (REF MCP 2025-11-05)

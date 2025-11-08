@@ -334,7 +334,18 @@ async def update_schema(
         schema.description = schema_update.description
 
     await db.commit()
-    await db.refresh(schema)
+
+    # Re-query with eager loading to avoid MissingGreenlet error in Pydantic serialization
+    # (db.refresh() doesn't preserve eager-loaded relationships after commit)
+    stmt = (
+        select(FieldSchema)
+        .where(FieldSchema.id == schema_id)
+        .options(
+            selectinload(FieldSchema.schema_fields).selectinload(SchemaField.field)
+        )
+    )
+    result = await db.execute(stmt)
+    schema = result.scalar_one()
 
     return schema
 
