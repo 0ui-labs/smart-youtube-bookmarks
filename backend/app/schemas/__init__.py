@@ -10,7 +10,6 @@ from .custom_field import (
     DuplicateCheckResponse,
 )
 from .field_schema import (
-    SchemaFieldInResponse,
     FieldInSchemaResponse,
     SchemaFieldResponse,
     SchemaFieldInput,
@@ -38,7 +37,6 @@ __all__ = [
     "DuplicateCheckRequest",
     "DuplicateCheckResponse",
     # Field Schema schemas
-    "SchemaFieldInResponse",
     "FieldInSchemaResponse",
     "SchemaFieldResponse",
     "SchemaFieldInput",

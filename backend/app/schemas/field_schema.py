@@ -13,47 +13,12 @@ from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ============================================================================
 # Nested Schema for SchemaField (Join Table Data)
 # ============================================================================
-
-class SchemaFieldInResponse(BaseModel):
-    """
-    Nested schema for schema_fields relationship in FieldSchemaResponse.
-
-    Represents a single field within a schema, including metadata from the
-    SchemaField join table (display_order, show_on_card) and full field details
-    from the CustomField model.
-
-    Example:
-        {
-            "field_id": "123e4567-e89b-12d3-a456-426614174000",
-            "display_order": 0,
-            "show_on_card": true,
-            "field": {
-                "id": "123e4567-e89b-12d3-a456-426614174000",
-                "name": "Presentation Quality",
-                "field_type": "select",
-                "config": {"options": ["bad", "good", "great"]},
-                ...
-            }
-        }
-    """
-    field_id: UUID = Field(..., description="ID of the custom field")
-    display_order: int = Field(..., description="Display order within schema (0-indexed)")
-    show_on_card: bool = Field(..., description="Whether to show field on video card")
-
-    # Nested CustomField details (populated via eager loading)
-    # Note: This will be populated by SQLAlchemy relationship loading
-    # We'll access it via schemafield.field in the ORM model
-
-    model_config = {
-        "from_attributes": True
-    }
-
 
 class FieldInSchemaResponse(BaseModel):
     """
@@ -148,6 +113,11 @@ class FieldSchemaCreate(FieldSchemaBase):
     Optionally accepts an array of fields to add to the schema during creation.
     If provided, all field_ids must exist in the same list as the schema.
 
+    Validates:
+    - Max 3 fields can have show_on_card=true
+    - No duplicate display_order values
+    - No duplicate field_id values
+
     Example (minimal):
         {
             "name": "Video Quality",
@@ -176,6 +146,86 @@ class FieldSchemaCreate(FieldSchemaBase):
         None,
         description="Optional array of fields to add to schema during creation"
     )
+
+    @field_validator('fields')
+    @classmethod
+    def validate_show_on_card_limit(cls, fields: Optional[list[SchemaFieldInput]]) -> Optional[list[SchemaFieldInput]]:
+        """
+        Validate that at most 3 fields have show_on_card=true.
+
+        This constraint ensures the UI doesn't become cluttered with too many
+        fields displayed on video cards. Users can still define more fields,
+        but only 3 will be prominently displayed.
+
+        Raises:
+            ValueError: If more than 3 fields have show_on_card=true
+        """
+        if fields is None:
+            return fields
+
+        show_on_card_fields = [f for f in fields if f.show_on_card]
+        if len(show_on_card_fields) > 3:
+            # Show first 5 field_ids (truncated) to help identify which fields need fixing
+            field_ids_str = ", ".join(str(f.field_id)[:8] + "..." for f in show_on_card_fields[:5])
+            raise ValueError(
+                f"At most 3 fields can have show_on_card=true, but {len(show_on_card_fields)} fields are marked. "
+                f"Please set show_on_card=false for {len(show_on_card_fields) - 3} of these fields: {field_ids_str}"
+            )
+        return fields
+
+    @field_validator('fields')
+    @classmethod
+    def validate_no_duplicate_display_orders(cls, fields: Optional[list[SchemaFieldInput]]) -> Optional[list[SchemaFieldInput]]:
+        """
+        Validate that all display_order values are unique.
+
+        Each field must have a unique display_order to ensure consistent
+        rendering order in the UI. Duplicate orders create ambiguity about
+        which field should appear first.
+
+        Raises:
+            ValueError: If duplicate display_order values are found
+        """
+        if fields is None:
+            return fields
+
+        display_orders = [f.display_order for f in fields]
+        if len(display_orders) != len(set(display_orders)):
+            # Find which orders are duplicated
+            duplicates = [order for order in display_orders if display_orders.count(order) > 1]
+            raise ValueError(
+                f"Duplicate display_order values found: {set(duplicates)}. "
+                f"Each field must have a unique display_order."
+            )
+        return fields
+
+    @field_validator('fields')
+    @classmethod
+    def validate_no_duplicate_field_ids(cls, fields: Optional[list[SchemaFieldInput]]) -> Optional[list[SchemaFieldInput]]:
+        """
+        Validate that all field_id values are unique.
+
+        Each field can only be added once to a schema. Duplicate field_ids
+        would create confusion and violate the database unique constraint on
+        (schema_id, field_id).
+
+        Raises:
+            ValueError: If duplicate field_id values are found
+        """
+        if fields is None:
+            return fields
+
+        field_ids = [f.field_id for f in fields]
+        if len(field_ids) != len(set(field_ids)):
+            # Find which field_ids are duplicated
+            duplicates = [fid for fid in field_ids if field_ids.count(fid) > 1]
+            # Show truncated UUIDs for readability
+            duplicates_str = ", ".join(str(fid)[:8] + "..." for fid in set(duplicates))
+            raise ValueError(
+                f"Duplicate field_id values found: {duplicates_str}. "
+                f"Each field can only be added once to a schema."
+            )
+        return fields
 
 
 class FieldSchemaUpdate(BaseModel):
