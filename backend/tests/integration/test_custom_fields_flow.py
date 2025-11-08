@@ -200,3 +200,57 @@ async def test_case_insensitive_duplicate_detection(
         )
         assert response.status_code == 409
         assert "already exists" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_duplicate_check_workflow(
+    client: AsyncClient,
+    test_list: BookmarkList
+):
+    """
+    Integration test: Full duplicate check workflow.
+
+    1. Check field doesn't exist → exists=false
+    2. Create field → 201 Created
+    3. Check field exists (case-insensitive) → exists=true
+    4. Verify full field details returned
+    """
+    field_name = "Presentation Quality"
+
+    # Step 1: Check field doesn't exist yet
+    response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
+        json={"name": field_name}
+    )
+    assert response.status_code == 200
+    assert response.json()["exists"] is False
+
+    # Step 2: Create the field
+    create_response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields",
+        json={
+            "name": field_name,
+            "field_type": "select",
+            "config": {"options": ["bad", "good", "great"]}
+        }
+    )
+    assert create_response.status_code == 201
+    created_field = create_response.json()
+
+    # Step 3: Check field exists (case-insensitive)
+    check_response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
+        json={"name": "presentation quality"}  # lowercase
+    )
+    assert check_response.status_code == 200
+    data = check_response.json()
+
+    # Step 4: Verify full field details
+    assert data["exists"] is True
+    assert data["field"] is not None
+    assert data["field"]["id"] == created_field["id"]
+    assert data["field"]["name"] == field_name  # Original casing
+    assert data["field"]["field_type"] == "select"
+    assert data["field"]["config"]["options"] == ["bad", "good", "great"]
+    assert "created_at" in data["field"]
+    assert "updated_at" in data["field"]

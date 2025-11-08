@@ -23,6 +23,7 @@ from app.models.list import BookmarkList
 from app.models.custom_field import CustomField
 from app.models.field_schema import FieldSchema
 from app.models.schema_field import SchemaField
+from app.models.user import User
 
 
 # ============================================================================
@@ -380,3 +381,206 @@ async def test_delete_custom_field_not_found(client: AsyncClient, test_list: Boo
     )
 
     assert response.status_code == 404
+
+
+# ============================================================================
+# POST /api/lists/{list_id}/custom-fields/check-duplicate
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_duplicate_check_exact_match(
+    client: AsyncClient,
+    test_db: AsyncSession,
+    test_list: BookmarkList
+):
+    """Test that exact name match returns exists=true with full field details."""
+    # Create a field
+    field = CustomField(
+        list_id=test_list.id,
+        name="Presentation Quality",
+        field_type="select",
+        config={"options": ["bad", "good", "great"]}
+    )
+    test_db.add(field)
+    await test_db.commit()
+    await test_db.refresh(field)
+
+    # Check for exact match
+    response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
+        json={"name": "Presentation Quality"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is True
+    assert data["field"] is not None
+    assert data["field"]["id"] == str(field.id)
+    assert data["field"]["name"] == "Presentation Quality"
+    assert data["field"]["field_type"] == "select"
+    assert data["field"]["config"]["options"] == ["bad", "good", "great"]
+
+
+@pytest.mark.asyncio
+async def test_duplicate_check_case_insensitive(
+    client: AsyncClient,
+    test_db: AsyncSession,
+    test_list: BookmarkList
+):
+    """Test that case-insensitive matching works (lowercase, UPPERCASE, MiXeD)."""
+    # Create field with mixed case
+    field = CustomField(
+        list_id=test_list.id,
+        name="Overall Rating",
+        field_type="rating",
+        config={"max_rating": 5}
+    )
+    test_db.add(field)
+    await test_db.commit()
+
+    # Check with lowercase
+    response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
+        json={"name": "overall rating"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is True
+    assert data["field"]["name"] == "Overall Rating"  # Original casing preserved
+
+    # Check with uppercase
+    response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
+        json={"name": "OVERALL RATING"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["exists"] is True
+
+    # Check with random casing
+    response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
+        json={"name": "OvErAlL rAtInG"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["exists"] is True
+
+
+@pytest.mark.asyncio
+async def test_duplicate_check_not_exists(
+    client: AsyncClient,
+    test_list: BookmarkList
+):
+    """Test that non-existent field returns exists=false with field=null."""
+    response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
+        json={"name": "Non-Existent Field"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is False
+    assert data["field"] is None
+
+
+@pytest.mark.asyncio
+async def test_duplicate_check_scoped_to_list(
+    client: AsyncClient,
+    test_db: AsyncSession,
+    test_list: BookmarkList,
+    test_user: User
+):
+    """Test that duplicate check is scoped to specific list."""
+    import uuid
+    from app.models.list import BookmarkList
+
+    # Create field in test_list
+    field = CustomField(
+        list_id=test_list.id,
+        name="Field A",
+        field_type="text",
+        config={}
+    )
+    test_db.add(field)
+
+    # Create another list with same field name
+    other_list_id = uuid.uuid4()
+    other_list = BookmarkList(
+        id=other_list_id,
+        name="Other List",
+        user_id=test_user.id
+    )
+    test_db.add(other_list)
+
+    other_field = CustomField(
+        list_id=other_list_id,
+        name="Field A",
+        field_type="text",
+        config={}
+    )
+    test_db.add(other_field)
+    await test_db.commit()
+
+    # Check in test_list - should find field
+    response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
+        json={"name": "Field A"}
+    )
+    assert response.status_code == 200
+    assert response.json()["exists"] is True
+    assert response.json()["field"]["id"] == str(field.id)  # Returns test_list field
+
+    # Check in other_list - should find different field
+    response = await client.post(
+        f"/api/lists/{other_list_id}/custom-fields/check-duplicate",
+        json={"name": "Field A"}
+    )
+    assert response.status_code == 200
+    assert response.json()["exists"] is True
+    assert response.json()["field"]["id"] == str(other_field.id)  # Returns other_list field
+
+
+@pytest.mark.asyncio
+async def test_duplicate_check_invalid_list_id(
+    client: AsyncClient
+):
+    """Test that checking in non-existent list returns 404."""
+    import uuid
+    fake_list_id = uuid.uuid4()
+    response = await client.post(
+        f"/api/lists/{fake_list_id}/custom-fields/check-duplicate",
+        json={"name": "Any Field"}
+    )
+
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_duplicate_check_empty_name(
+    client: AsyncClient,
+    test_list: BookmarkList
+):
+    """Test that empty name is rejected by Pydantic schema validation."""
+    response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
+        json={"name": ""}
+    )
+
+    assert response.status_code == 422  # Validation error
+
+
+@pytest.mark.asyncio
+async def test_duplicate_check_whitespace_name(
+    client: AsyncClient,
+    test_list: BookmarkList
+):
+    """Test that whitespace-only name is rejected by Pydantic validator."""
+    response = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
+        json={"name": "   "}
+    )
+
+    assert response.status_code == 422  # Validation error

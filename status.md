@@ -93,8 +93,10 @@ This file maintains **two separate lists**: PLAN and LOG.
 | #65 Report | 2025-11-07 09:41 | 2025-11-07 10:28 | 47 | REPORT-065 comprehensive documentation |
 | CodeRabbit Fixes | 2025-11-07 14:30 | 2025-11-07 17:30 | 180 | Fixed 13 critical/important issues (backend+frontend+docs) |
 | CodeRabbit Report | 2025-11-07 17:30 | 2025-11-07 17:45 | 15 | REPORT-CR-001 comprehensive documentation |
-| #66 | 2025-11-07 17:03 | | | Custom Fields CRUD Endpoints (REF MCP validation + implementation) |
-| **TOTAL** | | | **1539 min** | **25 hours 39 minutes** |
+| #66 | 2025-11-07 17:03 | 2025-11-07 17:35 | 32 | Custom Fields CRUD Endpoints (REF + Subagent-Driven + 19 tests) |
+| #66 Report | 2025-11-07 17:35 | 2025-11-07 20:34 | 179 | REPORT-066 comprehensive documentation |
+| #67 | 2025-11-08 09:30 | 2025-11-08 10:37 | 67 | Duplicate Check Endpoint (REF MCP validated + 7 unit tests + 1 integration test) |
+| **TOTAL** | | | **1817 min** | **30 hours 17 minutes** |
 
 ---
 
@@ -191,8 +193,8 @@ This file maintains **two separate lists**: PLAN and LOG.
 63. [x] Extend Tag model with schema_id foreign key (completed in Task #60)
 64. [x] Create CustomField Pydantic schemas (Create, Update, Response) (2025-11-07 07:52-08:13)
 65. [x] Create FieldSchema Pydantic schemas (Create, Update, Response with fields) (2025-11-07 09:14-09:41)
-66. [ ] Implement custom fields CRUD endpoints (GET, POST, PUT, DELETE)
-67. [ ] Implement duplicate field check endpoint (POST /custom-fields/check-duplicate)
+66. [x] Implement custom fields CRUD endpoints (GET, POST, PUT, DELETE) (2025-11-07 17:03-17:35)
+67. [x] Implement duplicate field check endpoint (POST /custom-fields/check-duplicate) (2025-11-08 09:30-10:37)
 68. [ ] Implement field schemas CRUD endpoints (GET, POST, PUT, DELETE)
 69. [ ] Implement schema-fields endpoints (add/remove fields to schema)
 70. [ ] Extend Tag endpoints with schema_id support (PUT /tags/{id})

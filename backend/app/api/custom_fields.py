@@ -6,12 +6,14 @@ Implements list-scoped custom field management:
 - POST /api/lists/{list_id}/custom-fields - Create new field
 - PUT /api/lists/{list_id}/custom-fields/{field_id} - Update field
 - DELETE /api/lists/{list_id}/custom-fields/{field_id} - Delete field
+- POST /api/lists/{list_id}/custom-fields/check-duplicate - Check for duplicate field names
 
 Includes:
 - Case-insensitive duplicate name detection
 - Config validation via Pydantic schemas (Task #64)
 - Schema usage check on deletion (prevents orphaned references)
 - List validation (404 if not found)
+- Real-time duplicate checking for UI validation
 """
 
 from uuid import UUID
@@ -28,7 +30,9 @@ from app.models.schema_field import SchemaField
 from app.schemas.custom_field import (
     CustomFieldCreate,
     CustomFieldUpdate,
-    CustomFieldResponse
+    CustomFieldResponse,
+    DuplicateCheckRequest,
+    DuplicateCheckResponse
 )
 
 router = APIRouter(prefix="/api/lists", tags=["custom-fields"])
@@ -377,3 +381,89 @@ async def delete_custom_field(
     await db.commit()
 
     return None
+
+
+@router.post(
+    "/{list_id}/custom-fields/check-duplicate",
+    response_model=DuplicateCheckResponse,
+    status_code=status.HTTP_200_OK
+)
+async def check_duplicate_field(
+    list_id: UUID,
+    request: DuplicateCheckRequest,
+    db: AsyncSession = Depends(get_db)
+) -> DuplicateCheckResponse:
+    """
+    Check if a custom field with the given name already exists (case-insensitive).
+
+    This endpoint is used for real-time duplicate validation in the UI.
+    Returns 200 OK regardless of whether the field exists - this is a check,
+    not an error condition.
+
+    The check is case-insensitive: "Overall Rating", "overall rating", and
+    "OVERALL RATING" are all considered duplicates.
+
+    Args:
+        list_id: UUID of the list to check within
+        request: Request body containing the field name to check
+        db: Database session
+
+    Returns:
+        DuplicateCheckResponse with exists=True and field details if found,
+        or exists=False if not found.
+
+    Raises:
+        HTTPException 404: List not found
+        HTTPException 422: Pydantic validation errors (auto-generated)
+
+    Example Response (exists):
+        {
+            "exists": true,
+            "field": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "name": "Presentation Quality",
+                "field_type": "select",
+                "config": {"options": ["bad", "good", "great"]},
+                "created_at": "2025-11-06T10:30:00Z",
+                "updated_at": "2025-11-06T10:30:00Z"
+            }
+        }
+
+    Example Response (not exists):
+        {
+            "exists": false,
+            "field": null
+        }
+    """
+    # Verify list exists
+    list_stmt = select(BookmarkList).where(BookmarkList.id == list_id)
+    list_result = await db.execute(list_stmt)
+    bookmark_list = list_result.scalar_one_or_none()
+
+    if not bookmark_list:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"List with id {list_id} not found"
+        )
+
+    # Case-insensitive query for existing field
+    # Uses func.lower() for PostgreSQL compatibility and database-level atomic operation
+    stmt = select(CustomField).where(
+        CustomField.list_id == list_id,
+        func.lower(CustomField.name) == request.name.lower()
+    )
+    result = await db.execute(stmt)
+    existing_field = result.scalar_one_or_none()
+
+    if existing_field:
+        # Field exists - return full details for rich UI feedback
+        return DuplicateCheckResponse(
+            exists=True,
+            field=CustomFieldResponse.model_validate(existing_field)
+        )
+    else:
+        # Field does not exist
+        return DuplicateCheckResponse(
+            exists=False,
+            field=None
+        )
