@@ -26,21 +26,19 @@ class TestListSchemas:
 
     async def test_list_schemas_empty(
         self,
-        async_client: AsyncClient,
-        db_session,
-        test_user: User,
+        client: AsyncClient,
         test_list: BookmarkList
     ):
         """Should return empty list when no schemas exist."""
-        response = await async_client.get(f"/api/lists/{test_list.id}/schemas")
+        response = await client.get(f"/api/lists/{test_list.id}/schemas")
 
         assert response.status_code == 200
         assert response.json() == []
 
     async def test_list_schemas_with_data(
         self,
-        async_client: AsyncClient,
-        db_session,
+        client: AsyncClient,
+        test_db,
         test_list: BookmarkList
     ):
         """Should return all schemas with nested fields."""
@@ -51,7 +49,7 @@ class TestListSchemas:
             field_type="select",
             config={"options": ["bad", "good", "great"]}
         )
-        db_session.add(field)
+        test_db.add(field)
 
         # Create schema
         schema = FieldSchema(
@@ -59,8 +57,8 @@ class TestListSchemas:
             name="Video Quality",
             description="Standard metrics"
         )
-        db_session.add(schema)
-        await db_session.flush()
+        test_db.add(schema)
+        await test_db.flush()
 
         # Create schema-field association
         schema_field = SchemaField(
@@ -69,10 +67,10 @@ class TestListSchemas:
             display_order=0,
             show_on_card=True
         )
-        db_session.add(schema_field)
-        await db_session.commit()
+        test_db.add(schema_field)
+        await test_db.commit()
 
-        response = await async_client.get(f"/api/lists/{test_list.id}/schemas")
+        response = await client.get(f"/api/lists/{test_list.id}/schemas")
 
         assert response.status_code == 200
         data = response.json()
@@ -84,11 +82,11 @@ class TestListSchemas:
 
     async def test_list_schemas_list_not_found(
         self,
-        async_client: AsyncClient
+        client: AsyncClient
     ):
         """Should return 404 if list doesn't exist."""
         fake_list_id = uuid4()
-        response = await async_client.get(f"/api/lists/{fake_list_id}/schemas")
+        response = await client.get(f"/api/lists/{fake_list_id}/schemas")
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
@@ -100,8 +98,8 @@ class TestCreateSchema:
 
     async def test_create_schema_minimal(
         self,
-        async_client: AsyncClient,
-        db_session,
+        client: AsyncClient,
+        test_db,
         test_list: BookmarkList
     ):
         """Should create schema with name and description only."""
@@ -110,7 +108,7 @@ class TestCreateSchema:
             "description": "Standard quality metrics"
         }
 
-        response = await async_client.post(
+        response = await client.post(
             f"/api/lists/{test_list.id}/schemas",
             json=data
         )
@@ -126,8 +124,8 @@ class TestCreateSchema:
 
     async def test_create_schema_with_fields(
         self,
-        async_client: AsyncClient,
-        db_session,
+        client: AsyncClient,
+        test_db,
         test_list: BookmarkList
     ):
         """Should create schema with initial fields."""
@@ -144,8 +142,8 @@ class TestCreateSchema:
             field_type="rating",
             config={"max_rating": 5}
         )
-        db_session.add_all([field1, field2])
-        await db_session.commit()
+        test_db.add_all([field1, field2])
+        await test_db.commit()
 
         data = {
             "name": "Video Quality",
@@ -164,7 +162,7 @@ class TestCreateSchema:
             ]
         }
 
-        response = await async_client.post(
+        response = await client.post(
             f"/api/lists/{test_list.id}/schemas",
             json=data
         )
@@ -179,7 +177,7 @@ class TestCreateSchema:
 
     async def test_create_schema_invalid_field_ids(
         self,
-        async_client: AsyncClient,
+        client: AsyncClient,
         test_list: BookmarkList
     ):
         """Should return 400 if field_ids don't exist."""
@@ -194,7 +192,7 @@ class TestCreateSchema:
             ]
         }
 
-        response = await async_client.post(
+        response = await client.post(
             f"/api/lists/{test_list.id}/schemas",
             json=data
         )
@@ -204,13 +202,13 @@ class TestCreateSchema:
 
     async def test_create_schema_list_not_found(
         self,
-        async_client: AsyncClient
+        client: AsyncClient
     ):
         """Should return 404 if list doesn't exist."""
         fake_list_id = uuid4()
         data = {"name": "Test Schema"}
 
-        response = await async_client.post(
+        response = await client.post(
             f"/api/lists/{fake_list_id}/schemas",
             json=data
         )
@@ -224,8 +222,8 @@ class TestUpdateSchema:
 
     async def test_update_schema_name(
         self,
-        async_client: AsyncClient,
-        db_session,
+        client: AsyncClient,
+        test_db,
         test_list: BookmarkList
     ):
         """Should update schema name."""
@@ -234,12 +232,12 @@ class TestUpdateSchema:
             name="Original Name",
             description="Original description"
         )
-        db_session.add(schema)
-        await db_session.commit()
+        test_db.add(schema)
+        await test_db.commit()
 
         data = {"name": "Updated Name"}
 
-        response = await async_client.put(
+        response = await client.put(
             f"/api/lists/{test_list.id}/schemas/{schema.id}",
             json=data
         )
@@ -251,8 +249,8 @@ class TestUpdateSchema:
 
     async def test_update_schema_description(
         self,
-        async_client: AsyncClient,
-        db_session,
+        client: AsyncClient,
+        test_db,
         test_list: BookmarkList
     ):
         """Should update schema description."""
@@ -261,12 +259,12 @@ class TestUpdateSchema:
             name="Schema Name",
             description="Original"
         )
-        db_session.add(schema)
-        await db_session.commit()
+        test_db.add(schema)
+        await test_db.commit()
 
         data = {"description": "Updated description"}
 
-        response = await async_client.put(
+        response = await client.put(
             f"/api/lists/{test_list.id}/schemas/{schema.id}",
             json=data
         )
@@ -278,14 +276,14 @@ class TestUpdateSchema:
 
     async def test_update_schema_not_found(
         self,
-        async_client: AsyncClient,
+        client: AsyncClient,
         test_list: BookmarkList
     ):
         """Should return 404 if schema doesn't exist."""
         fake_schema_id = uuid4()
         data = {"name": "Updated"}
 
-        response = await async_client.put(
+        response = await client.put(
             f"/api/lists/{test_list.id}/schemas/{fake_schema_id}",
             json=data
         )
@@ -299,8 +297,8 @@ class TestDeleteSchema:
 
     async def test_delete_schema_success(
         self,
-        async_client: AsyncClient,
-        db_session,
+        client: AsyncClient,
+        test_db,
         test_list: BookmarkList
     ):
         """Should delete schema when not used by tags."""
@@ -308,10 +306,10 @@ class TestDeleteSchema:
             list_id=test_list.id,
             name="Test Schema"
         )
-        db_session.add(schema)
-        await db_session.commit()
+        test_db.add(schema)
+        await test_db.commit()
 
-        response = await async_client.delete(
+        response = await client.delete(
             f"/api/lists/{test_list.id}/schemas/{schema.id}"
         )
 
@@ -319,8 +317,8 @@ class TestDeleteSchema:
 
     async def test_delete_schema_with_tags(
         self,
-        async_client: AsyncClient,
-        db_session,
+        client: AsyncClient,
+        test_db,
         test_list: BookmarkList,
         test_user: User
     ):
@@ -329,8 +327,8 @@ class TestDeleteSchema:
             list_id=test_list.id,
             name="Test Schema"
         )
-        db_session.add(schema)
-        await db_session.flush()
+        test_db.add(schema)
+        await test_db.flush()
 
         # Create tag using schema
         tag = Tag(
@@ -338,10 +336,10 @@ class TestDeleteSchema:
             name="Test Tag",
             schema_id=schema.id
         )
-        db_session.add(tag)
-        await db_session.commit()
+        test_db.add(tag)
+        await test_db.commit()
 
-        response = await async_client.delete(
+        response = await client.delete(
             f"/api/lists/{test_list.id}/schemas/{schema.id}"
         )
 
@@ -350,13 +348,13 @@ class TestDeleteSchema:
 
     async def test_delete_schema_not_found(
         self,
-        async_client: AsyncClient,
+        client: AsyncClient,
         test_list: BookmarkList
     ):
         """Should return 404 if schema doesn't exist."""
         fake_schema_id = uuid4()
 
-        response = await async_client.delete(
+        response = await client.delete(
             f"/api/lists/{test_list.id}/schemas/{fake_schema_id}"
         )
 
