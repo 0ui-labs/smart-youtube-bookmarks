@@ -97,7 +97,12 @@ This file maintains **two separate lists**: PLAN and LOG.
 | #66 Report | 2025-11-07 17:35 | 2025-11-07 20:34 | 179 | REPORT-066 comprehensive documentation |
 | #67 | 2025-11-08 09:30 | 2025-11-08 10:37 | 67 | Duplicate Check Endpoint (REF MCP validated + 7 unit tests + 1 integration test) |
 | #67 Report | 2025-11-08 10:37 | 2025-11-08 10:45 | 8 | REPORT-067 comprehensive documentation |
-| **TOTAL** | | | **1825 min** | **30 hours 25 minutes** |
+| #71 | 2025-11-08 21:41 | 2025-11-08 22:12 | 31 | Video GET endpoint field_values (REF MCP + 5 improvements + batch-loading) |
+| #71 Report | 2025-11-08 22:12 | 2025-11-08 23:17 | 65 | REPORT-071 comprehensive documentation |
+| #72 | 2025-11-09 09:00 | 2025-11-09 09:47 | 47 | Batch update field values endpoint (REF MCP + Subagent-Driven + 11 tests) |
+| #72 Report | 2025-11-09 09:47 | 2025-11-09 10:50 | 63 | REPORT-072 comprehensive documentation |
+| #73 | 2025-11-09 11:44 | 2025-11-09 12:56 | 72 | Extract validation module (REF MCP + 3 Subagents + 25 tests + 100% coverage) |
+| **TOTAL** | | | **2111 min** | **35 hours 11 minutes** |
 
 ---
 
@@ -118,10 +123,12 @@ This file maintains **two separate lists**: PLAN and LOG.
 | #68 | 2025-11-08 11:00 | 2025-11-08 13:55 | 175 |
 | #69 | 2025-11-08 13:42 | 2025-11-08 14:03 | 21 |
 | #70 | 2025-11-08 14:08 | 2025-11-08 15:04 | 56 |
-| #71 | 2025-11-08 21:41 | | (in progress) |
-| **TOTAL** | | | **1730 min (28h 50min)** |
+| #71 | 2025-11-08 21:41 | 2025-11-08 23:17 | 96 |
+| #72 | 2025-11-09 09:00 | 2025-11-09 10:50 | 110 |
+| #73 | 2025-11-09 11:44 | 2025-11-09 12:56 | 72 |
+| **TOTAL** | | | **2008 min (33h 28min)** |
 
-Note: This table includes only tasks #58-#68 + CodeRabbit fixes from the Custom Fields Migration wave. Earlier tasks not included.
+Note: This table includes only tasks #58-#73 + CodeRabbit fixes from the Custom Fields Migration wave. Earlier tasks not included.
 
 ---
 
@@ -223,9 +230,9 @@ Note: This table includes only tasks #58-#68 + CodeRabbit fixes from the Custom 
 68. [x] Implement field schemas CRUD endpoints (GET, POST, PUT, DELETE) (2025-11-08 11:00-13:55 [175 min total])
 69. [x] Implement schema-fields endpoints (add/remove fields to schema) (2025-11-08 13:42-15:15 [93 min total])
 70. [x] Extend Tag endpoints with schema_id support (PUT /tags/{id}) (2025-11-08 14:08-15:04 [56 min total: 28 min impl + 28 min report])
-71. [ ] Extend Video GET endpoint to include field_values with union logic (2025-11-08 21:41-)
-72. [ ] Implement video field values batch update endpoint (PUT /videos/{id}/fields)
-73. [ ] Add field value validation logic (type checks, rating range, select options)
+71. [x] Extend Video GET endpoint to include field_values with union logic (2025-11-08 21:41-23:17 [96 min: 31 min code + 65 min report])
+72. [x] Implement video field values batch update endpoint (PUT /videos/{id}/fields) (2025-11-09 09:00-10:50 [110 min: 47 min impl + 63 min report])
+73. [x] Extract field value validation logic into reusable module (2025-11-09 11:44-12:56 [72 min: REF MCP + 3 Subagents + 25 tests])
 74. [ ] Implement multi-tag field union query with conflict resolution
 75. [ ] Add database indexes for performance (field_id+value_numeric, video_id+field_id)
 76. [ ] Write backend unit tests (duplicate check, validation, union logic, conflict resolution)
