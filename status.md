@@ -226,7 +226,7 @@ Note: This table includes only tasks #58-#68 + CodeRabbit fixes from the Custom 
 69. [x] Implement schema-fields endpoints (add/remove fields to schema) (2025-11-08 13:42-15:15 [93 min total])
 70. [x] Extend Tag endpoints with schema_id support (PUT /tags/{id}) (2025-11-08 14:08-15:04 [56 min total: 28 min impl + 28 min report])
 71. [x] Extend Video GET endpoint to include field_values with union logic (2025-11-08 21:41-23:17 [96 min: 31 min code + 65 min report])
-72. [ ] Implement video field values batch update endpoint (PUT /videos/{id}/fields) (2025-11-09 10:00-)
+72. [x] Implement video field values batch update endpoint (PUT /videos/{id}/fields) (2025-11-09 09:00-09:47 [47 min total])
 73. [ ] Add field value validation logic (type checks, rating range, select options)
 74. [ ] Implement multi-tag field union query with conflict resolution
 75. [ ] Add database indexes for performance (field_id+value_numeric, video_id+field_id)
