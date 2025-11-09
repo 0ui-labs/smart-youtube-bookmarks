@@ -268,6 +268,92 @@ Extracted from Task #72 inline validation (videos.py:1294-1360) in Task #73. Ori
 - Frontend uses `tagStore` (Zustand) to manage selected tags
 - `TagNavigation` component displays all tags with selection state
 
+### Field Union Pattern (Option D - Intelligente Lösung)
+
+**Two-Tier Response Strategy:**
+- **List endpoints** (`GET /lists/{id}/videos`): Return only `field_values` (fast, ~50KB for 100 videos)
+- **Detail endpoint** (`GET /videos/{id}`): Return `field_values` + `available_fields` (complete, ~5KB for 1 video)
+
+**Use Cases:**
+- **List/Grid View:** Shows only filled fields on cards (user configures which fields to display)
+- **Detail Modal:** Shows ALL available fields for editing (filled + empty)
+
+**Implementation:**
+
+1. **Helper Module:** `backend/app/api/helpers/field_union.py`
+   - `get_available_fields_for_video()` - Single video field union with conflict resolution
+   - `get_available_fields_for_videos()` - Batch version for multiple videos
+   - `compute_field_union_with_conflicts()` - Two-pass algorithm for name conflicts
+
+2. **Conflict Resolution Algorithm (Two-Pass):**
+   ```
+   Pass 1: Detect conflicts
+   - Group fields by name (case-insensitive)
+   - If same name + different type → mark as conflict
+
+   Pass 2: Apply schema prefix
+   - Conflicting fields get prefix: "Schema Name: Field Name"
+   - Non-conflicting fields keep original name
+   ```
+
+3. **Example Scenario:**
+   ```
+   Video has tags: ["Makeup Tutorial", "Product Review"]
+
+   Schemas:
+   - "Makeup Tutorial": [Rating (rating), Quality (select)]
+   - "Product Review": [Rating (select), Price (number)]
+
+   Result after conflict resolution:
+   - "Makeup Tutorial: Rating" (type: rating)
+   - "Product Review: Rating" (type: select)
+   - "Quality" (type: select, no conflict)
+   - "Price" (type: number, no conflict)
+   ```
+
+4. **API Responses:**
+
+   **List Endpoint** (fast):
+   ```json
+   {
+     "id": "...",
+     "title": "Video Title",
+     "field_values": [
+       {"field_name": "Rating", "value": 4, ...}
+     ],
+     "available_fields": null
+   }
+   ```
+
+   **Detail Endpoint** (complete):
+   ```json
+   {
+     "id": "...",
+     "title": "Video Title",
+     "field_values": [
+       {"field_name": "Rating", "value": 4, ...},
+       {"field_name": "Quality", "value": null, ...}
+     ],
+     "available_fields": [
+       {"field_name": "Rating", "field_type": "rating", "config": {...}},
+       {"field_name": "Quality", "field_type": "select", "config": {...}}
+     ]
+   }
+   ```
+
+**Performance:**
+- List endpoint: 2-3 DB queries for 100 videos (batch loading with selectinload)
+- Detail endpoint: 2-3 DB queries for 1 video (<100ms target)
+- Conflict resolution: Pure Python, in-memory (0 DB queries)
+
+**Testing:**
+- Unit tests: `backend/tests/api/helpers/test_field_union.py` (9 passing, 7 skipped due to async greenlet issues)
+- Integration tests: Task #71 tests verify batch loading works correctly
+
+**Related Tasks:**
+- Task #71: Video GET endpoint with field_values (batch loading foundation)
+- Task #74: Multi-tag field union query with conflict resolution (Option D implementation)
+
 ### Feature Flag Pattern
 
 **Environment Variables (Frontend):**
