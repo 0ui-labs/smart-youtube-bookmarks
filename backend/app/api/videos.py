@@ -21,7 +21,7 @@ import csv
 import io
 from datetime import datetime, timezone
 from app.api.field_validation import validate_field_value, FieldValidationError
-from app.api.helpers.field_union import compute_field_union_with_conflicts, get_available_fields_for_videos
+from app.api.helpers.field_union import compute_field_union_with_conflicts, get_available_fields_for_videos, get_available_fields_for_video
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
@@ -46,7 +46,7 @@ from app.models.schema_field import SchemaField
 from app.models.field_schema import FieldSchema
 from app.models.custom_field import CustomField
 from app.models.video_field_value import VideoFieldValue
-from app.schemas.video import VideoAdd, VideoResponse, BulkUploadResponse, BulkUploadFailure, VideoFieldValueResponse
+from app.schemas.video import VideoAdd, VideoResponse, BulkUploadResponse, BulkUploadFailure, VideoFieldValueResponse, AvailableFieldResponse
 from app.schemas.video_field_value import (
     BatchUpdateFieldValuesRequest,
     BatchUpdateFieldValuesResponse,
@@ -460,6 +460,91 @@ async def get_videos_in_list(
             video.__dict__['field_values'] = []
 
     return list(videos)
+
+
+@router.get("/videos/{video_id}", response_model=VideoResponse)
+async def get_video_by_id(
+    video_id: UUID,
+    db: AsyncSession = Depends(get_db)
+) -> Video:
+    """
+    Get single video with complete field information (detail view).
+
+    Returns:
+    - field_values: Filled field values only
+    - available_fields: ALL available fields (based on video's tags)
+
+    Use Case: Modal/Detail view where user can edit all fields.
+    """
+    # Step 1: Load video with eager loading for tags and field_values
+    stmt = (
+        select(Video)
+        .where(Video.id == video_id)
+        .options(
+            selectinload(Video.tags).selectinload(Tag.schema),  # For available_fields
+            selectinload(Video.field_values).selectinload(VideoFieldValue.field)  # For field_values
+        )
+    )
+    result = await db.execute(stmt)
+    video = result.scalar_one_or_none()
+
+    if not video:
+        raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
+
+    # Step 2: Get available fields using helper module
+    available_fields_tuples = await get_available_fields_for_video(video, db)
+
+    # Step 3: Convert tuples to AvailableFieldResponse objects
+    available_fields = [
+        AvailableFieldResponse(
+            field_id=field.id,
+            field_name=schema_name + ": " + field.name if schema_name else field.name,
+            field_type=field.field_type,
+            schema_name=schema_name,
+            display_order=display_order,
+            show_on_card=show_on_card,
+            config=field.config or {}
+        )
+        for field, schema_name, display_order, show_on_card in available_fields_tuples
+    ]
+
+    # Step 4: Build field_values response (similar to list endpoint logic)
+    field_values_list = video.field_values if video.field_values is not None else []
+    values_by_field_id = {fv.field_id: fv for fv in field_values_list}
+
+    field_values_response = []
+    for field, schema_name, display_order, show_on_card in available_fields_tuples:
+        field_value = values_by_field_id.get(field.id)
+
+        # Extract value based on field type
+        value = None
+        if field_value:
+            if field.field_type == 'rating':
+                value = field_value.value_numeric  # Can be float
+            elif field.field_type in ('select', 'text'):
+                value = field_value.value_text
+            elif field.field_type == 'boolean':
+                value = field_value.value_boolean
+
+        # Create response dict (Pydantic will serialize)
+        field_values_response.append({
+            'field_id': field.id,
+            'field': field,  # CustomField ORM object
+            'value': value,
+            'schema_name': schema_name,
+            'show_on_card': show_on_card,
+            'display_order': display_order
+        })
+
+    # Step 5: Attach available_fields and field_values to video object for Pydantic
+    video.__dict__['available_fields'] = available_fields
+    video.__dict__['field_values'] = field_values_response
+
+    # Ensure tags is a list (not None) for Pydantic validation
+    if video.tags is None:
+        video.__dict__['tags'] = []
+
+    return video
 
 
 @router.get("/videos", response_model=List[VideoResponse])

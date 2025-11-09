@@ -188,7 +188,9 @@ async def get_available_fields_for_videos(
     video_schemas: Dict[UUID, List[UUID]] = {}  # video_id → [schema_ids]
 
     for video in videos:
-        schema_ids = [tag.schema_id for tag in video.tags if tag.schema_id is not None]
+        # Handle case where tags relationship might not be loaded or is None
+        tags = video.tags if video.tags is not None else []
+        schema_ids = [tag.schema_id for tag in tags if tag.schema_id is not None]
         if schema_ids:
             video_schemas[video.id] = schema_ids
             all_schema_ids.update(schema_ids)
