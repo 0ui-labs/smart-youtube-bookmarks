@@ -97,7 +97,9 @@ This file maintains **two separate lists**: PLAN and LOG.
 | #66 Report | 2025-11-07 17:35 | 2025-11-07 20:34 | 179 | REPORT-066 comprehensive documentation |
 | #67 | 2025-11-08 09:30 | 2025-11-08 10:37 | 67 | Duplicate Check Endpoint (REF MCP validated + 7 unit tests + 1 integration test) |
 | #67 Report | 2025-11-08 10:37 | 2025-11-08 10:45 | 8 | REPORT-067 comprehensive documentation |
-| **TOTAL** | | | **1825 min** | **30 hours 25 minutes** |
+| #71 | 2025-11-08 21:41 | 2025-11-08 22:12 | 31 | Video GET endpoint field_values (REF MCP validated + 5 improvements + batch-loading) |
+| #71 Report | 2025-11-08 22:12 | 2025-11-08 23:17 | 65 | REPORT-071 comprehensive documentation |
+| **TOTAL** | | | **1890 min** | **31 hours 30 minutes** |
 
 ---
 
@@ -118,8 +120,8 @@ This file maintains **two separate lists**: PLAN and LOG.
 | #68 | 2025-11-08 11:00 | 2025-11-08 13:55 | 175 |
 | #69 | 2025-11-08 13:42 | 2025-11-08 14:03 | 21 |
 | #70 | 2025-11-08 14:08 | 2025-11-08 15:04 | 56 |
-| #71 | 2025-11-08 21:41 | | (in progress) |
-| **TOTAL** | | | **1730 min (28h 50min)** |
+| #71 | 2025-11-08 21:41 | 2025-11-08 23:17 | 96 |
+| **TOTAL** | | | **1826 min (30h 26min)** |
 
 Note: This table includes only tasks #58-#68 + CodeRabbit fixes from the Custom Fields Migration wave. Earlier tasks not included.
 
@@ -223,8 +225,8 @@ Note: This table includes only tasks #58-#68 + CodeRabbit fixes from the Custom 
 68. [x] Implement field schemas CRUD endpoints (GET, POST, PUT, DELETE) (2025-11-08 11:00-13:55 [175 min total])
 69. [x] Implement schema-fields endpoints (add/remove fields to schema) (2025-11-08 13:42-15:15 [93 min total])
 70. [x] Extend Tag endpoints with schema_id support (PUT /tags/{id}) (2025-11-08 14:08-15:04 [56 min total: 28 min impl + 28 min report])
-71. [ ] Extend Video GET endpoint to include field_values with union logic (2025-11-08 21:41-)
-72. [ ] Implement video field values batch update endpoint (PUT /videos/{id}/fields)
+71. [x] Extend Video GET endpoint to include field_values with union logic (2025-11-08 21:41-23:17 [96 min: 31 min code + 65 min report])
+72. [ ] Implement video field values batch update endpoint (PUT /videos/{id}/fields) (2025-11-09 10:00-)
 73. [ ] Add field value validation logic (type checks, rating range, select options)
 74. [ ] Implement multi-tag field union query with conflict resolution
 75. [ ] Add database indexes for performance (field_id+value_numeric, video_id+field_id)

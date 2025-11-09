@@ -241,6 +241,76 @@ Videos now include custom field values based on their tags' schemas:
 - Schemas: `backend/app/schemas/video.py` (VideoFieldValueResponse)
 - Tests: `backend/tests/api/test_videos.py` (test_get_videos_field_values_*)
 
+### Video Field Values Batch Update (Task #72)
+
+**Endpoint:** `PUT /api/videos/{video_id}/fields`
+
+Batch update all custom field values for a video in a single atomic transaction.
+
+```json
+// Request
+{
+  "field_values": [
+    {"field_id": "uuid1", "value": 5},
+    {"field_id": "uuid2", "value": "great"},
+    {"field_id": "uuid3", "value": true}
+  ]
+}
+
+// Response (200)
+{
+  "updated_count": 3,
+  "field_values": [
+    {
+      "field_id": "uuid1",
+      "value": 5,
+      "schema_name": null,
+      "show_on_card": false,
+      "display_order": 0,
+      "field": {
+        "id": "uuid1",
+        "name": "Overall Rating",
+        "field_type": "rating",
+        "config": {"max_rating": 5}
+      }
+    },
+    ...
+  ]
+}
+```
+
+**Transaction Semantics:**
+- All-or-nothing: If any validation fails, no changes are persisted
+- Upsert: Creates new values or updates existing (idempotent)
+- Atomic: Single database transaction for all updates
+
+**Validation (Inline):**
+- Video must exist (404 if not)
+- All field_ids must be valid (400 if not)
+- Values validated per field type (422 if invalid):
+  - Rating: numeric, 0 to max_rating
+  - Select: string, in options list
+  - Text: string, max_length if configured
+  - Boolean: true/false
+- No duplicate field_ids in request (422 if duplicates)
+
+**Performance:**
+- Optimized for batches up to 50 fields
+- Single query for validation
+- PostgreSQL UPSERT for efficiency
+- Target: < 200ms for 10 field updates
+
+**Error Codes:**
+- 200: Success
+- 400: Invalid field_id
+- 404: Video not found
+- 422: Validation error (duplicate field_ids, invalid values)
+
+**Implementation Notes:**
+- Uses correct constraint name `uq_video_field_values` from migration
+- Reuses `VideoFieldValueResponse` from Task #71 (DRY principle)
+- Inline validation (independent of Task #73)
+
 ### Testing Patterns
 
 **Frontend (Vitest):**
