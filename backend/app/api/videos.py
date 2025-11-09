@@ -471,10 +471,14 @@ async def get_video_by_id(
     Get single video with complete field information (detail view).
 
     Returns:
-    - field_values: Filled field values only
-    - available_fields: ALL available fields (based on video's tags)
+    - field_values: ALL available fields with their current values (null if unfilled)
+    - available_fields: Field metadata for all editable fields (name, type, config)
 
-    Use Case: Modal/Detail view where user can edit all fields.
+    Note: field_values includes ALL applicable fields (from video's tags),
+    with value=None for fields that haven't been filled yet. This allows
+    the frontend to render all editable fields in the detail modal.
+
+    Use Case: Modal/Detail view where user can see and edit all fields.
     """
     # Step 1: Load video with eager loading for tags and field_values
     stmt = (
