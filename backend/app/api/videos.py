@@ -20,6 +20,7 @@ from typing import List, Sequence, Optional, Annotated, Dict, Tuple, Set
 import csv
 import io
 from datetime import datetime, timezone
+from app.api.field_validation import validate_field_value, FieldValidationError
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
@@ -1291,63 +1292,31 @@ async def batch_update_video_field_values(
             detail=f"Invalid field_id(s): {invalid_str}. These fields do not exist."
         )
 
-    # === STEP 3: Validate values against field types (INLINE) ===
+    # === STEP 3: Validate values against field types (MODULE) ===
     validation_errors = []
     for update in request.field_values:
         field = fields[update.field_id]
 
-        # Type compatibility and range checks
-        if field.field_type == 'rating':
-            if not isinstance(update.value, (int, float)):
-                validation_errors.append({
-                    "field_id": str(update.field_id),
-                    "field_name": field.name,
-                    "error": f"Rating value must be numeric, got {type(update.value).__name__}"
-                })
-            elif update.value < 0 or update.value > field.config.get('max_rating', 5):
-                validation_errors.append({
-                    "field_id": str(update.field_id),
-                    "field_name": field.name,
-                    "error": f"Rating must be between 0 and {field.config.get('max_rating', 5)}"
-                })
-
-        elif field.field_type == 'select':
-            if not isinstance(update.value, str):
-                validation_errors.append({
-                    "field_id": str(update.field_id),
-                    "field_name": field.name,
-                    "error": f"Select value must be string, got {type(update.value).__name__}"
-                })
-            elif update.value not in field.config.get('options', []):
-                validation_errors.append({
-                    "field_id": str(update.field_id),
-                    "field_name": field.name,
-                    "error": f"Invalid option '{update.value}'. Valid options: {field.config.get('options', [])}"
-                })
-
-        elif field.field_type == 'boolean':
-            if not isinstance(update.value, bool):
-                validation_errors.append({
-                    "field_id": str(update.field_id),
-                    "field_name": field.name,
-                    "error": f"Boolean value must be true/false, got {type(update.value).__name__}"
-                })
-
-        elif field.field_type == 'text':
-            if not isinstance(update.value, str):
-                validation_errors.append({
-                    "field_id": str(update.field_id),
-                    "field_name": field.name,
-                    "error": f"Text value must be string, got {type(update.value).__name__}"
-                })
-            else:
-                max_len = field.config.get('max_length')
-                if max_len and len(update.value) > max_len:
-                    validation_errors.append({
-                        "field_id": str(update.field_id),
-                        "field_name": field.name,
-                        "error": f"Text exceeds max length {max_len} ({len(update.value)} chars)"
-                    })
+        try:
+            validate_field_value(
+                value=update.value,
+                field_type=field.field_type,
+                config=field.config,
+                field_name=field.name
+            )
+        except FieldValidationError as e:
+            validation_errors.append({
+                "field_id": str(update.field_id),
+                "field_name": field.name,
+                "error": str(e)
+            })
+        except ValueError as e:
+            # Unknown field_type
+            validation_errors.append({
+                "field_id": str(update.field_id),
+                "field_name": field.name,
+                "error": str(e)
+            })
 
     # If any validation failed, abort before database changes
     if validation_errors:
