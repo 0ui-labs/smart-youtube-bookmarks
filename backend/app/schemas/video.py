@@ -95,6 +95,25 @@ class VideoFieldValueResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AvailableFieldResponse(BaseModel):
+    """
+    Metadata for an available field (without value).
+
+    Used in detail endpoint to show which fields CAN be filled.
+    """
+    field_id: UUID
+    field_name: str
+    field_type: str  # 'rating', 'select', 'text', 'boolean'
+    schema_name: str | None  # None if no conflict, else "Schema: Field"
+    display_order: int
+    show_on_card: bool
+
+    # Optional: For UI hints
+    config: dict = Field(default_factory=dict)  # e.g., {'max_rating': 5} or {'options': ['bad', 'good']}
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class VideoResponse(BaseModel):
     """
     Schema for video response.
@@ -118,6 +137,9 @@ class VideoResponse(BaseModel):
 
     # Field values (custom fields from tag schemas)
     field_values: list[VideoFieldValueResponse] = Field(default_factory=list)
+
+    # NEW field for detail endpoint (Option D - Intelligente Lösung)
+    available_fields: list[AvailableFieldResponse] | None = None  # Optional: only set in detail endpoint
 
     processing_status: str
     error_message: str | None = None
