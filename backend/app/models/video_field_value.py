@@ -1,5 +1,5 @@
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Numeric, Boolean, ForeignKey, Text, UniqueConstraint, CheckConstraint
+from sqlalchemy import String, Numeric, Boolean, ForeignKey, Text, UniqueConstraint, CheckConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from uuid import UUID as PyUUID
@@ -109,10 +109,13 @@ class VideoFieldValue(BaseModel):
             "((value_text IS NOT NULL)::int + (value_numeric IS NOT NULL)::int + (value_boolean IS NOT NULL)::int) = 1",
             name="ck_video_field_values_exactly_one_value"
         ),
-        # Note: Performance indexes defined in migration (lines 93-99):
-        # - idx_video_field_values_field_numeric: (field_id, value_numeric)
-        # - idx_video_field_values_field_text: (field_id, value_text)
-        # - idx_video_field_values_video_field: (video_id, field_id)
+        # Performance indexes from migration 1a6e18578c31 (lines 93-99)
+        # Index 1: Filter by field + numeric value (e.g., "Rating >= 4")
+        Index('idx_video_field_values_field_numeric', 'field_id', 'value_numeric'),
+        # Index 2: Filter by field + text value (e.g., "Presentation = 'great'")
+        Index('idx_video_field_values_field_text', 'field_id', 'value_text'),
+        # Index 3: Lookup all field values for a video (most common query)
+        Index('idx_video_field_values_video_field', 'video_id', 'field_id'),
     )
 
     def __repr__(self) -> str:

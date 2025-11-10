@@ -17,7 +17,7 @@ Implement React Query hooks and API client for Custom Fields CRUD operations wit
 | Query key factory follows hierarchical pattern (customFieldKeys) | customFieldKeys object with all/lists/list/detail pattern |
 | TypeScript types fully inferred (no `any`) | tsc --noEmit passes, Zod validation on responses |
 | Query invalidation working correctly after mutations | onSettled invalidates correct query keys |
-| API client with typed axios calls | customFieldsApi.ts with CustomFieldResponse types |
+| API client with typed axios calls | customFieldsApi.ts with CustomField types |
 | Debounced duplicate check hook (300ms) | useCheckDuplicateField with debounce logic |
 | 15+ unit tests passing (all hooks + edge cases) | npm test useCustomFields.test.tsx |
 | Integration with existing pattern (matches useTags.ts) | queryOptions helper, mutation keys, onSettled pattern |
@@ -33,23 +33,25 @@ Implement React Query hooks and API client for Custom Fields CRUD operations wit
 ```typescript
 import { api } from '@/lib/api'
 import type {
-  CustomFieldResponse,
+  CustomField,
   CustomFieldCreate,
   CustomFieldUpdate,
   DuplicateCheckRequest,
   DuplicateCheckResponse,
-} from '@/types/customField'
+} from '@/types/customFields'
 
 /**
  * API client for custom fields endpoints
- * Base path: /api/lists/{listId}/custom-fields
+ * Base paths:
+ * - GET/POST: /api/lists/{listId}/custom-fields
+ * - PUT/DELETE: /api/custom-fields/{fieldId}
  */
 export const customFieldsApi = {
   /**
    * Get all custom fields for a list
    */
-  async getAll(listId: string): Promise<CustomFieldResponse[]> {
-    const { data } = await api.get<CustomFieldResponse[]>(
+  async getAll(listId: string): Promise<CustomField[]> {
+    const { data } = await api.get<CustomField[]>(
       `/lists/${listId}/custom-fields`
     )
     return data ?? []
@@ -61,8 +63,8 @@ export const customFieldsApi = {
   async create(
     listId: string,
     fieldData: CustomFieldCreate
-  ): Promise<CustomFieldResponse> {
-    const { data } = await api.post<CustomFieldResponse>(
+  ): Promise<CustomField> {
+    const { data } = await api.post<CustomField>(
       `/lists/${listId}/custom-fields`,
       fieldData
     )
@@ -71,14 +73,14 @@ export const customFieldsApi = {
 
   /**
    * Update an existing custom field
+   * Note: Does NOT require listId - field is identified by UUID
    */
   async update(
-    listId: string,
     fieldId: string,
     fieldData: CustomFieldUpdate
-  ): Promise<CustomFieldResponse> {
-    const { data } = await api.put<CustomFieldResponse>(
-      `/lists/${listId}/custom-fields/${fieldId}`,
+  ): Promise<CustomField> {
+    const { data } = await api.put<CustomField>(
+      `/custom-fields/${fieldId}`,
       fieldData
     )
     return data
@@ -86,10 +88,11 @@ export const customFieldsApi = {
 
   /**
    * Delete a custom field
+   * Note: Does NOT require listId - field is identified by UUID
    * Will fail if field is used in any schema
    */
-  async delete(listId: string, fieldId: string): Promise<void> {
-    await api.delete(`/lists/${listId}/custom-fields/${fieldId}`)
+  async delete(fieldId: string): Promise<void> {
+    await api.delete(`/custom-fields/${fieldId}`)
   },
 
   /**
@@ -179,7 +182,7 @@ export const customFieldKeys = {
 ```typescript
 import { queryOptions } from '@tanstack/react-query'
 import { customFieldsApi } from '@/lib/customFieldsApi'
-import { CustomFieldsSchema } from '@/types/customField'
+import { CustomFieldSchema } from '@/types/customFields'
 
 /**
  * Query options factory for custom fields
@@ -363,7 +366,7 @@ export const useUpdateCustomField = (listId: string) => {
       fieldId: string
       data: CustomFieldUpdate
     }) => {
-      const result = await customFieldsApi.update(listId, fieldId, data)
+      const result = await customFieldsApi.update(fieldId, data)
       return CustomFieldSchema.parse(result)
     },
     onError: (error) => {
@@ -422,7 +425,7 @@ export const useDeleteCustomField = (listId: string) => {
   return useMutation({
     mutationKey: ['deleteCustomField', listId],
     mutationFn: async (fieldId: string) => {
-      await customFieldsApi.delete(listId, fieldId)
+      await customFieldsApi.delete(fieldId)
     },
     // Optimistic update: immediately remove from UI
     onMutate: async (fieldId) => {
@@ -432,12 +435,12 @@ export const useDeleteCustomField = (listId: string) => {
       })
 
       // Snapshot current value for rollback
-      const previous = queryClient.getQueryData<CustomFieldResponse[]>(
+      const previous = queryClient.getQueryData<CustomField[]>(
         customFieldKeys.list(listId)
       )
 
       // Optimistically update cache
-      queryClient.setQueryData<CustomFieldResponse[]>(
+      queryClient.setQueryData<CustomField[]>(
         customFieldKeys.list(listId),
         (old) => old?.filter((field) => field.id !== fieldId) ?? []
       )
@@ -480,78 +483,10 @@ export const useDeleteCustomField = (listId: string) => {
 
 **Purpose:** Real-time duplicate checking while user types field name
 
-```typescript
-import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
-import { debounce } from '@/lib/utils'
-
-/**
- * React Query hook to check if a field name already exists (case-insensitive)
- * 
- * IMPORTANT: This is a query (not mutation) because it doesn't modify state
- * Debounced to avoid excessive API calls while user types
- * 
- * @param listId - UUID of the list
- * @param name - Field name to check (debounced 300ms)
- * @param options - Query options (enabled flag)
- * @returns Query result with duplicate check response
- * 
- * @example
- * ```tsx
- * const [fieldName, setFieldName] = useState('')
- * const duplicateCheck = useCheckDuplicateField(listId, fieldName, {
- *   enabled: fieldName.length > 0
- * })
- * 
- * if (duplicateCheck.data?.exists) {
- *   return <ErrorMessage>Field "{duplicateCheck.data.field.name}" already exists</ErrorMessage>
- * }
- * ```
- */
-export const useCheckDuplicateField = (
-  listId: string,
-  name: string,
-  options?: { enabled?: boolean }
-) => {
-  // Debounce the name to avoid API spam (300ms delay)
-  const debouncedName = useMemo(
-    () => debounce((value: string) => value, 300),
-    []
-  )
-
-  return useQuery({
-    queryKey: ['checkDuplicateField', listId, name] as const,
-    queryFn: async () => {
-      const data = await customFieldsApi.checkDuplicate(listId, { name })
-      return DuplicateCheckResponseSchema.parse(data)
-    },
-    enabled: (options?.enabled ?? true) && name.length > 0,
-    // Don't cache duplicate checks (name changes frequently)
-    staleTime: 0,
-    gcTime: 0,
-    // No retries for duplicate checks (fast fail)
-    retry: false,
-  })
-}
-```
-
-**Design Decision: Query vs Mutation**
-- This is a **query**, not a mutation (doesn't change server state)
-- Uses queryKey with name parameter for automatic deduplication
-- enabled: false when name is empty (avoids unnecessary API calls)
-- staleTime: 0 ensures fresh data on every check
-
 **Debouncing Strategy:**
-- 300ms delay balances responsiveness vs API load
-- useMemo ensures debounce function doesn't recreate on every render
-- Alternative considered: useDebounce custom hook (overkill for single use case)
-
-**Potential Issue: Debouncing in React Query**
-- React Query already deduplicates requests by queryKey
-- Debouncing the **query key** (not the API call) is cleaner
-- Better approach: Use queryKey with debounced name value
-
-**REVISED APPROACH (Simpler):**
+- React Query deduplicates requests by queryKey automatically
+- Debounce the **queryKey value** (not the API call) - cleaner approach
+- Uses separate useDebounce hook for reusability
 
 ```typescript
 import { useDebounce } from '@/hooks/useDebounce' // Create utility hook
@@ -630,13 +565,12 @@ import {
 } from '@tanstack/react-query'
 import { customFieldsApi } from '@/lib/customFieldsApi'
 import {
-  CustomFieldsSchema,
   CustomFieldSchema,
   DuplicateCheckResponseSchema,
-  type CustomFieldResponse,
+  type CustomField,
   type CustomFieldCreate,
   type CustomFieldUpdate,
-} from '@/types/customField'
+} from '@/types/customFields'
 import { useDebounce } from '@/hooks/useDebounce'
 
 // ===== QUERY KEY FACTORY =====
@@ -759,7 +693,7 @@ import {
   customFieldsOptions,
 } from './useCustomFields'
 import { customFieldsApi } from '@/lib/customFieldsApi'
-import type { CustomFieldResponse } from '@/types/customField'
+import type { CustomField } from '@/types/customFields'
 
 // Mock API client
 vi.mock('@/lib/customFieldsApi', () => ({
@@ -774,7 +708,7 @@ vi.mock('@/lib/customFieldsApi', () => ({
 
 const mockListId = '00000000-0000-0000-0000-000000000001'
 
-const mockField: CustomFieldResponse = {
+const mockField: CustomField = {
   id: '00000000-0000-0000-0000-000000000101',
   list_id: mockListId,
   name: 'Presentation Quality',
@@ -784,7 +718,7 @@ const mockField: CustomFieldResponse = {
   updated_at: '2025-01-01T00:00:00Z',
 }
 
-const mockRatingField: CustomFieldResponse = {
+const mockRatingField: CustomField = {
   id: '00000000-0000-0000-0000-000000000102',
   list_id: mockListId,
   name: 'Overall Rating',
@@ -1046,7 +980,7 @@ describe('useDeleteCustomField', () => {
     result.current.mutate(mockField.id)
 
     // Optimistic update should remove field immediately
-    const cacheData = queryClient.getQueryData<CustomFieldResponse[]>(
+    const cacheData = queryClient.getQueryData<CustomField[]>(
       customFieldKeys.list(mockListId)
     )
     expect(cacheData).toHaveLength(1)
@@ -1054,7 +988,7 @@ describe('useDeleteCustomField', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-    expect(customFieldsApi.delete).toHaveBeenCalledWith(mockListId, mockField.id)
+    expect(customFieldsApi.delete).toHaveBeenCalledWith(mockField.id)
   })
 
   it('rolls back optimistic update on error', async () => {
@@ -1070,7 +1004,7 @@ describe('useDeleteCustomField', () => {
     await waitFor(() => expect(result.current.isError).toBe(true))
 
     // Cache should be restored
-    const cacheData = queryClient.getQueryData<CustomFieldResponse[]>(
+    const cacheData = queryClient.getQueryData<CustomField[]>(
       customFieldKeys.list(mockListId)
     )
     expect(cacheData).toHaveLength(2)
@@ -1375,8 +1309,8 @@ describe('useDebounce', () => {
 **Example:**
 ```typescript
 const { data } = useCustomFields(listId)
-// ✅ data is typed as CustomFieldResponse[] | undefined (inferred)
-// ✅ No need for useCustomFields<CustomFieldResponse[]>()
+// ✅ data is typed as CustomField[] | undefined (inferred)
+// ✅ No need for useCustomFields<CustomField[]>()
 ```
 
 ---
@@ -1404,8 +1338,8 @@ Before marking task complete, verify:
 ## 📝 Notes
 
 **Dependencies:**
-- Task #78 must provide TypeScript types (`CustomFieldResponse`, `CustomFieldCreate`, etc.)
-- If types not ready, create temporary interfaces and refactor later
+- Task #78 must provide TypeScript types (`CustomField`, `CustomFieldCreate`, etc.)
+- Types are ready in `frontend/src/types/customFields.ts` (86/86 tests passing)
 
 **Future Enhancements (Not MVP):**
 - Optimistic updates for create/update (low priority, fields created infrequently)
