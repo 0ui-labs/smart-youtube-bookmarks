@@ -9,9 +9,9 @@ import type {
 
 /**
  * API client for custom fields endpoints
- * Base paths:
- * - GET/POST: /api/lists/{listId}/custom-fields
- * - PUT/DELETE: /api/custom-fields/{fieldId}
+ * Base path: /api/lists/{listId}/custom-fields
+ *
+ * All endpoints are list-scoped for validation and authorization
  */
 export const customFieldsApi = {
   /**
@@ -40,14 +40,15 @@ export const customFieldsApi = {
 
   /**
    * Update an existing custom field
-   * Note: Does NOT require listId - field is identified by UUID
+   * Requires listId for list validation and authorization
    */
   async update(
+    listId: string,
     fieldId: string,
     fieldData: CustomFieldUpdate
   ): Promise<CustomField> {
     const { data } = await api.put<CustomField>(
-      `/custom-fields/${fieldId}`,
+      `/lists/${listId}/custom-fields/${fieldId}`,
       fieldData
     )
     return data
@@ -55,11 +56,11 @@ export const customFieldsApi = {
 
   /**
    * Delete a custom field
-   * Note: Does NOT require listId - field is identified by UUID
+   * Requires listId for list validation and authorization
    * Will fail if field is used in any schema
    */
-  async delete(fieldId: string): Promise<void> {
-    await api.delete(`/custom-fields/${fieldId}`)
+  async delete(listId: string, fieldId: string): Promise<void> {
+    await api.delete(`/lists/${listId}/custom-fields/${fieldId}`)
   },
 
   /**
