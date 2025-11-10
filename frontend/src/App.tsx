@@ -5,10 +5,6 @@ import { NotFound } from './pages/NotFound'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useLists } from './hooks/useLists'
 
-// Hardcoded listId for single-list MVP (will be replaced with Workspaces later)
-// This constant uses the first available list from the backend
-const FIXED_LIST_ID = 'first-available'
-
 function App() {
   // Listen laden und Zustände auswerten
   const { data: lists, isLoading, isError } = useLists()

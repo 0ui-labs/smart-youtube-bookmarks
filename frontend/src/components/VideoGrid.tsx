@@ -65,7 +65,7 @@ export const VideoGrid = ({ videos, gridColumns, onVideoClick, onDeleteVideo }: 
           key={video.id}
           video={video}
           onClick={onVideoClick}
-          onDelete={onDeleteVideo}
+          onDelete={onDeleteVideo ? () => onDeleteVideo(video) : undefined}
         />
       ))}
     </div>

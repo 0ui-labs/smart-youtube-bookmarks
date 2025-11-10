@@ -39,11 +39,6 @@ export const renderWithRouter = (
         retry: false,
       },
     },
-    logger: {
-      log: () => {},
-      warn: () => {},
-      error: () => {}, // Suppress errors in tests
-    },
   })
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (

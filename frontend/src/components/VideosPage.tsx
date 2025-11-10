@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   useReactTable,
@@ -9,7 +9,6 @@ import {
 import axios from 'axios'
 import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV, useAssignTags } from '@/hooks/useVideos'
 import { CSVUpload } from './CSVUpload'
-import { useWebSocket } from '@/hooks/useWebSocket'
 import { ProgressBar } from './ProgressBar'
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
@@ -25,7 +24,6 @@ import { useTagStore } from '@/stores/tagStore'
 import { useTableSettingsStore } from '@/stores/tableSettingsStore'
 import { useShallow } from 'zustand/react/shallow'
 import { FEATURE_FLAGS } from '@/config/featureFlags'
-import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import {
   DropdownMenu,
@@ -199,7 +197,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   // Fetch videos filtered by selected tag names (OR logic)
   // No polling needed - single videos get metadata synchronously
   // Bulk uploads use WebSocket for live updates
-  const { data: videos = [], isLoading, error, refetch } = useVideos(
+  const { data: videos = [], isLoading, error } = useVideos(
     listId,
     selectedTagNames.length > 0 ? selectedTagNames : undefined
   )
