@@ -260,7 +260,7 @@ Note: This table includes only tasks #58-#80 + #89 + CodeRabbit fixes from the C
 79. [x] Create useCustomFields React Query hook (2025-11-10 16:28-18:48 [140 min: 15min REF MCP FAILED + 75min impl + 17min fixes + 12min TS + 20min docs + report])
 80. [x] Create useSchemas React Query hook (2025-11-10 23:19 - 2025-11-11 07:59 [520 min: 497 min coding + 23 min report])
 81. [x] Create useVideoFieldValues React Query hook with mutations (2025-11-11 15:35 - 17:04 [89 min total: 51 min coding + 38 min report])
-82. [ ] Extend TagEditDialog with SchemaSelector component
+82. [x] Extend TagEditDialog with SchemaSelector component (2025-11-11 17:16 - 18:35 [79 min: 68 min coding + 11 min report])
 83. [ ] Create SchemaEditor component for inline schema creation
 84. [ ] Create FieldSelector component (multi-select from existing fields)
 85. [ ] Create NewFieldForm component with type selector and config editor
