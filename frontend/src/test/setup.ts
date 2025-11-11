@@ -6,10 +6,22 @@
 import '@testing-library/jest-dom/vitest';
 
 // Import vi from vitest for mocking
-import { vi } from 'vitest';
+import { vi, beforeAll, afterEach, afterAll } from 'vitest';
+
+// Import MSW server
+import { server } from './mocks/server';
 
 // Auto-mock Zustand for test isolation (uses __mocks__/zustand.ts)
 vi.mock('zustand');
+
+// Start MSW server before all tests
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+
+// Reset handlers after each test to prevent state leakage
+afterEach(() => server.resetHandlers());
+
+// Clean up after all tests
+afterAll(() => server.close());
 
 // Mock localStorage for tests
 class LocalStorageMock {

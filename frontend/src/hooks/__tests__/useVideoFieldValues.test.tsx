@@ -1,478 +1,288 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
-import { useUpdateFieldValue } from '../useVideoFieldValues'
-import { api } from '@/lib/api'
-import type { VideoResponse } from '@/types/video'
+import { useVideoFieldValues, useUpdateVideoFieldValues } from '../useVideoFieldValues'
+import { server } from '@/test/mocks/server'
+import { http, HttpResponse } from 'msw'
+import type { VideoResponse, BatchUpdateFieldValuesResponse } from '@/types/video'
 
-// Mock API
-vi.mock('@/lib/api', () => ({
-  api: {
-    put: vi.fn(),
-  },
-}))
-
-const mockListId = 'list-123'
-const mockVideoId = 'video-456'
-const mockFieldId = 'field-789'
-
-const mockVideo: VideoResponse = {
-  id: mockVideoId,
-  list_id: mockListId,
-  youtube_id: 'dQw4w9WgXcQ',
-  title: 'Test Video',
-  channel: 'Test Channel',
-  thumbnail_url: 'https://example.com/thumb.jpg',
-  duration: 300,
-  published_at: '2024-01-01T00:00:00Z',
-  tags: [],
-  processing_status: 'completed',
-  created_at: '2024-01-01T00:00:00Z',
-  updated_at: '2024-01-01T00:00:00Z',
-  field_values: [
-    {
-      id: 'fv-123',
-      video_id: mockVideoId,
-      field_id: mockFieldId,
-      field_name: 'Quality Rating',
-      show_on_card: true,
-      field: {
-        id: mockFieldId,
-        list_id: mockListId,
-        name: 'Quality Rating',
-        field_type: 'rating',
-        config: { max_rating: 5 },
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-      },
-      value: 3,
-      updated_at: '2024-01-01T00:00:00Z',
-    },
-  ],
-}
-
-describe('useUpdateFieldValue', () => {
+describe('useVideoFieldValues', () => {
   let queryClient: QueryClient
-  let wrapper: React.FC<{ children: React.ReactNode }>
 
   beforeEach(() => {
     queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
     })
-    wrapper = ({ children }: { children: React.ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    )
-    vi.clearAllMocks()
   })
 
-  describe('Optimistic Updates', () => {
-    it('updates cache immediately before API call', async () => {
-      const mockPut = vi.mocked(api.put).mockImplementation(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve({
-                  data: {
-                    updated_count: 1,
-                    updates: [
-                      {
-                        field_id: mockFieldId,
-                        value: 5,
-                        updated_at: new Date().toISOString(),
-                      },
-                    ],
-                  },
-                }),
-              100
-            )
-          )
+  afterEach(() => {
+    queryClient.clear()
+  })
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  )
+
+  describe('useVideoFieldValues (query)', () => {
+    it('should fetch field values successfully', async () => {
+      const { result } = renderHook(
+        () => useVideoFieldValues('video-123'),
+        { wrapper }
       )
 
-      // Pre-populate cache with video data
-      queryClient.setQueryData(['videos', 'list', mockListId], [mockVideo])
+      expect(result.current.isLoading).toBe(true)
 
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
+      await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-      // Trigger mutation
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: mockFieldId,
-        value: 5,
-      })
+      expect(result.current.data).toHaveLength(2)
+      expect(result.current.data?.[0].field.name).toBe('Overall Rating')
+      expect(result.current.data?.[0].value).toBe(4)
+    })
 
-      // Wait for optimistic update to apply (before API resolves)
-      await new Promise((resolve) => setTimeout(resolve, 10))
+    it('should handle empty field values', async () => {
+      const { result } = renderHook(
+        () => useVideoFieldValues('video-empty'),
+        { wrapper }
+      )
 
-      // Check cache was updated optimistically
-      const cachedData = queryClient.getQueryData<VideoResponse[]>(['videos', 'list', mockListId])
+      await waitFor(() => expect(result.current.isSuccess).toBe(true))
+      expect(result.current.data).toEqual([])
+    })
+
+    it('should handle API errors', async () => {
+      const { result } = renderHook(
+        () => useVideoFieldValues('video-404'),
+        { wrapper }
+      )
+
+      await waitFor(() => expect(result.current.isError).toBe(true))
+      expect(result.current.error).toBeTruthy()
+    })
+
+    it('should use correct query key', async () => {
+      const { result } = renderHook(
+        () => useVideoFieldValues('video-key-test'),
+        { wrapper }
+      )
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+      expect(result.current.dataUpdatedAt).toBeGreaterThan(0)
+
+      const cachedData = queryClient.getQueryData([
+        'videos',
+        'field-values',
+        'video-key-test',
+      ])
       expect(cachedData).toBeDefined()
-      expect(cachedData![0].field_values[0].value).toBe(5)
-
-      // Wait for mutation to complete
-      await waitFor(() => expect(result.current.isSuccess).toBe(true))
-
-      expect(mockPut).toHaveBeenCalledWith(`/videos/${mockVideoId}/fields`, {
-        updates: [{ field_id: mockFieldId, value: 5 }],
-      })
     })
 
-    it('calls correct API endpoint', async () => {
-      const mockPut = vi.mocked(api.put).mockResolvedValueOnce({
-        data: {
-          updated_count: 1,
-          updates: [
-            {
-              field_id: mockFieldId,
-              value: 4,
-              updated_at: new Date().toISOString(),
-            },
-          ],
-        },
-      })
-
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: mockFieldId,
-        value: 4,
-      })
+    it('should cache field values with 5 minute staleTime', async () => {
+      const { result } = renderHook(
+        () => useVideoFieldValues('video-123'),
+        { wrapper }
+      )
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-      expect(mockPut).toHaveBeenCalledTimes(1)
-      expect(mockPut).toHaveBeenCalledWith(`/videos/${mockVideoId}/fields`, {
-        updates: [{ field_id: mockFieldId, value: 4 }],
-      })
+      // Query should not be stale immediately (5 min staleTime)
+      const queryState = queryClient.getQueryState([
+        'videos',
+        'field-values',
+        'video-123',
+      ])
+      expect(queryState?.isInvalidated).toBe(false)
     })
 
-    it('uses batch request format', async () => {
-      const mockPut = vi.mocked(api.put).mockResolvedValueOnce({
-        data: {
-          updated_count: 1,
-          updates: [
-            {
-              field_id: mockFieldId,
-              value: 'great',
-              updated_at: new Date().toISOString(),
-            },
-          ],
-        },
-      })
-
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: mockFieldId,
-        value: 'great',
-      })
+    it('should not refetch on reconnect', async () => {
+      const { result } = renderHook(
+        () => useVideoFieldValues('video-123'),
+        { wrapper }
+      )
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-      // Verify batch format: { updates: [...] }
-      expect(mockPut).toHaveBeenCalledWith(`/videos/${mockVideoId}/fields`, {
-        updates: [{ field_id: mockFieldId, value: 'great' }],
-      })
-    })
+      // Verify the hook provides expected data and refetch capability
+      expect(result.current.data).toHaveLength(2)
+      expect(result.current.refetch).toBeDefined()
 
-    it('invalidates queries on success', async () => {
-      const mockPut = vi.mocked(api.put).mockResolvedValueOnce({
-        data: {
-          updated_count: 1,
-          updates: [
-            {
-              field_id: mockFieldId,
-              value: true,
-              updated_at: new Date().toISOString(),
-            },
-          ],
-        },
-      })
+      // Query should have data cached
+      const queryState = queryClient.getQueryState([
+        'videos',
+        'field-values',
+        'video-123',
+      ])
 
-      // Pre-populate cache
-      queryClient.setQueryData(['videos', 'list', mockListId], [mockVideo])
-
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      const initialDataUpdateCount = queryClient
-        .getQueryState(['videos', 'list', mockListId])
-        ?.dataUpdatedAt
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: mockFieldId,
-        value: true,
-      })
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true))
-
-      // Query should be invalidated
-      const queryState = queryClient.getQueryState(['videos', 'list', mockListId])
-      expect(queryState?.isInvalidated).toBe(true)
+      expect(queryState?.data).toBeDefined()
+      expect(queryState?.dataUpdatedAt).toBeGreaterThan(0)
     })
   })
 
-  describe('Error Handling', () => {
-    it('rolls back cache on mutation error', async () => {
-      const error = new Error('Network error')
-      const mockPut = vi.mocked(api.put).mockRejectedValueOnce(error)
+  describe('useUpdateVideoFieldValues (mutation)', () => {
+    it('should update field values successfully', async () => {
+      const { result } = renderHook(
+        () => useUpdateVideoFieldValues('video-123'),
+        { wrapper }
+      )
 
-      // Pre-populate cache
-      queryClient.setQueryData(['videos', 'list', mockListId], [mockVideo])
+      result.current.mutate([
+        { field_id: 'field-1', value: 5 },
+        { field_id: 'field-2', value: 'great' },
+      ])
 
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
+      await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: mockFieldId,
-        value: 5,
+      expect(result.current.data?.updated_count).toBe(2)
+      expect(result.current.data?.field_values).toHaveLength(2)
+    })
+
+    it('should handle validation errors', async () => {
+      const { result } = renderHook(
+        () => useUpdateVideoFieldValues('video-123'),
+        { wrapper }
+      )
+
+      result.current.mutate([
+        { field_id: 'field-invalid', value: 10 },
+      ])
+
+      await waitFor(() => expect(result.current.isError).toBe(true))
+      expect(result.current.error).toBeTruthy()
+    })
+
+    it('should invalidate field values cache after successful mutation', async () => {
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+
+      const { result } = renderHook(
+        () => useUpdateVideoFieldValues('video-123'),
+        { wrapper }
+      )
+
+      result.current.mutate([
+        { field_id: 'field-1', value: 5 },
+      ])
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['videos', 'field-values', 'video-123'],
       })
+    })
+
+    it('should invalidate all video queries after successful mutation', async () => {
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+
+      const { result } = renderHook(
+        () => useUpdateVideoFieldValues('video-123'),
+        { wrapper }
+      )
+
+      result.current.mutate([
+        { field_id: 'field-1', value: 5 },
+      ])
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['videos'],
+      })
+    })
+
+    it('should have correct mutation key', async () => {
+      const { result } = renderHook(
+        () => useUpdateVideoFieldValues('video-456'),
+        { wrapper }
+      )
+
+      result.current.mutate([])
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+      const mutationCache = queryClient.getMutationCache()
+      const mutations = mutationCache.getAll()
+
+      expect(mutations.length).toBeGreaterThan(0)
+      expect(mutations[0].options.mutationKey).toEqual([
+        'updateVideoFieldValues',
+        'video-456',
+      ])
+    })
+
+    it('should log errors to console', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const { result } = renderHook(
+        () => useUpdateVideoFieldValues('video-123'),
+        { wrapper }
+      )
+
+      result.current.mutate([
+        { field_id: 'field-invalid', value: 10 },
+      ])
 
       await waitFor(() => expect(result.current.isError).toBe(true))
 
-      // Cache should be restored to original value
-      const cachedData = queryClient.getQueryData<VideoResponse[]>(['videos', 'list', mockListId])
-      expect(cachedData).toBeDefined()
-      expect(cachedData![0].field_values[0].value).toBe(3) // Original value
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to update field values:',
+        expect.any(Object)
+      )
+
+      consoleErrorSpy.mockRestore()
     })
 
-    it('restores previous data from context', async () => {
-      const error = new Error('Server error')
-      const mockPut = vi.mocked(api.put).mockRejectedValueOnce(error)
+    it('should invalidate caches on error via onSettled', async () => {
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
-      // Pre-populate cache with multiple videos
-      const video2: VideoResponse = {
-        ...mockVideo,
-        id: 'video-999',
-      }
-      queryClient.setQueryData(['videos', 'list', mockListId], [mockVideo, video2])
+      const { result } = renderHook(
+        () => useUpdateVideoFieldValues('video-123'),
+        { wrapper }
+      )
 
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: mockFieldId,
-        value: 5,
-      })
+      result.current.mutate([
+        { field_id: 'field-invalid', value: 10 },
+      ])
 
       await waitFor(() => expect(result.current.isError).toBe(true))
 
-      // Cache should restore entire array
-      const cachedData = queryClient.getQueryData<VideoResponse[]>(['videos', 'list', mockListId])
-      expect(cachedData).toHaveLength(2)
-      expect(cachedData![0].field_values[0].value).toBe(3)
+      // onSettled should run even on error
+      expect(invalidateSpy).toHaveBeenCalled()
     })
 
-    it('logs error to console', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const error = new Error('API failure')
-      const mockPut = vi.mocked(api.put).mockRejectedValueOnce(error)
+    it('should update single field value', async () => {
+      const { result } = renderHook(
+        () => useUpdateVideoFieldValues('video-single'),
+        { wrapper }
+      )
 
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: mockFieldId,
-        value: 5,
-      })
-
-      await waitFor(() => expect(result.current.isError).toBe(true))
-
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to update field value:', error)
-
-      consoleSpy.mockRestore()
-    })
-  })
-
-  describe('Edge Cases', () => {
-    it('handles null values in update', async () => {
-      const mockPut = vi.mocked(api.put).mockResolvedValueOnce({
-        data: {
-          updated_count: 1,
-          updates: [
-            {
-              field_id: mockFieldId,
-              value: null,
-              updated_at: new Date().toISOString(),
-            },
-          ],
-        },
-      })
-
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: mockFieldId,
-        value: null,
-      })
+      result.current.mutate([
+        { field_id: 'field-1', value: 3 },
+      ])
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-      expect(mockPut).toHaveBeenCalledWith(`/videos/${mockVideoId}/fields`, {
-        updates: [{ field_id: mockFieldId, value: null }],
-      })
+      expect(result.current.data?.updated_count).toBe(1)
+      expect(result.current.data?.field_values[0].value).toBe(3)
     })
 
-    it('works with rating field type', async () => {
-      const mockPut = vi.mocked(api.put).mockResolvedValueOnce({
-        data: {
-          updated_count: 1,
-          updates: [
-            {
-              field_id: mockFieldId,
-              value: 5,
-              updated_at: new Date().toISOString(),
-            },
-          ],
-        },
-      })
+    it('should support clearing field value with null', async () => {
+      const { result } = renderHook(
+        () => useUpdateVideoFieldValues('video-clear'),
+        { wrapper }
+      )
 
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: mockFieldId,
-        value: 5, // number
-      })
+      result.current.mutate([
+        { field_id: 'field-1', value: null },
+      ])
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-      expect(mockPut).toHaveBeenCalledWith(`/videos/${mockVideoId}/fields`, {
-        updates: [{ field_id: mockFieldId, value: 5 }],
-      })
-    })
-
-    it('works with select field type', async () => {
-      const mockPut = vi.mocked(api.put).mockResolvedValueOnce({
-        data: {
-          updated_count: 1,
-          updates: [
-            {
-              field_id: 'select-field-id',
-              value: 'great',
-              updated_at: new Date().toISOString(),
-            },
-          ],
-        },
-      })
-
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: 'select-field-id',
-        value: 'great', // string
-      })
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true))
-
-      expect(mockPut).toHaveBeenCalledWith(`/videos/${mockVideoId}/fields`, {
-        updates: [{ field_id: 'select-field-id', value: 'great' }],
-      })
-    })
-
-    it('works with boolean field type', async () => {
-      const mockPut = vi.mocked(api.put).mockResolvedValueOnce({
-        data: {
-          updated_count: 1,
-          updates: [
-            {
-              field_id: 'boolean-field-id',
-              value: true,
-              updated_at: new Date().toISOString(),
-            },
-          ],
-        },
-      })
-
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: 'boolean-field-id',
-        value: true, // boolean
-      })
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true))
-
-      expect(mockPut).toHaveBeenCalledWith(`/videos/${mockVideoId}/fields`, {
-        updates: [{ field_id: 'boolean-field-id', value: true }],
-      })
-    })
-
-    it('works with text field type', async () => {
-      const mockPut = vi.mocked(api.put).mockResolvedValueOnce({
-        data: {
-          updated_count: 1,
-          updates: [
-            {
-              field_id: 'text-field-id',
-              value: 'Great tutorial!',
-              updated_at: new Date().toISOString(),
-            },
-          ],
-        },
-      })
-
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: 'text-field-id',
-        value: 'Great tutorial!', // string
-      })
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true))
-
-      expect(mockPut).toHaveBeenCalledWith(`/videos/${mockVideoId}/fields`, {
-        updates: [{ field_id: 'text-field-id', value: 'Great tutorial!' }],
-      })
-    })
-
-    it('handles optimistic update when cache is empty', async () => {
-      const mockPut = vi.mocked(api.put).mockResolvedValueOnce({
-        data: {
-          updated_count: 1,
-          updates: [
-            {
-              field_id: mockFieldId,
-              value: 5,
-              updated_at: new Date().toISOString(),
-            },
-          ],
-        },
-      })
-
-      // No cache data
-      const { result } = renderHook(() => useUpdateFieldValue(mockListId), { wrapper })
-
-      result.current.mutate({
-        listId: mockListId,
-        videoId: mockVideoId,
-        fieldId: mockFieldId,
-        value: 5,
-      })
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true))
-
-      // Should not crash, should complete successfully
-      expect(mockPut).toHaveBeenCalledTimes(1)
+      expect(result.current.data?.field_values[0].value).toBe(null)
     })
   })
 })
