@@ -168,7 +168,6 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
         {video.field_values && video.field_values.length > 0 && (
           <CustomFieldsPreview
             videoId={video.id}
-            listId={video.list_id}
             fieldValues={video.field_values}
             onMoreClick={handleMoreFieldsClick}
           />

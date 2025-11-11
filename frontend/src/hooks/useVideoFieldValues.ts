@@ -1,195 +1,128 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import { videoKeys } from '@/hooks/useVideos'
-import type { VideoResponse } from '@/types/video'
+/**
+ * React Query hooks for managing video custom field values.
+ *
+ * Provides queries and mutations for fetching and updating field values
+ * with simplified optimistic updates (React Query v5 pattern).
+ *
+ * @see backend/app/api/videos.py - GET /videos/{id} includes field_values
+ * @see backend/app/api/videos.py - PUT /videos/{id}/fields batch update
+ * @see Task #71 - Video endpoint field_values integration
+ * @see Task #72 - Batch update endpoint
+ */
 
-// ============================================================================
-// Types
-// ============================================================================
+import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query'
+import { videoFieldValuesApi } from '@/lib/videoFieldValuesApi'
+import { videoKeys } from './useVideos'
+import type { FieldValueUpdate } from '@/types/video'
 
 /**
- * Request payload for updating a single field value
+ * Query options factory for video field values.
+ * Enables type-safe reusability across useQuery/prefetchQuery/setQueryData.
  *
- * NOTE: Backend endpoint is `/api/videos/{videoId}/fields` (flat structure),
- * not `/lists/{listId}/videos/{videoId}/fields` as mentioned in original plan.
- *
- * We keep listId parameter for:
- * 1. Query invalidation (invalidate queries for specific list)
- * 2. Future authentication/authorization (ownership checks)
- * 3. Consistency with other hooks (useCustomFields, useVideos)
+ * @param videoId - UUID of the video
+ * @returns Query options object
  */
-export interface UpdateFieldValueRequest {
-  listId: string       // Used for query invalidation, not API path
-  videoId: string
-  fieldId: string
-  value: string | number | boolean | null
+export function videoFieldValuesOptions(videoId: string) {
+  return queryOptions({
+    queryKey: videoKeys.videoFieldValues(videoId),
+    queryFn: async () => videoFieldValuesApi.getFieldValues(videoId),
+    staleTime: 5 * 60 * 1000, // 5 minutes (field values change infrequently)
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
 }
 
 /**
- * Response from backend after updating field value
- * Matches backend BatchUpdateFieldValuesResponse.updates[0]
- */
-export interface UpdateFieldValueResponse {
-  field_id: string
-  value: string | number | boolean | null
-  updated_at: string
-}
-
-/**
- * Backend batch update request format
- * The API expects updates array even for single field
- */
-interface BatchUpdateFieldValuesRequest {
-  updates: Array<{
-    field_id: string
-    value: string | number | boolean | null
-  }>
-}
-
-/**
- * Backend batch update response format
- */
-interface BatchUpdateFieldValuesResponse {
-  updated_count: number
-  updates: UpdateFieldValueResponse[]
-}
-
-// ============================================================================
-// Mutation Hook
-// ============================================================================
-
-/**
- * React Query mutation hook to update a single video field value
+ * React Query hook to fetch custom field values for a video.
  *
- * Uses optimistic updates to immediately reflect changes in UI,
- * with automatic rollback on error.
+ * Fetches field values from the video endpoint which includes field_values
+ * in the response via Task #71 implementation.
  *
- * **Backend Endpoint:** `PUT /api/videos/{videoId}/fields`
- *
- * **Optimistic Update Strategy:**
- * - Updates ALL video queries (list and detail views)
- * - Uses videoKeys.all to target all cached video data
- * - Preserves data integrity with snapshot + rollback
- *
- * **Query Invalidation:**
- * - On success: Invalidates all video queries for consistency
- * - Uses refetchType: 'active' to avoid refetching inactive queries
- *
- * @param listId - UUID of the list (used for query invalidation)
- * @returns Mutation hook with mutate function
+ * @param videoId - UUID of the video
+ * @returns Query result with field values array
  *
  * @example
  * ```tsx
- * const updateFieldValue = useUpdateFieldValue(listId)
+ * const { data: fieldValues, isLoading, error } = useVideoFieldValues(videoId)
  *
- * // Update rating field
- * updateFieldValue.mutate({
- *   listId,
- *   videoId: 'video-uuid',
- *   fieldId: 'field-uuid',
- *   value: 4
- * })
+ * if (isLoading) return <Skeleton />
+ * if (error) return <ErrorMessage />
  *
- * // Update select field
- * updateFieldValue.mutate({
- *   listId,
- *   videoId: 'video-uuid',
- *   fieldId: 'field-uuid',
- *   value: 'great'
- * })
- *
- * // Clear field value (set to null)
- * updateFieldValue.mutate({
- *   listId,
- *   videoId: 'video-uuid',
- *   fieldId: 'field-uuid',
- *   value: null
- * })
+ * return (
+ *   <div>
+ *     {fieldValues?.map(fv => (
+ *       <FieldDisplay key={fv.field_id} fieldValue={fv} />
+ *     ))}
+ *   </div>
+ * )
  * ```
  */
-export const useUpdateFieldValue = (listId: string) => {
+export const useVideoFieldValues = (videoId: string) => {
+  return useQuery(videoFieldValuesOptions(videoId))
+}
+
+/**
+ * React Query mutation hook to batch update video field values.
+ *
+ * Uses React Query v5 simplified optimistic updates pattern:
+ * - UI components read mutation.variables directly during isPending
+ * - No manual cache manipulation (less error-prone)
+ * - Automatic cache invalidation via onSettled
+ *
+ * @param videoId - UUID of the video to update
+ * @returns Mutation result with mutate function
+ *
+ * @example
+ * ```tsx
+ * const { data: fieldValues } = useVideoFieldValues(videoId)
+ * const updateFields = useUpdateVideoFieldValues(videoId)
+ *
+ * // UI-based optimistic updates (v5 pattern):
+ * return (
+ *   <div>
+ *     {fieldValues?.map(fv => {
+ *       // Show pending value during mutation:
+ *       const pendingValue = updateFields.isPending &&
+ *         updateFields.variables?.find(v => v.field_id === fv.field_id)?.value
+ *
+ *       return (
+ *         <FieldDisplay
+ *           key={fv.field_id}
+ *           value={pendingValue ?? fv.value}
+ *           opacity={updateFields.isPending ? 0.5 : 1}
+ *         />
+ *       )
+ *     })}
+ *   </div>
+ * )
+ * ```
+ */
+export const useUpdateVideoFieldValues = (videoId: string) => {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationKey: ['updateFieldValue', listId],
-    mutationFn: async (request: UpdateFieldValueRequest) => {
-      const { videoId, fieldId, value } = request
+    mutationKey: ['updateVideoFieldValues', videoId],
 
-      // Backend expects batch format even for single field
-      const batchRequest: BatchUpdateFieldValuesRequest = {
-        updates: [{ field_id: fieldId, value }],
-      }
-
-      // API path: /api/videos/{videoId}/fields (not hierarchical)
-      const { data } = await api.put<BatchUpdateFieldValuesResponse>(
-        `/videos/${videoId}/fields`,
-        batchRequest
-      )
-
-      // Return first (and only) update from batch response
-      return data.updates[0]
+    mutationFn: async (updates: FieldValueUpdate[]) => {
+      return videoFieldValuesApi.updateFieldValues(videoId, updates)
     },
 
-    // Optimistic update: immediately update cache
-    onMutate: async (request) => {
-      const { videoId, fieldId, value } = request
-
-      // Cancel outgoing refetches (so they don't overwrite optimistic update)
-      await queryClient.cancelQueries({ queryKey: videoKeys.all })
-
-      // Snapshot ALL video queries for rollback
-      const previousQueries = queryClient
-        .getQueryCache()
-        .findAll({ queryKey: videoKeys.all })
-        .map((query) => ({
-          queryKey: query.queryKey,
-          data: query.state.data,
-        }))
-
-      // Update ALL video queries (list + detail views)
-      queryClient.setQueriesData<VideoResponse[]>(
-        { queryKey: videoKeys.all },
-        (old) => {
-          if (!old) return old
-
-          // Update videos array
-          return old.map((video) => {
-            if (video.id !== videoId) return video
-
-            // Update field_values for matching video
-            return {
-              ...video,
-              field_values: video.field_values.map((fv) =>
-                fv.field_id === fieldId
-                  ? { ...fv, value: value as any, updated_at: new Date().toISOString() }
-                  : fv
-              ),
-            }
-          })
-        }
-      )
-
-      return { previousQueries }
-    },
-
-    // Rollback on error
-    onError: (error, _request, context) => {
-      console.error('Failed to update field value:', error)
-
-      // Restore all snapshots
-      if (context?.previousQueries) {
-        context.previousQueries.forEach(({ queryKey, data }) => {
-          queryClient.setQueryData(queryKey, data)
-        })
-      }
-    },
-
-    // Invalidate queries on success for consistency
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: videoKeys.all,
-        refetchType: 'active', // Only refetch active queries
+    // React Query v5: Use onSettled for cache invalidation (not deprecated onSuccess)
+    onSettled: async () => {
+      // Invalidate field values query to refetch from server
+      await queryClient.invalidateQueries({
+        queryKey: videoKeys.videoFieldValues(videoId)
       })
+
+      // Also invalidate video queries (field_values included in video response)
+      await queryClient.invalidateQueries({
+        queryKey: videoKeys.all
+      })
+    },
+
+    // Error logging for debugging
+    onError: (error) => {
+      console.error('Failed to update field values:', error)
     },
   })
 }

@@ -1,19 +1,17 @@
 import { useMemo, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { FieldDisplay } from './FieldDisplay'
-import { useUpdateFieldValue } from '@/hooks/useVideoFieldValues'
+import { useUpdateVideoFieldValues } from '@/hooks/useVideoFieldValues'
 import type { VideoFieldValue } from '@/types/video'
 
 export interface CustomFieldsPreviewProps {
   videoId: string
-  listId: string
   fieldValues: VideoFieldValue[]
   onMoreClick?: () => void
 }
 
 export const CustomFieldsPreview = ({
   videoId,
-  listId,
   fieldValues,
   onMoreClick
 }: CustomFieldsPreviewProps) => {
@@ -35,20 +33,18 @@ export const CustomFieldsPreview = ({
     [fieldValues]
   )
 
-  const updateField = useUpdateFieldValue(listId)
+  const updateField = useUpdateVideoFieldValues(videoId)
 
   // Memoize change handler to prevent FieldDisplay re-renders
   // Note: FieldDisplay onChange now only receives value (not fieldId)
   const handleFieldChange = useCallback(
     (fieldId: string, value: string | number | boolean) => {
-      updateField.mutate({
-        listId,
-        videoId,
-        fieldId,
+      updateField.mutate([{
+        field_id: fieldId,
         value
-      })
+      }])
     },
-    [updateField, listId, videoId]
+    [updateField, videoId]
   )
 
   // Early return if no fields to show

@@ -120,7 +120,6 @@ describe('CustomFieldsPreview - Rendering Tests', () => {
     const { container } = renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={[]}
       />
     )
@@ -137,7 +136,6 @@ describe('CustomFieldsPreview - Rendering Tests', () => {
     const { container } = renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
@@ -156,7 +154,6 @@ describe('CustomFieldsPreview - Rendering Tests', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
@@ -179,7 +176,6 @@ describe('CustomFieldsPreview - Rendering Tests', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
@@ -199,7 +195,6 @@ describe('CustomFieldsPreview - Rendering Tests', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
@@ -228,7 +223,6 @@ describe('CustomFieldsPreview - Interaction Tests', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
         onMoreClick={onMoreClick}
       />
@@ -256,7 +250,6 @@ describe('CustomFieldsPreview - Interaction Tests', () => {
       <div onClick={parentClick}>
         <CustomFieldsPreview
           videoId="video-123"
-          listId="list-123"
           fieldValues={fieldValues}
           onMoreClick={onMoreClick}
         />
@@ -282,7 +275,6 @@ describe('CustomFieldsPreview - Field Type Rendering', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
@@ -303,7 +295,6 @@ describe('CustomFieldsPreview - Field Type Rendering', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
@@ -321,7 +312,6 @@ describe('CustomFieldsPreview - Field Type Rendering', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
@@ -341,7 +331,6 @@ describe('CustomFieldsPreview - Field Type Rendering', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
@@ -370,7 +359,6 @@ describe('CustomFieldsPreview - Edge Cases', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues.slice(0, 3)} // Only render 3
       />
     )
@@ -398,7 +386,6 @@ describe('CustomFieldsPreview - Edge Cases', () => {
     const { container } = renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={[]}
       />
     )
@@ -418,7 +405,6 @@ describe('CustomFieldsPreview - Edge Cases', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
@@ -445,7 +431,6 @@ describe('CustomFieldsPreview - Edge Cases', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
@@ -475,7 +460,6 @@ describe('CustomFieldsPreview - Edge Cases', () => {
     renderWithQuery(
       <CustomFieldsPreview
         videoId="video-123"
-        listId="list-123"
         fieldValues={fieldValues}
       />
     )
