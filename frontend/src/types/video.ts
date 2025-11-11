@@ -409,32 +409,6 @@ export interface FieldValueUpdate {
 }
 
 /**
- * Response from GET /videos/{id}/fields
- *
- * Returns field values with full field metadata for a single video.
- * Uses dedicated endpoint (not full video fetch).
- *
- * @example
- * // API response
- * const response: GetFieldValuesResponse = {
- *   field_values: [
- *     {
- *       id: '123e4567-e89b-12d3-a456-426614174000',
- *       video_id: '987fcdeb-51a2-43d1-9012-345678901234',
- *       field_id: '111e4567-e89b-12d3-a456-426614174000',
- *       field_name: 'Overall Rating',
- *       field: { ... },
- *       value: 4,
- *       updated_at: '2024-01-01T00:00:00Z'
- *     }
- *   ]
- * }
- */
-export interface GetFieldValuesResponse {
-  field_values: VideoFieldValue[]
-}
-
-/**
  * Response from PUT /videos/{id}/fields (batch update)
  *
  * Returns updated count and all field values after update.

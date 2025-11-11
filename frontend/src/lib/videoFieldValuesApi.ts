@@ -1,7 +1,7 @@
 import { api } from './api'
 import type {
   FieldValueUpdate,
-  GetFieldValuesResponse,
+  VideoResponse,
   BatchUpdateFieldValuesResponse,
   VideoFieldValue,
 } from '@/types/video'
@@ -14,15 +14,15 @@ import type {
 export const videoFieldValuesApi = {
   /**
    * Get all field values for a video.
-   * Uses dedicated endpoint (not full video fetch).
+   *
+   * Uses the video endpoint which includes field_values (Task #71).
+   * Extracts only field_values from the full video response.
    *
    * @param videoId - Video UUID
    * @returns Field values array with field metadata
    */
   async getFieldValues(videoId: string): Promise<VideoFieldValue[]> {
-    const { data } = await api.get<GetFieldValuesResponse>(
-      `/videos/${videoId}/fields`
-    )
+    const { data } = await api.get<VideoResponse>(`/videos/${videoId}`)
     return data.field_values || []
   },
 
