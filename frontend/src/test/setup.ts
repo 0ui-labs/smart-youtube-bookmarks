@@ -54,3 +54,29 @@ class LocalStorageMock {
 }
 
 global.localStorage = new LocalStorageMock() as Storage;
+
+// Polyfill for Radix UI components (hasPointerCapture, setPointerCapture, releasePointerCapture, scrollIntoView)
+// JSDOM doesn't implement these methods, but Radix UI requires them
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = function() {
+    return false;
+  };
+}
+
+if (!Element.prototype.setPointerCapture) {
+  Element.prototype.setPointerCapture = function() {
+    // No-op for JSDOM
+  };
+}
+
+if (!Element.prototype.releasePointerCapture) {
+  Element.prototype.releasePointerCapture = function() {
+    // No-op for JSDOM
+  };
+}
+
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function() {
+    // No-op for JSDOM
+  };
+}

@@ -1,7 +1,7 @@
 /**
  * CreateTagDialog Component
  *
- * Modal dialog for creating new tags with name and optional color.
+ * Modal dialog for creating new tags with name, optional color, and optional schema.
  * Uses AlertDialog from Radix UI for accessibility.
  *
  * @example
@@ -9,6 +9,7 @@
  * <CreateTagDialog
  *   open={isOpen}
  *   onOpenChange={setIsOpen}
+ *   listId={listId}
  * />
  * ```
  */
@@ -23,18 +24,31 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { useCreateTag } from '@/hooks/useTags'
+import { SchemaSelector } from './SchemaSelector'
+import { schemasOptions } from '@/hooks/useSchemas'
+import { useQuery } from '@tanstack/react-query'
 
 interface CreateTagDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  listId: string
 }
 
-export const CreateTagDialog = ({ open, onOpenChange }: CreateTagDialogProps) => {
+export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogProps) => {
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3B82F6') // Default blue
   const [error, setError] = useState<string | null>(null)
+  // Task #82: Schema ID state for SchemaSelector
+  // null = "Kein Schema", 'new' = Create new schema, UUID string = Existing schema
+  const [schemaId, setSchemaId] = useState<string | null>(null)
 
   const createTag = useCreateTag()
+
+  // Task #82 Batch 3: Fetch schemas with dependent query
+  const { data: schemas = [], isLoading: isSchemasLoading } = useQuery({
+    ...schemasOptions(listId),
+    enabled: !!listId,  // REF MCP Improvement #4: Dependent query pattern
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,15 +64,23 @@ export const CreateTagDialog = ({ open, onOpenChange }: CreateTagDialogProps) =>
       return
     }
 
+    // Task #82 Batch 3: Validate 'new' mode (Task #83 not implemented yet)
+    if (schemaId === 'new') {
+      setError('Bitte schließen Sie die Schema-Erstellung ab oder wählen Sie "Kein Schema"')
+      return
+    }
+
     try {
       await createTag.mutateAsync({
         name: name.trim(),
         color: color || undefined, // Send undefined if empty
+        schema_id: schemaId,  // Task #82 Batch 3: Include schema_id
       })
 
       // Success - reset form and close dialog
       setName('')
       setColor('#3B82F6')
+      setSchemaId(null)
       setError(null)
       onOpenChange(false)
     } catch (err: any) {
@@ -74,6 +96,7 @@ export const CreateTagDialog = ({ open, onOpenChange }: CreateTagDialogProps) =>
   const handleCancel = () => {
     setName('')
     setColor('#3B82F6')
+    setSchemaId(null)
     setError(null)
     onOpenChange(false)
   }
@@ -133,6 +156,32 @@ export const CreateTagDialog = ({ open, onOpenChange }: CreateTagDialogProps) =>
               <p className="mt-1 text-sm text-gray-500">
                 Wählen Sie eine Farbe zur visuellen Unterscheidung
               </p>
+            </div>
+
+            {/* Task #82 Batch 3: Schema Selector */}
+            <div>
+              <label
+                htmlFor="tag-schema"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Schema (optional)
+              </label>
+              <SchemaSelector
+                value={schemaId}
+                schemas={schemas}
+                onChange={setSchemaId}
+                disabled={isSchemasLoading}
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Verknüpfen Sie benutzerdefinierte Felder mit diesem Tag
+              </p>
+
+              {/* TODO (Task #83): Show SchemaEditor when schemaId === 'new' */}
+              {schemaId === 'new' && (
+                <p className="mt-2 text-sm text-amber-600">
+                  Schema-Editor wird in Task #83 implementiert
+                </p>
+              )}
             </div>
           </div>
 

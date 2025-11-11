@@ -822,6 +822,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       <CreateTagDialog
         open={isCreateTagDialogOpen}
         onOpenChange={setIsCreateTagDialogOpen}
+        listId={listId}
       />
         </div>
       </div>

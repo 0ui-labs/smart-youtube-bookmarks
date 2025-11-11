@@ -8,6 +8,7 @@ export const TagSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(100),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable(),
+  schema_id: z.string().uuid().nullish(), // null/undefined = no schema, UUID = bound to schema
   user_id: z.string().uuid(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -24,6 +25,7 @@ export type Tag = z.infer<typeof TagSchema>
 export const TagCreateSchema = z.object({
   name: z.string().min(1).max(100),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  schema_id: z.string().uuid().nullish(), // nullish = nullable + optional (Zod v3.23+)
 })
 
 export type TagCreate = z.infer<typeof TagCreateSchema>
@@ -34,6 +36,7 @@ export type TagCreate = z.infer<typeof TagCreateSchema>
 export const TagUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional(),
+  schema_id: z.string().uuid().nullish(), // Can update or remove schema binding
 })
 
 export type TagUpdate = z.infer<typeof TagUpdateSchema>
