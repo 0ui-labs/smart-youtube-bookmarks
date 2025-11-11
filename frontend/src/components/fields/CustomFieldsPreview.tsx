@@ -44,7 +44,7 @@ export const CustomFieldsPreview = ({
         value
       }])
     },
-    [updateField, videoId]
+    [updateField]
   )
 
   // Early return if no fields to show
