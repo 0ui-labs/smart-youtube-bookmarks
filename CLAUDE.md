@@ -504,6 +504,56 @@ export const CustomFieldsPreview = React.memo(({ ... }) => { ... })
 - Task #79: useCustomFields hook (CRUD operations template)
 - Task #90: VideoDetailsModal (will use same field display components)
 
+### Custom Field Value Mutations (Task #81)
+
+**Implementation Files:**
+- Types: `frontend/src/types/video.ts` (FieldValueUpdate, VideoFieldValue)
+- API: `frontend/src/lib/videoFieldValuesApi.ts` (getFieldValues, updateFieldValues)
+- Hooks: `frontend/src/hooks/useVideoFieldValues.ts` (query + mutation)
+- Tests: `frontend/src/hooks/__tests__/useVideoFieldValues.test.tsx` (16 tests, MSW-based)
+
+**React Query v5 Pattern:**
+```typescript
+// Query hook - Fetch field values
+const { data: fieldValues } = useVideoFieldValues(videoId)
+
+// Mutation hook - Batch update (simplified optimistic updates)
+const updateFields = useUpdateVideoFieldValues(videoId)
+updateFields.mutate([
+  { field_id: 'uuid', value: 5 }
+])
+
+// UI-based optimistic updates (v5 pattern):
+const pendingValue = updateFields.isPending &&
+  updateFields.variables?.find(v => v.field_id === fv.field_id)?.value
+```
+
+**Key Features:**
+- **Simplified Optimistic Updates:** UI components read `mutation.variables` during `isPending` (no cache manipulation)
+- **onSettled Invalidation:** Cache invalidation via `onSettled` (not deprecated `onSuccess`)
+- **Direct Array Parameter:** Mutation accepts `FieldValueUpdate[]` directly (API client wraps)
+- **Hierarchical Query Keys:** `['videos', 'field-values', videoId]` for granular invalidation
+- **MSW Testing:** 16 comprehensive tests with Mock Service Worker (not vi.mock)
+
+**Backend Endpoints:**
+- GET `/api/videos/:id` - Returns VideoResponse with field_values (Task #71)
+- PUT `/api/videos/:id/fields` - Batch update (Task #72)
+
+**Usage in Components:**
+- `CustomFieldsPreview.tsx` - Inline field editing with instant UI feedback
+- `VideoCard.tsx` - Displays field values on video cards
+
+**Performance:**
+- Query staleTime: 5 minutes (field values change infrequently)
+- No unnecessary refetches (refetchOnWindowFocus: false)
+- Batch updates in single API call (1-50 fields)
+
+**Related Tasks:**
+- Task #71: Video GET endpoint includes field_values
+- Task #72: Batch update endpoint with validation
+- Task #78: TypeScript field value types
+- Task #89: CustomFieldsPreview component (uses these hooks)
+
 ## Security Notes
 
 **Current Status (Development):**
