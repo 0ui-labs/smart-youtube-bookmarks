@@ -139,9 +139,9 @@ This file maintains **two separate lists**: PLAN and LOG.
 | #78 | 2025-11-10 14:15 | 2025-11-10 16:02 | 107 |
 | #79 | 2025-11-10 16:28 | 2025-11-10 18:48 | 140 |
 | #80 | 2025-11-10 23:19 | 2025-11-11 07:59 | 520 |
-| #81 | 2025-11-11 15:35 | 2025-11-11 16:26 | 51 |
+| #81 | 2025-11-11 15:35 | 2025-11-11 17:04 | 89 |
 | #89 | 2025-11-11 08:15 | 2025-11-11 11:15 | 180 |
-| **TOTAL** | | | **4042 min (67h 22min)** |
+| **TOTAL** | | | **4080 min (68h 00min)** |
 
 Note: This table includes only tasks #58-#80 + #89 + CodeRabbit fixes from the Custom Fields Migration wave. Earlier tasks not included.
 
@@ -258,7 +258,7 @@ Note: This table includes only tasks #58-#80 + #89 + CodeRabbit fixes from the C
 78. [x] Create FieldType TypeScript types and interfaces (2025-11-10 14:15-16:02 [107 min: 30min REF MCP + 15min impl + 15min tests + 47min report])
 79. [x] Create useCustomFields React Query hook (2025-11-10 16:28-18:48 [140 min: 15min REF MCP FAILED + 75min impl + 17min fixes + 12min TS + 20min docs + report])
 80. [x] Create useSchemas React Query hook (2025-11-10 23:19 - 2025-11-11 07:59 [520 min: 497 min coding + 23 min report])
-81. [x] Create useVideoFieldValues React Query hook with mutations (2025-11-11 15:35 - 16:26 [51 min: REF MCP validation + Subagent-Driven + 4 batches + 16 tests])
+81. [x] Create useVideoFieldValues React Query hook with mutations (2025-11-11 15:35 - 17:04 [89 min total: 51 min coding + 38 min report])
 82. [ ] Extend TagEditDialog with SchemaSelector component
 83. [ ] Create SchemaEditor component for inline schema creation
 84. [ ] Create FieldSelector component (multi-select from existing fields)
