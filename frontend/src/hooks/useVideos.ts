@@ -56,6 +56,11 @@ export const videoKeys = {
   filtered: (listId: string, tagNames: string[]) =>
     // Sort tagNames alphabetically for consistent cache keys regardless of selection order
     [...videoKeys.list(listId), { tags: [...tagNames].sort() }] as const,
+  /** Base key for all field values queries */
+  fieldValues: () => [...videoKeys.all, 'field-values'] as const,
+  /** Key for field values of a specific video */
+  videoFieldValues: (videoId: string) =>
+    [...videoKeys.fieldValues(), videoId] as const,
 }
 
 /**

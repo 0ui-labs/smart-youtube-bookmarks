@@ -13,6 +13,9 @@ import type { VideoResponse } from '@/types/video'
 // REF MCP Improvement #2: Use existing VideoThumbnail API (url, title props)
 import { VideoThumbnail } from './VideosPage'
 
+// Import CustomFieldsPreview for field value display (Task #89)
+import { CustomFieldsPreview } from './fields'
+
 interface VideoCardProps {
   video: VideoResponse
   onClick?: (video: VideoResponse) => void
@@ -35,6 +38,11 @@ interface VideoCardProps {
  * - Native lazy loading via VideoThumbnail (already implemented)
  * - YouTube-inspired design (16:9 thumbnail, line-clamp-2 title, tag chips)
  * - WCAG 2.1 Level AA compliant (ARIA labels, keyboard navigation)
+ *
+ * Custom Fields Integration (Task #89):
+ * - Shows CustomFieldsPreview component after tags
+ * - Max 3 fields with inline editing
+ * - "More fields" opens modal (placeholder for Task #90)
  */
 export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
   const cardRef = useRef<HTMLDivElement>(null)
@@ -49,6 +57,12 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
       e.preventDefault()
       handleCardClick()
     }
+  }
+
+  // Task #89: Handler for "More fields" click (placeholder for Task #90)
+  const handleMoreFieldsClick = () => {
+    // TODO: Task #90 - VideoDetailsModal implementation
+    console.log('Open video details modal for:', video.id)
   }
 
   return (
@@ -148,6 +162,16 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
               </span>
             ))}
           </div>
+        )}
+
+        {/* Custom Fields Preview (Task #89) */}
+        {video.field_values && video.field_values.length > 0 && (
+          <CustomFieldsPreview
+            videoId={video.id}
+            listId={video.list_id}
+            fieldValues={video.field_values}
+            onMoreClick={handleMoreFieldsClick}
+          />
         )}
       </div>
     </div>

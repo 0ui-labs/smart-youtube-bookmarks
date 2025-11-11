@@ -5,6 +5,7 @@
 **Date:** YYYY-MM-DD
 **Author:** Claude Code
 **Thread ID:** #XX
+**File Name:** `YYYY-MM-DD-task-NNN-report.md`
 
 ---
 
@@ -509,38 +510,6 @@ npm test -- [test-file]
 
 ---
 
-## ⏱️ Timeline & Effort Breakdown
-
-### Timeline
-
-```
-[Start Time] ──────────────────────────────────────────── [End Time]
-             │         │         │         │         │
-         Planning  Validation  Impl   Testing  Reviews  Docs
-```
-
-### Effort Breakdown
-
-| Phase | Duration | % of Total | Notes |
-|-------|----------|------------|-------|
-| Planning & Analysis | XX min | XX% | [Notes] |
-| REF MCP Validation | XX min | XX% | [Notes] |
-| Implementation | XX min | XX% | [Notes] |
-| Testing (Writing) | XX min | XX% | [Notes] |
-| Testing (Running) | XX min | XX% | [Notes] |
-| Code Reviews | XX min | XX% | [Notes] |
-| Fixing Issues | XX min | XX% | [Notes] |
-| Documentation | XX min | XX% | [Notes] |
-| **TOTAL** | **XX min** | **100%** | |
-
-### Comparison to Estimate
-
-- **Estimated Duration:** X hours
-- **Actual Duration:** X hours
-- **Variance:** +/- XX%
-- **Reason for Variance:** [Explanation if significant]
-
----
 
 ## ⚠️ Risk Assessment
 
