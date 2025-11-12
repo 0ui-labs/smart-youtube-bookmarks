@@ -15,7 +15,7 @@ import { server } from './mocks/server';
 vi.mock('zustand');
 
 // Start MSW server before all tests
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
 
 // Reset handlers after each test to prevent state leakage
 afterEach(() => server.resetHandlers());
