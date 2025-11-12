@@ -80,3 +80,13 @@ if (!Element.prototype.scrollIntoView) {
     // No-op for JSDOM
   };
 }
+
+// Polyfill for ResizeObserver (required by Radix UI Slider)
+if (!global.ResizeObserver) {
+  global.ResizeObserver = class ResizeObserver {
+    constructor(callback: ResizeObserverCallback) {}
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as any;
+}

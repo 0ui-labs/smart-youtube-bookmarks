@@ -25,3 +25,16 @@ export type { FieldDisplayProps } from './FieldDisplay'
 
 export { CustomFieldsPreview } from './CustomFieldsPreview'
 export type { CustomFieldsPreviewProps } from './CustomFieldsPreview'
+
+// Field Config Editor Components (Task #124)
+export { FieldConfigEditor } from './FieldConfigEditor'
+export type { FieldConfigEditorProps, FieldConfig } from './FieldConfigEditor'
+
+export { SelectConfigEditor } from './SelectConfigEditor'
+export type { SelectConfigEditorProps } from './SelectConfigEditor'
+
+export { RatingConfigEditor } from './RatingConfigEditor'
+export type { RatingConfigEditorProps } from './RatingConfigEditor'
+
+export { TextConfigEditor } from './TextConfigEditor'
+export type { TextConfigEditorProps } from './TextConfigEditor'

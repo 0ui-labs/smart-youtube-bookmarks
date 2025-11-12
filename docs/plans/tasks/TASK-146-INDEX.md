@@ -1,8 +1,8 @@
-# Task #146: UNIQUE Constraint Planning Index
+# Task #184: UNIQUE Constraint Planning Index
 
 ## Quick Navigation
 
-**Main Plan:** [task-146-unique-user-youtube-constraint.md](./task-146-unique-user-youtube-constraint.md)
+**Main Plan:** [task-184-unique-user-youtube-constraint.md](./task-184-unique-user-youtube-constraint.md)
 
 ---
 
@@ -11,7 +11,7 @@
 **Master Plan:** `docs/plans/2025-11-02-security-hardening-implementation.md`  
 **Phase:** Task 9: Database Constraints (Step 2)  
 **Priority:** P2 - Operational Excellence  
-**Related:** Task #145 (youtube_id length check), Task #1 (User model)
+**Related:** Task #183 (youtube_id length check), Task #1 (User model)
 
 ---
 
@@ -50,9 +50,9 @@ Provided with exact syntax for semantic commit
 
 ```
 BEFORE STARTING:
-  [ ] Read full plan (task-146-unique-user-youtube-constraint.md)
+  [ ] Read full plan (task-184-unique-user-youtube-constraint.md)
   [ ] Verify Task #1 (User model) implemented
-  [ ] Verify Task #145 (length check) scheduled/done
+  [ ] Verify Task #183 (length check) scheduled/done
 
 DURING IMPLEMENTATION:
   [ ] Create test file
@@ -91,7 +91,7 @@ DEPLOYMENT:
 ## Integration with Broader Context
 
 **Part of:** Security Hardening Phase 1 (Task #9)  
-**Runs Alongside:** Task #145 (youtube_id length check)  
+**Runs Alongside:** Task #183 (youtube_id length check)  
 **Depends On:** Task #1 (User model implementation)  
 **Informs Future:** Task #72 (API error handling for constraint violations)
 
@@ -112,15 +112,15 @@ Plan is complete when implementer confirms:
 
 ## Follow-Up Tasks
 
-After Task #146 completes:
+After Task #184 completes:
 
 1. **Task #72 (if not done):** Implement API error handling for constraint violations
    - Return 409 Conflict when duplicate detected
    - Provide helpful error message to user
 
 2. **Task #9 Complete:** All database constraints deployed
-   - CHECK: youtube_id length (Task #145)
-   - UNIQUE: (user_id, youtube_id) (Task #146)
+   - CHECK: youtube_id length (Task #183)
+   - UNIQUE: (user_id, youtube_id) (Task #184)
    - CHECK: List/tag names non-empty
    - Other constraints from Task #9
 

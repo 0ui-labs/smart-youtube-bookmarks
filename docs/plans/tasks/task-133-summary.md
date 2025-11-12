@@ -1,8 +1,8 @@
-# Task #133: Verification Plan Summary
+# Task #171: Verification Plan Summary
 
 ## Quick Reference
 
-**File:** `docs/plans/tasks/task-133-verify-cors-security.md`  
+**File:** `docs/plans/tasks/task-171-verify-cors-security.md`  
 **Lines:** 1095  
 **Status:** Ready for implementation
 
@@ -32,7 +32,7 @@ This verification task takes a pragmatic approach:
 
 1. **Test what exists** (current hardcoded implementation)
 2. **Document the gap** (missing environment-aware functions)
-3. **Recommend follow-up** (Task #134 to implement missing functions)
+3. **Recommend follow-up** (Task #172 to implement missing functions)
 
 This avoids scope creep while delivering value through testing and documentation.
 
@@ -48,7 +48,7 @@ This avoids scope creep while delivering value through testing and documentation
 ### 2. Documentation
 - **Setup Guide:** `docs/deployment/CORS_SETUP.md` (comprehensive, 2000+ words)
 - **Testing Checklist:** `docs/deployment/CORS_TESTING_CHECKLIST.md` (manual tests)
-- **Gap Analysis:** `docs/analysis/task-133-cors-gap-analysis.md` (master plan vs. reality)
+- **Gap Analysis:** `docs/analysis/task-171-cors-gap-analysis.md` (master plan vs. reality)
 
 ### 3. Updated Project Docs
 - `CLAUDE.md` - Add CORS configuration section
@@ -91,7 +91,7 @@ This avoids scope creep while delivering value through testing and documentation
 - Overly permissive (allows all methods/headers)
 
 **Required before production:**
-- Implement Task #134 (environment-aware CORS functions)
+- Implement Task #172 (environment-aware CORS functions)
 - Set ALLOWED_ORIGINS env var
 - Test production configuration
 
@@ -122,12 +122,12 @@ This avoids scope creep while delivering value through testing and documentation
 3. 🔲 Execute Phase 2: Integration Tests
 4. 🔲 Execute Phase 3: Manual Testing
 5. 🔲 Execute Phase 4: Documentation
-6. 🔲 Create Task #134 (implement missing functions)
+6. 🔲 Create Task #172 (implement missing functions)
 
 ---
 
 ## References
 
-- Full plan: `docs/plans/tasks/task-133-verify-cors-security.md`
+- Full plan: `docs/plans/tasks/task-171-verify-cors-security.md`
 - Master plan: `docs/plans/2025-11-02-security-hardening-implementation.md` (lines 2090-2200)
 - Current CORS code: `backend/app/main.py` (lines 34-40)

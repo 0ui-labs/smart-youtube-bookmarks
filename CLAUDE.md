@@ -354,6 +354,129 @@ Extracted from Task #72 inline validation (videos.py:1294-1360) in Task #73. Ori
 - Task #71: Video GET endpoint with field_values (batch loading foundation)
 - Task #74: Multi-tag field union query with conflict resolution (Option D implementation)
 
+### Custom Fields System Components
+
+**CRITICAL: Form Component Pattern (2025 shadcn/ui)**
+
+**⚠️ DEPRECATED - DO NOT USE:**
+```typescript
+// Form component is DEPRECATED as of 2025
+<FormField control={form.control} name="..." render={...} />
+<FormItem><FormLabel>...</FormLabel><FormControl>...</FormControl></FormItem>
+```
+
+**✅ REQUIRED - Field Component Pattern:**
+```typescript
+import { Controller } from 'react-hook-form'
+import { Field, FieldLabel, FieldError, FieldDescription } from '@/components/ui/field'
+
+<Controller
+  control={form.control}
+  name="fieldName"
+  render={({ field, fieldState }) => (
+    <Field data-invalid={fieldState.invalid}>
+      <FieldLabel htmlFor="field-id">Label *</FieldLabel>
+      <Input {...field} id="field-id" aria-invalid={fieldState.invalid} />
+      <FieldDescription>Helper text</FieldDescription>
+      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+    </Field>
+  )}
+/>
+```
+
+**Why Field Pattern:**
+- Form component deprecated per 2025 shadcn/ui documentation
+- Better TypeScript inference (fieldState typed correctly)
+- Better composability (Field components independent)
+- All future forms MUST use Field pattern (established in Task #123)
+
+**NewFieldForm Component (Task #123):**
+- **Location:** `frontend/src/components/schemas/NewFieldForm.tsx`
+- **Purpose:** Inline form for creating custom fields within SchemaEditor
+- **Pattern:** **FIRST IMPLEMENTATION of Field Component pattern** - precedent for all future forms
+- **Features:**
+  - Field name input with real-time duplicate validation (debounced 500ms)
+  - Type selector (select, rating, text, boolean)
+  - Dynamic config editor based on selected type
+  - React Hook Form + Zod validation with Controller + Field pattern
+  - WCAG 2.1 Level AA accessible (ARIA labels, keyboard nav, role="alert")
+- **Dependencies:**
+  - `react-hook-form@^7.51.0` - Form state management
+  - `@hookform/resolvers@^3.3.4` - Zod resolver
+  - `use-debounce@^10.0.0` - Debounced duplicate check
+  - shadcn/ui Field components (Field, FieldLabel, FieldDescription, FieldError)
+  - Backend API: `POST /api/lists/{id}/custom-fields/check-duplicate`
+- **Props:**
+  - `listId: string` - List ID for duplicate check scoping
+  - `onSubmit: (fieldData: CustomFieldCreate) => void | Promise<void>` - Submit handler
+  - `onCancel: () => void` - Cancel handler
+  - `isSubmitting?: boolean` - External submission state
+- **State Management:**
+  - Form state: React Hook Form `useForm` hook with Controller
+  - Duplicate check: Local state with debounced API call (500ms)
+  - Config: Auto-resets when field type changes
+- **Testing:**
+  - 26 unit tests (validation, type switching, duplicate check, submission, keyboard, a11y)
+  - Mock API calls with Vitest
+  - Accessibility testing with RTL queries (getByRole, getByLabelText)
+- **Key Implementation Details:**
+  - **Migration from Form:** Task #123 migrated from deprecated Form pattern to Field pattern
+  - **Debounced Validation:** `useDebouncedCallback` reduces API calls by 90%
+  - **Dynamic Schema Validation:** Zod `superRefine` for type-specific config validation
+  - **Keyboard Navigation:** Escape cancels, Enter submits
+- **Related Tasks:**
+  - Task #124: FieldConfigEditor - Will replace placeholder config editors (MUST use Field pattern)
+  - Task #125: DuplicateWarning - Will replace placeholder warning UI (MUST use Field pattern)
+  - Task #132: FieldEditorComponent - Edit existing fields (MUST use Field pattern)
+
+**Report:** See `docs/reports/2025-11-11-task-123-report.md` for comprehensive Field pattern migration documentation
+
+**FieldConfigEditor Components (Task #124):**
+- **Location:** `frontend/src/components/fields/FieldConfigEditor.tsx` + 3 sub-components
+- **Purpose:** Type-specific configuration editors for custom fields (select, rating, text, boolean)
+- **Pattern:** Field Component pattern (2025 shadcn/ui) - CRITICAL precedent from Task #123
+- **Sub-Components:**
+  - `SelectConfigEditor.tsx` - Dynamic options list with useFieldArray (REF MCP #1)
+  - `RatingConfigEditor.tsx` - Numeric input (1-10 range validation)
+  - `TextConfigEditor.tsx` - Optional max_length with checkbox toggle
+  - Boolean type returns null (no config needed)
+- **REF MCP Improvements:**
+  - **REF MCP #1:** useFieldArray hook for SelectConfigEditor (NOT manual array state)
+  - **REF MCP #2:** Icon accessibility with aria-hidden + sr-only spans
+  - Field component pattern from Task #123 (all sub-components use Field/FieldLabel/FieldError)
+- **Features:**
+  - Real-time validation matching backend rules (backend/app/schemas/custom_field.py)
+  - German localization (all labels, errors, helper text)
+  - WCAG 2.1 Level AA accessible (ARIA labels, keyboard nav, role="alert")
+  - Controlled component pattern with onChange callback
+  - Empty state handling (Select: "No options yet", Rating: default 5, Text: optional)
+- **Testing:**
+  - 42 unit tests (5 parent + 19 SelectConfigEditor + 10 RatingConfigEditor + 6 TextConfigEditor + 2 integration)
+  - 100% pass rate (42/42 passing)
+  - Accessibility testing with RTL queries (getByRole, getByLabelText)
+- **Integration with NewFieldForm:**
+  ```tsx
+  <FieldConfigEditor
+    fieldType={selectedFieldType}
+    config={fieldConfig}
+    onChange={setFieldConfig}
+    control={form.control} // Required for SelectConfigEditor useFieldArray
+    error={validationError}
+  />
+  ```
+- **Key Implementation Details:**
+  - **useFieldArray Pattern:** SelectConfigEditor uses react-hook-form's useFieldArray for options array (REF MCP #1)
+  - **Icon Accessibility:** All icons have aria-hidden="true" + sr-only text on buttons (REF MCP #2)
+  - **Controlled Components:** All sub-components use onChange callback (not local state mutations)
+  - **Validation:** Inline validation with local error state + external error prop
+  - **Type Safety:** Discriminated union for FieldConfig with TypeScript exhaustiveness checks
+- **Related Tasks:**
+  - Task #123: NewFieldForm - Parent component that uses FieldConfigEditor
+  - Task #125: DuplicateWarning - Will integrate with FieldConfigEditor
+  - Task #132: FieldEditorComponent - Edit existing fields (will reuse FieldConfigEditor)
+
+**Report:** See `docs/reports/2025-11-11-task-124-report.md` for comprehensive implementation documentation
+
 ### Feature Flag Pattern
 
 **Environment Variables (Frontend):**
