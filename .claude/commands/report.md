@@ -1,3 +1,2 @@
 Bitte schreibe einen Implementation Report. Verwende dieses Template docs/templates/task-report-template.md und schreibe ihn in diesen Ordner docs/reports.
-Wenn du den Bericht geschrieben und gespeichert hast, dann aktualisiere die status.md Datei. Da du die aktuelle Uhrzeit bereits in der Protokoll schreibst und der Coding Agent die Urhzeit an dem er mit der Arbeit begonnen hat, berechne wie lange der TAsk inklusive report schreiben gedauert hat
-Führe eine zusäatzliche Tabelle ein in dem du nur die Task nummer, start, ende und dauert einträgst so das wir das am ende leichert zusammenaddieren können.
+Wenn du den Bericht geschrieben und gespeichert hast, dann aktualisiere die status.md Datei. 

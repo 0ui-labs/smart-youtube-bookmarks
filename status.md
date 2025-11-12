@@ -50,159 +50,60 @@ This file maintains **two separate lists**: PLAN and LOG.
 - **LOG** = True history of what happened, including detours (debugging, refactoring, etc.)
 - Example: Plan says tasks 1-10, but LOG might show: 1, 2, debug, 3, refactor, debug, 4, 5, planning, 6...
 
----
-
-## 📚 Key Documents
-
-- Roadmap: `docs/plans/2025-10-30-consumer-app-roadmap.md`
-- UX Design: `docs/plans/2025-10-31-ID-04-ux-optimization-tag-system-design.md`
-- Implementation: `docs/plans/2025-10-31-ID-05-ux-optimization-implementation-plan.md`
-- Security Hardening: `docs/plans/2025-11-02-security-hardening-implementation.md`
-- Latest Handoff: `docs/handoffs/2025-11-04-log-037-grid-list-thumbnail-separation.md`
-- Latest Report: `docs/reports/2025-11-05-grid-menu-merge-report.md`
-
----
-
-## ⏱️ Task Time Tracking (for easy summation)
-
-| Task # | Start Time | End Time | Duration (min) | Notes |
-|--------|------------|----------|----------------|-------|
-| #33 | 2025-11-04 15:10 | 2025-11-04 15:50 | 40 | gridColumns state in store |
-| #34 | 2025-11-04 16:00 | 2025-11-04 17:30 | 90 | GridColumnControl component |
-| #35 | 2025-11-04 18:45 | 2025-11-04 19:45 | 60 | Dynamic grid columns (impl) |
-| #35 Report | 2025-11-04 19:45 | 2025-11-04 20:20 | 35 | REPORT-035 documentation |
-| #35 Fix | 2025-11-04 23:00 | 2025-11-04 23:20 | 20 | Grid/List thumbnail separation |
-| #35 Fix Report | 2025-11-04 23:20 | 2025-11-04 23:55 | 35 | REPORT-035-FIX documentation |
-| UI Polish | 2025-11-05 00:30 | 2025-11-05 01:40 | 70 | Tag carousel & alignment fixes |
-| UI Polish Report | 2025-11-05 01:40 | 2025-11-05 01:45 | 5 | REPORT-036 documentation |
-| Grid Menu Merge | 2025-11-05 12:00 | 2025-11-05 13:05 | 65 | Merge feature branch, resolve conflicts |
-| Grid Menu Merge Report | 2025-11-05 13:05 | 2025-11-05 13:15 | 10 | REPORT-037 documentation |
-| #58 | 2025-11-05 14:55 | 2025-11-05 15:33 | 38 | Custom Fields Migration (implementation) |
-| #58 Report | 2025-11-05 15:33 | 2025-11-05 15:47 | 14 | REPORT-058 documentation |
-| #59 | 2025-11-05 16:37 | 2025-11-05 16:51 | 14 | CustomField Model (impl+review+fix) |
-| #59 Report | 2025-11-05 16:51 | 2025-11-05 17:02 | 11 | REPORT-059 documentation |
-| #60 | 2025-11-05 22:43 | 2025-11-06 00:20 | 97 | FieldSchema Model (REF MCP+impl+review+fix) |
-| #60 Report | 2025-11-06 00:20 | 2025-11-06 00:33 | 13 | REPORT-060 documentation |
-| #61 | 2025-11-06 16:22 | 2025-11-06 16:56 | 34 | SchemaField Model (REF MCP+Subagent+Review) |
-| #61 Report | 2025-11-06 16:56 | 2025-11-06 23:57 | 421 | REPORT-061 comprehensive documentation |
-| #62 | 2025-11-07 00:04 | 2025-11-07 00:18 | 14 | VideoFieldValue Model (Subagent+Review) |
-| #62 Report | 2025-11-07 00:18 | 2025-11-07 02:19 | 121 | REPORT-062 comprehensive documentation |
-| #64 | 2025-11-07 07:52 | 2025-11-07 08:13 | 21 | CustomField Pydantic Schemas (REF+Subagents+36 tests) |
-| #64 Report | 2025-11-07 08:13 | 2025-11-07 08:55 | 42 | REPORT-064 comprehensive documentation |
-| #65 | 2025-11-07 09:14 | 2025-11-07 09:41 | 27 | FieldSchema Pydantic Schemas (5 REF improvements+21 tests) |
-| #65 Report | 2025-11-07 09:41 | 2025-11-07 10:28 | 47 | REPORT-065 comprehensive documentation |
-| CodeRabbit Fixes | 2025-11-07 14:30 | 2025-11-07 17:30 | 180 | Fixed 13 critical/important issues (backend+frontend+docs) |
-| CodeRabbit Report | 2025-11-07 17:30 | 2025-11-07 17:45 | 15 | REPORT-CR-001 comprehensive documentation |
-| #66 | 2025-11-07 17:03 | 2025-11-07 17:35 | 32 | Custom Fields CRUD Endpoints (REF + Subagent-Driven + 19 tests) |
-| #66 Report | 2025-11-07 17:35 | 2025-11-07 20:34 | 179 | REPORT-066 comprehensive documentation |
-| #67 | 2025-11-08 09:30 | 2025-11-08 10:37 | 67 | Duplicate Check Endpoint (REF MCP validated + 7 unit tests + 1 integration test) |
-| #67 Report | 2025-11-08 10:37 | 2025-11-08 10:45 | 8 | REPORT-067 comprehensive documentation |
-| #71 | 2025-11-08 21:41 | 2025-11-08 22:12 | 31 | Video GET endpoint field_values (REF MCP + 5 improvements + batch-loading) |
-| #71 Report | 2025-11-08 22:12 | 2025-11-08 23:17 | 65 | REPORT-071 comprehensive documentation |
-| #72 | 2025-11-09 09:00 | 2025-11-09 09:47 | 47 | Batch update field values endpoint (REF MCP + Subagent-Driven + 11 tests) |
-| #72 Report | 2025-11-09 09:47 | 2025-11-09 10:50 | 63 | REPORT-072 comprehensive documentation |
-| #73 | 2025-11-09 11:44 | 2025-11-09 12:56 | 72 | Extract validation module (REF MCP + 3 Subagents + 25 tests + 100% coverage) |
-| #73 Report | 2025-11-09 12:56 | 2025-11-09 13:33 | 37 | REPORT-073 comprehensive documentation |
-| #78 | 2025-11-10 14:15 | 2025-11-10 15:15 | 60 | TypeScript Types (REF MCP + 5 improvements + 86 tests) |
-| #78 Report | 2025-11-10 15:15 | 2025-11-10 16:02 | 47 | REPORT-078 comprehensive documentation |
-| #79 | 2025-11-10 16:28 | 2025-11-10 18:20 | 112 | useCustomFields React Query Hook (REF MCP FAILED + 3 subagents + critical fixes + 7 TS errors) |
-| #79 Report | 2025-11-10 18:20 | 2025-11-10 18:48 | 28 | REPORT-079 comprehensive documentation |
-| #89 | 2025-11-11 08:15 | 2025-11-11 11:15 | 180 | CustomFieldsPreview Component (REF MCP + 5 improvements + 9 subagents + 41 tests + 2533 lines) |
-| #122 | 2025-11-11 21:51 | 2025-11-11 21:57 | 6 | FieldSelector Component (REF MCP + 4 improvements + 14 tests passing + 0 TS errors) |
-| #123 | 2025-11-11 22:40 | 2025-11-11 23:20 | 40 | NewFieldForm Component (Field pattern migration + REF MCP + 26 tests + 0 TS errors) |
-| #123 Report | 2025-11-11 23:20 | 2025-11-11 23:30 | 10 | REPORT-123 comprehensive documentation + CLAUDE.md update |
-| #124 | 2025-11-11 23:38 | 2025-11-12 00:24 | 46 | FieldConfigEditor Components (REF MCP + useFieldArray + Icon a11y + 42 tests + 0 TS errors) |
-| **TOTAL** | | | **2677 min** | **44 hours 37 minutes** |
-
----
-
-## 📊 Task Summary (for easy aggregation)
-
-| Task | Start | End | Duration (min) |
-|------|-------|-----|----------------|
-| #58 | 2025-11-05 14:55 | 2025-11-05 15:47 | 52 |
-| #59 | 2025-11-05 16:37 | 2025-11-05 17:02 | 25 |
-| #60 | 2025-11-05 22:43 | 2025-11-06 00:33 | 110 |
-| #61 | 2025-11-06 16:22 | 2025-11-06 23:57 | 455 |
-| #62 | 2025-11-07 00:04 | 2025-11-07 02:19 | 135 |
-| #64 | 2025-11-07 07:52 | 2025-11-07 08:55 | 63 |
-| #65 | 2025-11-07 09:14 | 2025-11-07 10:28 | 74 |
-| CodeRabbit | 2025-11-07 14:30 | 2025-11-07 17:45 | 195 |
-| #66 | 2025-11-07 17:03 | 2025-11-07 20:34 | 211 |
-| #67 | 2025-11-08 09:30 | 2025-11-08 10:53 | 83 |
-| #68 | 2025-11-08 11:00 | 2025-11-08 13:55 | 175 |
-| #69 | 2025-11-08 13:42 | 2025-11-08 14:03 | 21 |
-| #70 | 2025-11-08 14:08 | 2025-11-08 15:04 | 56 |
-| #71 | 2025-11-08 21:41 | 2025-11-08 23:17 | 96 |
-| #72 | 2025-11-09 09:00 | 2025-11-09 10:50 | 110 |
-| #73 | 2025-11-09 11:44 | 2025-11-09 13:33 | 109 |
-| #74 | 2025-11-09 18:51 | 2025-11-09 22:42 | 231 |
-| #75 | 2025-11-09 23:00 | 2025-11-10 08:11 | 551 |
-| #76 | 2025-11-10 11:05 | 2025-11-10 12:00 | 55 |
-| #77 | 2025-11-10 11:16 | 2025-11-10 13:58 | 162 |
-| #78 | 2025-11-10 14:15 | 2025-11-10 16:02 | 107 |
-| #79 | 2025-11-10 16:28 | 2025-11-10 18:48 | 140 |
-| #80 | 2025-11-10 23:19 | 2025-11-11 07:59 | 520 |
-| #81 | 2025-11-11 15:35 | 2025-11-11 17:04 | 89 |
-| #82 | 2025-11-11 17:16 | 2025-11-11 18:35 | 79 |
-| #89 | 2025-11-11 08:15 | 2025-11-11 11:15 | 180 |
-| **TOTAL** | | | **4159 min (69h 19min)** |
-
-Note: This table includes only tasks #58-#80 + #89 + CodeRabbit fixes from the Custom Fields Migration wave. Earlier tasks not included.
 
 ---
 
 ### Backend
 
-01. [x] Create tags and video_tags database schema (2025-11-01 14:00)
-02. [x] Implement Tag SQLAlchemy model with many-to-many (2025-11-01 14:30)
-03. [x] Create Tag Pydantic schemas with validation (2025-11-01 15:00)
-04. [x] Implement Tag CRUD API endpoints (2025-11-01 16:00)
-05. [x] Implement video-tag assignment endpoints (2025-11-01 17:00)
-06. [x] Add tag filtering to videos endpoint (OR/AND) (2025-11-01 18:00)
-07. [x] Optimize tag queries (case-insensitive, indexes) (2025-11-01 19:00)
-08. [x] Implement bulk tag assignment endpoint (2025-11-01 20:00)
+1.  [x] Create tags and video_tags database schema 
+2.  [x] Implement Tag SQLAlchemy model with many-to-many 
+3.  [x] Create Tag Pydantic schemas with validation 
+4.  [x] Implement Tag CRUD API endpoints 
+5.  [x] Implement video-tag assignment endpoints 
+6.  [x] Add tag filtering to videos endpoint (OR/AND) 
+7.  [x] Optimize tag queries (case-insensitive, indexes) 
+8.  [x] Implement bulk tag assignment endpoint 
 
 ### React Query Optimization
 
-09. [x] Apply best practices with queryOptions() helper (2025-11-02 00:30)
-10. [x] Change onSuccess to onSettled with async/await (2025-11-02 00:45)
-11. [x] Optimize QueryClient defaults (2025-11-02 01:00)
-12. [x] Add mutation keys to all mutations (2025-11-02 01:15)
-13. [x] Add error logging callbacks (2025-11-02 01:30)
-14. [x] Update test suite to match new config (2025-11-02 01:45)
+1.  [x] Apply best practices with queryOptions() helper 
+2.  [x] Change onSuccess to onSettled with async/await 
+3.  [x] Optimize QueryClient defaults 
+4.  [x] Add mutation keys to all mutations 
+5.  [x] Add error logging callbacks 
+6.  [x] Update test suite to match new config
 
 ### Frontend
 
-15. [x] Create CollapsibleSidebar component with mobile drawer (2025-11-01 21:00)
-16. [x] Create Tag store with Zustand for multi-select filtering (2025-11-02 10:45)
-17. [x] Create TagNavigation component with tag list and multi-select (2025-11-02 13:40)
-18. [x] Create useTags React Query hook for API calls (2025-11-02 13:40)
-19. [x] Integrate TagNavigation into VideosPage with layout (2025-11-02 16:10)
-20. [x] Connect tag filter state to useVideos hook (2025-11-02 17:51)
-21. [x] Migrate App.tsx to React Router v6 (2025-11-02 20:15)
-22. [x] Update App.tsx default route to /videos (2025-11-02 20:15)
-23. [x] Hide Lists/Dashboard navigation from UI (2025-11-02 20:15)
+1.  [x] Create CollapsibleSidebar component with mobile drawer 
+2.  [x] Create Tag store with Zustand for multi-select filtering
+3.  [x] Create TagNavigation component with tag list and multi-select
+4.  [x] Create useTags React Query hook for API calls 
+5.  [x] Integrate TagNavigation into VideosPage with layout
+6.  [x] Connect tag filter state to useVideos hook 
+7.  [x] Migrate App.tsx to React Router v6 
+8.  [x] Update App.tsx default route to /videos 
+9.  [x] Hide Lists/Dashboard navigation from UI 
 
 ### UI Cleanup
 
-24. [x] Add feature flags to hide Add Video, CSV Upload, CSV Export buttons (2025-11-02 23:50)
-25. [x] Create table settings store with thumbnail size and column visibility (2025-11-03 01:20)
-26. [x] Implement TableSettingsDropdown component (2025-11-03 12:30)
-27. [x] Replace Actions column with three-dot menu (2025-11-03 15:15)
-28. [x] Make table rows clickable (except menu) (2025-11-03 15:15)
-29. [x] Create ConfirmDeleteModal component (2025-11-03 17:30)
-30. [x] Add Plus icon to page header (2025-11-03 20:50)
-31. [x] Implement thumbnail size CSS classes (small/medium/large) (2025-11-03 22:00)
-32. [x] Create large thumbnail grid layout (2025-11-04 14:30)
+1.  [x] Add feature flags to hide Add Video, CSV Upload, CSV Export buttons 
+2.  [x] Create table settings store with thumbnail size and column visibility 
+3.  [x] Implement TableSettingsDropdown component 
+4.  [x] Replace Actions column with three-dot menu 
+5.  [x] Make table rows clickable (except menu) 
+6.  [x] Create ConfirmDeleteModal component 
+7.  [x] Add Plus icon to page header
+8.  [x] Implement thumbnail size CSS classes (small/medium/large)
+9.  [x] Create large thumbnail grid layout
 
 ### Grid View Enhancement
 
-33. [x] Add independent grid column control (2, 3, 4, 5 columns) (2025-11-04 15:10)
-34. [x] Create GridColumnControl component (2025-11-04 17:30)
-35. [x] Separate grid/list view settings (gridColumns vs thumbnailSize) (2025-11-04 18:45 - 19:15)
-36. [x] Add three-dot menu to Grid View cards (Thread #12) (2025-11-05)
-37. [x] Merge grid-view-three-dot-menu feature branch to main (2025-11-05 12:00)
+1.  [x] Add independent grid column control (2, 3, 4, 5 columns) 
+2.  [x] Create GridColumnControl component 
+3.  [x] Separate grid/list view settings (gridColumns vs thumbnailSize) 
+4.  [x] Add three-dot menu to Grid View cards (Thread #12) 
+5.  [x] Merge grid-view-three-dot-menu feature branch to main 
 
 ### Advanced Features
 
@@ -294,41 +195,41 @@ Note: This table includes only tasks #58-#80 + #89 + CodeRabbit fixes from the C
 
 **Phase 1: MVP - Backend (Database + Models + API)**
 
-96. [x] Create Alembic migration for 4 new tables (custom_fields, field_schemas, schema_fields, video_field_values) (2025-11-05 14:55-15:33)
-97. [x] Create CustomField SQLAlchemy model with field_type enum and JSONB config (2025-11-05 16:37-16:51)
-98. [x] Create FieldSchema SQLAlchemy model (2025-11-05 22:43 - 2025-11-06 00:20)
-99. [x] Create SchemaField join table model with display_order and show_on_card (2025-11-06 16:22-16:56)
-100. [x] Create VideoFieldValue model with typed value columns (text, numeric, boolean) (2025-11-07 00:04-00:18)
-101. [x] Extend Tag model with schema_id foreign key (completed in Task #98)
-102. [x] Create CustomField Pydantic schemas (Create, Update, Response) (2025-11-07 07:52-08:13)
-103. [x] Create FieldSchema Pydantic schemas (Create, Update, Response with fields) (2025-11-07 09:14-09:41)
-104. [x] Implement custom fields CRUD endpoints (GET, POST, PUT, DELETE) (2025-11-07 17:03-17:35)
-105. [x] Implement duplicate field check endpoint (POST /custom-fields/check-duplicate) (2025-11-08 09:30-10:53 [83 min total])
-106. [x] Implement field schemas CRUD endpoints (GET, POST, PUT, DELETE) (2025-11-08 11:00-13:55 [175 min total])
-107. [x] Implement schema-fields endpoints (add/remove fields to schema) (2025-11-08 13:42-15:15 [93 min total])
-108. [x] Extend Tag endpoints with schema_id support (PUT /tags/{id}) (2025-11-08 14:08-15:04 [56 min total: 28 min impl + 28 min report])
-109. [x] Extend Video GET endpoint to include field_values with union logic (2025-11-08 21:41-23:17 [96 min: 31 min code + 65 min report])
-110. [x] Implement video field values batch update endpoint (PUT /videos/{id}/fields) (2025-11-09 09:00-10:50 [110 min: 47 min impl + 63 min report])
-111. [x] Extract field value validation logic into reusable module (2025-11-09 11:44-12:56 [72 min: REF MCP + 3 Subagents + 25 tests])
-112. [x] Implement multi-tag field union query with conflict resolution (2025-11-09 18:51-22:42 [231 min: Option D - Two-Tier Strategy, 6 commits])
-113. [x] Add database indexes for performance - Decision: SKIP boolean index (YAGNI, 0% query frequency) (2025-11-09 23:00 - 2025-11-10 08:11 [551 min: REF MCP validation + 3 subagents + 2 code reviews])
-114. [x] Write backend unit tests (duplicate check, validation, union logic, conflict resolution) - VERIFICATION: All 48 tests already exist via Tasks #102-112 (2025-11-10 11:05 - 12:00 [55 min: Analysis + verification])
-115. [x] Write backend integration tests (create tag+schema+field flow, cascade deletes) (2025-11-10 11:16-13:58 [162 min: REF MCP validation + 3 CASCADE tests + 9 verified + report, 12/14 passing])
+1.  [x] Create Alembic migration for 4 new tables (custom_fields, field_schemas, schema_fields, video_field_values)
+2.  [x] Create CustomField SQLAlchemy model with field_type enum and JSONB config 
+3.  [x] Create FieldSchema SQLAlchemy model (2025-11-05 22:43 - 2025-11-06 00:20)
+4.  [x] Create SchemaField join table model with display_order and show_on_card 
+5.   [x] Create VideoFieldValue model with typed value columns (text, numeric, boolean) 
+6.   [x] Extend Tag model with schema_id foreign key (completed in Task #98)
+7.   [x] Create CustomField Pydantic schemas (Create, Update, Response)
+8.   [x] Create FieldSchema Pydantic schemas (Create, Update, Response with fields) 
+9.   [x] Implement custom fields CRUD endpoints (GET, POST, PUT, DELETE)
+10.  [x] Implement duplicate field check endpoint (POST /custom-fields/check-duplicate)
+11.  [x] Implement field schemas CRUD endpoints (GET, POST, PUT, DELETE)
+12.  [x] Implement schema-fields endpoints (add/remove fields to schema)
+13.  [x] Extend Tag endpoints with schema_id support (PUT /tags/{id}) 
+14.  [x] Extend Video GET endpoint to include field_values with union logic 
+15.  [x] Implement video field values batch update endpoint (PUT /videos/{id}/fields)  
+16.  [x] Extract field value validation logic into reusable module 
+17.  [x] Implement multi-tag field union query with conflict resolution 
+18.  [x] Add database indexes for performance - Decision: SKIP boolean index (YAGNI, 0% query frequency) 
+19.  [x] Write backend unit tests (duplicate check, validation, union logic, conflict resolution) 
+20.  [x] Write backend integration tests (create tag+schema+field flow, cascade deletes) 
 
 **Phase 1: MVP - Frontend (Components + UI)**
 
-116. [x] Create FieldType TypeScript types and interfaces (2025-11-10 14:15-16:02 [107 min: 30min REF MCP + 15min impl + 15min tests + 47min report])
-117. [x] Create useCustomFields React Query hook (2025-11-10 16:28-18:48 [140 min: 15min REF MCP FAILED + 75min impl + 17min fixes + 12min TS + 20min docs + report])
-118. [x] Create useSchemas React Query hook (2025-11-10 23:19 - 2025-11-11 07:59 [520 min: 497 min coding + 23 min report])
-119. [x] Create useVideoFieldValues React Query hook with mutations (2025-11-11 15:35 - 17:04 [89 min total: 51 min coding + 38 min report])
-120. [x] Extend TagEditDialog with SchemaSelector component (2025-11-11 17:16 - 18:35 [79 min: 68 min coding + 11 min report])
+116. [x] Create FieldType TypeScript types and interfaces
+117. [x] Create useCustomFields React Query hook
+118. [x] Create useSchemas React Query hook 
+119. [x] Create useVideoFieldValues React Query hook with mutations 
+120. [x] Extend TagEditDialog with SchemaSelector component 
 121. [x] Create SchemaEditor component for inline schema creation
 122. [x] Create FieldSelector component (multi-select from existing fields)
 123. [x] Create NewFieldForm component with type selector and config editor
 124. [x] Create FieldConfigEditor sub-components (rating max, select options)
-125. [ ] Create DuplicateWarning component with real-time check
+125. [ ] Create DuplicateWarning component with real-time check 
 126. [ ] Create FieldOrderManager component (drag-drop + show_on_card toggles)
-127. [x] Create CustomFieldsPreview component for VideoCard (max 3 fields) (2025-11-11 08:15 - 11:15)
+127. [x] Create CustomFieldsPreview component for VideoCard (max 3 fields) 
 128. [ ] Create FieldDisplay component with type-specific renderers (Rating, Select, Boolean, Text)
 129. [ ] Implement inline editing in CustomFieldsPreview
 130. [ ] Create VideoDetailsModal component
