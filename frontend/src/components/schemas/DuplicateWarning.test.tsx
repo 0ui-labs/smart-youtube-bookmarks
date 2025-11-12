@@ -12,16 +12,18 @@
  * - Config preview formatting (select, rating, text, boolean)
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { http, HttpResponse } from 'msw'
-import { server } from '@/test/mocks/server'
+import * as customFieldsApi from '@/api/customFields'
 
 import { DuplicateWarning } from './DuplicateWarning'
 import { CustomField } from '@/types/customFields'
 
-// Uses shared MSW server from test/setup.ts (handlers reset automatically after each test)
+// Mock API functions
+vi.mock('@/api/customFields', () => ({
+  checkFieldNameDuplicate: vi.fn(),
+}))
 
 // Helper to render with QueryClient
 function renderWithQuery(ui: React.ReactElement) {
@@ -41,6 +43,14 @@ function renderWithQuery(ui: React.ReactElement) {
 }
 
 describe('DuplicateWarning', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Default: no duplicate exists
+    vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockResolvedValue({
+      exists: false,
+      field: null,
+    })
+  })
   describe('Empty field name', () => {
     it('renders nothing when field name is empty', () => {
       const { container } = renderWithQuery(
@@ -68,10 +78,9 @@ describe('DuplicateWarning', () => {
   describe('Loading state', () => {
     it('shows loading spinner while checking for duplicates', async () => {
       // Mock slow API response
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', async () => {
-          await new Promise(resolve => setTimeout(resolve, 100))
-          return HttpResponse.json({ exists: false, field: null })
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockImplementation(
+        () => new Promise((resolve) => {
+          setTimeout(() => resolve({ exists: false, field: null }), 100)
         })
       )
 
@@ -101,14 +110,10 @@ describe('DuplicateWarning', () => {
         updated_at: '2025-11-12T10:00:00Z',
       }
 
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return HttpResponse.json({
-            exists: true,
-            field: existingField,
-          })
-        })
-      )
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockResolvedValue({
+        exists: true,
+        field: existingField,
+      })
 
       renderWithQuery(
         <DuplicateWarning
@@ -140,14 +145,10 @@ describe('DuplicateWarning', () => {
         updated_at: '2025-11-12T10:00:00Z',
       }
 
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return HttpResponse.json({
-            exists: true,
-            field: existingField,
-          })
-        })
-      )
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockResolvedValue({
+        exists: true,
+        field: existingField,
+      })
 
       renderWithQuery(
         <DuplicateWarning
@@ -173,14 +174,10 @@ describe('DuplicateWarning', () => {
         updated_at: '2025-11-12T10:00:00Z',
       }
 
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return HttpResponse.json({
-            exists: true,
-            field: existingField,
-          })
-        })
-      )
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockResolvedValue({
+        exists: true,
+        field: existingField,
+      })
 
       renderWithQuery(
         <DuplicateWarning
@@ -206,14 +203,10 @@ describe('DuplicateWarning', () => {
         updated_at: '2025-11-12T10:00:00Z',
       }
 
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return HttpResponse.json({
-            exists: true,
-            field: existingField,
-          })
-        })
-      )
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockResolvedValue({
+        exists: true,
+        field: existingField,
+      })
 
       renderWithQuery(
         <DuplicateWarning
@@ -239,14 +232,10 @@ describe('DuplicateWarning', () => {
         updated_at: '2025-11-12T10:00:00Z',
       }
 
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return HttpResponse.json({
-            exists: true,
-            field: existingField,
-          })
-        })
-      )
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockResolvedValue({
+        exists: true,
+        field: existingField,
+      })
 
       renderWithQuery(
         <DuplicateWarning
@@ -272,14 +261,10 @@ describe('DuplicateWarning', () => {
         updated_at: '2025-11-12T10:00:00Z',
       }
 
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return HttpResponse.json({
-            exists: true,
-            field: existingField,
-          })
-        })
-      )
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockResolvedValue({
+        exists: true,
+        field: existingField,
+      })
 
       renderWithQuery(
         <DuplicateWarning
@@ -290,21 +275,20 @@ describe('DuplicateWarning', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByText(/Ja\/Nein/)).toBeInTheDocument()
+        // Check for "Typ: Ja/Nein" to be more specific
+        expect(screen.getByText(/Typ:/)).toBeInTheDocument()
+        const allJaNein = screen.getAllByText(/Ja\/Nein/)
+        expect(allJaNein.length).toBeGreaterThan(0)
       })
     })
   })
 
   describe('No duplicate', () => {
     it('renders nothing when field name is available', async () => {
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return HttpResponse.json({
-            exists: false,
-            field: null,
-          })
-        })
-      )
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockResolvedValue({
+        exists: false,
+        field: null,
+      })
 
       const { container } = renderWithQuery(
         <DuplicateWarning
@@ -326,10 +310,8 @@ describe('DuplicateWarning', () => {
 
   describe('Error handling', () => {
     it('shows error message when API call fails', async () => {
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return new HttpResponse(null, { status: 500 })
-        })
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockRejectedValue(
+        new Error('API error')
       )
 
       renderWithQuery(
@@ -349,10 +331,8 @@ describe('DuplicateWarning', () => {
     })
 
     it('shows error message on network error', async () => {
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return HttpResponse.error()
-        })
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockRejectedValue(
+        new Error('Network error')
       )
 
       renderWithQuery(
@@ -373,25 +353,37 @@ describe('DuplicateWarning', () => {
 
   describe('Debouncing', () => {
     it('debounces API calls with custom delay', async () => {
-      const mockHandler = vi.fn(() => {
-        return HttpResponse.json({ exists: false, field: null })
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockResolvedValue({
+        exists: false,
+        field: null,
       })
 
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', mockHandler)
-      )
-
+      // Start with empty field name (no API call)
       const { rerender } = renderWithQuery(
         <DuplicateWarning
-          fieldName="R"
+          fieldName=""
           listId="list-123"
           debounceMs={500}
         />
       )
 
-      // Fast updates should not trigger API calls
+      // Now start typing - fast updates should be debounced
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } }
+      })
+
       rerender(
-        <QueryClientProvider client={new QueryClient()}>
+        <QueryClientProvider client={queryClient}>
+          <DuplicateWarning
+            fieldName="R"
+            listId="list-123"
+            debounceMs={500}
+          />
+        </QueryClientProvider>
+      )
+
+      rerender(
+        <QueryClientProvider client={queryClient}>
           <DuplicateWarning
             fieldName="Ra"
             listId="list-123"
@@ -401,7 +393,7 @@ describe('DuplicateWarning', () => {
       )
 
       rerender(
-        <QueryClientProvider client={new QueryClient()}>
+        <QueryClientProvider client={queryClient}>
           <DuplicateWarning
             fieldName="Rat"
             listId="list-123"
@@ -410,25 +402,26 @@ describe('DuplicateWarning', () => {
         </QueryClientProvider>
       )
 
-      // API should not be called yet
-      expect(mockHandler).not.toHaveBeenCalled()
+      // Wait a short time - API should not be called yet due to debounce
+      await new Promise(resolve => setTimeout(resolve, 200))
+      expect(customFieldsApi.checkFieldNameDuplicate).not.toHaveBeenCalled()
 
-      // Wait for debounce
-      await new Promise(resolve => setTimeout(resolve, 600))
+      // Wait for full debounce period
+      await new Promise(resolve => setTimeout(resolve, 400))
 
-      // Now API should be called once
+      // Now API should be called once with the final value
       await waitFor(() => {
-        expect(mockHandler).toHaveBeenCalledTimes(1)
+        expect(customFieldsApi.checkFieldNameDuplicate).toHaveBeenCalledTimes(1)
+        expect(customFieldsApi.checkFieldNameDuplicate).toHaveBeenCalledWith('list-123', 'Rat')
       })
     })
   })
 
   describe('Accessibility', () => {
     it('has proper ARIA roles for loading state', () => {
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', async () => {
-          await new Promise(resolve => setTimeout(resolve, 100))
-          return HttpResponse.json({ exists: false, field: null })
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockImplementation(
+        () => new Promise((resolve) => {
+          setTimeout(() => resolve({ exists: false, field: null }), 100)
         })
       )
 
@@ -456,14 +449,10 @@ describe('DuplicateWarning', () => {
         updated_at: '2025-11-12T10:00:00Z',
       }
 
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return HttpResponse.json({
-            exists: true,
-            field: existingField,
-          })
-        })
-      )
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockResolvedValue({
+        exists: true,
+        field: existingField,
+      })
 
       renderWithQuery(
         <DuplicateWarning
@@ -480,10 +469,8 @@ describe('DuplicateWarning', () => {
     })
 
     it('has role="alert" for error state', async () => {
-      server.use(
-        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
-          return new HttpResponse(null, { status: 500 })
-        })
+      vi.mocked(customFieldsApi.checkFieldNameDuplicate).mockRejectedValue(
+        new Error('API error')
       )
 
       renderWithQuery(
