@@ -13,6 +13,11 @@ from app.schemas.schema_field import (
     SchemaFieldUpdate,
     SchemaFieldResponse
 )
+from app.schemas.field_schema import (
+    SchemaFieldUpdateItem,
+    SchemaFieldBatchUpdateRequest,
+    SchemaFieldBatchUpdateResponse
+)
 
 router = APIRouter(
     prefix="/api/lists/{list_id}/schemas/{schema_id}/fields",
@@ -187,6 +192,103 @@ async def add_field_to_schema(
     )
     result = await db.execute(stmt)
     return result.scalar_one()
+
+
+@router.put("/batch", response_model=SchemaFieldBatchUpdateResponse)
+async def batch_update_schema_fields(
+    list_id: UUID,
+    schema_id: UUID,
+    request: SchemaFieldBatchUpdateRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Batch update schema_fields (display_order + show_on_card).
+
+    Updates multiple schema field associations in a single atomic operation.
+    Useful for drag-and-drop reordering in the frontend.
+
+    Validates:
+    - Schema exists and belongs to list
+    - All field_ids exist and belong to same list as schema
+    - Max 3 fields with show_on_card=true (validated in Pydantic schema)
+    - display_order values are unique (validated in Pydantic schema)
+    - Batch size: 1-50 items (validated in Pydantic schema)
+
+    Uses PostgreSQL UPSERT pattern (ON CONFLICT DO UPDATE) to create
+    missing associations or update existing ones.
+
+    Returns:
+        SchemaFieldBatchUpdateResponse with updated_count and complete
+        updated schema_fields list with nested field data.
+    """
+    # Verify schema exists and belongs to list
+    schema_stmt = select(FieldSchema).where(
+        FieldSchema.id == schema_id,
+        FieldSchema.list_id == list_id
+    )
+    schema_result = await db.execute(schema_stmt)
+    schema = schema_result.scalar_one_or_none()
+
+    if not schema:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Schema not found or does not belong to this list"
+        )
+
+    # Extract field_ids from request
+    field_ids = [item.field_id for item in request.fields]
+
+    # Verify all fields exist and belong to same list (security check)
+    fields_stmt = select(CustomField).where(
+        CustomField.id.in_(field_ids),
+        CustomField.list_id == list_id
+    )
+    fields_result = await db.execute(fields_stmt)
+    existing_fields = fields_result.scalars().all()
+
+    if len(existing_fields) != len(field_ids):
+        # Find which field_ids are missing/invalid
+        existing_field_ids = {field.id for field in existing_fields}
+        missing_field_ids = set(field_ids) - existing_field_ids
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"One or more field_ids not found or belong to different list: {[str(fid)[:8] + '...' for fid in missing_field_ids]}"
+        )
+
+    # Perform UPSERT for each field (ON CONFLICT DO UPDATE)
+    from sqlalchemy.dialects.postgresql import insert
+
+    for item in request.fields:
+        stmt = insert(SchemaField).values(
+            schema_id=schema_id,
+            field_id=item.field_id,
+            display_order=item.display_order,
+            show_on_card=item.show_on_card
+        ).on_conflict_do_update(
+            index_elements=['schema_id', 'field_id'],
+            set_={
+                'display_order': item.display_order,
+                'show_on_card': item.show_on_card
+            }
+        )
+        await db.execute(stmt)
+
+    await db.commit()
+
+    # Query updated schema_fields with eager loading
+    updated_stmt = (
+        select(SchemaField)
+        .where(SchemaField.schema_id == schema_id)
+        .options(selectinload(SchemaField.field))
+        .order_by(SchemaField.display_order)
+    )
+    updated_result = await db.execute(updated_stmt)
+    updated_fields = updated_result.scalars().all()
+
+    return SchemaFieldBatchUpdateResponse(
+        updated_count=len(request.fields),
+        fields=updated_fields
+    )
 
 
 @router.put("/{field_id}", response_model=SchemaFieldResponse)

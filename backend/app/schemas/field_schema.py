@@ -348,3 +348,122 @@ class FieldSchemaResponse(FieldSchemaBase):
         if hasattr(value, 'schema_id') and hasattr(value, 'field_id'):
             return [value]
         return value
+
+
+# ============================================================================
+# Batch Update Schemas (Task #126)
+# ============================================================================
+
+class SchemaFieldUpdateItem(BaseModel):
+    """
+    Single field update for batch operations.
+
+    Used in SchemaFieldBatchUpdateRequest to update display_order and
+    show_on_card for multiple fields in a single API call.
+
+    Example:
+        {
+            "field_id": "123e4567-e89b-12d3-a456-426614174000",
+            "display_order": 0,
+            "show_on_card": true
+        }
+    """
+    field_id: UUID = Field(..., description="ID of field to update")
+    display_order: int = Field(..., ge=0, description="Display order (0-indexed)")
+    show_on_card: bool = Field(..., description="Show field on video cards")
+
+
+class SchemaFieldBatchUpdateRequest(BaseModel):
+    """
+    Request schema for batch updating schema_fields.
+
+    Used in: PUT /api/schemas/{schema_id}/fields/batch
+
+    Enables updating display_order and show_on_card for multiple fields
+    in a single atomic operation. Useful for drag-and-drop reordering
+    in the frontend.
+
+    Validates:
+    - Max 3 fields can have show_on_card=true
+    - display_order values must be unique
+    - Batch size: 1-50 items
+
+    Example:
+        {
+            "fields": [
+                {"field_id": "uuid-1", "display_order": 0, "show_on_card": true},
+                {"field_id": "uuid-2", "display_order": 1, "show_on_card": true},
+                {"field_id": "uuid-3", "display_order": 2, "show_on_card": false}
+            ]
+        }
+    """
+    fields: list[SchemaFieldUpdateItem] = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="List of fields to update (1-50 items)"
+    )
+
+    @field_validator('fields')
+    @classmethod
+    def validate_show_on_card_limit(cls, fields: list[SchemaFieldUpdateItem]) -> list[SchemaFieldUpdateItem]:
+        """
+        Validate that at most 3 fields have show_on_card=true.
+
+        Raises:
+            ValueError: If more than 3 fields have show_on_card=true
+        """
+        show_on_card_count = sum(1 for item in fields if item.show_on_card)
+        if show_on_card_count > 3:
+            raise ValueError(
+                f"At most 3 fields can have show_on_card=true, but {show_on_card_count} fields are marked. "
+                f"Please set show_on_card=false for {show_on_card_count - 3} fields."
+            )
+        return fields
+
+    @field_validator('fields')
+    @classmethod
+    def validate_unique_display_orders(cls, fields: list[SchemaFieldUpdateItem]) -> list[SchemaFieldUpdateItem]:
+        """
+        Validate that all display_order values are unique.
+
+        Raises:
+            ValueError: If duplicate display_order values are found
+        """
+        display_orders = [item.display_order for item in fields]
+        if len(display_orders) != len(set(display_orders)):
+            duplicates = [order for order in display_orders if display_orders.count(order) > 1]
+            raise ValueError(
+                f"Duplicate display_order values found: {set(duplicates)}. "
+                f"Each field must have a unique display_order."
+            )
+        return fields
+
+
+class SchemaFieldBatchUpdateResponse(BaseModel):
+    """
+    Response schema for batch update operation.
+
+    Returns count of updated fields and complete updated schema_fields list
+    with nested field data for immediate UI refresh.
+
+    Example:
+        {
+            "updated_count": 3,
+            "fields": [
+                {
+                    "field_id": "uuid-1",
+                    "schema_id": "schema-uuid",
+                    "display_order": 0,
+                    "show_on_card": true,
+                    "field": { "id": "uuid-1", "name": "Rating", ... }
+                },
+                ...
+            ]
+        }
+    """
+    updated_count: int = Field(..., description="Number of fields updated")
+    fields: list[SchemaFieldResponse] = Field(
+        ...,
+        description="Complete updated schema_fields list with nested field data"
+    )
