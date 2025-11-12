@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FieldSelector } from './FieldSelector'
-import { FieldOrderManager, type FieldItem } from './FieldOrderManager'
+// import { FieldOrderManager } from './FieldOrderManager' // TODO Task #127: Integrate new FieldOrderManager API
 import { useCustomFields } from '@/hooks/useCustomFields'
 import { NewFieldForm } from './NewFieldForm'
 
@@ -292,14 +292,37 @@ export function SchemaEditor({ listId, onSave, onCancel, initialData }: SchemaEd
           </div>
         )}
 
-        {/* FieldOrderManager (Task #83d) */}
+        {/* TODO Task #127: Integrate new FieldOrderManager component with batch update API
+            Old API (placeholder from Task #83d):
+              <FieldOrderManager
+                fields={fieldItems}
+                onReorder={handleReorder}
+                onToggleShowOnCard={handleToggleShowOnCard}
+                onRemove={handleRemove}
+              />
+
+            New API (Task #126):
+              <FieldOrderManager
+                listId={listId}
+                schemaId={schemaId}
+                fields={schema?.schema_fields || []}
+                onUpdate={async (updates) => {
+                  await updateSchemaFieldsBatch.mutateAsync({ fields: updates })
+                }}
+                isUpdating={updateSchemaFieldsBatch.isPending}
+              />
+        */}
         {fields.length > 0 ? (
-          <FieldOrderManager
-            fields={fieldItems}
-            onReorder={handleReorder}
-            onToggleShowOnCard={handleToggleShowOnCard}
-            onRemove={handleRemove}
-          />
+          <div className="space-y-2">
+            {fieldItems.map((field) => (
+              <div key={field.field_id} className="flex items-center gap-3 rounded-md border p-3">
+                <div className="flex-1">
+                  <div className="font-medium">{field.field.name}</div>
+                  <div className="text-sm text-muted-foreground">{field.field.field_type}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">
             Noch keine Felder hinzugefügt. Erstellen Sie ein neues Feld oder wählen Sie vorhandene aus.

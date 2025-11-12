@@ -12,6 +12,7 @@ import type {
   SchemaFieldCreate,
   SchemaFieldUpdate,
   ReorderSchemaFields,
+  SchemaFieldBatchUpdateRequest,
 } from '@/types/schema'
 
 // ============================================================================
@@ -571,6 +572,87 @@ export function useReorderSchemaFields(listId: string, schemaId: string) {
     },
     // Refetch after success or error to ensure consistency
     onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) })
+    },
+  })
+}
+
+/**
+ * Hook to batch update schema fields (display_order + show_on_card).
+ *
+ * PUT /api/lists/{list_id}/schemas/{schema_id}/fields/batch (Task #126)
+ *
+ * Used by FieldOrderManager for atomic drag-drop + checkbox updates.
+ * Replaces useReorderSchemaFields for transactional guarantees.
+ *
+ * Invalidation strategy:
+ * - Invalidates schemas list (schema name shows in list, changes visible)
+ * - Invalidates schema details (FieldOrderManager sees updated order/checkboxes)
+ *
+ * REF MCP Best Practices:
+ * - onSettled (not onSuccess) per React Query v5
+ * - No optimistic updates (atomic backend transaction is fast enough)
+ * - Invalidate both list and detail queries (field changes affect both views)
+ *
+ * @example
+ * ```tsx
+ * function FieldOrderManager({ listId, schemaId, fields }: Props) {
+ *   const updateBatch = useUpdateSchemaFieldsBatch(listId, schemaId)
+ *   const [localFields, setLocalFields] = useState(fields)
+ *
+ *   const handleSave = () => {
+ *     updateBatch.mutate({
+ *       fields: localFields.map((f, index) => ({
+ *         field_id: f.field_id,
+ *         display_order: index,
+ *         show_on_card: f.show_on_card,
+ *       }))
+ *     }, {
+ *       onSuccess: () => {
+ *         toast.success('Order saved')
+ *       },
+ *       onError: (error) => {
+ *         if (error.response?.status === 409) {
+ *           toast.error('Max 3 fields can have show_on_card=true')
+ *         }
+ *       }
+ *     })
+ *   }
+ *
+ *   return (
+ *     <DragDropContext onDragEnd={handleDragEnd}>
+ *       <Droppable droppableId="fields">
+ *         {localFields.map((field, index) => (
+ *           <Draggable key={field.field_id} draggableId={field.field_id} index={index}>
+ *             <FieldRow
+ *               field={field}
+ *               onCheckboxChange={(checked) => {
+ *                 setLocalFields(prev => prev.map(f =>
+ *                   f.field_id === field.field_id ? { ...f, show_on_card: checked } : f
+ *                 ))
+ *               }}
+ *             />
+ *           </Draggable>
+ *         ))}
+ *       </Droppable>
+ *       <Button onClick={handleSave} disabled={updateBatch.isPending}>
+ *         Save Order
+ *       </Button>
+ *     </DragDropContext>
+ *   )
+ * }
+ * ```
+ */
+export function useUpdateSchemaFieldsBatch(listId: string, schemaId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationKey: ['updateSchemaFieldsBatch', schemaId],
+    mutationFn: async (request: SchemaFieldBatchUpdateRequest) =>
+      schemasApi.updateSchemaFieldsBatch(listId, schemaId, request),
+    onSettled: () => {
+      // Invalidate ALL schema queries for this list (Task #80 pattern)
+      queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) })
       queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) })
     },
   })

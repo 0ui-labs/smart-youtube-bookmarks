@@ -1,3 +1,24 @@
+/**
+ * FieldOrderManager Component (Task #126)
+ *
+ * Drag-drop field ordering with show_on_card toggles.
+ *
+ * REF MCP Improvements Applied:
+ * - #2: Direct Mocking (tests use vi.mocked, NOT MSW)
+ * - #3: No control prop (local useState, NOT useForm)
+ * - #4: dnd-kit announcements (DndContext announcements prop)
+ * - #5: Type Guards (Checkbox onCheckedChange with typeof check)
+ *
+ * Features:
+ * - Drag-drop reordering with dnd-kit
+ * - Show on card toggles (max 3 constraint)
+ * - Save changes button (appears on local edits)
+ * - Keyboard navigation (Arrow keys, Escape, Enter)
+ * - Screen reader announcements
+ * - WCAG 2.1 AA accessible
+ */
+
+import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -6,239 +27,238 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  UniqueIdentifier,
+  DragOverlay,
+  Announcements,
 } from '@dnd-kit/core'
-import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import {
+  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Trash2 } from 'lucide-react'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
+import type { SchemaFieldResponse, SchemaFieldUpdateItem } from '@/types/schema'
+import { SortableFieldRow } from './SortableFieldRow'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-
-/**
- * FieldItem represents a field in the schema with its metadata
- */
-export interface FieldItem {
-  id: string // Unique key from useFieldArray
-  field_id: string // UUID of the custom field
-  display_order: number
-  show_on_card: boolean
-  field_name: string
-  field_type: string
-}
+import { Save, AlertCircle } from 'lucide-react'
 
 interface FieldOrderManagerProps {
-  fields: FieldItem[]
-  onReorder: (activeId: string, overId: string) => void
-  onToggleShowOnCard: (fieldId: string, show: boolean) => void
-  onRemove: (fieldId: string) => void
+  listId: string
+  schemaId: string
+  fields: SchemaFieldResponse[]
+  onUpdate: (updates: SchemaFieldUpdateItem[]) => Promise<void>
+  isUpdating?: boolean
 }
 
-/**
- * Sortable field item component with drag handle, show-on-card toggle, and remove button
- */
-function SortableFieldItem({
-  field,
-  canEnableShowOnCard,
-  onToggleShowOnCard,
-  onRemove,
-}: {
-  field: FieldItem
-  canEnableShowOnCard: boolean
-  onToggleShowOnCard: (show: boolean) => void
-  onRemove: () => void
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: field.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }
-
-  // Helper to get field type display text
-  const getFieldTypeDisplay = (fieldType: string) => {
-    switch (fieldType) {
-      case 'rating':
-        return 'Rating'
-      case 'select':
-        return 'Auswahl'
-      case 'text':
-        return 'Text'
-      case 'boolean':
-        return 'Ja/Nein'
-      default:
-        return fieldType
-    }
-  }
-
-  // Disable switch when:
-  // - Already at max 3 AND this field is not checked
-  // - Always allow unchecking
-  const switchDisabled = !canEnableShowOnCard && !field.show_on_card
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        'flex items-center gap-3 p-3 bg-white border rounded-lg',
-        isDragging && 'ring-2 ring-primary'
-      )}
-    >
-      {/* Drag Handle */}
-      <button
-        type="button"
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors touch-none"
-        aria-label={`${field.field_name} verschieben`}
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="h-5 w-5" />
-      </button>
-
-      {/* Field Info */}
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate">{field.field_name}</p>
-        <p className="text-xs text-muted-foreground">
-          {getFieldTypeDisplay(field.field_type)}
-        </p>
-      </div>
-
-      {/* Show on Card Toggle */}
-      <div className="flex items-center gap-2">
-        <Switch
-          id={`show-on-card-${field.id}`}
-          checked={field.show_on_card}
-          onCheckedChange={onToggleShowOnCard}
-          disabled={switchDisabled}
-          aria-label={`${field.field_name} auf Karte anzeigen`}
-        />
-        <Label
-          htmlFor={`show-on-card-${field.id}`}
-          className={cn(
-            'text-xs cursor-pointer select-none',
-            switchDisabled && 'opacity-50 cursor-not-allowed'
-          )}
-        >
-          Auf Karte
-        </Label>
-      </div>
-
-      {/* Remove Button */}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={onRemove}
-        aria-label={`${field.field_name} entfernen`}
-        className="text-muted-foreground hover:text-destructive"
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
-    </div>
-  )
-}
-
-/**
- * FieldOrderManager - Drag-and-drop sortable field list with show_on_card toggles
- *
- * REF MCP Improvement: Uses restrictToVerticalAxis modifier for clearer UX
- *
- * Features:
- * - Drag-and-drop reordering with @dnd-kit/sortable
- * - Show-on-card toggles (max 3 enforcement)
- * - Remove field buttons
- * - Keyboard navigation (Arrow keys + Space/Enter)
- * - Visual feedback during drag (opacity 0.5)
- *
- * @example
- * <FieldOrderManager
- *   fields={fields}
- *   onReorder={(activeId, overId) => {
- *     const oldIndex = fields.findIndex(f => f.id === activeId)
- *     const newIndex = fields.findIndex(f => f.id === overId)
- *     move(oldIndex, newIndex)
- *   }}
- *   onToggleShowOnCard={(fieldId, show) => {
- *     const index = fields.findIndex(f => f.id === fieldId)
- *     update(index, { ...fields[index], show_on_card: show })
- *   }}
- *   onRemove={(fieldId) => {
- *     const index = fields.findIndex(f => f.id === fieldId)
- *     remove(index)
- *   }}
- * />
- */
-export function FieldOrderManager({
+export const FieldOrderManager: React.FC<FieldOrderManagerProps> = ({
   fields,
-  onReorder,
-  onToggleShowOnCard,
-  onRemove,
-}: FieldOrderManagerProps) {
-  // Configure sensors for mouse + keyboard navigation
+  onUpdate,
+  isUpdating = false,
+}) => {
+  // REF MCP Improvement #3: Local useState (NOT useForm)
+  const [localFields, setLocalFields] = useState<SchemaFieldResponse[]>(fields)
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
+  const [hasChanges, setHasChanges] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Sync props to local state
+  useEffect(() => {
+    setLocalFields(fields)
+    setHasChanges(false)
+  }, [fields])
+
+  // Configure sensors
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
+  // Count show_on_card fields
+  const showOnCardCount = useMemo(
+    () => localFields.filter((f) => f.show_on_card).length,
+    [localFields]
+  )
 
-    if (over && active.id !== over.id) {
-      onReorder(active.id as string, over.id as string)
-    }
+  // REF MCP Improvement #4: dnd-kit announcements (NOT manual useState)
+  const announcements: Announcements = {
+    onDragStart({ active }) {
+      const field = localFields.find((f) => f.field_id === active.id)
+      return field
+        ? `${field.field.name} aufgenommen. Drücken Sie Pfeiltasten zum Verschieben.`
+        : 'Feld aufgenommen'
+    },
+    onDragOver({ active, over }) {
+      if (!over) return ''
+      const activeField = localFields.find((f) => f.field_id === active.id)
+      const overField = localFields.find((f) => f.field_id === over.id)
+      return activeField && overField
+        ? `${activeField.field.name} über ${overField.field.name}`
+        : ''
+    },
+    onDragEnd({ active, over }) {
+      if (!over) return 'Vorgang abgebrochen'
+      const activeField = localFields.find((f) => f.field_id === active.id)
+      const oldIndex = localFields.findIndex((f) => f.field_id === active.id)
+      const newIndex = localFields.findIndex((f) => f.field_id === over.id)
+      return activeField
+        ? `${activeField.field.name} von Position ${oldIndex + 1} zu Position ${newIndex + 1} verschoben`
+        : 'Feld verschoben'
+    },
+    onDragCancel({ active }) {
+      const field = localFields.find((f) => f.field_id === active.id)
+      return field ? `Verschieben von ${field.field.name} abgebrochen` : 'Vorgang abgebrochen'
+    },
   }
 
-  // Count fields with show_on_card enabled
-  const showOnCardCount = fields.filter(f => f.show_on_card).length
-  const canEnableShowOnCard = showOnCardCount < 3
+  // Drag handlers
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id)
+  }, [])
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveId(null)
+
+    if (!over || active.id === over.id) return
+
+    setLocalFields((items) => {
+      const oldIndex = items.findIndex((item) => item.field_id === active.id)
+      const newIndex = items.findIndex((item) => item.field_id === over.id)
+      const reordered = arrayMove(items, oldIndex, newIndex)
+
+      // Recalculate display_order
+      return reordered.map((item, index) => ({
+        ...item,
+        display_order: index,
+      }))
+    })
+
+    setHasChanges(true)
+    setError(null)
+  }, [])
+
+  // REF MCP Improvement #5: Type guard for Checkbox (NOT === true coercion)
+  const handleToggleShowOnCard = useCallback(
+    (fieldId: string, checked: boolean | 'indeterminate') => {
+      if (typeof checked !== 'boolean') return // Type guard
+
+      setLocalFields((items) => {
+        const currentCount = items.filter((f) => f.show_on_card).length
+
+        if (checked && currentCount >= 3) {
+          setError('Maximal 3 Felder können auf Karten angezeigt werden')
+          return items
+        }
+
+        setError(null)
+        return items.map((item) =>
+          item.field_id === fieldId ? { ...item, show_on_card: checked } : item
+        )
+      })
+
+      setHasChanges(true)
+    },
+    []
+  )
+
+  // Save changes
+  const handleSave = useCallback(async () => {
+    const updates: SchemaFieldUpdateItem[] = localFields.map((field) => ({
+      field_id: field.field_id,
+      display_order: field.display_order,
+      show_on_card: field.show_on_card,
+    }))
+
+    try {
+      await onUpdate(updates)
+      setHasChanges(false)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler beim Speichern')
+    }
+  }, [localFields, onUpdate])
+
+  // Active field for overlay
+  const activeField = useMemo(
+    () => localFields.find((f) => f.field_id === activeId),
+    [localFields, activeId]
+  )
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-      modifiers={[restrictToVerticalAxis]} // REF MCP Improvement
-    >
-      <SortableContext
-        items={fields.map(f => f.id)} // Use stable field.id keys
-        strategy={verticalListSortingStrategy}
-      >
-        <div className="space-y-2" role="list" aria-label="Felder">
-          {fields.map((field) => (
-            <SortableFieldItem
-              key={field.id}
-              field={field}
-              canEnableShowOnCard={canEnableShowOnCard}
-              onToggleShowOnCard={(show) => onToggleShowOnCard(field.id, show)}
-              onRemove={() => onRemove(field.id)}
-            />
-          ))}
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          {showOnCardCount}/3 Felder auf Karten angezeigt
         </div>
-      </SortableContext>
+        {hasChanges && (
+          <Button onClick={handleSave} disabled={isUpdating} size="sm" className="gap-2">
+            <Save className="h-4 w-4" aria-hidden="true" />
+            {isUpdating ? 'Speichern...' : 'Änderungen speichern'}
+          </Button>
+        )}
+      </div>
 
-      {/* Helper text for show-on-card limit */}
-      {showOnCardCount >= 3 && (
-        <p className="text-xs text-muted-foreground mt-2">
-          Maximal 3 Felder können auf der Karte angezeigt werden ({showOnCardCount}/3)
-        </p>
+      {/* Error */}
+      {error && (
+        <div
+          className="flex items-center gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+          role="alert"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {error}
+        </div>
       )}
-    </DndContext>
+
+      {/* Drag-drop list */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        modifiers={[restrictToVerticalAxis]}
+        accessibility={{ announcements }}
+      >
+        <SortableContext
+          items={localFields.map((f) => f.field_id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-2" role="list" aria-label="Feldliste">
+            {localFields.map((field) => (
+              <SortableFieldRow
+                key={field.field_id}
+                field={field}
+                onToggleShowOnCard={handleToggleShowOnCard}
+                isShowOnCardDisabled={!field.show_on_card && showOnCardCount >= 3}
+              />
+            ))}
+          </div>
+        </SortableContext>
+
+        <DragOverlay>
+          {activeField ? (
+            <div className="rounded-md border border-primary bg-background p-3 shadow-lg">
+              <div className="font-medium">{activeField.field.name}</div>
+              <div className="text-sm text-muted-foreground">
+                {activeField.field.field_type}
+              </div>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      {/* Empty state */}
+      {localFields.length === 0 && (
+        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+          Keine Felder vorhanden. Fügen Sie Felder zum Schema hinzu.
+        </div>
+      )}
+    </div>
   )
 }

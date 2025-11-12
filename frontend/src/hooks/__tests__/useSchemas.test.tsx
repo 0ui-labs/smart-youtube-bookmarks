@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 import {
@@ -12,6 +12,7 @@ import {
   useRemoveFieldFromSchema,
   useUpdateSchemaField,
   useReorderSchemaFields,
+  useUpdateSchemaFieldsBatch,
 } from '../useSchemas'
 import { schemasApi } from '@/lib/schemasApi'
 import type {
@@ -22,6 +23,7 @@ import type {
   SchemaFieldUpdate,
   SchemaFieldResponse,
   ReorderSchemaFields,
+  SchemaFieldBatchUpdateResponse,
 } from '@/types/schema'
 
 // Mock API client
@@ -36,6 +38,7 @@ vi.mock('@/lib/schemasApi', () => ({
     removeFieldFromSchema: vi.fn(),
     updateSchemaField: vi.fn(),
     reorderSchemaFields: vi.fn(),
+    updateSchemaFieldsBatch: vi.fn(),
   },
 }))
 
@@ -670,5 +673,153 @@ describe('useReorderSchemaFields', () => {
     await waitFor(() => {
       expect(schemaResult.current.dataUpdatedAt).toBeGreaterThan(initialDataUpdateCount)
     })
+  })
+})
+
+describe('useUpdateSchemaFieldsBatch', () => {
+  let queryClient: QueryClient
+  let wrapper: React.FC<{ children: React.ReactNode }>
+
+  beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    })
+    wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+    vi.clearAllMocks()
+  })
+
+  it('updates schema fields in batch', async () => {
+    const mockResponse: SchemaFieldBatchUpdateResponse = {
+      updated_count: 3,
+      fields: [
+        {
+          field_id: 'field-1',
+          schema_id: mockSchemaId,
+          display_order: 0,
+          show_on_card: true,
+          field: {
+            id: 'field-1',
+            name: 'Presentation',
+            field_type: 'rating',
+            config: { max_rating: 10 },
+            list_id: mockListId,
+            created_at: '2025-11-07T09:00:00Z',
+            updated_at: '2025-11-07T09:00:00Z',
+          },
+        },
+        {
+          field_id: 'field-2',
+          schema_id: mockSchemaId,
+          display_order: 1,
+          show_on_card: true,
+          field: {
+            id: 'field-2',
+            name: 'Content Rating',
+            field_type: 'rating',
+            config: { max_rating: 10 },
+            list_id: mockListId,
+            created_at: '2025-11-07T09:00:00Z',
+            updated_at: '2025-11-07T09:00:00Z',
+          },
+        },
+        {
+          field_id: 'field-3',
+          schema_id: mockSchemaId,
+          display_order: 2,
+          show_on_card: false,
+          field: {
+            id: 'field-3',
+            name: 'Audio Quality',
+            field_type: 'rating',
+            config: { max_rating: 10 },
+            list_id: mockListId,
+            created_at: '2025-11-07T09:00:00Z',
+            updated_at: '2025-11-07T09:00:00Z',
+          },
+        },
+      ],
+    }
+
+    vi.mocked(schemasApi.updateSchemaFieldsBatch).mockResolvedValueOnce(mockResponse)
+
+    const { result } = renderHook(() => useUpdateSchemaFieldsBatch(mockListId, mockSchemaId), {
+      wrapper,
+    })
+
+    await act(async () => {
+      result.current.mutate({
+        fields: [
+          { field_id: 'field-1', display_order: 0, show_on_card: true },
+          { field_id: 'field-2', display_order: 1, show_on_card: true },
+          { field_id: 'field-3', display_order: 2, show_on_card: false },
+        ],
+      })
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(schemasApi.updateSchemaFieldsBatch).toHaveBeenCalledWith(
+      mockListId,
+      mockSchemaId,
+      {
+        fields: [
+          { field_id: 'field-1', display_order: 0, show_on_card: true },
+          { field_id: 'field-2', display_order: 1, show_on_card: true },
+          { field_id: 'field-3', display_order: 2, show_on_card: false },
+        ],
+      }
+    )
+    expect(result.current.data).toEqual(mockResponse)
+  })
+
+  it('invalidates schema queries on success', async () => {
+    const mockResponse: SchemaFieldBatchUpdateResponse = {
+      updated_count: 2,
+      fields: [],
+    }
+
+    vi.mocked(schemasApi.updateSchemaFieldsBatch).mockResolvedValueOnce(mockResponse)
+
+    const { result } = renderHook(() => useUpdateSchemaFieldsBatch(mockListId, mockSchemaId), {
+      wrapper,
+    })
+
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+
+    await act(async () => {
+      result.current.mutate({
+        fields: [{ field_id: 'field-1', display_order: 0, show_on_card: true }],
+      })
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas', 'list', mockListId] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas', 'detail', mockSchemaId] })
+  })
+
+  it('handles API errors', async () => {
+    const error = new Error('Validation failed: Max 3 show_on_card')
+    vi.mocked(schemasApi.updateSchemaFieldsBatch).mockRejectedValueOnce(error)
+
+    const { result } = renderHook(() => useUpdateSchemaFieldsBatch(mockListId, mockSchemaId), {
+      wrapper,
+    })
+
+    await act(async () => {
+      result.current.mutate({
+        fields: [
+          { field_id: 'field-1', display_order: 0, show_on_card: true },
+          { field_id: 'field-2', display_order: 1, show_on_card: true },
+          { field_id: 'field-3', display_order: 2, show_on_card: true },
+          { field_id: 'field-4', display_order: 3, show_on_card: true }, // 4th field - error!
+        ],
+      })
+    })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.error).toBe(error)
   })
 })

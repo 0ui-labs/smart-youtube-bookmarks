@@ -10,6 +10,9 @@ import {
   SchemaFieldResponse,
   SchemaFieldResponseSchema,
   ReorderSchemaFields,
+  SchemaFieldBatchUpdateRequest,
+  SchemaFieldBatchUpdateResponse,
+  SchemaFieldBatchUpdateResponseSchema,
 } from '@/types/schema'
 
 /**
@@ -193,5 +196,42 @@ export const schemasApi = {
         display_order: field.display_order,
       })
     }
+  },
+
+  /**
+   * Batch update schema fields (display_order + show_on_card).
+   *
+   * PUT /api/lists/{list_id}/schemas/{schema_id}/fields/batch (Task #126)
+   *
+   * Atomic transaction: All updates succeed or all fail.
+   * Used by FieldOrderManager for drag-drop + checkbox toggling.
+   *
+   * Backend validates:
+   * - Max 50 fields per request
+   * - Max 3 show_on_card=true
+   * - No duplicate field_ids
+   * - No duplicate display_orders
+   *
+   * @example
+   * ```ts
+   * await updateSchemaFieldsBatch('list-1', 'schema-1', {
+   *   fields: [
+   *     { field_id: 'field-1', display_order: 0, show_on_card: true },
+   *     { field_id: 'field-2', display_order: 1, show_on_card: true },
+   *     { field_id: 'field-3', display_order: 2, show_on_card: false },
+   *   ]
+   * })
+   * ```
+   */
+  async updateSchemaFieldsBatch(
+    listId: string,
+    schemaId: string,
+    request: SchemaFieldBatchUpdateRequest
+  ): Promise<SchemaFieldBatchUpdateResponse> {
+    const { data } = await api.put(
+      `/lists/${listId}/schemas/${schemaId}/fields/batch`,
+      request
+    )
+    return SchemaFieldBatchUpdateResponseSchema.parse(data)
   },
 }

@@ -97,6 +97,53 @@ export const ReorderSchemaFieldsSchema = z.array(z.object({
 export type ReorderSchemaFields = z.infer<typeof ReorderSchemaFieldsSchema>
 
 // ============================================================================
+// Batch Update Operations (Task #126)
+// ============================================================================
+
+/**
+ * Single field update item for batch operations.
+ *
+ * Used in FieldOrderManager for drag-drop reordering + show_on_card toggling.
+ * Backend validates max 3 show_on_card=true constraint.
+ */
+export const SchemaFieldUpdateItemSchema = z.object({
+  field_id: z.string().uuid(),
+  display_order: z.number().int().min(0),
+  show_on_card: z.boolean(),
+})
+
+export type SchemaFieldUpdateItem = z.infer<typeof SchemaFieldUpdateItemSchema>
+
+/**
+ * Batch update request schema.
+ *
+ * PUT /api/lists/{list_id}/schemas/{schema_id}/fields/batch
+ *
+ * Constraints:
+ * - Min 1, Max 50 fields per request
+ * - Backend validates max 3 show_on_card=true
+ * - Backend validates no duplicate field_ids
+ * - Backend validates no duplicate display_orders
+ */
+export const SchemaFieldBatchUpdateRequestSchema = z.object({
+  fields: z.array(SchemaFieldUpdateItemSchema).min(1).max(50),
+})
+
+export type SchemaFieldBatchUpdateRequest = z.infer<typeof SchemaFieldBatchUpdateRequestSchema>
+
+/**
+ * Batch update response schema.
+ *
+ * Returns updated count + full field details for cache updates.
+ */
+export const SchemaFieldBatchUpdateResponseSchema = z.object({
+  updated_count: z.number().int(),
+  fields: z.array(SchemaFieldResponseSchema),
+})
+
+export type SchemaFieldBatchUpdateResponse = z.infer<typeof SchemaFieldBatchUpdateResponseSchema>
+
+// ============================================================================
 // API Error Response (for MSW handlers and error handling)
 // REF MCP Improvement #3: Type-safe error responses
 // ============================================================================
