@@ -12,31 +12,16 @@
  * - Config preview formatting (select, rating, text, boolean)
  */
 
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
+import { server } from '@/test/mocks/server'
 
 import { DuplicateWarning } from './DuplicateWarning'
 import { CustomField } from '@/types/customFields'
 
-// Mock server for API calls
-const API_BASE_URL = 'http://localhost:8000'
-
-const server = setupServer()
-
-beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'warn' })
-})
-
-afterEach(() => {
-  server.resetHandlers()
-})
-
-afterAll(() => {
-  server.close()
-})
+// Uses shared MSW server from test/setup.ts (handlers reset automatically after each test)
 
 // Helper to render with QueryClient
 function renderWithQuery(ui: React.ReactElement) {
@@ -84,7 +69,7 @@ describe('DuplicateWarning', () => {
     it('shows loading spinner while checking for duplicates', async () => {
       // Mock slow API response
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, async () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', async () => {
           await new Promise(resolve => setTimeout(resolve, 100))
           return HttpResponse.json({ exists: false, field: null })
         })
@@ -117,7 +102,7 @@ describe('DuplicateWarning', () => {
       }
 
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return HttpResponse.json({
             exists: true,
             field: existingField,
@@ -156,7 +141,7 @@ describe('DuplicateWarning', () => {
       }
 
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return HttpResponse.json({
             exists: true,
             field: existingField,
@@ -189,7 +174,7 @@ describe('DuplicateWarning', () => {
       }
 
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return HttpResponse.json({
             exists: true,
             field: existingField,
@@ -222,7 +207,7 @@ describe('DuplicateWarning', () => {
       }
 
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return HttpResponse.json({
             exists: true,
             field: existingField,
@@ -255,7 +240,7 @@ describe('DuplicateWarning', () => {
       }
 
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return HttpResponse.json({
             exists: true,
             field: existingField,
@@ -288,7 +273,7 @@ describe('DuplicateWarning', () => {
       }
 
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return HttpResponse.json({
             exists: true,
             field: existingField,
@@ -313,7 +298,7 @@ describe('DuplicateWarning', () => {
   describe('No duplicate', () => {
     it('renders nothing when field name is available', async () => {
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return HttpResponse.json({
             exists: false,
             field: null,
@@ -342,7 +327,7 @@ describe('DuplicateWarning', () => {
   describe('Error handling', () => {
     it('shows error message when API call fails', async () => {
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return new HttpResponse(null, { status: 500 })
         })
       )
@@ -365,7 +350,7 @@ describe('DuplicateWarning', () => {
 
     it('shows error message on network error', async () => {
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return HttpResponse.error()
         })
       )
@@ -393,7 +378,7 @@ describe('DuplicateWarning', () => {
       })
 
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, mockHandler)
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', mockHandler)
       )
 
       const { rerender } = renderWithQuery(
@@ -441,7 +426,7 @@ describe('DuplicateWarning', () => {
   describe('Accessibility', () => {
     it('has proper ARIA roles for loading state', () => {
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, async () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', async () => {
           await new Promise(resolve => setTimeout(resolve, 100))
           return HttpResponse.json({ exists: false, field: null })
         })
@@ -472,7 +457,7 @@ describe('DuplicateWarning', () => {
       }
 
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return HttpResponse.json({
             exists: true,
             field: existingField,
@@ -496,7 +481,7 @@ describe('DuplicateWarning', () => {
 
     it('has role="alert" for error state', async () => {
       server.use(
-        http.post(`${API_BASE_URL}/api/lists/list-123/custom-fields/check-duplicate`, () => {
+        http.post('/api/lists/list-123/custom-fields/check-duplicate', () => {
           return new HttpResponse(null, { status: 500 })
         })
       )
