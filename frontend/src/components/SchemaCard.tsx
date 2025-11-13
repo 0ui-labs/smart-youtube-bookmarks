@@ -1,117 +1,168 @@
-import { MoreVertical, Edit, Trash2, Copy } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useState } from 'react'
+import { Card, CardHeader, CardContent } from '@/components/ui/card'
+import { SchemaActionsMenu } from './SchemaActionsMenu'
+import { EditSchemaDialog } from './EditSchemaDialog'
+import { ConfirmDeleteSchemaDialog } from './ConfirmDeleteSchemaDialog'
+import { DuplicateSchemaDialog } from './DuplicateSchemaDialog'
+import { SchemaUsageStatsModal } from './SchemaUsageStatsModal'
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  useUpdateSchema,
+  useDeleteSchema,
+  useDuplicateSchema,
+  useSchemaUsageStats,
+} from '@/hooks/useSchemas'
+import { useTags } from '@/hooks/useTags'
 import type { FieldSchemaResponse } from '@/types/schema'
 
 export interface SchemaCardProps {
   schema: FieldSchemaResponse
-  onEdit: (schemaId: string) => void
-  onDelete: (schemaId: string) => void
-  onDuplicate: (schemaId: string) => void
-  tagCount: number // Number of tags using this schema
+  listId: string
+  onClick?: (schema: FieldSchemaResponse) => void
 }
 
 /**
- * SchemaCard - Displays a schema summary with action menu
+ * SchemaCard - Displays a schema summary with integrated action dialogs
  *
  * Shows:
  * - Schema name and description
  * - Field count
- * - Tag usage count (warns if schema is in use)
- * - Action menu (Edit, Delete, Duplicate)
+ * - Action menu (Edit, Delete, Duplicate, View Usage)
+ * - Integrated dialogs for all actions
  *
- * Design follows JobProgressCard pattern with shadcn/ui Card component.
+ * Mutations:
+ * - Edit: useUpdateSchema with optimistic updates
+ * - Delete: useDeleteSchema with usage validation
+ * - Duplicate: useDuplicateSchema (client-side GET + POST)
  *
- * Accessibility:
- * - Dynamic aria-label includes schema name for screen readers (WCAG 2.1 AA)
- * - Keyboard navigation support
+ * Design follows REF MCP validated patterns with React Query v5 context API.
  *
  * @example
  * <SchemaCard
  *   schema={schema}
- *   onEdit={(id) => openEditor(id)}
- *   onDelete={(id) => confirmDelete(id)}
- *   onDuplicate={(id) => duplicateSchema(id)}
- *   tagCount={5}
+ *   listId={listId}
+ *   onClick={(schema) => console.log('Clicked:', schema)}
  * />
  */
-export function SchemaCard({
-  schema,
-  onEdit,
-  onDelete,
-  onDuplicate,
-  tagCount,
-}: SchemaCardProps) {
-  const fieldCount = schema.schema_fields.length
+export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
+  const { data: tags = [] } = useTags()
+  const usageStats = useSchemaUsageStats(schema.id, tags)
+
+  // Mutations
+  const updateSchema = useUpdateSchema(listId)
+  const deleteSchema = useDeleteSchema(listId)
+  const duplicateSchema = useDuplicateSchema(listId)
+
+  // Modal states
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [duplicateOpen, setDuplicateOpen] = useState(false)
+  const [usageStatsOpen, setUsageStatsOpen] = useState(false)
+
+  // Action handlers
+  const handleEdit = (data: { name: string; description: string | null }) => {
+    updateSchema.mutate(
+      { schemaId: schema.id, updates: data },
+      {
+        onSuccess: () => {
+          setEditOpen(false)
+        },
+        // Keep modal open on error for retry
+      }
+    )
+  }
+
+  const handleDelete = () => {
+    deleteSchema.mutate(
+      { schemaId: schema.id },
+      {
+        onSuccess: () => {
+          setDeleteOpen(false)
+        },
+        // Keep modal open on error (e.g., 409 Conflict)
+      }
+    )
+  }
+
+  const handleDuplicate = (newName: string) => {
+    duplicateSchema.mutate(
+      { schemaId: schema.id, newName },
+      {
+        onSuccess: () => {
+          setDuplicateOpen(false)
+        },
+        // Keep modal open on error for retry
+      }
+    )
+  }
 
   return (
-    <Card className="hover:shadow-lg transition-shadow duration-200">
-      <CardHeader>
-        <div className="flex justify-between items-start">
+    <>
+      <Card
+        className="hover:shadow-md transition-shadow cursor-pointer"
+        onClick={() => onClick?.(schema)}
+      >
+        <CardHeader className="flex flex-row items-start gap-2">
           <div className="flex-1">
-            <CardTitle className="text-lg">{schema.name}</CardTitle>
+            <h3 className="text-lg font-semibold">{schema.name}</h3>
             {schema.description && (
-              <CardDescription className="mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 {schema.description}
-              </CardDescription>
+              </p>
             )}
           </div>
 
-          {/* Action Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                aria-label={`Actions for ${schema.name}`} // ✨ FIX #6: Schema-specific aria-label
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(schema.id)}>
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDuplicate(schema.id)}>
-                <Copy className="h-4 w-4 mr-2" />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onDelete(schema.id)}
-                className="text-red-600"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardHeader>
+          {/* Actions Menu */}
+          <SchemaActionsMenu
+            schema={schema}
+            usageCount={usageStats.count}
+            onEdit={() => setEditOpen(true)}
+            onDelete={() => setDeleteOpen(true)}
+            onDuplicate={() => setDuplicateOpen(true)}
+            onViewUsage={() => setUsageStatsOpen(true)}
+          />
+        </CardHeader>
 
-      <CardContent>
-        <div className="flex items-center gap-4 text-sm text-gray-600">
-          <span>{fieldCount} {fieldCount === 1 ? 'field' : 'fields'}</span>
-          {tagCount > 0 && (
-            <span className="text-blue-600 font-medium">
-              Used by {tagCount} {tagCount === 1 ? 'tag' : 'tags'}
-            </span>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        <CardContent>
+          {/* Field count */}
+          <p className="text-sm text-muted-foreground">
+            {schema.schema_fields.length} Feld
+            {schema.schema_fields.length !== 1 ? 'er' : ''}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Modals */}
+      <EditSchemaDialog
+        open={editOpen}
+        schema={schema}
+        onConfirm={handleEdit}
+        onCancel={() => setEditOpen(false)}
+        isLoading={updateSchema.isPending}
+      />
+
+      <ConfirmDeleteSchemaDialog
+        open={deleteOpen}
+        schema={schema}
+        usageStats={usageStats}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteOpen(false)}
+        isLoading={deleteSchema.isPending}
+      />
+
+      <DuplicateSchemaDialog
+        open={duplicateOpen}
+        schema={schema}
+        onConfirm={handleDuplicate}
+        onCancel={() => setDuplicateOpen(false)}
+        isLoading={duplicateSchema.isPending}
+      />
+
+      <SchemaUsageStatsModal
+        open={usageStatsOpen}
+        schema={schema}
+        tags={tags}
+        onClose={() => setUsageStatsOpen(false)}
+      />
+    </>
   )
 }

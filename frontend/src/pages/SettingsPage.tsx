@@ -100,12 +100,7 @@ export function SettingsPage() {
                 <p className="text-red-600 text-lg">Error loading schemas.</p>
               </div>
             ) : schemas && schemas.length > 0 ? (
-              <SchemasList
-                schemas={schemas}
-                onEdit={(schemaId) => console.log('Edit schema:', schemaId)}
-                onDelete={(schemaId) => console.log('Delete schema:', schemaId)}
-                onDuplicate={(schemaId) => console.log('Duplicate schema:', schemaId)}
-              />
+              <SchemasList schemas={schemas} listId={listId} />
             ) : (
               <div className="text-center py-12">
                 <p className="text-gray-500 text-lg mb-4">
