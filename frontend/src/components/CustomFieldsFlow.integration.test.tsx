@@ -296,4 +296,74 @@ describe('Custom Fields Flow Integration (Task #134)', () => {
       expect(screen.getByText('Makeup Tutorials')).toBeInTheDocument()
     })
   })
+
+  describe('Test 2: Assign tag to video and set field value', () => {
+    beforeEach(() => {
+      // Pre-populate with existing tag, schema, and field
+      const field = createMockField()
+      const schema = createMockSchema({
+        schema_fields: [{
+          field_id: MOCK_FIELD_ID,
+          schema_id: MOCK_SCHEMA_ID,
+          display_order: 0,
+          show_on_card: true,
+          field,
+        }],
+      })
+      const tag = createMockTag({ schema_id: MOCK_SCHEMA_ID })
+
+      mockFields = [field]
+      mockSchemas = [schema]
+      mockTags = [tag]
+    })
+
+    it('assigns tag to video and sets rating field value to 5 stars', async () => {
+      const user = userEvent.setup({ delay: null })
+
+      renderWithRouter(<VideosPage listId={MOCK_LIST_ID} />)
+
+      // Wait for video to render
+      await waitFor(() => {
+        expect(screen.getByText('How to Apply Perfect Eyeliner')).toBeInTheDocument()
+      })
+
+      // STEP 1: Open video actions menu
+      const videoCard = screen.getByTestId(`video-card-${MOCK_VIDEO_ID}`)
+      const menuButton = within(videoCard).getByLabelText(/aktionen|actions/i)
+      await user.click(menuButton)
+
+      // STEP 2: Click "Assign Tags"
+      const assignTagsButton = screen.getByRole('menuitem', { name: /tags.*zuweisen|assign.*tags/i })
+      await user.click(assignTagsButton)
+
+      // STEP 3: Select tag
+      const tagCheckbox = screen.getByRole('checkbox', { name: /makeup tutorials/i })
+      await user.click(tagCheckbox)
+
+      // STEP 4: Save tag assignment
+      const saveButton = screen.getByRole('button', { name: /zuweisen|assign/i })
+      await user.click(saveButton)
+
+      // STEP 5: Verify tag appears on card
+      await waitFor(() => {
+        expect(within(videoCard).getByText('Makeup Tutorials')).toBeInTheDocument()
+      })
+
+      // STEP 6: Verify field appears and set value
+      await waitFor(() => {
+        const ratingField = within(videoCard).getByLabelText(/overall rating/i)
+        expect(ratingField).toBeInTheDocument()
+      })
+
+      // Click 5th star
+      const stars = within(videoCard).getAllByRole('button', { name: /stern|star/i })
+      await user.click(stars[4]) // 5th star (0-indexed)
+
+      // STEP 7: Verify outcome (field value saved)
+      await waitFor(() => {
+        expect(mockVideos[0].field_values).toHaveLength(1)
+        expect(mockVideos[0].field_values[0].value).toBe(5)
+      })
+    })
+  })
 })
