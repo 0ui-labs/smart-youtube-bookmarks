@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   useReactTable,
   createColumnHelper,
@@ -19,12 +19,13 @@ import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { CreateTagDialog } from './CreateTagDialog'
 import { ViewModeToggle } from './ViewModeToggle'
 import { VideoGrid } from './VideoGrid'
+import { Button } from '@/components/ui/button'
 import { useTags } from '@/hooks/useTags'
 import { useTagStore } from '@/stores/tagStore'
 import { useTableSettingsStore } from '@/stores/tableSettingsStore'
 import { useShallow } from 'zustand/react/shallow'
 import { FEATURE_FLAGS } from '@/config/featureFlags'
-import { Plus } from 'lucide-react'
+import { Plus, Settings } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -164,6 +165,7 @@ const VideoThumbnail = ({ url, title, useFullWidth = false }: { url: string | nu
 }
 
 export const VideosPage = ({ listId }: VideosPageProps) => {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [isAdding, setIsAdding] = useState(false)
   const [newVideoUrl, setNewVideoUrl] = useState('')
@@ -610,6 +612,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
         {/* Right side - View controls */}
         <div className="flex gap-1 items-center flex-shrink-0 ml-auto">
+          {/* Settings Button - Task #135 Step 12 */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/settings/schemas')}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
           {/* View Mode Toggle - Task #32 */}
           <ViewModeToggle viewMode={viewMode} onToggle={setViewMode} />
           {/* Table Settings Dropdown - Task #35 */}
