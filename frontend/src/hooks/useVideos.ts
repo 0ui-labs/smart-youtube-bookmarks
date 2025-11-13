@@ -302,3 +302,135 @@ export const useAssignTags = () => {
   })
 }
 
+/**
+ * Request/Response types for field value updates
+ */
+export interface FieldValueUpdate {
+  field_id: string
+  value: number | string | boolean | null
+}
+
+export interface BatchUpdateFieldValuesRequest {
+  field_values: FieldValueUpdate[]
+}
+
+export interface VideoFieldValueResponse {
+  id: string
+  video_id: string
+  field_id: string
+  value: number | string | boolean | null
+  updated_at: string
+  field: {
+    id: string
+    name: string
+    field_type: 'select' | 'rating' | 'text' | 'boolean'
+    config: Record<string, any>
+  }
+}
+
+export interface BatchUpdateFieldValuesResponse {
+  updated_count: number
+  field_values: VideoFieldValueResponse[]
+}
+
+/**
+ * Hook for batch updating video field values with optimistic updates
+ * Pattern: Follows useDeleteVideo mutation pattern
+ */
+export const useUpdateVideoFieldValues = (videoId: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (request: BatchUpdateFieldValuesRequest) => {
+      const { data } = await api.put<BatchUpdateFieldValuesResponse>(
+        `/videos/${videoId}/fields`,
+        request
+      )
+      return data
+    },
+
+    // Optimistic update pattern (same as useDeleteVideo)
+    onMutate: async (request) => {
+      await queryClient.cancelQueries({ queryKey: videoKeys.all })
+      const previousVideos = queryClient.getQueriesData({ queryKey: videoKeys.all })
+
+      queryClient.setQueriesData<any[]>(
+        { queryKey: videoKeys.all },
+        (oldVideos) => {
+          if (!oldVideos) return oldVideos
+
+          return oldVideos.map((video: any) => {
+            if (video.id !== videoId) return video
+
+            const updatedFieldValues = video.field_values?.map((fv: VideoFieldValueResponse) => {
+              const update = request.field_values.find(u => u.field_id === fv.field_id)
+              if (!update) return fv
+
+              return {
+                ...fv,
+                value: update.value,
+                updated_at: new Date().toISOString(),
+              }
+            }) ?? []
+
+            request.field_values.forEach(update => {
+              const exists = updatedFieldValues.some((fv: VideoFieldValueResponse) => fv.field_id === update.field_id)
+              if (!exists) {
+                updatedFieldValues.push({
+                  id: `temp-${update.field_id}`,
+                  video_id: videoId,
+                  field_id: update.field_id,
+                  value: update.value,
+                  updated_at: new Date().toISOString(),
+                  field: video.field_values?.find((fv: VideoFieldValueResponse) => fv.field_id === update.field_id)?.field,
+                })
+              }
+            })
+
+            return {
+              ...video,
+              field_values: updatedFieldValues,
+            }
+          })
+        }
+      )
+
+      return { previousVideos }
+    },
+
+    onError: (err, _request, context) => {
+      console.error('Failed to update field values:', err)
+
+      if (context?.previousVideos) {
+        context.previousVideos.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data)
+        })
+      }
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: videoKeys.all })
+    },
+  })
+}
+
+/**
+ * Parse backend validation errors (422 responses)
+ * German error messages for UI
+ */
+export const parseValidationError = (error: any): string => {
+  if (error.response?.status === 422) {
+    const detail = error.response.data?.detail
+
+    if (detail?.errors && Array.isArray(detail.errors)) {
+      return detail.errors[0]?.error || 'Validierungsfehler'
+    }
+
+    if (detail?.message) {
+      return detail.message
+    }
+  }
+
+  return 'Fehler beim Speichern. Bitte versuchen Sie es erneut.'
+}
+
