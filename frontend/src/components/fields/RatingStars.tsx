@@ -27,6 +27,10 @@ export interface RatingStarsProps {
    * Callback when rating changes
    */
   onChange?: (value: number) => void
+  /**
+   * Custom className for the container
+   */
+  className?: string
 }
 
 /**
@@ -35,9 +39,11 @@ export interface RatingStarsProps {
  * Interactive star rating component with keyboard navigation and accessibility.
  *
  * REF MCP Improvements Applied:
+ * - #1 (Button Pattern): aria-pressed on all star buttons (NOT radio group)
  * - #3 (Keyboard Navigation): Arrow Left/Right, Enter, Space keys
  * - #3 (Event Propagation): stopPropagation on all interactive events
  * - #4 (Performance): Wrapped in React.memo()
+ * - #5 (Accessibility): aria-hidden="true" on all Star icons
  * - #5 (Accessibility): Complete ARIA labels with screen reader context
  *
  * @example
@@ -60,7 +66,7 @@ export interface RatingStarsProps {
  * />
  */
 export const RatingStars = React.memo<RatingStarsProps>(
-  ({ value, maxRating = 5, size = 'md', readonly = false, fieldName, onChange }) => {
+  ({ value, maxRating = 5, size = 'md', readonly = false, fieldName, onChange, className }) => {
     const [hoverValue, setHoverValue] = useState<number | null>(null)
 
     const displayValue = hoverValue !== null ? hoverValue : value ?? 0
@@ -100,7 +106,7 @@ export const RatingStars = React.memo<RatingStarsProps>(
 
     return (
       <div
-        className="flex items-center gap-0.5"
+        className={cn('flex items-center gap-0.5', className)}
         role="group"
         aria-label={`${fieldName}: ${value ?? 0} out of ${maxRating}`} // REF MCP #5: Screen reader context
         onClick={(e) => e.stopPropagation()} // REF MCP #3: Prevent VideoCard click
@@ -127,6 +133,7 @@ export const RatingStars = React.memo<RatingStarsProps>(
               onMouseLeave={() => !readonly && setHoverValue(null)}
               onKeyDown={(e) => handleKeyDown(e, starValue)}
               aria-label={`${starValue} star${starValue > 1 ? 's' : ''}`} // REF MCP #5: ARIA label per button
+              aria-pressed={isFilled} // REF MCP #1: Button Pattern - indicate pressed state
               tabIndex={readonly ? -1 : 0}
             >
               <Star
@@ -135,6 +142,7 @@ export const RatingStars = React.memo<RatingStarsProps>(
                   isFilled ? 'fill-yellow-400 text-yellow-400' : 'fill-none text-gray-300',
                   'transition-all duration-150'
                 )}
+                aria-hidden="true" // REF MCP #5: Hide icon from screen readers
               />
             </button>
           )

@@ -238,11 +238,39 @@ export type VideoFieldValue = z.infer<typeof VideoFieldValueSchema>
 // VideoResponse Interface (Extended with field_values)
 // ============================================================================
 
+// ============================================================================
+// AvailableField Type (Task #74 - Field Union)
+// ============================================================================
+
+/**
+ * Zod schema for AvailableFieldResponse
+ *
+ * Represents metadata for an available field (without value).
+ * Used in detail endpoint to show which fields CAN be filled.
+ * Includes schema_name for conflict resolution (Option D).
+ */
+export const AvailableFieldResponseSchema = z.object({
+  field_id: z.string().uuid(),
+  field_name: z.string().min(1),
+  field_type: z.enum(['rating', 'select', 'text', 'boolean']),
+  schema_name: z.string().nullable(),
+  display_order: z.number(),
+  show_on_card: z.boolean(),
+  config: z.record(z.any()).default({}),
+})
+
+export type AvailableFieldResponse = z.infer<typeof AvailableFieldResponseSchema>
+
+// ============================================================================
+// VideoResponse Interface (Extended with field_values)
+// ============================================================================
+
 /**
  * Zod schema for VideoResponse
  *
  * Includes field_values array for displaying custom field data.
- * Matches backend VideoResponse schema (Task #71).
+ * Includes available_fields for detail endpoint (Task #74 - Field Union).
+ * Matches backend VideoResponse schema (Task #71, Task #74).
  */
 export const VideoResponseSchema = z.object({
   id: z.string().uuid(),
@@ -258,6 +286,7 @@ export const VideoResponseSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   field_values: z.array(VideoFieldValueSchema).optional().default([]),
+  available_fields: z.array(AvailableFieldResponseSchema).nullable().optional(),
 })
 
 /**

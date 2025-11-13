@@ -6,7 +6,6 @@ import type { GridColumnCount } from '@/stores/tableSettingsStore'
 interface VideoGridProps {
   videos: VideoResponse[]
   gridColumns: GridColumnCount  // NEW: Dynamic column count from store
-  onVideoClick?: (video: VideoResponse) => void
   onDeleteVideo?: (video: VideoResponse) => void
 }
 
@@ -28,7 +27,7 @@ interface VideoGridProps {
  * - All Tailwind classes explicitly written in object (no template literals)
  * - Pattern from Task #31 (proven working with thumbnailSize)
  */
-export const VideoGrid = ({ videos, gridColumns, onVideoClick, onDeleteVideo }: VideoGridProps) => {
+export const VideoGrid = ({ videos, gridColumns, onDeleteVideo }: VideoGridProps) => {
   // PurgeCSS-safe: All classes explicitly written in object (no template literals)
   // Responsive behavior: mobile 1-2, tablet 2, desktop user choice (2-5)
   // Pattern from Task #31 (proven working with thumbnailSize)
@@ -64,7 +63,6 @@ export const VideoGrid = ({ videos, gridColumns, onVideoClick, onDeleteVideo }: 
         <VideoCard
           key={video.id}
           video={video}
-          onClick={onVideoClick}
           onDelete={onDeleteVideo ? () => onDeleteVideo(video) : undefined}
         />
       ))}

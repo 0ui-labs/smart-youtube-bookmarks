@@ -2,6 +2,7 @@ import { ListsPage } from './components/ListsPage'
 import { VideosPage } from './components/VideosPage'
 import { Dashboard } from './pages/Dashboard'
 import { NotFound } from './pages/NotFound'
+import { VideoDetailsPage } from './pages/VideoDetailsPage'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useLists } from './hooks/useLists'
 
@@ -33,6 +34,7 @@ function App() {
           )
         }
       />
+      <Route path="/videos/:videoId" element={<VideoDetailsPage />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/" element={<Navigate to="/videos" replace />} />
       <Route path="*" element={<NotFound />} />

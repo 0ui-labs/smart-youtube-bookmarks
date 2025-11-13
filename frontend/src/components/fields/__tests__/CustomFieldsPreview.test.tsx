@@ -338,8 +338,8 @@ describe('CustomFieldsPreview - Field Type Rendering', () => {
     // Check field label
     expect(screen.getByText('Notes:')).toBeInTheDocument()
 
-    // Check value is displayed
-    expect(screen.getByText('Great tutorial!')).toBeInTheDocument()
+    // Check value is displayed (TextSnippet renders input element)
+    expect(screen.getByDisplayValue('Great tutorial!')).toBeInTheDocument()
   })
 })
 
@@ -374,8 +374,8 @@ describe('CustomFieldsPreview - Edge Cases', () => {
     )
     expect(stars).toHaveLength(5)
 
-    // Select should show "not set"
-    expect(screen.getByText('not set')).toBeInTheDocument()
+    // Select should show "—" (em dash for null values)
+    expect(screen.getByText('—')).toBeInTheDocument()
 
     // Boolean checkbox should be unchecked
     const checkbox = screen.getByRole('checkbox')

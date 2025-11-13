@@ -1,11 +1,5 @@
 import React from 'react'
-import {
-  VideoFieldValue,
-  isRatingFieldValue,
-  isSelectFieldValue,
-  isBooleanFieldValue,
-  isTextFieldValue,
-} from '@/types/video'
+import { VideoFieldValue } from '@/types/video'
 import { RatingStars } from './RatingStars'
 import { SelectBadge } from './SelectBadge'
 import { BooleanCheckbox } from './BooleanCheckbox'
@@ -13,108 +7,140 @@ import { TextSnippet } from './TextSnippet'
 
 export interface FieldDisplayProps {
   /**
-   * Field value with nested field metadata
+   * Field value to display (discriminated union by field.field_type)
    */
   fieldValue: VideoFieldValue
   /**
-   * Whether the field is editable
+   * Whether the field is read-only (default: false)
    */
   readonly?: boolean
   /**
-   * Size for rating stars (only applies to rating fields)
+   * Callback when value changes (type-safe union: number | string | boolean)
    */
-  size?: 'sm' | 'md' | 'lg'
+  onChange?: (value: number | string | boolean) => void
   /**
-   * Callback when value changes
-   * Note: Receives only the new value (not field_id)
+   * Callback when text field expand button is clicked
    */
-  onChange?: (newValue: number | string | boolean) => void
+  onExpand?: () => void
+  /**
+   * Optional custom CSS class
+   */
+  className?: string
 }
 
 /**
  * FieldDisplay Component
  *
- * Router component that renders the appropriate field component based on field type.
- * Uses discriminated union type guards for type-safe field value access.
+ * Dispatches to type-specific sub-components based on field.field_type.
+ * Uses discriminated union for type-safe rendering without useMemo/useCallback.
  *
  * REF MCP Improvements Applied:
- * - #1 (Type Safety): Uses type guards from @/types/video for discriminated union
- * - NO React.memo(): This is a wrapper component, not a leaf component
+ * - #3 (No Premature Optimization): NO useMemo or useCallback
+ * - #5 (Accessibility): All sub-components have aria-hidden on icons
+ *
+ * Sub-components:
+ * - RatingStars: 'rating' field type
+ * - SelectBadge: 'select' field type
+ * - BooleanCheckbox: 'boolean' field type
+ * - TextSnippet: 'text' field type (truncateAt=50)
+ *
+ * Type Safety:
+ * - Switch statement narrows VideoFieldValue type
+ * - Type guards ensure correct value types passed to sub-components
+ * - Exhaustiveness check with never type
  *
  * @example
  * // Rating field
  * <FieldDisplay
  *   fieldValue={ratingFieldValue}
- *   size="md"
- *   onChange={(newValue) => console.log(newValue)}
+ *   onChange={(value) => console.log(value)} // value is number
  * />
  *
  * @example
- * // Read-only field
+ * // Select field (read-only)
  * <FieldDisplay
  *   fieldValue={selectFieldValue}
  *   readonly
+ * />
+ *
+ * @example
+ * // Text field with expand callback
+ * <FieldDisplay
+ *   fieldValue={textFieldValue}
+ *   onExpand={() => openModal()}
  * />
  */
 export const FieldDisplay: React.FC<FieldDisplayProps> = ({
   fieldValue,
   readonly = false,
-  size = 'md',
   onChange,
+  onExpand,
+  className,
 }) => {
-  // REF MCP #1: Type-safe routing using discriminated union type guards
-  if (isRatingFieldValue(fieldValue)) {
-    return (
-      <RatingStars
-        value={fieldValue.value}
-        maxRating={fieldValue.field.config.max_rating}
-        size={size}
-        fieldName={fieldValue.field_name}
-        readonly={readonly}
-        onChange={(newValue) => onChange?.(newValue)}
-      />
-    )
-  }
+  // Discriminated union switch on field.field_type
+  // TypeScript narrows VideoFieldValue type in each case
+  switch (fieldValue.field.field_type) {
+    case 'rating': {
+      // Type is narrowed to RatingFieldValue
+      return (
+        <RatingStars
+          value={fieldValue.value}
+          maxRating={fieldValue.field.config.max_rating}
+          fieldName={fieldValue.field_name}
+          readonly={readonly}
+          onChange={onChange as ((value: number) => void) | undefined}
+          className={className}
+        />
+      )
+    }
 
-  if (isSelectFieldValue(fieldValue)) {
-    return (
-      <SelectBadge
-        value={fieldValue.value}
-        options={fieldValue.field.config.options}
-        fieldName={fieldValue.field_name}
-        readonly={readonly}
-        onChange={(newValue) => onChange?.(newValue)}
-      />
-    )
-  }
+    case 'select': {
+      // Type is narrowed to SelectFieldValue
+      return (
+        <SelectBadge
+          value={fieldValue.value}
+          options={fieldValue.field.config.options}
+          fieldName={fieldValue.field_name}
+          readonly={readonly}
+          onChange={onChange as ((value: string) => void) | undefined}
+          className={className}
+        />
+      )
+    }
 
-  if (isBooleanFieldValue(fieldValue)) {
-    return (
-      <BooleanCheckbox
-        value={fieldValue.value}
-        fieldName={fieldValue.field_name}
-        readonly={readonly}
-        onChange={(newValue) => onChange?.(newValue)}
-      />
-    )
-  }
+    case 'boolean': {
+      // Type is narrowed to BooleanFieldValue
+      return (
+        <BooleanCheckbox
+          value={fieldValue.value}
+          fieldName={fieldValue.field_name}
+          readonly={readonly}
+          onChange={onChange as ((value: boolean) => void) | undefined}
+          className={className}
+        />
+      )
+    }
 
-  if (isTextFieldValue(fieldValue)) {
-    return (
-      <TextSnippet
-        value={fieldValue.value}
-        fieldName={fieldValue.field_name}
-        maxLength={fieldValue.field.config.max_length}
-        readonly={readonly}
-        onChange={(newValue) => onChange?.(newValue)}
-      />
-    )
-  }
+    case 'text': {
+      // Type is narrowed to TextFieldValue
+      return (
+        <TextSnippet
+          value={fieldValue.value}
+          truncateAt={50} // REF MCP #2: Use truncateAt prop (NOT maxLength)
+          readOnly={readonly}
+          onChange={onChange as ((value: string) => void) | undefined}
+          onExpand={onExpand}
+          maxLength={fieldValue.field.config.max_length}
+          className={className}
+        />
+      )
+    }
 
-  // Fallback for unknown field types
-  return (
-    <div className="text-sm text-muted-foreground" onClick={(e) => e.stopPropagation()}>
-      Unknown field type: {(fieldValue.field as { field_type?: string }).field_type}
-    </div>
-  )
+    default: {
+      // Exhaustiveness check: if a new field type is added, TypeScript will error here
+      const exhaustiveCheck: never = fieldValue.field.field_type
+      console.error('Unknown field type:', exhaustiveCheck)
+      return null
+    }
+  }
 }

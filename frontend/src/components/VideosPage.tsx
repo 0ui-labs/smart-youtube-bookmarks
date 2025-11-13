@@ -492,14 +492,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     })
   }
 
-  // Handle video click - opens YouTube in new tab (Task #32)
-  const handleVideoClick = (video: VideoResponse) => {
-    window.open(
-      `https://www.youtube.com/watch?v=${video.youtube_id}`,
-      '_blank',
-      'noopener,noreferrer'
-    )
-  }
 
   // Quick add handler for Plus icon button
   const handleQuickAdd = () => {
@@ -751,11 +743,10 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           </p>
         </div>
       ) : viewMode === 'grid' ? (
-        // Grid View - Task #32, Task #35 (gridColumns)
+        // Grid View - Task #32, Task #35 (gridColumns), Task #130 (navigation)
         <VideoGrid
           videos={videos}
           gridColumns={gridColumns}
-          onVideoClick={handleVideoClick}
           onDeleteVideo={handleGridDeleteClick}
         />
       ) : (

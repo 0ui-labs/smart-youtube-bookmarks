@@ -1,170 +1,101 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { Badge } from '@/components/ui/badge'
+/**
+ * TextSnippet Component - Text Field Display with Truncation
+ *
+ * Features:
+ * - Read-only mode: Displays truncated text with expand button
+ * - Editable mode: Native input with maxLength enforcement
+ * - Null/undefined handling: Displays em dash (—)
+ * - REF MCP #2: Uses truncateAt prop (NOT maxLength) for clarity
+ *
+ * Props:
+ * - value: string | null | undefined - Text content to display
+ * - truncateAt: number - Character limit for display truncation (read-only)
+ * - readOnly?: boolean - Toggle between read-only and editable modes
+ * - onChange?: (value: string) => void - Callback on input change (editable mode)
+ * - onExpand?: () => void - Callback when expand button clicked
+ * - maxLength?: number - Max characters for input field (editable mode)
+ * - className?: string - Custom Tailwind classes
+ */
+
+import React from 'react'
+import { ChevronRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 export interface TextSnippetProps {
-  /**
-   * Current text value
-   */
-  value: string | null
-  /**
-   * Field name for accessibility
-   */
-  fieldName: string
-  /**
-   * Maximum length constraint (optional)
-   */
-  maxLength?: number
-  /**
-   * Whether the field is editable
-   */
-  readonly?: boolean
-  /**
-   * Save on blur (default: true) - RSuite pattern
-   * REF MCP #3: New prop for Tab key behavior
-   */
-  saveOnBlur?: boolean
-  /**
-   * Callback when value changes
-   */
+  /** Text content to display */
+  value: string | null | undefined
+  /** Character limit for display truncation (read-only mode) - REF MCP #2 */
+  truncateAt: number
+  /** Toggle between read-only and editable modes (default: true) */
+  readOnly?: boolean
+  /** Callback when input value changes (editable mode) */
   onChange?: (value: string) => void
+  /** Callback when expand button clicked */
+  onExpand?: () => void
+  /** Max characters for input field (editable mode) */
+  maxLength?: number
+  /** Custom Tailwind classes */
+  className?: string
 }
 
-/**
- * TextSnippet Component
- *
- * Click-to-edit text field with keyboard navigation.
- *
- * REF MCP Improvements Applied:
- * - #3 (Keyboard Navigation): Enter saves, Escape cancels, Tab saves + blurs (NEW!)
- * - #3 (saveOnBlur prop): Default true for RSuite pattern (NEW!)
- * - #3 (Event Propagation): stopPropagation on all interactive events
- * - #4 (Performance): Wrapped in React.memo()
- * - #5 (Accessibility): Complete ARIA labels with current value and edit hint
- *
- * @example
- * // Editable text with auto-save on blur
- * <TextSnippet
- *   value="Great tutorial!"
- *   fieldName="Notes"
- *   maxLength={500}
- *   onChange={(newValue) => console.log(newValue)}
- * />
- *
- * @example
- * // No auto-save on blur (must press Enter)
- * <TextSnippet
- *   value="Notes here"
- *   fieldName="Comments"
- *   saveOnBlur={false}
- *   onChange={(newValue) => console.log(newValue)}
- * />
- */
-export const TextSnippet = React.memo<TextSnippetProps>(
-  ({ value, fieldName, maxLength, readonly = false, saveOnBlur = true, onChange }) => {
-    const [isEditing, setIsEditing] = useState(false)
-    const [editValue, setEditValue] = useState(value ?? '')
-    const inputRef = useRef<HTMLInputElement>(null)
+export const TextSnippet = React.forwardRef<HTMLDivElement, TextSnippetProps>(
+  (
+    {
+      value,
+      truncateAt,
+      readOnly = true,
+      onChange,
+      onExpand,
+      maxLength,
+      className,
+    },
+    ref
+  ) => {
+    // Determine if text needs truncation
+    const isTruncated = value && value.length > truncateAt
+    const displayText = isTruncated ? value.slice(0, truncateAt) : value
 
-    // Sync editValue when value prop changes
-    useEffect(() => {
-      if (!isEditing) {
-        setEditValue(value ?? '')
-      }
-    }, [value, isEditing])
-
-    // Auto-select text on edit mode entry
-    useEffect(() => {
-      if (isEditing && inputRef.current) {
-        inputRef.current.select()
-      }
-    }, [isEditing])
-
-    const displayValue = value || 'empty'
-    const truncatedDisplay = displayValue.length > 30 ? `${displayValue.slice(0, 30)}...` : displayValue
-
-    const handleSave = () => {
-      if (editValue !== value) {
-        onChange?.(editValue)
-      }
-      setIsEditing(false)
-    }
-
-    const handleCancel = () => {
-      setEditValue(value ?? '')
-      setIsEditing(false)
-    }
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      // REF MCP #3: Keyboard navigation
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        e.stopPropagation() // REF MCP #3: Prevent VideoCard click
-        handleSave()
-      } else if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation() // REF MCP #3: Prevent VideoCard click
-        handleCancel()
-      } else if (e.key === 'Tab') {
-        // REF MCP #3: Tab saves + blurs (NEW!)
-        if (saveOnBlur) {
-          // Don't prevent default, let Tab work normally
-          // But save before blur happens
-          handleSave()
-        }
-      }
-    }
-
-    const handleBlur = () => {
-      // REF MCP #3: saveOnBlur prop (default: true)
-      if (saveOnBlur) {
-        handleSave()
-      } else {
-        handleCancel()
-      }
-    }
-
-    if (readonly) {
+    if (readOnly) {
+      // Read-only mode: display text with optional expand button
       return (
-        <Badge
-          variant="secondary"
-          className="cursor-default"
-          onClick={(e: React.MouseEvent) => e.stopPropagation()} // REF MCP #3: Prevent VideoCard click
+        <div
+          ref={ref}
+          className={cn(
+            'inline-flex items-center gap-2 text-sm',
+            className
+          )}
         >
-          {truncatedDisplay}
-        </Badge>
+          <span className="truncate">
+            {!displayText ? '—' : displayText}
+            {isTruncated && '...'}
+          </span>
+          {isTruncated && onExpand && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 shrink-0 p-0"
+              onClick={onExpand}
+              aria-label="Expand text"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       )
     }
 
-    if (isEditing) {
-      return (
-        <Input
-          ref={inputRef}
-          type="text"
-          value={editValue}
-          maxLength={maxLength}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          onClick={(e: React.MouseEvent) => e.stopPropagation()} // REF MCP #3: Prevent VideoCard click
-          className="h-6 px-2 text-sm"
-          aria-label={`Editing ${fieldName}`}
-        />
-      )
-    }
-
+    // Editable mode: native input element
     return (
-      <Badge
-        variant="outline"
-        className="cursor-pointer hover:bg-accent transition-colors"
-        onClick={(e: React.MouseEvent) => {
-          e.stopPropagation() // REF MCP #3: Prevent VideoCard click
-          setIsEditing(true)
-        }}
-        aria-label={`${fieldName}: ${displayValue}, click to edit`} // REF MCP #5: Screen reader context
-      >
-        {truncatedDisplay}
-      </Badge>
+      <Input
+        ref={ref as React.Ref<HTMLInputElement>}
+        type="text"
+        value={value ?? ''}
+        onChange={(e) => onChange?.(e.target.value)}
+        maxLength={maxLength}
+        className={className}
+      />
     )
   }
 )

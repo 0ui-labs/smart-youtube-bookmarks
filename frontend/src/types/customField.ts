@@ -8,6 +8,42 @@ import { z } from 'zod'
 export type FieldType = 'select' | 'rating' | 'text' | 'boolean'
 
 /**
+ * Type-specific config interfaces
+ */
+
+/**
+ * Configuration for 'select' field type
+ * Select fields provide a dropdown with predefined options.
+ */
+export type SelectConfig = {
+  options: string[] // Min 1 option, validated by backend
+}
+
+/**
+ * Configuration for 'rating' field type
+ * Rating fields provide numeric scales (e.g., 1-5 stars).
+ * Backend validation: max_rating must be between 1 and 10
+ */
+export type RatingConfig = {
+  max_rating: number // 1-10 (validated by backend)
+}
+
+/**
+ * Configuration for 'text' field type
+ * Text fields allow free-form text input with optional length limits.
+ * Backend validation: max_length must be ≥1 if specified
+ */
+export type TextConfig = {
+  max_length?: number | null // ≥1 if specified (validated by backend)
+}
+
+/**
+ * Configuration for 'boolean' field type
+ * Boolean fields provide yes/no checkboxes. No configuration needed.
+ */
+export type BooleanConfig = Record<string, never> // Empty object
+
+/**
  * Type-specific config schemas matching backend validation
  */
 export const SelectConfigSchema = z.object({
@@ -19,19 +55,22 @@ export const RatingConfigSchema = z.object({
 })
 
 export const TextConfigSchema = z.object({
-  max_length: z.number().int().min(1).optional()
+  max_length: z.number().int().min(1).optional().nullable()
 })
 
 export const BooleanConfigSchema = z.object({})
 
 /**
- * Union type for field config (discriminated by field_type)
+ * Discriminated union type for field config
+ * The actual config shape depends on field_type.
  */
-export type FieldConfig =
-  | z.infer<typeof SelectConfigSchema>
-  | z.infer<typeof RatingConfigSchema>
-  | z.infer<typeof TextConfigSchema>
-  | z.infer<typeof BooleanConfigSchema>
+export type FieldConfig = SelectConfig | RatingConfig | TextConfig | BooleanConfig
+
+/**
+ * FieldValue type - Union of all possible field value types
+ * Value type depends on field_type: rating=number, select=string, text=string, boolean=boolean
+ */
+export type FieldValue = string | number | boolean | null
 
 /**
  * CustomField schema matching backend CustomFieldResponse
@@ -61,6 +100,21 @@ export const CustomFieldCreateSchema = z.object({
 })
 
 export type CustomFieldCreate = z.infer<typeof CustomFieldCreateSchema>
+
+/**
+ * Schema for updating existing field (matches backend CustomFieldUpdate)
+ * All fields are optional to support partial updates.
+ */
+export const CustomFieldUpdateSchema = z.object({
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(255, 'Field name must be 255 characters or less')
+    .optional(),
+  field_type: z.enum(['select', 'rating', 'text', 'boolean']).optional(),
+  config: z.record(z.any()).optional(), // Type-specific validation in form
+})
+
+export type CustomFieldUpdate = z.infer<typeof CustomFieldUpdateSchema>
 
 /**
  * Duplicate check response schema
