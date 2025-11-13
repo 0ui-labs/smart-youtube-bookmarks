@@ -10,6 +10,30 @@ import * as api from '@/lib/api'
 // Mocks
 // ============================================================================
 
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: vi.fn(() => vi.fn()),
+  }
+})
+
+vi.mock('@/stores/tagStore', () => ({
+  useTagStore: vi.fn(() => ({
+    tags: [],
+    toggleTag: vi.fn(),
+  })),
+}))
+
+vi.mock('@/stores/tableSettingsStore', () => ({
+  useTableSettingsStore: vi.fn((selector: any) => {
+    if (typeof selector === 'function') {
+      return selector({ videoDetailsView: 'page' })
+    }
+    return { videoDetailsView: 'page' }
+  }),
+}))
+
 vi.mock('@/lib/api', () => ({
   api: {
     put: vi.fn(),

@@ -1,5 +1,6 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,6 +9,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
+import { useTagStore } from '@/stores/tagStore'
+import { useTableSettingsStore } from '@/stores/tableSettingsStore'
+import { useUpdateVideoFieldValues } from '@/hooks/useVideoFieldValues'
 
 // Import VideoThumbnail from VideosPage (reuse existing component)
 // REF MCP Improvement #2: Use existing VideoThumbnail API (url, title props)
@@ -16,9 +20,11 @@ import { VideoThumbnail } from './VideosPage'
 // Import CustomFieldsPreview for field value display (Task #89)
 import { CustomFieldsPreview } from './fields'
 
+// Import VideoDetailsModal for modal view (Task #131 Step 4)
+import { VideoDetailsModal } from './VideoDetailsModal'
+
 interface VideoCardProps {
   video: VideoResponse
-  onClick?: (video: VideoResponse) => void
   onDelete?: (videoId: string) => void
 }
 
@@ -43,12 +49,52 @@ interface VideoCardProps {
  * - Shows CustomFieldsPreview component after tags
  * - Max 3 fields with inline editing
  * - "More fields" opens modal (placeholder for Task #90)
+ *
+ * Navigation (Task #130):
+ * - Task #6: Click card/title/thumbnail → Navigate to /videos/:videoId
+ * - Task #7: Click channel name → Select channel tag, filter to /videos
+ * - useNavigate hook for React Router v6 navigation
+ * - useTagStore for channel tag filtering with toggle action
  */
-export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
+export const VideoCard = ({ video, onDelete }: VideoCardProps) => {
   const cardRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+  const { tags, toggleTag } = useTagStore()
 
+  // Task #131 Step 4: Modal state for conditional navigation
+  const [showModal, setShowModal] = useState(false)
+  const videoDetailsView = useTableSettingsStore(state => state.videoDetailsView)
+
+  // Task #131 Step 4: Field mutation for modal updates
+  const updateField = useUpdateVideoFieldValues(video.id)
+
+  // Task #6: Navigate to video details page on card click
+  // Task #131 Step 4: Conditional navigation (page vs modal) - REF MCP #6 Early Return
   const handleCardClick = () => {
-    onClick?.(video)
+    // Early return pattern for clean conditional logic (REF MCP #6)
+    if (videoDetailsView === 'modal') {
+      setShowModal(true)
+      return
+    }
+
+    // Default: navigate to page (preserves existing behavior)
+    navigate(`/videos/${video.id}`)
+  }
+
+  // Task #7: Find channel tag by name (case-insensitive) and toggle it
+  const handleChannelClick = (e: React.MouseEvent, channelName: string) => {
+    e.stopPropagation() // CRITICAL: Prevent card click navigation
+
+    // Find channel tag by name (case-insensitive)
+    const channelTag = tags.find(tag =>
+      tag.name.toLowerCase() === channelName.toLowerCase()
+    )
+
+    if (channelTag) {
+      toggleTag(channelTag.id)
+      // Navigate to /videos to show filtered results
+      navigate('/videos')
+    }
   }
 
   // REF MCP #3: Complete keyboard navigation (Enter, Space)
@@ -137,11 +183,15 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
           </DropdownMenu>
         </div>
 
-        {/* Channel Name */}
+        {/* Channel Name - Task #7: Clickable to filter by channel tag */}
         {((video as any).channel_name || video.channel) && (
-          <p className="text-xs text-muted-foreground truncate">
+          <button
+            onClick={(e) => handleChannelClick(e, (video as any).channel_name || video.channel)}
+            className="text-xs text-muted-foreground hover:text-foreground hover:underline truncate text-left w-full transition-colors"
+            aria-label={`Filter by channel: ${(video as any).channel_name || video.channel}`}
+          >
             {(video as any).channel_name || video.channel}
-          </p>
+          </button>
         )}
 
         {/* Tags */}
@@ -173,6 +223,18 @@ export const VideoCard = ({ video, onClick, onDelete }: VideoCardProps) => {
           />
         )}
       </div>
+
+      {/* Task #131 Step 4: VideoDetailsModal for modal view */}
+      <VideoDetailsModal
+        video={video}
+        open={showModal}
+        onOpenChange={setShowModal}
+        listId={video.list_id}
+        onFieldChange={(fieldId, value) => {
+          // Use existing updateField mutation from VideoCard
+          updateField.mutate([{ field_id: fieldId, value }])
+        }}
+      />
     </div>
   )
 }

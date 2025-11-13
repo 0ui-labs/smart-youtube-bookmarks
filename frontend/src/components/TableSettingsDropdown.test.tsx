@@ -19,6 +19,7 @@ describe('TableSettingsDropdown', () => {
       thumbnailSize: 'small',
       viewMode: 'list',
       gridColumns: 3,
+      videoDetailsView: 'page', // Task #131: Default to page
       visibleColumns: {
         thumbnail: true,
         title: true,
@@ -28,6 +29,7 @@ describe('TableSettingsDropdown', () => {
       setThumbnailSize: vi.fn(),
       setViewMode: vi.fn(),
       setGridColumns: vi.fn(),
+      setVideoDetailsView: vi.fn(), // Task #131
       toggleColumn: vi.fn(),
     };
 
@@ -403,6 +405,97 @@ describe('TableSettingsDropdown', () => {
       // RadioGroup should have aria-label
       const radioGroup = screen.getByRole('group', { name: /spaltenanzahl für grid-ansicht/i });
       expect(radioGroup).toBeInTheDocument();
+    });
+  });
+
+  // Task #131 Step 5: Video Details View Tests
+  describe('Video Details View (Task #131)', () => {
+    it('renders Video Details RadioGroup with correct default ("page")', async () => {
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      // Open dropdown
+      const trigger = screen.getByRole('button', { name: /einstellungen/i });
+      await user.click(trigger);
+
+      // Should show Video Details section
+      expect(screen.getByText('Video Details')).toBeInTheDocument();
+
+      // Should show 2 options
+      expect(screen.getByLabelText('Eigene Seite (Standard)')).toBeInTheDocument();
+      expect(screen.getByLabelText('Modal Dialog')).toBeInTheDocument();
+
+      // "page" option should be checked by default
+      const pageRadio = screen.getByRole('radio', { name: /eigene seite/i });
+      expect(pageRadio).toBeChecked();
+    });
+
+    it('updates store when "modal" option selected', async () => {
+      const setVideoDetailsView = vi.fn();
+      const mockStore = {
+        thumbnailSize: 'small',
+        viewMode: 'list',
+        gridColumns: 3,
+        videoDetailsView: 'page',
+        visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
+        setThumbnailSize: vi.fn(),
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
+        setVideoDetailsView,
+        toggleColumn: vi.fn(),
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
+
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      // Open dropdown
+      await user.click(screen.getByRole('button', { name: /einstellungen/i }));
+
+      // Click "Modal Dialog" option
+      const modalRadio = screen.getByLabelText('Modal Dialog');
+      await user.click(modalRadio);
+
+      // Verify store was updated with 'modal'
+      expect(setVideoDetailsView).toHaveBeenCalledWith('modal');
+    });
+
+    it('updates store when "page" option selected', async () => {
+      const setVideoDetailsView = vi.fn();
+      const mockStore = {
+        thumbnailSize: 'small',
+        viewMode: 'list',
+        gridColumns: 3,
+        videoDetailsView: 'modal', // Start with modal
+        visibleColumns: { thumbnail: true, title: true, duration: true, actions: true },
+        setThumbnailSize: vi.fn(),
+        setViewMode: vi.fn(),
+        setGridColumns: vi.fn(),
+        setVideoDetailsView,
+        toggleColumn: vi.fn(),
+      };
+      vi.mocked(useTableSettingsStore).mockImplementation((selector: any) =>
+        typeof selector === 'function' ? selector(mockStore) : mockStore
+      );
+
+      const user = userEvent.setup();
+      render(<TableSettingsDropdown />);
+
+      // Open dropdown
+      await user.click(screen.getByRole('button', { name: /einstellungen/i }));
+
+      // Modal should be checked initially
+      const modalRadio = screen.getByRole('radio', { name: /modal dialog/i });
+      expect(modalRadio).toBeChecked();
+
+      // Click "Eigene Seite" option
+      const pageRadio = screen.getByLabelText('Eigene Seite (Standard)');
+      await user.click(pageRadio);
+
+      // Verify store was updated with 'page'
+      expect(setVideoDetailsView).toHaveBeenCalledWith('page');
     });
   });
 });

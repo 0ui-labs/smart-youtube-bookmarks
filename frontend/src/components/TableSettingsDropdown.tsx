@@ -14,6 +14,8 @@
  */
 import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -35,6 +37,10 @@ export const TableSettingsDropdown = () => {
   const setGridColumns = useTableSettingsStore((state) => state.setGridColumns);
   const visibleColumns = useTableSettingsStore((state) => state.visibleColumns);
   const toggleColumn = useTableSettingsStore((state) => state.toggleColumn);
+
+  // Task #131 Step 5: Video details view mode setting
+  const videoDetailsView = useTableSettingsStore((state) => state.videoDetailsView);
+  const setVideoDetailsView = useTableSettingsStore((state) => state.setVideoDetailsView);
 
   // REF MCP Improvement #1: Runtime validation + Type narrowing (NO type casting!)
   const handleThumbnailSizeChange = (value: string) => {
@@ -140,6 +146,32 @@ export const TableSettingsDropdown = () => {
         >
           Aktionen
         </DropdownMenuCheckboxItem>
+
+        <DropdownMenuSeparator />
+
+        {/* Video Details Ansicht Section (Task #131 Step 5) */}
+        {/* REF MCP #4: RadioGroup for mutually exclusive choice (page OR modal) */}
+        <div className="px-2 py-1.5">
+          <Label className="text-xs font-medium">Video Details</Label>
+          <RadioGroup
+            value={videoDetailsView}
+            onValueChange={(value) => setVideoDetailsView(value as 'page' | 'modal')}
+            className="mt-2 space-y-2"
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="page" id="view-page" />
+              <Label htmlFor="view-page" className="font-normal cursor-pointer">
+                Eigene Seite (Standard)
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="modal" id="view-modal" />
+              <Label htmlFor="view-modal" className="font-normal cursor-pointer">
+                Modal Dialog
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
