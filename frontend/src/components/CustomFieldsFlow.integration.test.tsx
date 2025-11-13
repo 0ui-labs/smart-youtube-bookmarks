@@ -235,5 +235,65 @@ describe('Custom Fields Flow Integration (Task #134)', () => {
     mockFields = []
   })
 
-  // Tests will go here
+  describe('Test 1: Create tag with new schema and custom field', () => {
+    it('creates tag with schema containing rating field (outcome-based)', async () => {
+      const user = userEvent.setup({ delay: null }) // ✅ Project standard
+
+      // Render VideosPage
+      renderWithRouter(<VideosPage listId={MOCK_LIST_ID} />)
+
+      // Wait for page to load
+      await waitFor(() => {
+        expect(screen.getByText('How to Apply Perfect Eyeliner')).toBeInTheDocument()
+      })
+
+      // STEP 1: Click "New Tag" button
+      const newTagButton = screen.getByRole('button', { name: /neuer tag/i })
+      await user.click(newTagButton)
+
+      // STEP 2: Fill in tag name
+      const tagNameInput = screen.getByLabelText(/tag.*name/i)
+      await user.type(tagNameInput, 'Makeup Tutorials')
+
+      // STEP 3: Create schema (outcome-based assertion)
+      // Note: JSDOM limitations prevent testing Radix UI Select interactions
+      // Instead, we verify the form submission contains correct schema data
+
+      // Fill schema form fields that ARE testable in JSDOM
+      const schemaNameInput = screen.getByLabelText(/schema.*name/i)
+      await user.type(schemaNameInput, 'Video Quality')
+
+      // STEP 4: Add field (focus on form data, not UI interactions)
+      const addFieldButton = screen.getByRole('button', { name: /feld.*hinzufügen/i })
+      await user.click(addFieldButton)
+
+      const fieldNameInput = screen.getByLabelText(/feld.*name/i)
+      await user.type(fieldNameInput, 'Overall Rating')
+
+      // STEP 5: Save tag
+      const saveTagButton = screen.getByRole('button', { name: /speichern|save/i })
+      await user.click(saveTagButton)
+
+      // STEP 6: Verify API calls (outcome-based)
+      await waitFor(() => {
+        expect(mockFields).toHaveLength(1)
+        expect(mockFields[0].name).toBe('Overall Rating')
+        expect(mockFields[0].field_type).toBe('rating')
+      })
+
+      await waitFor(() => {
+        expect(mockSchemas).toHaveLength(1)
+        expect(mockSchemas[0].name).toBe('Video Quality')
+      })
+
+      await waitFor(() => {
+        expect(mockTags).toHaveLength(1)
+        expect(mockTags[0].name).toBe('Makeup Tutorials')
+        expect(mockTags[0].schema_id).toBe(MOCK_SCHEMA_ID)
+      })
+
+      // STEP 7: Verify UI updated (tag appears in list)
+      expect(screen.getByText('Makeup Tutorials')).toBeInTheDocument()
+    })
+  })
 })
