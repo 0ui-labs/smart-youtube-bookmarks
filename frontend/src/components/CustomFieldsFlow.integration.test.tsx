@@ -104,3 +104,136 @@ let mockVideos: MockVideo[] = []
 let mockTags: any[] = []
 let mockSchemas: any[] = []
 let mockFields: any[] = []
+
+// ============================================================================
+// Test Lifecycle (Uses global MSW server from setup.ts)
+// ============================================================================
+
+describe('Custom Fields Flow Integration (Task #134)', () => {
+  beforeEach(() => {
+    // Reset test data before each test
+    mockVideos = [createMockVideo()]
+    mockTags = []
+    mockSchemas = []
+    mockFields = []
+
+    // Extend global MSW server with test-specific handlers
+    server.use(
+      // GET /api/lists/{listId}/videos
+      http.get(`${API_BASE}/lists/:listId/videos`, () => {
+        return HttpResponse.json(mockVideos)
+      }),
+
+      // GET /api/lists/{listId}/tags
+      http.get(`${API_BASE}/lists/:listId/tags`, () => {
+        return HttpResponse.json(mockTags)
+      }),
+
+      // POST /api/lists/{listId}/tags
+      http.post(`${API_BASE}/lists/:listId/tags`, async ({ request }) => {
+        const body = await request.json() as any
+        const newTag = createMockTag({
+          id: MOCK_TAG_ID,
+          name: body.name,
+          color: body.color,
+          schema_id: body.schema_id || null,
+        })
+        mockTags.push(newTag)
+        return HttpResponse.json(newTag, { status: 201 })
+      }),
+
+      // GET /api/lists/{listId}/schemas
+      http.get(`${API_BASE}/lists/:listId/schemas`, () => {
+        return HttpResponse.json(mockSchemas)
+      }),
+
+      // POST /api/lists/{listId}/schemas
+      http.post(`${API_BASE}/lists/:listId/schemas`, async ({ request }) => {
+        const body = await request.json() as any
+        const newSchema = createMockSchema({
+          id: MOCK_SCHEMA_ID,
+          name: body.name,
+          description: body.description,
+          schema_fields: body.fields?.map((f: any, index: number) => ({
+            field_id: f.field_id,
+            schema_id: MOCK_SCHEMA_ID,
+            display_order: f.display_order ?? index,
+            show_on_card: f.show_on_card ?? false,
+            field: mockFields.find(field => field.id === f.field_id) || createMockField({ id: f.field_id }),
+          })) || [],
+        })
+        mockSchemas.push(newSchema)
+        return HttpResponse.json(newSchema, { status: 201 })
+      }),
+
+      // GET /api/lists/{listId}/custom-fields
+      http.get(`${API_BASE}/lists/:listId/custom-fields`, () => {
+        return HttpResponse.json(mockFields)
+      }),
+
+      // POST /api/lists/{listId}/custom-fields
+      http.post(`${API_BASE}/lists/:listId/custom-fields`, async ({ request }) => {
+        const body = await request.json() as any
+        const newField = createMockField({
+          id: MOCK_FIELD_ID,
+          name: body.name,
+          field_type: body.field_type,
+          config: body.config,
+        })
+        mockFields.push(newField)
+        return HttpResponse.json(newField, { status: 201 })
+      }),
+
+      // POST /api/lists/{listId}/custom-fields/check-duplicate
+      http.post(`${API_BASE}/lists/:listId/custom-fields/check-duplicate`, async ({ request }) => {
+        const body = await request.json() as any
+        const existingField = mockFields.find(
+          f => f.name.toLowerCase() === body.name.toLowerCase()
+        )
+        return HttpResponse.json({
+          exists: !!existingField,
+          field: existingField || null,
+        })
+      }),
+
+      // PUT /api/videos/{videoId}/tags
+      http.put(`${API_BASE}/videos/:videoId/tags`, async ({ request, params }) => {
+        const body = await request.json() as any
+        const video = mockVideos.find(v => v.id === params.videoId)
+        if (video) {
+          video.tags = mockTags.filter(t => body.tag_ids.includes(t.id))
+        }
+        return HttpResponse.json(video || createMockVideo())
+      }),
+
+      // PUT /api/videos/{videoId}/fields
+      http.put(`${API_BASE}/videos/:videoId/fields`, async ({ request, params }) => {
+        const body = await request.json() as any
+        const video = mockVideos.find(v => v.id === params.videoId)
+        if (video) {
+          video.field_values = body.field_values.map((fv: any) => ({
+            id: `value-${fv.field_id}`,
+            video_id: params.videoId,
+            field_id: fv.field_id,
+            field: mockFields.find(f => f.id === fv.field_id) || createMockField({ id: fv.field_id }),
+            value: fv.value,
+            show_on_card: true,
+            updated_at: new Date().toISOString(),
+          }))
+        }
+        return HttpResponse.json(video || createMockVideo())
+      })
+    )
+  })
+
+  afterEach(() => {
+    // Reset handlers (inherited from global setup.ts)
+    // Also reset mutable state to prevent test pollution
+    mockVideos = []
+    mockTags = []
+    mockSchemas = []
+    mockFields = []
+  })
+
+  // Tests will go here
+})
