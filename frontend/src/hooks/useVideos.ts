@@ -354,12 +354,12 @@ export const useUpdateVideoFieldValues = (videoId: string) => {
       await queryClient.cancelQueries({ queryKey: videoKeys.all })
       const previousVideos = queryClient.getQueriesData({ queryKey: videoKeys.all })
 
-      queryClient.setQueriesData<any[]>(
+      queryClient.setQueriesData<VideoResponse[]>(
         { queryKey: videoKeys.all },
         (oldVideos) => {
           if (!oldVideos) return oldVideos
 
-          return oldVideos.map((video: any) => {
+          return oldVideos.map((video) => {
             if (video.id !== videoId) return video
 
             const updatedFieldValues = video.field_values?.map((fv: VideoFieldValueResponse) => {
@@ -403,7 +403,7 @@ export const useUpdateVideoFieldValues = (videoId: string) => {
 
       if (context?.previousVideos) {
         context.previousVideos.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data)
+          queryClient.setQueryData<VideoResponse[]>(queryKey, data as VideoResponse[])
         })
       }
     },
