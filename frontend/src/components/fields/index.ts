@@ -38,3 +38,8 @@ export type { RatingConfigEditorProps } from './RatingConfigEditor'
 
 export { TextConfigEditor } from './TextConfigEditor'
 export type { TextConfigEditorProps } from './TextConfigEditor'
+
+// Field Value Editors (Task #132)
+export { FieldEditor } from './FieldEditor'
+
+export * from './editors'
