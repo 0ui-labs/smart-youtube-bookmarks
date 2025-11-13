@@ -184,6 +184,37 @@ All custom field values are validated before persisting to database using centra
 - Integration tests: `tests/integration/` (real database via fixture)
 - Fixtures in `tests/conftest.py` (db session, test client, async support)
 
+### CreateTagDialog / TagEditDialog Testing
+
+**Test File:** `frontend/src/components/CreateTagDialog.schema-selector.test.tsx`
+
+**Coverage:**
+- CreateTagDialog: 90.19% statements, 30.76% branch, 80% functions
+- SchemaSelector: 96.55% statements, 80% branch, 50% functions
+
+**Test Patterns:**
+- Mock `useSchemas` and `useTags` hooks with `vi.mock()` (Component test pattern)
+- Use `QueryClientProvider` wrapper for mutations
+- Use `userEvent.setup({ delay: null })` for fast, deterministic tests
+- Inline factory functions (e.g., `createMockSchema`) - NOT separate mockData.ts
+- Test Radix UI Select with outcome-based assertions (form data) due to JSDOM portal limitations
+- Verify mutation calls with `vi.mocked(useCreateTag).mockReturnValue()`
+
+**Schema Selector Coverage:**
+- Rendering with all options (Kein Schema, existing schemas, + Neues Schema)
+- Form state updates and default values
+- API request validation (includes/omits schema_id)
+- Accessibility attributes (ARIA roles, labels) for keyboard users
+- Error handling (loading failures, empty schemas)
+- Backwards compatibility (tags without schema_id)
+- Cancel/reset behavior
+
+**JSDOM Adaptations:**
+- Radix UI Select portals don't render in JSDOM
+- Tests verify form submission data instead of dropdown interactions
+- ARIA attributes tested instead of actual keyboard navigation
+- Outcome-based approach ensures functionality while accepting JSDOM limitations
+
 ## Key Patterns & Conventions
 
 ### Forms - Field Component Pattern (CRITICAL)
