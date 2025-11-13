@@ -60,6 +60,16 @@ export type ViewMode = 'list' | 'grid';
 export type GridColumnCount = 2 | 3 | 4 | 5;
 
 /**
+ * Video details display mode (Task #131)
+ * - page: Navigate to separate /videos/:id page (DEFAULT - YouTube-like UX)
+ * - modal: Open details in modal dialog (quick preview)
+ *
+ * REF MCP #1: Extends existing tableSettingsStore pattern
+ * REF MCP #5: Default 'page' preserves Task #130 behavior (non-breaking)
+ */
+export type VideoDetailsView = 'page' | 'modal';
+
+/**
  * Column visibility configuration for video table
  * Based on existing VideosPage table structure (4 columns as of Task #24)
  *
@@ -95,6 +105,9 @@ interface TableSettingsStore {
   /** Grid column count (grid view only, Task #33) */
   gridColumns: GridColumnCount;
 
+  /** Video details view mode (Task #131) */
+  videoDetailsView: VideoDetailsView;
+
   /** Update thumbnail size */
   setThumbnailSize: (size: ThumbnailSize) => void;
 
@@ -106,6 +119,9 @@ interface TableSettingsStore {
 
   /** Update grid column count (Task #33) */
   setGridColumns: (count: GridColumnCount) => void;
+
+  /** Update video details view mode (Task #131) */
+  setVideoDetailsView: (view: VideoDetailsView) => void;
 }
 
 /**
@@ -165,6 +181,7 @@ export const useTableSettingsStore = create<TableSettingsStore>()(
       visibleColumns: DEFAULT_VISIBLE_COLUMNS,
       viewMode: 'list', // Task #32: Default to list view (preserves current behavior)
       gridColumns: 3, // Task #33: Default to 3 columns (balanced, matches YouTube)
+      videoDetailsView: 'page', // Task #131: Default to page (preserves existing behavior)
 
       // Actions
       setThumbnailSize: (size) => set({ thumbnailSize: size }),
@@ -179,6 +196,7 @@ export const useTableSettingsStore = create<TableSettingsStore>()(
 
       setViewMode: (mode) => set({ viewMode: mode }), // Task #32: Set view mode
       setGridColumns: (count) => set({ gridColumns: count }), // Task #33
+      setVideoDetailsView: (view) => set({ videoDetailsView: view }), // Task #131
     }),
     {
       name: 'video-table-settings', // localStorage key (must be unique)
