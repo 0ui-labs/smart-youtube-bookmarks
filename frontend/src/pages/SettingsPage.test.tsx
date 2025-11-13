@@ -30,6 +30,7 @@ const mockSchemas: FieldSchemaResponse[] = [
     updated_at: '2025-11-08T10:00:00Z',
     schema_fields: [
       {
+        id: 'sf-1',
         field_id: 'field-1',
         schema_id: 'schema-1',
         display_order: 1,
