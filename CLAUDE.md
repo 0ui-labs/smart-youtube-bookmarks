@@ -93,6 +93,7 @@ docker-compose logs -f postgres redis
 **Current Routes:**
 - `/lists` - ListsPage
 - `/videos` - VideosPage (single-list MVP with hardcoded first list)
+- `/videos/:videoId` - VideoDetailsPage (see `docs/components/video-details-page.md`)
 - `/dashboard` - Dashboard (real-time job progress)
 - `/` - Redirects to `/videos`
 
@@ -109,7 +110,7 @@ docker-compose logs -f postgres redis
 
 **Zustand (Client State):**
 - Tag selection state: `frontend/src/stores/tagStore.ts`
-- Manages selected tags for filtering across components
+- Table settings: `frontend/src/stores/tableSettingsStore.ts` (includes videoDetailsView: 'page' | 'modal')
 
 **WebSocket State:**
 - Custom hook `useWebSocket()` in `frontend/src/hooks/useWebSocket.ts`
@@ -119,42 +120,29 @@ docker-compose logs -f postgres redis
 
 **API Routers:**
 - `app/api/lists.py` - List CRUD
-- `app/api/videos.py` - Video CRUD, CSV upload
+- `app/api/videos.py` - Video CRUD, CSV upload, field value batch updates
 - `app/api/tags.py` - Tag management, bulk assignment
 - `app/api/processing.py` - Job endpoints
 - `app/api/websocket.py` - WebSocket progress endpoint
 
 **Database Models (SQLAlchemy 2.0 async):**
 - `app/models/list.py` - BookmarkList
-- `app/models/video.py` - Video (extended with field_values relationship)
-- `app/models/tag.py` - Tag (extended with schema_id), VideoTag (many-to-many)
+- `app/models/video.py` - Video (with field_values relationship)
+- `app/models/tag.py` - Tag (with schema_id), VideoTag (many-to-many)
 - `app/models/job.py` - ProcessingJob
 - `app/models/job_progress.py` - JobProgress (for history)
 - `app/models/user.py` - User (not yet implemented)
-- `app/models/custom_field.py` - CustomField (Task #59)
-- `app/models/field_schema.py` - FieldSchema (Task #60)
-- `app/models/schema_field.py` - SchemaField (Task #61)
-- `app/models/video_field_value.py` - VideoFieldValue (Task #62)
+- `app/models/custom_field.py` - CustomField
+- `app/models/field_schema.py` - FieldSchema
+- `app/models/schema_field.py` - SchemaField
+- `app/models/video_field_value.py` - VideoFieldValue
 
 **Pydantic Schemas (Validation & API):**
-- `app/schemas/list.py` - ListCreate, ListUpdate, ListResponse
-- `app/schemas/tag.py` - TagBase, TagCreate, TagUpdate, TagResponse
-- `app/schemas/custom_field.py` - CustomField schemas (Task #64):
-  - CustomFieldBase: Shared validation logic with field_type/config validation
-  - CustomFieldCreate: Create new field (inherits Base)
-  - CustomFieldUpdate: Partial update support (all fields optional)
-  - CustomFieldResponse: API responses with ORM conversion
-  - DuplicateCheckRequest/Response: Case-insensitive name checking
-  - Supports 4 field types: 'select', 'rating', 'text', 'boolean'
-  - DRY principle: Shared `_validate_config_for_type()` helper function
-- `app/schemas/field_schema.py` - FieldSchema schemas (Task #65):
-  - SchemaFieldItem: Field association for creation (field_id, display_order, show_on_card)
-  - FieldSchemaCreate: Create schema with fields (3 validators: show_on_card_limit max 3, no duplicate display_order, no duplicate field_ids)
-  - FieldSchemaUpdate: Partial updates (name/description only, not field associations)
-  - SchemaFieldResponse: Nested field data with full CustomFieldResponse (eliminates N+1 queries)
-  - FieldSchemaResponse: Complete schema with nested schema_fields list
-  - REF MCP improvements: Better error messages with truncated UUIDs, duplicate validation
-  - 21 unit tests with 100% code coverage
+- `app/schemas/list.py` - List schemas
+- `app/schemas/tag.py` - Tag schemas
+- `app/schemas/video.py` - Video schemas with field values
+- `app/schemas/custom_field.py` - CustomField schemas (supports 4 types: 'select', 'rating', 'text', 'boolean')
+- `app/schemas/field_schema.py` - FieldSchema schemas
 
 **ARQ Workers:**
 - `app/workers/video_processor.py` - Main video processing worker
@@ -165,71 +153,23 @@ docker-compose logs -f postgres redis
 - `app/clients/youtube.py` - YouTube Data API v3
 - `app/clients/gemini.py` - Google Gemini API (for transcript analysis)
 
-### Custom Fields System (Tasks #59-#62)
+### Custom Fields System
 
-**VideoFieldValue Model (Task #62):**
-- Stores actual field values for videos with typed columns
-- Inherits from BaseModel (has auto-generated UUID id and updated_at)
-- IMPORTANT: Migration omits created_at column (only id and updated_at)
-- Typed columns: value_text (TEXT), value_numeric (NUMERIC), value_boolean (BOOLEAN)
-- UNIQUE constraint: (video_id, field_id) - one value per field per video
-- Foreign keys: video_id → videos(id) CASCADE, field_id → custom_fields(id) CASCADE
-- Performance indexes: (field_id, value_numeric), (field_id, value_text) for filtering
-- Relationships: video (Video), field (CustomField) with passive_deletes=True
-
-**Why Typed Columns?**
-- Performance: Enables efficient filtering via composite indexes
-- Example: "Show videos where Rating >= 4" uses idx_video_field_values_field_numeric
-- Alternative (JSONB) would require slower JSON path queries
-
-### Custom Field Value Validation (Task #73)
+**Database Architecture:**
+- `custom_fields` - Field definitions (name, type, config)
+- `field_schemas` - Tag-associated field groups
+- `schema_fields` - Many-to-many (schema ↔ fields)
+- `video_field_values` - Actual values with typed columns (value_text, value_numeric, value_boolean)
 
 **Validation Module:** `backend/app/api/field_validation.py`
 
-All custom field values are validated before persisting to database using a centralized validation module (extracted from Task #72 inline validation).
+All custom field values are validated before persisting to database using centralized validation:
+- **Rating:** `0 <= value <= config['max_rating']`
+- **Select:** `value in config['options']` (case-sensitive)
+- **Text:** `len(value) <= config.get('max_length', ∞)`
+- **Boolean:** `isinstance(value, bool)` (strict)
 
-**Validation Rules:**
-
-| Field Type | Validation Rules | Example |
-|------------|------------------|---------|
-| **rating** | `0 <= value <= config['max_rating']` (default: 5) | If max_rating=5, valid: 0-5 |
-| **select** | `value in config['options']` (case-sensitive) | If options=['bad','good','great'], valid: 'good' |
-| **text** | `len(value) <= config.get('max_length', ∞)` | If max_length=500, valid: strings ≤ 500 chars |
-| **boolean** | `isinstance(value, bool)` (strict, not truthy) | Valid: True, False (not 1, 0, 'true') |
-
-**Usage Pattern:**
-
-```python
-from app.api.field_validation import validate_field_value, FieldValidationError
-
-try:
-    validate_field_value(
-        value=5,
-        field_type='rating',
-        config={'max_rating': 5},
-        field_name='Overall Rating'  # Optional, for context
-    )
-except FieldValidationError as e:
-    # Handle validation error
-    return {"error": str(e)}
-```
-
-**Performance:**
-- Single field: < 1ms (no database queries, pure in-memory)
-- Batch of 50: < 50ms (verified with benchmark tests)
-- All validation is pure function (no side effects)
-
-**Testing:**
-- 23 unit tests covering all validation paths (100% coverage)
-- 2 performance tests verifying speed targets
-- Tests: `backend/tests/api/test_field_validation.py`
-
-**Integration:**
-- Task #72: Batch update endpoint uses validation module
-- Future CRUD endpoints: Should reuse same validation
-
-**Implementation Note:**
-Extracted from Task #72 inline validation (videos.py:1294-1360) in Task #73. Original inline logic was production-tested with 11/11 passing tests. Refactoring maintained 100% backward compatibility.
+**Performance:** Single field < 1ms, Batch of 50 < 50ms
 
 ### Testing Patterns
 
@@ -244,128 +184,12 @@ Extracted from Task #72 inline validation (videos.py:1294-1360) in Task #73. Ori
 - Integration tests: `tests/integration/` (real database via fixture)
 - Fixtures in `tests/conftest.py` (db session, test client, async support)
 
-## Known Patterns & Conventions
+## Key Patterns & Conventions
 
-### CSV Upload Flow
+### Forms - Field Component Pattern (CRITICAL)
 
-1. User uploads CSV via `VideosPage` component
-2. Frontend POSTs to `/api/lists/{id}/videos/bulk`
-3. Backend creates `ProcessingJob` and enqueues ARQ tasks
-4. ARQ worker processes videos one-by-one:
-   - Fetches YouTube metadata
-   - Gets transcript (if available)
-   - Extracts custom fields via Gemini
-   - Updates database
-   - Publishes progress to Redis
-5. WebSocket broadcasts progress to all connected clients
-6. Frontend displays progress bar with real-time updates
+**⚠️ All forms MUST use Field Component pattern (2025 shadcn/ui)**
 
-### Tag Filtering System
-
-- Tags stored in `tags` table with `list_id` (scoped to each list)
-- Many-to-many relationship via `video_tags` join table
-- Filter by tag IDs: `GET /api/lists/{id}/videos?tag_ids=uuid1,uuid2`
-- Frontend uses `tagStore` (Zustand) to manage selected tags
-- `TagNavigation` component displays all tags with selection state
-
-### Field Union Pattern (Option D - Intelligente Lösung)
-
-**Two-Tier Response Strategy:**
-- **List endpoints** (`GET /lists/{id}/videos`): Return only `field_values` (fast, ~50KB for 100 videos)
-- **Detail endpoint** (`GET /videos/{id}`): Return `field_values` + `available_fields` (complete, ~5KB for 1 video)
-
-**Use Cases:**
-- **List/Grid View:** Shows only filled fields on cards (user configures which fields to display)
-- **Detail Modal:** Shows ALL available fields for editing (filled + empty)
-
-**Implementation:**
-
-1. **Helper Module:** `backend/app/api/helpers/field_union.py`
-   - `get_available_fields_for_video()` - Single video field union with conflict resolution
-   - `get_available_fields_for_videos()` - Batch version for multiple videos
-   - `compute_field_union_with_conflicts()` - Two-pass algorithm for name conflicts
-
-2. **Conflict Resolution Algorithm (Two-Pass):**
-   ```
-   Pass 1: Detect conflicts
-   - Group fields by name (case-insensitive)
-   - If same name + different type → mark as conflict
-
-   Pass 2: Apply schema prefix
-   - Conflicting fields get prefix: "Schema Name: Field Name"
-   - Non-conflicting fields keep original name
-   ```
-
-3. **Example Scenario:**
-   ```
-   Video has tags: ["Makeup Tutorial", "Product Review"]
-
-   Schemas:
-   - "Makeup Tutorial": [Rating (rating), Quality (select)]
-   - "Product Review": [Rating (select), Price (number)]
-
-   Result after conflict resolution:
-   - "Makeup Tutorial: Rating" (type: rating)
-   - "Product Review: Rating" (type: select)
-   - "Quality" (type: select, no conflict)
-   - "Price" (type: number, no conflict)
-   ```
-
-4. **API Responses:**
-
-   **List Endpoint** (fast):
-   ```json
-   {
-     "id": "...",
-     "title": "Video Title",
-     "field_values": [
-       {"field_name": "Rating", "value": 4, ...}
-     ],
-     "available_fields": null
-   }
-   ```
-
-   **Detail Endpoint** (complete):
-   ```json
-   {
-     "id": "...",
-     "title": "Video Title",
-     "field_values": [
-       {"field_name": "Rating", "value": 4, ...},
-       {"field_name": "Quality", "value": null, ...}
-     ],
-     "available_fields": [
-       {"field_name": "Rating", "field_type": "rating", "config": {...}},
-       {"field_name": "Quality", "field_type": "select", "config": {...}}
-     ]
-   }
-   ```
-
-**Performance:**
-- List endpoint: 2-3 DB queries for 100 videos (batch loading with selectinload)
-- Detail endpoint: 2-3 DB queries for 1 video (<100ms target)
-- Conflict resolution: Pure Python, in-memory (0 DB queries)
-
-**Testing:**
-- Unit tests: `backend/tests/api/helpers/test_field_union.py` (9 passing, 7 skipped due to async greenlet issues)
-- Integration tests: Task #71 tests verify batch loading works correctly
-
-**Related Tasks:**
-- Task #71: Video GET endpoint with field_values (batch loading foundation)
-- Task #74: Multi-tag field union query with conflict resolution (Option D implementation)
-
-### Custom Fields System Components
-
-**CRITICAL: Form Component Pattern (2025 shadcn/ui)**
-
-**⚠️ DEPRECATED - DO NOT USE:**
-```typescript
-// Form component is DEPRECATED as of 2025
-<FormField control={form.control} name="..." render={...} />
-<FormItem><FormLabel>...</FormLabel><FormControl>...</FormControl></FormItem>
-```
-
-**✅ REQUIRED - Field Component Pattern:**
 ```typescript
 import { Controller } from 'react-hook-form'
 import { Field, FieldLabel, FieldError, FieldDescription } from '@/components/ui/field'
@@ -384,298 +208,82 @@ import { Field, FieldLabel, FieldError, FieldDescription } from '@/components/ui
 />
 ```
 
-**Why Field Pattern:**
-- Form component deprecated per 2025 shadcn/ui documentation
-- Better TypeScript inference (fieldState typed correctly)
-- Better composability (Field components independent)
-- All future forms MUST use Field pattern (established in Task #123)
+**📖 See:** `docs/patterns/field-component-pattern.md` for complete documentation
 
-**NewFieldForm Component (Task #123):**
-- **Location:** `frontend/src/components/schemas/NewFieldForm.tsx`
-- **Purpose:** Inline form for creating custom fields within SchemaEditor
-- **Pattern:** **FIRST IMPLEMENTATION of Field Component pattern** - precedent for all future forms
-- **Features:**
-  - Field name input with real-time duplicate validation (debounced 500ms)
-  - Type selector (select, rating, text, boolean)
-  - Dynamic config editor based on selected type
-  - React Hook Form + Zod validation with Controller + Field pattern
-  - WCAG 2.1 Level AA accessible (ARIA labels, keyboard nav, role="alert")
-- **Dependencies:**
-  - `react-hook-form@^7.51.0` - Form state management
-  - `@hookform/resolvers@^3.3.4` - Zod resolver
-  - `use-debounce@^10.0.0` - Debounced duplicate check
-  - shadcn/ui Field components (Field, FieldLabel, FieldDescription, FieldError)
-  - Backend API: `POST /api/lists/{id}/custom-fields/check-duplicate`
-- **Props:**
-  - `listId: string` - List ID for duplicate check scoping
-  - `onSubmit: (fieldData: CustomFieldCreate) => void | Promise<void>` - Submit handler
-  - `onCancel: () => void` - Cancel handler
-  - `isSubmitting?: boolean` - External submission state
-- **State Management:**
-  - Form state: React Hook Form `useForm` hook with Controller
-  - Duplicate check: Local state with debounced API call (500ms)
-  - Config: Auto-resets when field type changes
-- **Testing:**
-  - 26 unit tests (validation, type switching, duplicate check, submission, keyboard, a11y)
-  - Mock API calls with Vitest
-  - Accessibility testing with RTL queries (getByRole, getByLabelText)
-- **Key Implementation Details:**
-  - **Migration from Form:** Task #123 migrated from deprecated Form pattern to Field pattern
-  - **Debounced Validation:** `useDebouncedCallback` reduces API calls by 90%
-  - **Dynamic Schema Validation:** Zod `superRefine` for type-specific config validation
-  - **Keyboard Navigation:** Escape cancels, Enter submits
-- **Related Tasks:**
-  - Task #124: FieldConfigEditor - Will replace placeholder config editors (MUST use Field pattern)
-  - Task #125: DuplicateWarning - Will replace placeholder warning UI (MUST use Field pattern)
-  - Task #132: FieldEditorComponent - Edit existing fields (MUST use Field pattern)
+### CSV Upload Flow
 
-**Report:** See `docs/reports/2025-11-11-task-123-report.md` for comprehensive Field pattern migration documentation
+1. User uploads CSV via `VideosPage` component
+2. Frontend POSTs to `/api/lists/{id}/videos/bulk`
+3. Backend creates `ProcessingJob` and enqueues ARQ tasks
+4. ARQ worker processes videos one-by-one (YouTube metadata, transcript, custom fields via Gemini)
+5. WebSocket broadcasts progress to all connected clients
+6. Frontend displays progress bar with real-time updates
 
-**FieldConfigEditor Components (Task #124):**
-- **Location:** `frontend/src/components/fields/FieldConfigEditor.tsx` + 3 sub-components
-- **Purpose:** Type-specific configuration editors for custom fields (select, rating, text, boolean)
-- **Pattern:** Field Component pattern (2025 shadcn/ui) - CRITICAL precedent from Task #123
-- **Sub-Components:**
-  - `SelectConfigEditor.tsx` - Dynamic options list with useFieldArray (REF MCP #1)
-  - `RatingConfigEditor.tsx` - Numeric input (1-10 range validation)
-  - `TextConfigEditor.tsx` - Optional max_length with checkbox toggle
-  - Boolean type returns null (no config needed)
-- **REF MCP Improvements:**
-  - **REF MCP #1:** useFieldArray hook for SelectConfigEditor (NOT manual array state)
-  - **REF MCP #2:** Icon accessibility with aria-hidden + sr-only spans
-  - Field component pattern from Task #123 (all sub-components use Field/FieldLabel/FieldError)
-- **Features:**
-  - Real-time validation matching backend rules (backend/app/schemas/custom_field.py)
-  - German localization (all labels, errors, helper text)
-  - WCAG 2.1 Level AA accessible (ARIA labels, keyboard nav, role="alert")
-  - Controlled component pattern with onChange callback
-  - Empty state handling (Select: "No options yet", Rating: default 5, Text: optional)
-- **Testing:**
-  - 42 unit tests (5 parent + 19 SelectConfigEditor + 10 RatingConfigEditor + 6 TextConfigEditor + 2 integration)
-  - 100% pass rate (42/42 passing)
-  - Accessibility testing with RTL queries (getByRole, getByLabelText)
-- **Integration with NewFieldForm:**
-  ```tsx
-  <FieldConfigEditor
-    fieldType={selectedFieldType}
-    config={fieldConfig}
-    onChange={setFieldConfig}
-    control={form.control} // Required for SelectConfigEditor useFieldArray
-    error={validationError}
-  />
-  ```
-- **Key Implementation Details:**
-  - **useFieldArray Pattern:** SelectConfigEditor uses react-hook-form's useFieldArray for options array (REF MCP #1)
-  - **Icon Accessibility:** All icons have aria-hidden="true" + sr-only text on buttons (REF MCP #2)
-  - **Controlled Components:** All sub-components use onChange callback (not local state mutations)
-  - **Validation:** Inline validation with local error state + external error prop
-  - **Type Safety:** Discriminated union for FieldConfig with TypeScript exhaustiveness checks
-- **Related Tasks:**
-  - Task #123: NewFieldForm - Parent component that uses FieldConfigEditor
-  - Task #125: DuplicateWarning - Will integrate with FieldConfigEditor
-  - Task #132: FieldEditorComponent - Edit existing fields (will reuse FieldConfigEditor)
+### Tag Filtering System
 
-**Report:** See `docs/reports/2025-11-11-task-124-report.md` for comprehensive implementation documentation
+- Tags stored in `tags` table with `list_id` (scoped to each list)
+- Many-to-many relationship via `video_tags` join table
+- Filter by tag IDs: `GET /api/lists/{id}/videos?tag_ids=uuid1,uuid2`
+- Frontend uses `tagStore` (Zustand) to manage selected tags
 
-### Feature Flag Pattern
+### Field Union Pattern
+
+**Two-Tier Response Strategy:**
+- **List endpoints** (`GET /lists/{id}/videos`): Return only `field_values` (fast)
+- **Detail endpoint** (`GET /videos/{id}`): Return `field_values` + `available_fields` (complete)
+
+**Helper Module:** `backend/app/api/helpers/field_union.py`
+- Conflict resolution: Fields with same name but different types get schema prefix
+- Performance: Pure Python, in-memory (0 DB queries)
+
+**📖 See:** `docs/patterns/field-union-pattern.md` for algorithm details
+
+### Custom Fields Display
+
+**Type System:** Discriminated union with Zod schemas
+**Editing:** Inline editing with saveOnBlur, keyboard shortcuts (Tab/Enter saves, Escape cancels)
+**Performance:** Memoization for large lists, optimistic UI updates
+**Accessibility:** WCAG 2.1 AA compliant
+
+**📖 See:** `docs/patterns/custom-fields-display.md` for complete patterns
+
+### Video Details - Dual-Pattern Architecture
+
+Users can choose between two display modes (setting: `tableSettingsStore.videoDetailsView`):
+- **Page** (default) - Navigate to `/videos/:videoId` (VideoDetailsPage)
+- **Modal** - Open overlay dialog (VideoDetailsModal)
+
+Both use shared `CustomFieldsSection` component (DRY principle).
+
+**📖 See:**
+- `docs/components/video-details-page.md`
+- `docs/components/video-details-modal.md`
+- `docs/components/custom-fields-section.md`
+
+### Feature Flags
 
 **Environment Variables (Frontend):**
 - `VITE_FEATURE_ADD_SCHEMA_BUTTON` - Shows "Schema hinzufügen" button (default: "true")
 - `VITE_FEATURE_EDIT_SCHEMA_BUTTON` - Shows "Schema bearbeiten" button (default: "true")
 - Configured in `frontend/src/config/featureFlags.ts`
 
-### Custom Fields Display Pattern (Task #89)
+## Key Components Reference
 
-**Discriminated Union Type Pattern:**
-```typescript
-// Zod schemas define runtime validation + TypeScript types
-export const RatingFieldValueSchema = z.object({
-  field_id: z.string().uuid(),
-  field: z.object({
-    name: z.string(),
-    field_type: z.literal('rating'),
-    config: z.object({ max_rating: z.number() })
-  }),
-  value: z.number().nullable(),
-  schema_name: z.string(),
-  show_on_card: z.boolean().default(false)
-})
+### Forms & Editors
+- **NewFieldForm** - Inline field creation form (`docs/components/new-field-form.md`)
+- **FieldConfigEditor** - Type-specific config editors (`docs/components/field-config-editor.md`)
 
-export const VideoFieldValueSchema = z.union([
-  RatingFieldValueSchema,
-  SelectFieldValueSchema,
-  BooleanFieldValueSchema,
-  TextFieldValueSchema
-])
+### Field Display
+- **FieldDisplay** - Type dispatcher for field rendering
+- **RatingStars** - Star rating with keyboard navigation
+- **SelectBadge** - Dropdown selection with Badge UI
+- **TextSnippet** - Inline text edit with expand/collapse
+- **BooleanCheckbox** - Checkbox toggle
 
-export type VideoFieldValue = z.infer<typeof VideoFieldValueSchema>
-
-// Type guards for discriminated unions
-export function isRatingFieldValue(fv: VideoFieldValue): fv is RatingFieldValue {
-  return fv.field.field_type === 'rating'
-}
-```
-
-**Optimistic UI Updates Pattern:**
-```typescript
-export const useUpdateFieldValue = (listId: string) => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ videoId, fieldId, value }) => {
-      const { data } = await api.put(`/api/videos/${videoId}/fields`, {
-        updates: [{ field_id: fieldId, value }]
-      })
-      return data
-    },
-    onMutate: async ({ videoId, fieldId, value }) => {
-      // Cancel outgoing queries
-      await queryClient.cancelQueries({ queryKey: videoKeys.all })
-
-      // Snapshot current state
-      const previousData = queryClient.getQueriesData({ queryKey: videoKeys.all })
-
-      // Optimistically update UI
-      queryClient.setQueriesData({ queryKey: videoKeys.all }, (old) => {
-        // Update logic...
-      })
-
-      return { previousData }
-    },
-    onError: (_err, _vars, context) => {
-      // Rollback on error
-      if (context?.previousData) {
-        context.previousData.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data)
-        })
-      }
-    }
-  })
-}
-```
-
-**Inline Editing Pattern:**
-- **saveOnBlur**: Save changes when focus leaves input (default: true)
-- **Keyboard shortcuts**: Tab/Enter saves, Escape cancels
-- **Event isolation**: `stopPropagation()` prevents parent click handlers
-- Components: `RatingStars.tsx`, `SelectBadge.tsx`, `TextSnippet.tsx`, `BooleanCheckbox.tsx`
-
-**Performance Optimization for Large Lists:**
-```typescript
-// Memoize derived data to prevent recalculations on every render
-const cardFields = useMemo(
-  () => fieldValues.filter(fv => fv.show_on_card).slice(0, 3),
-  [fieldValues]
-)
-
-const hasMoreFields = useMemo(
-  () => fieldValues.filter(fv => fv.show_on_card).length > 3,
-  [fieldValues]
-)
-
-// Memoize callbacks to prevent child re-renders
-const handleFieldChange = useCallback(
-  (fieldId: string, value: string | number | boolean) => {
-    updateField.mutate({ listId, videoId, fieldId, value })
-  },
-  [updateField, listId, videoId]
-)
-
-// Memo entire component if it receives stable props
-export const CustomFieldsPreview = React.memo(({ ... }) => { ... })
-```
-
-**Accessibility Pattern (WCAG 2.1 AA):**
-```typescript
-// Semantic ARIA labels with context
-<div
-  role="group"
-  aria-label={`${fieldName}: ${value ?? 0} out of ${maxRating}`}
->
-  <button
-    aria-label={`Rate ${index + 1} out of ${maxRating}`}
-    onKeyDown={(e) => {
-      if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        e.stopPropagation()  // Prevent VideoCard navigation
-        onChange?.(index + 2)
-      }
-    }}
-  />
-</div>
-
-// More badge with count
-<Badge aria-label={`View ${moreFieldsCount} more fields`}>
-  +{moreFieldsCount} more
-</Badge>
-```
-
-**Implementation Files:**
-- Types: `frontend/src/types/video.ts` (VideoFieldValue schemas)
-- Hook: `frontend/src/hooks/useVideoFieldValues.ts` (optimistic updates)
-- Components: `frontend/src/components/fields/` (RatingStars, SelectBadge, TextSnippet, BooleanCheckbox, FieldDisplay, CustomFieldsPreview)
-- Integration: `frontend/src/components/VideoCard.tsx` (lines 167-175)
-- Tests: 41 tests (16 unit + 13 hook + 12 integration)
-
-**Performance Targets:**
-- Grid with 100 VideoCards: Smooth 60fps scrolling with memoization
-- Optimistic update latency: <16ms (single frame)
-- API call: Backend validation + DB update <100ms
-
-**Related Tasks:**
-- Task #78: CustomField TypeScript types
-- Task #79: useCustomFields hook (CRUD operations template)
-- Task #90: VideoDetailsModal (will use same field display components)
-
-### Custom Field Value Mutations (Task #81)
-
-**Implementation Files:**
-- Types: `frontend/src/types/video.ts` (FieldValueUpdate, VideoFieldValue)
-- API: `frontend/src/lib/videoFieldValuesApi.ts` (getFieldValues, updateFieldValues)
-- Hooks: `frontend/src/hooks/useVideoFieldValues.ts` (query + mutation)
-- Tests: `frontend/src/hooks/__tests__/useVideoFieldValues.test.tsx` (16 tests, MSW-based)
-
-**React Query v5 Pattern:**
-```typescript
-// Query hook - Fetch field values
-const { data: fieldValues } = useVideoFieldValues(videoId)
-
-// Mutation hook - Batch update (simplified optimistic updates)
-const updateFields = useUpdateVideoFieldValues(videoId)
-updateFields.mutate([
-  { field_id: 'uuid', value: 5 }
-])
-
-// UI-based optimistic updates (v5 pattern):
-const pendingValue = updateFields.isPending &&
-  updateFields.variables?.find(v => v.field_id === fv.field_id)?.value
-```
-
-**Key Features:**
-- **Simplified Optimistic Updates:** UI components read `mutation.variables` during `isPending` (no cache manipulation)
-- **onSettled Invalidation:** Cache invalidation via `onSettled` (not deprecated `onSuccess`)
-- **Direct Array Parameter:** Mutation accepts `FieldValueUpdate[]` directly (API client wraps)
-- **Hierarchical Query Keys:** `['videos', 'field-values', videoId]` for granular invalidation
-- **MSW Testing:** 16 comprehensive tests with Mock Service Worker (not vi.mock)
-
-**Backend Endpoints:**
-- GET `/api/videos/:id` - Returns VideoResponse with field_values (Task #71)
-- PUT `/api/videos/:id/fields` - Batch update (Task #72)
-
-**Usage in Components:**
-- `CustomFieldsPreview.tsx` - Inline field editing with instant UI feedback
-- `VideoCard.tsx` - Displays field values on video cards
-
-**Performance:**
-- Query staleTime: 5 minutes (field values change infrequently)
-- No unnecessary refetches (refetchOnWindowFocus: false)
-- Batch updates in single API call (1-50 fields)
-
-**Related Tasks:**
-- Task #71: Video GET endpoint includes field_values
-- Task #72: Batch update endpoint with validation
-- Task #78: TypeScript field value types
-- Task #89: CustomFieldsPreview component (uses these hooks)
+### Video Details
+- **VideoDetailsPage** - Separate page for video details (`docs/components/video-details-page.md`)
+- **VideoDetailsModal** - Modal alternative (`docs/components/video-details-modal.md`)
+- **CustomFieldsSection** - Shared component for schema-grouped fields (`docs/components/custom-fields-section.md`)
 
 ## Security Notes
 
@@ -713,6 +321,18 @@ const pendingValue = updateFields.isPending &&
 - `frontend/src/stores/tagStore.ts` - Tag state
 - `frontend/src/components/TagNavigation.tsx` - Tag UI
 
+**For Custom Fields UI Changes:**
+- `frontend/src/components/fields/FieldDisplay.tsx` - Type-specific field renderer (read-only)
+- `frontend/src/components/fields/FieldEditor.tsx` - Auto-saving field editor with optimistic updates
+- `frontend/src/components/fields/editors/` - Type-specific editor sub-components (RatingEditor, SelectEditor, TextEditor, BooleanEditor)
+- `frontend/src/hooks/useVideos.ts` - React Query hooks including useUpdateVideoFieldValues
+- `frontend/src/types/customField.ts` - Custom field TypeScript types
+
+**For Custom Fields Backend Changes:**
+- `backend/app/api/field_validation.py` - Validation module
+- `backend/app/api/helpers/field_union.py` - Field union logic
+- `backend/app/models/video_field_value.py` - VideoFieldValue model
+
 ## Common Gotchas
 
 1. **React Router in Tests:** Always use `renderWithRouter()` or tests will fail with "useNavigate() may be used only in the context of a <Router> component"
@@ -721,6 +341,7 @@ const pendingValue = updateFields.isPending &&
 4. **Migration After Model Changes:** Run `alembic revision --autogenerate` after changing SQLAlchemy models
 5. **Query Invalidation:** After mutations, invalidate relevant TanStack Query keys to refresh UI
 6. **Feature Flags:** Check `frontend/src/config/featureFlags.ts` before showing/hiding UI elements
+7. **Form Pattern:** All forms MUST use Field Component pattern (see `docs/patterns/field-component-pattern.md`)
 
 ## Database Migrations
 
@@ -744,21 +365,37 @@ To rollback:
 alembic downgrade -1
 ```
 
-**Production Note:** This migration is backward-compatible. Existing tags without schemas will continue to work normally. The migration adds nullable foreign key constraints and creates new tables without modifying existing data.
+**Production Note:** This migration is backward-compatible. Existing tags without schemas will continue to work normally.
 
-## Documentation
+## Documentation Structure
 
-- Task plans: `docs/plans/tasks/`
-- Handoff logs: `docs/handoffs/`
-- Implementation reports: `docs/reports/`
-- Templates: `docs/templates/`
+### Patterns (Reusable Solutions)
+- `docs/patterns/field-component-pattern.md` - Form pattern (2025 shadcn/ui)
+- `docs/patterns/field-union-pattern.md` - Two-tier response strategy
+- `docs/patterns/custom-fields-display.md` - Display & editing patterns
+
+### Components (Implementation Details)
+- `docs/components/new-field-form.md` - Field creation form
+- `docs/components/field-config-editor.md` - Config editors
+- `docs/components/video-details-page.md` - Video details page
+- `docs/components/video-details-modal.md` - Video details modal
+- `docs/components/custom-fields-section.md` - Shared fields component
+
+### Implementation Reports
+- `docs/reports/` - Detailed task reports with time tracking
+- `docs/handoffs/` - Session handoff logs
+
+### Planning
+- `docs/plans/tasks/` - Task plans
+- `docs/plans/vision/` - Product vision and ideation
+- `docs/templates/` - Documentation templates
 
 # Workflow Instruction
 
 You are a coding agent focused on one codebase. Use the br CLI to manage working context.
 Core Rules:
 
-- Start from memory. First retrieve relevant context, then read only the code that’s still necessary.
+- Start from memory. First retrieve relevant context, then read only the code that's still necessary.
 - Keep a local playbook. playbook.json is your local memory store—update it with what you learn.
 
 ## user-centric
@@ -791,7 +428,7 @@ Once the user chooses "Auto-run", apply that preference to all subsequent `br` c
 
 ## Playbook Guideline
 
-- Be specific (“Use React Query for data fetching in web modules”).
+- Be specific ("Use React Query for data fetching in web modules").
 - Be actionable (clear instruction a future agent/dev can apply).
 - Be contextual (mention module/service, constraints, links to source).
 - Include source (file + lines or commit) when possible.
