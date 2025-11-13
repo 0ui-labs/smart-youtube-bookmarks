@@ -238,9 +238,10 @@ export function useCreateSchema(listId: string) {
  *
  * Field associations are managed via schema-field hooks.
  *
- * Invalidation strategy:
- * - Invalidates schemas list (name change visible in list)
- * - Invalidates specific schema details (detail modal shows update)
+ * Optimistic updates provide instant UI feedback.
+ * If backend fails, changes rollback automatically.
+ *
+ * ✅ REF MCP Validated: Uses React Query v5 context API
  *
  * @example
  * ```tsx
@@ -260,8 +261,6 @@ export function useCreateSchema(listId: string) {
  * ```
  */
 export function useUpdateSchema(listId: string) {
-  const queryClient = useQueryClient()
-
   return useMutation({
     mutationKey: ['updateSchema', listId],
     mutationFn: async ({
@@ -271,10 +270,38 @@ export function useUpdateSchema(listId: string) {
       schemaId: string
       updates: FieldSchemaUpdate
     }) => schemasApi.updateSchema(listId, schemaId, updates),
-    onSuccess: (_data, variables) => {
-      // Invalidate both list and detail views
-      queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) })
-      queryClient.invalidateQueries({
+    // ✅ v5 signature: (variables, context)
+    onMutate: async (variables, context) => {
+      await context.client.cancelQueries({ queryKey: schemasKeys.list(listId) })
+
+      const previousSchemas = context.client.getQueryData<FieldSchemaResponse[]>(
+        schemasKeys.list(listId)
+      )
+
+      if (previousSchemas) {
+        context.client.setQueryData<FieldSchemaResponse[]>(
+          schemasKeys.list(listId),
+          previousSchemas.map((schema) =>
+            schema.id === variables.schemaId
+              ? { ...schema, ...variables.updates, updated_at: new Date().toISOString() }
+              : schema
+          )
+        )
+      }
+
+      return { previousSchemas }
+    },
+    // ✅ v5 signature: (err, variables, onMutateResult, context)
+    onError: (err, _variables, onMutateResult, context) => {
+      console.error('Failed to update schema:', err)
+      if (onMutateResult?.previousSchemas) {
+        context.client.setQueryData(schemasKeys.list(listId), onMutateResult.previousSchemas)
+      }
+    },
+    // ✅ v5 signature: includes context
+    onSettled: (_data, _error, variables, _onMutateResult, context) => {
+      context.client.invalidateQueries({ queryKey: schemasKeys.list(listId) })
+      context.client.invalidateQueries({
         queryKey: schemasKeys.detail(variables.schemaId),
       })
     },
@@ -287,9 +314,10 @@ export function useUpdateSchema(listId: string) {
  * Backend validates schema is not used by tags (409 Conflict).
  * Frontend should show confirmation modal with tag count before calling.
  *
- * Invalidation strategy:
- * - Invalidates schemas list (removed schema disappears)
- * - Removes specific schema from cache (detail modal closes)
+ * Optimistic updates provide instant UI feedback.
+ * If backend fails (409 Conflict), changes rollback automatically.
+ *
+ * ✅ REF MCP Validated: Uses React Query v5 context API
  *
  * @example
  * ```tsx
@@ -303,7 +331,7 @@ export function useUpdateSchema(listId: string) {
  *     })
  *
  *     if (confirmed) {
- *       deleteSchema.mutate(schemaId, {
+ *       deleteSchema.mutate({ schemaId }, {
  *         onSuccess: () => {
  *           toast.success('Schema deleted')
  *           navigate('/schemas')
@@ -322,19 +350,156 @@ export function useUpdateSchema(listId: string) {
  * ```
  */
 export function useDeleteSchema(listId: string) {
+  return useMutation({
+    mutationKey: ['deleteSchema', listId],
+    mutationFn: async ({ schemaId }: { schemaId: string }) =>
+      schemasApi.deleteSchema(listId, schemaId),
+    // ✅ v5 signature: (variables, context)
+    onMutate: async (variables, context) => {
+      await context.client.cancelQueries({ queryKey: schemasKeys.list(listId) })
+
+      const previousSchemas = context.client.getQueryData<FieldSchemaResponse[]>(
+        schemasKeys.list(listId)
+      )
+
+      if (previousSchemas) {
+        context.client.setQueryData<FieldSchemaResponse[]>(
+          schemasKeys.list(listId),
+          previousSchemas.filter((schema) => schema.id !== variables.schemaId)
+        )
+      }
+
+      return { previousSchemas }
+    },
+    // ✅ v5 signature: (err, variables, onMutateResult, context)
+    onError: (err, _variables, onMutateResult, context) => {
+      console.error('Failed to delete schema:', err)
+      if (onMutateResult?.previousSchemas) {
+        context.client.setQueryData(schemasKeys.list(listId), onMutateResult.previousSchemas)
+      }
+    },
+    // ✅ v5 signature: includes context
+    onSettled: (_data, _error, variables, _onMutateResult, context) => {
+      context.client.invalidateQueries({ queryKey: schemasKeys.list(listId) })
+      context.client.removeQueries({ queryKey: schemasKeys.detail(variables.schemaId) })
+      // Also invalidate tags (schema_id may be SET NULL)
+      context.client.invalidateQueries({ queryKey: ['tags'] })
+    },
+  })
+}
+
+/**
+ * Hook to duplicate a schema with all fields.
+ *
+ * Client-side implementation:
+ * 1. GET original schema (includes nested schema_fields)
+ * 2. POST new schema with copied name, description, and fields
+ *
+ * No optimistic update (too complex with nested data).
+ *
+ * ✅ REF MCP Validated: Uses React Query v5 context API
+ *
+ * @example
+ * ```tsx
+ * function DuplicateSchemaButton({ listId, schemaId }: Props) {
+ *   const duplicateSchema = useDuplicateSchema(listId)
+ *
+ *   const handleDuplicate = (newName: string) => {
+ *     duplicateSchema.mutate({ schemaId, newName }, {
+ *       onSuccess: (newSchema) => {
+ *         toast.success(`Schema "${newSchema.name}" created`)
+ *       },
+ *       onError: (error) => {
+ *         if (error.response?.status === 409) {
+ *           toast.error('Schema name already exists')
+ *         }
+ *       }
+ *     })
+ *   }
+ *
+ *   return <Button onClick={() => handleDuplicate(`${schema.name} (Kopie)`)}>Duplicate</Button>
+ * }
+ * ```
+ */
+export function useDuplicateSchema(listId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationKey: ['deleteSchema', listId],
-    mutationFn: async (schemaId: string) =>
-      schemasApi.deleteSchema(listId, schemaId),
-    onSuccess: (_data, schemaId) => {
-      // Remove from list
+    mutationKey: ['duplicateSchema', listId],
+    mutationFn: async ({
+      schemaId,
+      newName,
+    }: {
+      schemaId: string
+      newName: string
+    }) => {
+      // Step 1: GET original schema with nested fields
+      const originalSchema = await schemasApi.getSchema(listId, schemaId)
+
+      // Step 2: Create new schema with copied fields
+      const createData: FieldSchemaCreate = {
+        name: newName,
+        description: originalSchema.description ?? undefined,
+        fields: originalSchema.schema_fields.map((sf) => ({
+          field_id: sf.field_id,
+          display_order: sf.display_order,
+          show_on_card: sf.show_on_card,
+        })),
+      }
+
+      return schemasApi.createSchema(listId, createData)
+    },
+    // No optimistic update (too complex with nested data)
+    onError: (err) => {
+      console.error('Failed to duplicate schema:', err)
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) })
-      // Remove detail cache
-      queryClient.removeQueries({ queryKey: schemasKeys.detail(schemaId) })
     },
   })
+}
+
+/**
+ * Compute usage statistics for a schema.
+ *
+ * Client-side computation from tags array (no backend call).
+ * Returns count of tags using this schema and their names.
+ *
+ * @param schemaId - The schema ID to check usage for
+ * @param tags - Array of tags to filter (defaults to empty array)
+ *
+ * @returns Object with count and tagNames array
+ *
+ * @example
+ * ```tsx
+ * function SchemaUsageStats({ schemaId }: Props) {
+ *   const { data: tags = [] } = useTags()
+ *   const usageStats = useSchemaUsageStats(schemaId, tags)
+ *
+ *   return (
+ *     <div>
+ *       Used by {usageStats.count} tag{usageStats.count !== 1 ? 's' : ''}:
+ *       <ul>
+ *         {usageStats.tagNames.map(name => <li key={name}>{name}</li>)}
+ *       </ul>
+ *     </div>
+ *   )
+ * }
+ * ```
+ */
+export function useSchemaUsageStats(
+  schemaId: string | null,
+  tags: Array<{ schema_id?: string | null; name: string }> = []
+) {
+  if (!schemaId || !tags) {
+    return { count: 0, tagNames: [] }
+  }
+
+  const usedByTags = tags.filter((tag) => tag.schema_id === schemaId)
+  return {
+    count: usedByTags.length,
+    tagNames: usedByTags.map((tag) => tag.name),
+  }
 }
 
 // ============================================================================
