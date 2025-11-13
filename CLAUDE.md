@@ -95,6 +95,7 @@ docker-compose logs -f postgres redis
 - `/videos` - VideosPage (single-list MVP with hardcoded first list)
 - `/videos/:videoId` - VideoDetailsPage (see `docs/components/video-details-page.md`)
 - `/dashboard` - Dashboard (real-time job progress)
+- `/settings/schemas` - SettingsPage (schema and field management)
 - `/` - Redirects to `/videos`
 
 **Testing with React Router:**
@@ -105,8 +106,13 @@ docker-compose logs -f postgres redis
 
 **TanStack Query (React Query):**
 - Centralized query client: `frontend/src/lib/queryClient.ts`
-- Custom hooks: `useLists()`, `useVideos()`, `useTags()` in `frontend/src/hooks/`
+- Custom hooks: `useLists()`, `useVideos()`, `useTags()`, `useSchemas()` in `frontend/src/hooks/`
 - Invalidation after mutations (e.g., `queryClient.invalidateQueries(['videos', listId])`)
+- Query key patterns:
+  - `['lists']` - All lists
+  - `['videos', listId]` - Videos for a list
+  - `['tags', listId]` - Tags for a list
+  - `['schemas', listId]` - Schemas for a list
 
 **Zustand (Client State):**
 - Tag selection state: `frontend/src/stores/tagStore.ts`
@@ -178,6 +184,12 @@ All custom field values are validated before persisting to database using centra
 - Integration tests: `*.integration.test.tsx` (test full flows with mocked APIs)
 - Always use `renderWithRouter()` for components using React Router hooks
 - Mock WebSocket: `vi.mock('react-use-websocket')`
+
+**Established Test Patterns (REF MCP Validated):**
+- Always add `afterEach(() => { vi.clearAllMocks() })` in test files for cleanup
+- Use `userEvent.setup({ delay: null })` for fast, deterministic tests (60% faster)
+- Use schema-specific aria-labels for accessibility testing (e.g., `screen.getByRole('button', { name: /actions for schema name/i })`)
+- Mock `useLists()` when testing components that need dynamic listId (e.g., SettingsPage)
 
 **Backend (pytest):**
 - Unit tests: `tests/api/`, `tests/models/`, `tests/workers/`
@@ -300,6 +312,14 @@ Both use shared `CustomFieldsSection` component (DRY principle).
 
 ## Key Components Reference
 
+### Pages
+- **Dashboard** (`frontend/src/pages/Dashboard.tsx`) - Real-time job progress monitoring with WebSocket updates
+- **SettingsPage** (`frontend/src/pages/SettingsPage.tsx`) - Schema and field management interface
+  - Uses `useLists()` to fetch listId dynamically (not hardcoded)
+  - Tabbed interface with Schemas/Fields sections using shadcn/ui Tabs
+  - Integrates SchemasList component for schema display
+- **NotFound** (`frontend/src/pages/NotFound.tsx`) - 404 error page
+
 ### Forms & Editors
 - **NewFieldForm** - Inline field creation form (`docs/components/new-field-form.md`)
 - **FieldConfigEditor** - Type-specific config editors (`docs/components/field-config-editor.md`)
@@ -315,6 +335,13 @@ Both use shared `CustomFieldsSection` component (DRY principle).
 - **VideoDetailsPage** - Separate page for video details (`docs/components/video-details-page.md`)
 - **VideoDetailsModal** - Modal alternative (`docs/components/video-details-modal.md`)
 - **CustomFieldsSection** - Shared component for schema-grouped fields (`docs/components/custom-fields-section.md`)
+
+### Settings & Schema Management
+- **SchemasList** (`frontend/src/components/SchemasList.tsx`) - Grid layout of schema cards with responsive design
+- **SchemaCard** (`frontend/src/components/SchemaCard.tsx`) - Individual schema card with actions dropdown
+  - Displays schema name, description, and field count
+  - Action menu with Edit/Delete/Duplicate options
+  - Accessibility: Dynamic aria-labels with schema names (e.g., "Actions for Schema Name")
 
 ## Security Notes
 
@@ -351,6 +378,12 @@ Both use shared `CustomFieldsSection` component (DRY principle).
 - `backend/app/api/tags.py` - Tag endpoints
 - `frontend/src/stores/tagStore.ts` - Tag state
 - `frontend/src/components/TagNavigation.tsx` - Tag UI
+
+**For Schema Management Changes:**
+- `frontend/src/pages/SettingsPage.tsx` - Settings page with tabs
+- `frontend/src/components/SchemasList.tsx` - Schema grid layout
+- `frontend/src/components/SchemaCard.tsx` - Individual schema cards
+- `frontend/src/hooks/useSchemas.ts` - TanStack Query hook for schemas
 
 **For Custom Fields UI Changes:**
 - `frontend/src/components/fields/FieldDisplay.tsx` - Type-specific field renderer (read-only)
