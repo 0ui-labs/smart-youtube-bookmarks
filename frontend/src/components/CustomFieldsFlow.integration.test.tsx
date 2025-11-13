@@ -366,4 +366,43 @@ describe('Custom Fields Flow Integration (Task #134)', () => {
       })
     })
   })
+
+  describe('Test 3: Error handling for API failures', () => {
+    it('shows error toast when field creation fails', async () => {
+      const user = userEvent.setup({ delay: null })
+
+      // Override handler to return error (using global server)
+      server.use(
+        http.post(`${API_BASE}/lists/:listId/custom-fields`, () => {
+          return HttpResponse.json(
+            { detail: 'Validation error: Invalid field_type' },
+            { status: 400 }
+          )
+        })
+      )
+
+      renderWithRouter(<VideosPage listId={MOCK_LIST_ID} />)
+
+      // Open new tag dialog and try to create field
+      const newTagButton = screen.getByRole('button', { name: /neuer tag/i })
+      await user.click(newTagButton)
+
+      const addFieldButton = screen.getByRole('button', { name: /feld.*hinzufügen/i })
+      await user.click(addFieldButton)
+
+      const fieldNameInput = screen.getByLabelText(/feld.*name/i)
+      await user.type(fieldNameInput, 'Test Field')
+
+      const saveFieldButton = screen.getByRole('button', { name: /feld.*speichern/i })
+      await user.click(saveFieldButton)
+
+      // Verify error toast appears
+      await waitFor(() => {
+        expect(screen.getByText(/fehler|error/i)).toBeInTheDocument()
+      })
+
+      // Verify field was NOT added
+      expect(mockFields).toHaveLength(0)
+    })
+  })
 })
