@@ -9,7 +9,7 @@ Config validation uses discriminated unions to ensure type-specific constraints
 are enforced (e.g., rating fields must have max_rating between 1-10).
 """
 
-from typing import Literal, Annotated, Any, Dict
+from typing import Literal, Annotated, Any, Dict, List
 from uuid import UUID
 from datetime import datetime
 
@@ -389,4 +389,79 @@ class DuplicateCheckResponse(BaseModel):
     field: CustomFieldResponse | None = Field(
         None,
         description="Existing field details (if exists=true)"
+    )
+
+
+class SmartSuggestion(BaseModel):
+    """
+    A single similarity suggestion from smart duplicate detection.
+
+    Includes the similar field, similarity score, and explanation
+    for why it was suggested.
+    """
+    field: CustomFieldResponse = Field(
+        ...,
+        description="The similar existing field"
+    )
+    score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Similarity score (0.0-1.0, higher = more similar)"
+    )
+    similarity_type: Literal["exact", "levenshtein", "semantic", "no_match"] = Field(
+        ...,
+        description="Type of similarity detected"
+    )
+    explanation: str = Field(
+        ...,
+        description="Human-readable explanation of why this field was suggested"
+    )
+
+
+class SmartDuplicateCheckResponse(BaseModel):
+    """
+    Response for smart duplicate checking with AI-powered suggestions.
+
+    Returns ranked list of similar fields with scores and explanations.
+
+    Example (typo detected):
+        {
+            "exists": true,
+            "suggestions": [
+                {
+                    "field": {...},
+                    "score": 0.95,
+                    "similarity_type": "levenshtein",
+                    "explanation": "Very similar name (1 character difference): 'Presentation Quality'"
+                }
+            ],
+            "mode": "smart"
+        }
+
+    Example (semantic similarity):
+        {
+            "exists": true,
+            "suggestions": [
+                {
+                    "field": {...},
+                    "score": 0.72,
+                    "similarity_type": "semantic",
+                    "explanation": "Semantically similar concept: 'Overall Rating' (AI detected 88% meaning similarity)"
+                }
+            ],
+            "mode": "smart"
+        }
+    """
+    exists: bool = Field(
+        ...,
+        description="True if any similar fields found (score >= 0.60)"
+    )
+    suggestions: List[SmartSuggestion] = Field(
+        default_factory=list,
+        description="List of similar fields ranked by score (highest first)"
+    )
+    mode: Literal["basic", "smart"] = Field(
+        default="basic",
+        description="Detection mode used"
     )
