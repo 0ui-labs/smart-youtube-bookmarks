@@ -28,6 +28,7 @@ except ImportError:
     import difflib
     RAPIDFUZZ_AVAILABLE = False
 
+import httpx
 import numpy as np
 from redis.asyncio import Redis
 
@@ -141,6 +142,14 @@ class DuplicateDetector:
             >>> print(results[0].explanation)
             "Very similar name (1 character difference)"
         """
+        # Input validation
+        if not field_name or not field_name.strip():
+            logger.warning("Empty field_name provided to find_similar_fields")
+            return []
+
+        if not existing_fields:
+            return []
+
         results: List[SimilarityResult] = []
 
         # Strategy 1: Exact match (case-insensitive)
@@ -344,8 +353,6 @@ class DuplicateDetector:
         - Includes task_type and output_dimensionality
         - Response is data["embeddings"][0]["values"] (plural + array index)
         """
-        import httpx
-
         # CORRECTED: Use v1beta endpoint with gemini-embedding-001
         url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent"
 
