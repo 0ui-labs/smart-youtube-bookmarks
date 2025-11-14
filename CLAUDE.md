@@ -207,6 +207,48 @@ All custom field values are validated before persisting to database using centra
 - Checkbox-based multi-select (preferred over dropdown for visual feedback)
 - Separate results dialog (cleaner UX than inline results)
 
+### Analytics System (Task #142)
+
+**Overview:**
+Provides insights into custom fields and schema usage across video collections with 4 key metrics:
+- **Most-Used Fields** - Top 10 custom fields by usage count with percentage
+- **Unused Schemas** - Schemas with no tags or no field values (identifies cleanup candidates)
+- **Field Coverage** - Percentage of videos with values for each field (sorted by lowest coverage)
+- **Schema Effectiveness** - Average field completion rate per schema with video count
+
+**Component Architecture:**
+- Parent: `AnalyticsView` - Tabbed layout with metric visualizations
+- Charts: `MostUsedFieldsChart` (Bar), `SchemaEffectivenessChart` (Bar with dual metrics)
+- Tables: `UnusedSchemasTable`, `FieldCoverageStats` (sortable with icons)
+- Hook: `useAnalytics()` - TanStack Query hook with listId parameter
+
+**API Integration:**
+- Endpoint: `GET /api/lists/{list_id}/analytics`
+- Response: `AnalyticsResponse` with 4 metric arrays
+- Validation: Pydantic schemas with business logic constraints (percentages, counts)
+- Performance: Single database query with joins (< 100ms for 1000+ videos)
+
+**Key Files:**
+- `frontend/src/components/analytics/AnalyticsView.tsx` - Main container
+- `frontend/src/components/analytics/MostUsedFieldsChart.tsx` - Bar chart
+- `frontend/src/components/analytics/SchemaEffectivenessChart.tsx` - Dual-metric bar chart
+- `frontend/src/components/analytics/UnusedSchemasTable.tsx` - Table with reason column
+- `frontend/src/components/analytics/FieldCoverageStats.tsx` - Sortable table
+- `frontend/src/hooks/useAnalytics.ts` - React Query hook
+- `backend/app/api/analytics.py` - Analytics endpoint
+- `backend/app/schemas/analytics.py` - Pydantic validation schemas
+
+**Testing Coverage:**
+- Backend: 33 tests (7 API integration, 26 schema validation)
+- Frontend: 24 tests across 5 component files
+- Patterns: Mock data factories, loading/error states, accessibility (ARIA), sorting
+
+**Integration Points:**
+- Access from SettingsPage "Analytics" tab
+- Uses existing listId from useLists() hook
+- Respects custom field types and schema relationships
+- Future: Export to CSV, historical trend tracking
+
 ### Testing Patterns
 
 **Frontend (Vitest):**
