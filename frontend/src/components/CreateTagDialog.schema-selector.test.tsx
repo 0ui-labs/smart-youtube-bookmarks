@@ -27,6 +27,7 @@ const mockSchemasOptions = vi.fn((listId: string) => ({
 
 vi.mock('@/hooks/useSchemas', () => ({
   schemasOptions: (listId: string) => mockSchemasOptions(listId),
+  useSchemaUsageStats: vi.fn(() => ({ count: 0, tagNames: [] })),
 }))
 
 // Mock useTags hook

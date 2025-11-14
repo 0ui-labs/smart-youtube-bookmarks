@@ -7,6 +7,7 @@ import type { FieldSchemaResponse } from '@/types/schema'
 // Mock useSchemas and useLists hooks
 vi.mock('@/hooks/useSchemas', () => ({
   useSchemas: vi.fn(),
+  useSchemaUsageStats: vi.fn(() => ({ count: 0, tagNames: [] })),
 }))
 
 vi.mock('@/hooks/useLists', () => ({
