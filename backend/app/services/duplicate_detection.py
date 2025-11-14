@@ -23,6 +23,7 @@ from enum import Enum
 
 try:
     from rapidfuzz import fuzz
+    from rapidfuzz.distance import Levenshtein
     RAPIDFUZZ_AVAILABLE = True
 except ImportError:
     import difflib
@@ -244,7 +245,7 @@ class DuplicateDetector:
         """
         if RAPIDFUZZ_AVAILABLE:
             # Use rapidfuzz (faster)
-            distance = fuzz.distance.Levenshtein.distance(str1, str2)
+            distance = Levenshtein.distance(str1, str2)
             ratio = fuzz.ratio(str1, str2) / 100.0  # Convert 0-100 to 0-1
         else:
             # Fallback to difflib (standard library)

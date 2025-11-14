@@ -32,6 +32,13 @@ class TestLevenshteinDetection:
             CustomField(
                 id=uuid4(),
                 list_id=uuid4(),
+                name="Presentation",
+                field_type="select",
+                config={"options": ["bad", "good", "great"]}
+            ),
+            CustomField(
+                id=uuid4(),
+                list_id=uuid4(),
                 name="Overall Rating",
                 field_type="rating",
                 config={"max_rating": 5}
@@ -78,7 +85,7 @@ class TestLevenshteinDetection:
     async def test_two_char_typo(self, detector, sample_fields):
         """Two character typo should be detected."""
         results = await detector.find_similar_fields(
-            "Presenttion",  # 'a' → 't', missing 'a'
+            "Presntttion",  # 2 character differences
             sample_fields,
             include_semantic=False
         )
@@ -92,7 +99,7 @@ class TestLevenshteinDetection:
     async def test_three_char_typo_edge_case(self, detector, sample_fields):
         """Three character typo is at threshold (distance = 3)."""
         results = await detector.find_similar_fields(
-            "Presenttion Qality",  # 3 errors
+            "Presntttio",  # 3 character differences
             sample_fields,
             include_semantic=False
         )
@@ -105,14 +112,13 @@ class TestLevenshteinDetection:
     async def test_four_char_typo_no_match(self, detector, sample_fields):
         """Four character typo should not match (distance > 3)."""
         results = await detector.find_similar_fields(
-            "Prsnttion Qality",  # 4+ errors
+            "Presntto",  # 4 character differences (distance > 3)
             sample_fields,
             include_semantic=False
         )
 
-        # Should not find Presentation Quality (too different)
-        if results:
-            assert results[0].score < 0.80  # Not Levenshtein match
+        # Should NOT suggest (distance > 3)
+        assert len(results) == 0
 
     @pytest.mark.asyncio
     async def test_completely_different_no_match(self, detector, sample_fields):
@@ -128,26 +134,26 @@ class TestLevenshteinDetection:
 
     @pytest.mark.asyncio
     async def test_multiple_matches_sorted_by_score(self, detector):
-        """Multiple matches should be sorted by score (highest first)."""
+        """Multiple fuzzy matches should be sorted by score (highest first)."""
         fields = [
             CustomField(
                 id=uuid4(),
                 list_id=uuid4(),
-                name="Rating",
+                name="Ratng",  # closer typo (distance 1)
                 field_type="rating",
                 config={"max_rating": 5}
             ),
             CustomField(
                 id=uuid4(),
                 list_id=uuid4(),
-                name="Ratng",  # closer typo
+                name="Rtng",  # further typo (distance 2)
                 field_type="rating",
                 config={"max_rating": 5}
             ),
             CustomField(
                 id=uuid4(),
                 list_id=uuid4(),
-                name="Rtng",  # further typo
+                name="Other Field",  # no match
                 field_type="rating",
                 config={"max_rating": 5}
             )
@@ -159,10 +165,11 @@ class TestLevenshteinDetection:
             include_semantic=False
         )
 
-        # Should be sorted: exact, then by proximity
-        assert len(results) == 3
-        assert results[0].score == 1.0  # Exact
-        assert results[1].score > results[2].score  # "Ratng" > "Rtng"
+        # Should return 2 fuzzy matches sorted by proximity
+        assert len(results) == 2
+        assert results[0].similarity_type == SimilarityType.LEVENSHTEIN
+        assert results[1].similarity_type == SimilarityType.LEVENSHTEIN
+        assert results[0].score > results[1].score  # "Ratng" > "Rtng"
 
     @pytest.mark.asyncio
     async def test_special_characters_and_spaces(self, detector):
