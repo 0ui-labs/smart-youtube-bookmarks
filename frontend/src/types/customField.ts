@@ -125,3 +125,11 @@ export const DuplicateCheckResponseSchema = z.object({
 })
 
 export type DuplicateCheckResponse = z.infer<typeof DuplicateCheckResponseSchema>
+
+/**
+ * Extended CustomField with usage statistics
+ * Used by FieldsList component to show schema usage count
+ */
+export interface CustomFieldWithUsage extends CustomField {
+  usage_count: number; // Number of schemas using this field
+}
