@@ -4,8 +4,8 @@ Analytics Pydantic schemas for custom fields usage statistics.
 Provides typed response models for the /api/lists/{list_id}/analytics endpoint.
 Validates aggregated data from PostgreSQL queries before API serialization.
 """
-from typing import Optional
-from pydantic import BaseModel, Field
+from typing import Optional, Literal
+from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 
 
@@ -27,6 +27,31 @@ class MostUsedFieldStat(BaseModel):
         description="Percentage of videos with this field set (usage_count / total_videos * 100)"
     )
 
+    @model_validator(mode='after')
+    def validate_usage_count_and_percentage(self) -> 'MostUsedFieldStat':
+        """Ensure usage_count <= total_videos and percentage matches ratio."""
+        if self.usage_count > self.total_videos:
+            raise ValueError(
+                f"usage_count ({self.usage_count}) cannot exceed total_videos ({self.total_videos})"
+            )
+
+        # Validate percentage calculation (allow small floating point error)
+        if self.total_videos > 0:
+            expected_percentage = (self.usage_count / self.total_videos) * 100
+            if abs(self.usage_percentage - expected_percentage) > 0.01:
+                raise ValueError(
+                    f"usage_percentage ({self.usage_percentage:.2f}) does not match calculated value "
+                    f"({expected_percentage:.2f}) from usage_count/total_videos"
+                )
+        else:
+            # When total_videos is 0, percentage should be 0
+            if self.usage_percentage != 0.0:
+                raise ValueError(
+                    f"usage_percentage must be 0.0 when total_videos is 0, got {self.usage_percentage}"
+                )
+
+        return self
+
 
 class UnusedSchemaStat(BaseModel):
     """
@@ -44,7 +69,7 @@ class UnusedSchemaStat(BaseModel):
         None,
         description="Last time a field value was set for this schema (NULL if never used)"
     )
-    reason: str = Field(
+    reason: Literal["no_tags", "no_values"] = Field(
         description="Why schema is unused: 'no_tags' or 'no_values'"
     )
 
@@ -66,6 +91,31 @@ class FieldCoverageStat(BaseModel):
         le=100.0,
         description="Percentage coverage (videos_with_values / total_videos * 100)"
     )
+
+    @model_validator(mode='after')
+    def validate_coverage_count_and_percentage(self) -> 'FieldCoverageStat':
+        """Ensure videos_with_values <= total_videos and percentage matches ratio."""
+        if self.videos_with_values > self.total_videos:
+            raise ValueError(
+                f"videos_with_values ({self.videos_with_values}) cannot exceed total_videos ({self.total_videos})"
+            )
+
+        # Validate percentage calculation (allow small floating point error)
+        if self.total_videos > 0:
+            expected_percentage = (self.videos_with_values / self.total_videos) * 100
+            if abs(self.coverage_percentage - expected_percentage) > 0.01:
+                raise ValueError(
+                    f"coverage_percentage ({self.coverage_percentage:.2f}) does not match calculated value "
+                    f"({expected_percentage:.2f}) from videos_with_values/total_videos"
+                )
+        else:
+            # When total_videos is 0, percentage should be 0
+            if self.coverage_percentage != 0.0:
+                raise ValueError(
+                    f"coverage_percentage must be 0.0 when total_videos is 0, got {self.coverage_percentage}"
+                )
+
+        return self
 
 
 class SchemaEffectivenessStat(BaseModel):
@@ -92,6 +142,31 @@ class SchemaEffectivenessStat(BaseModel):
         ge=0,
         description="Number of videos with tags bound to this schema"
     )
+
+    @model_validator(mode='after')
+    def validate_effectiveness_and_percentage(self) -> 'SchemaEffectivenessStat':
+        """Ensure avg_fields_filled <= field_count and percentage matches ratio."""
+        if self.avg_fields_filled > self.field_count:
+            raise ValueError(
+                f"avg_fields_filled ({self.avg_fields_filled:.2f}) cannot exceed field_count ({self.field_count})"
+            )
+
+        # Validate percentage calculation (allow small floating point error)
+        if self.field_count > 0:
+            expected_percentage = (self.avg_fields_filled / self.field_count) * 100
+            if abs(self.completion_percentage - expected_percentage) > 0.01:
+                raise ValueError(
+                    f"completion_percentage ({self.completion_percentage:.2f}) does not match calculated value "
+                    f"({expected_percentage:.2f}) from avg_fields_filled/field_count"
+                )
+        else:
+            # When field_count is 0, percentage should be 0
+            if self.completion_percentage != 0.0:
+                raise ValueError(
+                    f"completion_percentage must be 0.0 when field_count is 0, got {self.completion_percentage}"
+                )
+
+        return self
 
 
 class AnalyticsResponse(BaseModel):
