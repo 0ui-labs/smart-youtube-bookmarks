@@ -1,7 +1,17 @@
 import { useState } from 'react'
 import { useSchemas } from '@/hooks/useSchemas'
 import { useLists } from '@/hooks/useLists' // ✨ FIX #4: Import useLists
+import {
+  useCustomFields,
+  useUpdateCustomField,
+  useDeleteCustomField,
+  useFieldUsageCounts,
+} from '@/hooks/useCustomFields'
 import { SchemasList } from '@/components/SchemasList'
+import { SchemaCreationDialog } from '@/components/schemas/SchemaCreationDialog'
+import { FieldsList } from '@/components/settings/FieldsList'
+import { FieldEditDialog } from '@/components/settings/FieldEditDialog'
+import { ConfirmDeleteFieldModal } from '@/components/settings/ConfirmDeleteFieldModal'
 import { Button } from '@/components/ui/button'
 import {
   Tabs,
@@ -10,6 +20,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { Plus } from 'lucide-react'
+import type { CustomField } from '@/types/customField'
 
 /**
  * SettingsPage - Centralized settings management
@@ -40,14 +51,88 @@ export function SettingsPage() {
   // Fetch schemas for current list
   const { data: schemas, isLoading: isSchemasLoading, isError: isSchemasError } = useSchemas(listId)
 
+  // Fetch custom fields for current list (Task #139 Step 8)
+  const { data: fields = [], isLoading: isFieldsLoading } = useCustomFields(listId)
+  const updateField = useUpdateCustomField(listId)
+  const deleteField = useDeleteCustomField(listId)
+  const usageCounts = useFieldUsageCounts(listId)
+
+  // Schema creation dialog state (Task #140 Step 7)
+  const [schemaDialogOpen, setSchemaDialogOpen] = useState(false)
+
+  // Edit dialog state (Task #139 Step 8)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [fieldToEdit, setFieldToEdit] = useState<CustomField | null>(null)
+
+  // Delete dialog state (Task #139 Step 8)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [fieldToDelete, setFieldToDelete] = useState<CustomField | null>(null)
+
   // Combine loading states
-  const isLoading = isListsLoading || isSchemasLoading
+  const isLoading = isListsLoading || isSchemasLoading || isFieldsLoading
   const isError = isListsError || isSchemasError
 
-  // Placeholder handlers (to be implemented in future tasks)
+  // Schema creation handler (Task #140 Step 7)
   const handleCreateSchema = () => {
-    console.log('Create schema clicked - to be implemented')
-    // TODO: Open SchemaEditor dialog (Task #121)
+    setSchemaDialogOpen(true)
+  }
+
+  // Field edit handler (Task #139 Step 8)
+  const handleEditClick = (field: CustomField) => {
+    setFieldToEdit(field)
+    setEditDialogOpen(true)
+  }
+
+  // Field edit save handler (Task #139 Step 8)
+  const handleEditSave = (fieldId: string, updates: any) => {
+    updateField.mutate(
+      { fieldId, data: updates },
+      {
+        onSuccess: () => {
+          console.log('Field updated successfully')
+          setEditDialogOpen(false)
+          setFieldToEdit(null)
+        },
+        onError: (error: any) => {
+          const message = error.response?.data?.detail || 'Failed to update field'
+          console.error('Update failed:', message)
+          // Keep dialog open on error (don't reset state)
+        },
+      }
+    )
+  }
+
+  // Field delete click handler (Task #139 Step 8)
+  const handleDeleteClick = (fieldId: string) => {
+    const field = fields.find((f) => f.id === fieldId)
+    if (field) {
+      setFieldToDelete(field)
+      setDeleteDialogOpen(true)
+    }
+  }
+
+  // Field delete confirm handler (Task #139 Step 8)
+  const handleDeleteConfirm = () => {
+    if (!fieldToDelete) return
+
+    deleteField.mutate(fieldToDelete.id, {
+      onSuccess: () => {
+        console.log(`Field "${fieldToDelete.name}" deleted successfully`)
+        setDeleteDialogOpen(false)
+        setFieldToDelete(null)
+      },
+      onError: (error: any) => {
+        const message = error.response?.data?.detail || 'Failed to delete field'
+        console.error('Delete failed:', message)
+        // Keep dialog open on error (don't reset state)
+      },
+    })
+  }
+
+  // Schema creation success handler (Task #140 Step 7)
+  const handleSchemaCreated = (schema: any) => {
+    console.log(`Schema created successfully: "${schema.name}" with ${schema.schema_fields?.length || 0} fields`)
+    // TODO: Add toast notification when toast component is available
   }
 
   // Show loading state
@@ -114,16 +199,59 @@ export function SettingsPage() {
             )}
           </TabsContent>
 
-          {/* Fields Tab - Placeholder */}
+          {/* Fields Tab - Task #139 Step 8 */}
           <TabsContent value="fields">
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">
-                Fields management coming soon...
-              </p>
-            </div>
+            {fields.length > 0 ? (
+              <FieldsList
+                fields={fields}
+                onEdit={handleEditClick}
+                onDelete={handleDeleteClick}
+                showUsageCount={true}
+                usageCounts={usageCounts}
+              />
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-lg mb-4">
+                  No custom fields yet. Create your first field to extend video metadata!
+                </p>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Edit Dialog - Task #139 Step 8 */}
+      <FieldEditDialog
+        open={editDialogOpen}
+        field={fieldToEdit}
+        onClose={() => {
+          setEditDialogOpen(false)
+          setFieldToEdit(null)
+        }}
+        onSave={handleEditSave}
+        isLoading={updateField.isPending}
+      />
+
+      {/* Delete Confirmation - Task #139 Step 8 */}
+      <ConfirmDeleteFieldModal
+        open={deleteDialogOpen}
+        fieldName={fieldToDelete?.name || null}
+        usageCount={fieldToDelete ? usageCounts.get(fieldToDelete.id) || 0 : 0}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setDeleteDialogOpen(false)
+          setFieldToDelete(null)
+        }}
+        isLoading={deleteField.isPending}
+      />
+
+      {/* Schema Creation Dialog - Task #140 Step 7 */}
+      <SchemaCreationDialog
+        listId={listId}
+        open={schemaDialogOpen}
+        onOpenChange={setSchemaDialogOpen}
+        onSchemaCreated={handleSchemaCreated}
+      />
     </div>
   )
 }

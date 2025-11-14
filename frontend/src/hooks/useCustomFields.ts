@@ -14,6 +14,7 @@ import {
   type CustomFieldUpdate,
 } from '@/types/customFields'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useSchemas } from './useSchemas'
 
 // ============================================================================
 // Query Key Factory
@@ -326,4 +327,53 @@ export const useDeleteCustomField = (listId: string) => {
       })
     },
   })
+}
+
+// ============================================================================
+// Usage Count Hook
+// ============================================================================
+
+/**
+ * Calculate usage count for each custom field
+ *
+ * Returns a Map<fieldId, usageCount> showing how many schemas use each field.
+ * Client-side calculation from schema data (no additional API call needed).
+ *
+ * WHY client-side:
+ * - Schemas already fetched for Settings page
+ * - No N+1 query problem (single schemas fetch)
+ * - Real-time updates when schemas change
+ *
+ * Alternative (backend approach):
+ * - Add `usage_count` to CustomFieldResponse schema
+ * - Requires JOIN in backend query (more complex)
+ * - Chosen approach is simpler for MVP
+ *
+ * @param listId - List to calculate usage for
+ * @returns Map of fieldId → usageCount
+ *
+ * @example
+ * ```tsx
+ * const usageCounts = useFieldUsageCounts(listId)
+ *
+ * // Check if field is in use
+ * const isFieldUsed = (usageCounts.get(fieldId) ?? 0) > 0
+ *
+ * // Show usage count in UI
+ * <Badge>{usageCounts.get(field.id) ?? 0} schemas</Badge>
+ * ```
+ */
+export const useFieldUsageCounts = (listId: string): Map<string, number> => {
+  const { data: schemas = [] } = useSchemas(listId)
+
+  const usageCounts = new Map<string, number>()
+
+  schemas.forEach((schema) => {
+    schema.schema_fields?.forEach((schemaField) => {
+      const fieldId = schemaField.field_id
+      usageCounts.set(fieldId, (usageCounts.get(fieldId) || 0) + 1)
+    })
+  })
+
+  return usageCounts
 }

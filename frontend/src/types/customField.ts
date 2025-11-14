@@ -88,6 +88,11 @@ export const CustomFieldSchema = z.object({
 export type CustomField = z.infer<typeof CustomFieldSchema>
 
 /**
+ * Alias for CustomField to match backend naming (CustomFieldResponse)
+ */
+export type CustomFieldResponse = CustomField
+
+/**
  * Schema for creating new field (matches backend CustomFieldCreate)
  */
 export const CustomFieldCreateSchema = z.object({

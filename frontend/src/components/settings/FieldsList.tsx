@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-table';
 import type { CustomField } from '@/types/customField';
 import { FieldTypeBadge } from './FieldTypeBadge';
+import { FieldActionsMenu } from './FieldActionsMenu';
 import { formatConfigPreview } from '@/utils/fieldConfigPreview';
 
 /**
@@ -16,9 +17,10 @@ import { formatConfigPreview } from '@/utils/fieldConfigPreview';
  */
 interface FieldsListProps {
   fields: CustomField[];
-  onEdit?: (field: CustomField) => void;
-  onDelete?: (field: CustomField) => void;
+  onEdit: (field: CustomField) => void;
+  onDelete: (fieldId: string) => void;
   showUsageCount?: boolean;
+  usageCounts: Map<string, number>;
   isLoading?: boolean;
 }
 
@@ -65,7 +67,8 @@ export const FieldsList: React.FC<FieldsListProps> = ({
   fields,
   onEdit,
   onDelete,
-  showUsageCount = true,
+  showUsageCount = false,
+  usageCounts,
   isLoading = false,
 }) => {
   /**
@@ -123,51 +126,45 @@ export const FieldsList: React.FC<FieldsListProps> = ({
       ...(showUsageCount
         ? [
             {
-              accessorKey: 'usage_count',
-              header: 'Used In',
+              id: 'usage',
+              header: 'Usage',
               cell: (info: any) => {
-                const count = info.getValue() ?? 0;
+                const fieldId = info.row.original.id;
+                const count = usageCounts.get(fieldId) ?? 0;
                 return (
                   <span className="text-sm text-gray-500">
-                    {count} schema{count !== 1 ? 's' : ''}
+                    Used by {count} schema{count !== 1 ? 's' : ''}
                   </span>
                 );
               },
               enableSorting: true,
+              sortingFn: (rowA: any, rowB: any) => {
+                const countA = usageCounts.get(rowA.original.id) ?? 0;
+                const countB = usageCounts.get(rowB.original.id) ?? 0;
+                return countA - countB;
+              },
             } as ColumnDef<CustomFieldRow>,
           ]
         : []),
 
-      // Actions Column
+      // Actions Column (empty header, right-aligned, w-12)
       {
-        accessorKey: 'id',
-        header: 'Actions',
+        id: 'actions',
+        header: () => <span className="sr-only">Actions</span>,
         cell: (info) => (
-          <div className="flex gap-2">
-            {onEdit && (
-              <button
-                onClick={() => onEdit(info.row.original)}
-                className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                aria-label={`Edit ${info.row.original.name}`}
-              >
-                Edit
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={() => onDelete(info.row.original)}
-                className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                aria-label={`Delete ${info.row.original.name}`}
-              >
-                Delete
-              </button>
-            )}
+          <div className="text-right">
+            <FieldActionsMenu
+              field={info.row.original}
+              onEdit={() => onEdit(info.row.original)}
+              onDelete={() => onDelete(info.row.original.id)}
+            />
           </div>
         ),
         enableSorting: false,
+        size: 48, // w-12 equivalent (48px)
       },
     ],
-    [onEdit, onDelete, showUsageCount]
+    [onEdit, onDelete, showUsageCount, usageCounts]
   );
 
   /**
@@ -276,12 +273,14 @@ export const FieldsList: React.FC<FieldsListProps> = ({
                   return (
                     <th
                       key={header.id}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                        header.id === 'actions' ? 'w-12 text-right' : ''
+                      }`}
                       onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                       style={{ cursor: canSort ? 'pointer' : 'default' }}
                       aria-sort={ariaSort}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className={`flex items-center gap-2 ${header.id === 'actions' ? 'justify-end' : ''}`}>
                         {header.isPlaceholder
                           ? null
                           : flexRender(header.column.columnDef.header, header.getContext())}
