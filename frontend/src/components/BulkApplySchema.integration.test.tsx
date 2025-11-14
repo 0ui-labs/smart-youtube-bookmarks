@@ -1,6 +1,6 @@
 // frontend/src/components/BulkApplySchema.integration.test.tsx
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -80,6 +80,10 @@ describe('BulkApplySchema Integration', () => {
       }
       return Promise.reject(new Error(`Unexpected GET: ${url}`))
     })
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
   })
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
