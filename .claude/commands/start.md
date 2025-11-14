@@ -166,7 +166,7 @@
    **time_tracking.csv:**
    - Füge einen neuen Eintrag am Ende der CSV-Datei hinzu
    - Format: `YYYY-MM-DD,#XXX,HH:MM,HH:MM,XXX min`
-   - Beispiel: `2025-11-14,#138,08:30,10:15,105 min`
+   - Beispiel: `2025-11-14,#138,08:30,10:15,105`
    - **Wichtig:** Verwende `echo` mit append (`>>`) um den Eintrag hinzuzufügen
 
    **status.md:**

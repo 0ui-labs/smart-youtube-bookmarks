@@ -251,7 +251,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 
 **Phase 3: Advanced Features**
 
-143. [ ] Implement AI-powered duplicate detection (Levenshtein + semantic similarity)
+143. [x] Implement AI-powered duplicate detection (Levenshtein + semantic similarity)
 144. [ ] Add field-based filtering to video list UI
 145. [ ] Implement field-based sorting
 146. [ ] Extend CSV export to include custom field values
