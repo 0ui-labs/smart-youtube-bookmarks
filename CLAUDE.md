@@ -177,6 +177,36 @@ All custom field values are validated before persisting to database using centra
 
 **Performance:** Single field < 1ms, Batch of 50 < 50ms
 
+### Bulk Operations (Task #141)
+
+**Bulk Schema Application:**
+- Component: `BulkApplySchemaDialog` - Multi-select UI for applying schema to multiple tags
+- Hook: `useBulkApplySchema()` - Frontend-side batch mutation with Promise.all
+- Pattern: Checkbox-based multi-select with "Select All" functionality
+- Error Handling: Partial failure support with per-tag error messages and retry
+- API Strategy: Loops existing `PUT /api/tags/{id}` endpoint (no backend changes)
+
+**Bulk Operation Flow:**
+1. User opens SchemaCard menu → "Auf Tags anwenden"
+2. BulkApplySchemaDialog shows all tags with checkboxes
+3. User selects tags (individual or "Select All")
+4. Confirmation shows count and warnings for overwrites
+5. useBulkApplySchema() executes batch with optimistic updates
+6. BulkOperationResultDialog shows results (success/failure counts)
+7. User can retry failed tags from results dialog
+
+**Key Files:**
+- `frontend/src/components/BulkApplySchemaDialog.tsx` - Multi-select UI
+- `frontend/src/components/BulkOperationResultDialog.tsx` - Results display
+- `frontend/src/hooks/useTags.ts` - useBulkApplySchema() mutation
+- `frontend/src/types/bulk.ts` - Type definitions
+
+**REF MCP Patterns:**
+- Promise.all (not allSettled) with try/catch per item for partial failure handling
+- Optimistic updates with onMutate snapshot and onError rollback
+- Checkbox-based multi-select (preferred over dropdown for visual feedback)
+- Separate results dialog (cleaner UX than inline results)
+
 ### Testing Patterns
 
 **Frontend (Vitest):**
