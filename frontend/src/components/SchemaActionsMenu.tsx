@@ -1,4 +1,4 @@
-import { MoreVertical, Edit2, Copy, BarChart3, Trash2 } from 'lucide-react'
+import { MoreVertical, Edit2, Copy, BarChart3, Trash2, Grid2x2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,7 @@ interface SchemaActionsMenuProps {
   onDelete: () => void
   onDuplicate: () => void
   onViewUsage: () => void
+  onBulkApply: () => void
 }
 
 export const SchemaActionsMenu = ({
@@ -24,6 +25,7 @@ export const SchemaActionsMenu = ({
   onDelete,
   onDuplicate,
   onViewUsage,
+  onBulkApply,
 }: SchemaActionsMenuProps) => {
   return (
     <DropdownMenu modal={false}>
@@ -62,6 +64,17 @@ export const SchemaActionsMenu = ({
         >
           <Copy className="w-4 h-4 mr-2" />
           Schema duplizieren
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation()
+            onBulkApply()
+          }}
+          className="cursor-pointer"
+        >
+          <Grid2x2 className="w-4 h-4 mr-2" />
+          Auf Tags anwenden
         </DropdownMenuItem>
 
         <DropdownMenuItem

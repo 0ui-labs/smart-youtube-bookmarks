@@ -5,13 +5,15 @@ import { EditSchemaDialog } from './EditSchemaDialog'
 import { ConfirmDeleteSchemaDialog } from './ConfirmDeleteSchemaDialog'
 import { DuplicateSchemaDialog } from './DuplicateSchemaDialog'
 import { SchemaUsageStatsModal } from './SchemaUsageStatsModal'
+import { BulkApplySchemaDialog } from './BulkApplySchemaDialog'
+import { BulkOperationResultDialog } from './BulkOperationResultDialog'
 import {
   useUpdateSchema,
   useDeleteSchema,
   useDuplicateSchema,
   useSchemaUsageStats,
 } from '@/hooks/useSchemas'
-import { useTags } from '@/hooks/useTags'
+import { useTags, useBulkApplySchema } from '@/hooks/useTags'
 import type { FieldSchemaResponse } from '@/types/schema'
 
 export interface SchemaCardProps {
@@ -51,12 +53,15 @@ export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
   const updateSchema = useUpdateSchema(listId)
   const deleteSchema = useDeleteSchema(listId)
   const duplicateSchema = useDuplicateSchema(listId)
+  const bulkApply = useBulkApplySchema()
 
   // Modal states
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [duplicateOpen, setDuplicateOpen] = useState(false)
   const [usageStatsOpen, setUsageStatsOpen] = useState(false)
+  const [bulkApplyOpen, setBulkApplyOpen] = useState(false)
+  const [showResults, setShowResults] = useState(false)
 
   // Action handlers
   const handleEdit = (data: { name: string; description: string | null }) => {
@@ -95,6 +100,29 @@ export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
     )
   }
 
+  const handleBulkApply = (selectedTagIds: string[]) => {
+    bulkApply.mutate(
+      {
+        tagIds: selectedTagIds,
+        schemaId: schema.id,
+      },
+      {
+        onSuccess: () => {
+          setBulkApplyOpen(false)
+          setShowResults(true)
+        },
+        // Errors handled by mutation's onError (rollback)
+      }
+    )
+  }
+
+  const handleRetry = (failedTagIds: string[]) => {
+    bulkApply.mutate({
+      tagIds: failedTagIds,
+      schemaId: schema.id,
+    })
+  }
+
   return (
     <>
       <Card
@@ -119,6 +147,7 @@ export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
             onDelete={() => setDeleteOpen(true)}
             onDuplicate={() => setDuplicateOpen(true)}
             onViewUsage={() => setUsageStatsOpen(true)}
+            onBulkApply={() => setBulkApplyOpen(true)}
           />
         </CardHeader>
 
@@ -162,6 +191,23 @@ export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
         schema={schema}
         tags={tags}
         onClose={() => setUsageStatsOpen(false)}
+      />
+
+      {/* Bulk Apply Dialog */}
+      <BulkApplySchemaDialog
+        open={bulkApplyOpen}
+        schema={schema}
+        tags={tags}
+        onConfirm={handleBulkApply}
+        onCancel={() => setBulkApplyOpen(false)}
+      />
+
+      {/* Results Dialog */}
+      <BulkOperationResultDialog
+        open={showResults}
+        result={bulkApply.data || null}
+        onClose={() => setShowResults(false)}
+        onRetry={handleRetry}
       />
     </>
   )
