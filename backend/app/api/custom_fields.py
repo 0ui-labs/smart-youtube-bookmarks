@@ -17,13 +17,16 @@ Includes:
 """
 
 from uuid import UUID
-from typing import List
+from typing import List, Literal
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from redis.asyncio import Redis
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.list import BookmarkList
 from app.models.custom_field import CustomField
 from app.models.schema_field import SchemaField
@@ -32,8 +35,13 @@ from app.schemas.custom_field import (
     CustomFieldUpdate,
     CustomFieldResponse,
     DuplicateCheckRequest,
-    DuplicateCheckResponse
+    DuplicateCheckResponse,
+    SmartDuplicateCheckResponse
 )
+from app.services.duplicate_detection import DuplicateDetector
+from app.clients.gemini import GeminiClient
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/lists", tags=["custom-fields"])
 
@@ -385,54 +393,48 @@ async def delete_custom_field(
 
 @router.post(
     "/{list_id}/custom-fields/check-duplicate",
-    response_model=DuplicateCheckResponse,
+    response_model=DuplicateCheckResponse | SmartDuplicateCheckResponse,
     status_code=status.HTTP_200_OK
 )
 async def check_duplicate_field(
     list_id: UUID,
     request: DuplicateCheckRequest,
+    mode: Literal["basic", "smart"] = "basic",
     db: AsyncSession = Depends(get_db)
-) -> DuplicateCheckResponse:
+) -> DuplicateCheckResponse | SmartDuplicateCheckResponse:
     """
-    Check if a custom field with the given name already exists (case-insensitive).
+    Check if a custom field with the given name already exists.
 
-    This endpoint is used for real-time duplicate validation in the UI.
-    Returns 200 OK regardless of whether the field exists - this is a check,
-    not an error condition.
+    Supports two modes:
+    - **basic** (default): Case-insensitive exact match only (fast, <50ms)
+    - **smart**: Exact + Levenshtein + Semantic similarity (slower, <500ms)
 
-    The check is case-insensitive: "Overall Rating", "overall rating", and
-    "OVERALL RATING" are all considered duplicates.
+    Smart mode detects:
+    - Typos: "Presentaton" → "Presentation Quality" (Levenshtein distance < 3)
+    - Semantic: "Video Rating" → "Overall Score" (AI embeddings cosine similarity > 0.75)
 
     Args:
         list_id: UUID of the list to check within
         request: Request body containing the field name to check
+        mode: Detection mode ("basic" or "smart")
         db: Database session
 
     Returns:
-        DuplicateCheckResponse with exists=True and field details if found,
-        or exists=False if not found.
+        - Basic mode: DuplicateCheckResponse (backward compatible)
+        - Smart mode: SmartDuplicateCheckResponse with ranked suggestions
 
-    Raises:
-        HTTPException 404: List not found
-        HTTPException 422: Pydantic validation errors (auto-generated)
-
-    Example Response (exists):
+    Example Smart Response:
         {
             "exists": true,
-            "field": {
-                "id": "123e4567-e89b-12d3-a456-426614174000",
-                "name": "Presentation Quality",
-                "field_type": "select",
-                "config": {"options": ["bad", "good", "great"]},
-                "created_at": "2025-11-06T10:30:00Z",
-                "updated_at": "2025-11-06T10:30:00Z"
-            }
-        }
-
-    Example Response (not exists):
-        {
-            "exists": false,
-            "field": null
+            "suggestions": [
+                {
+                    "field": {...},
+                    "score": 0.95,
+                    "similarity_type": "levenshtein",
+                    "explanation": "Very similar name (1 character difference)"
+                }
+            ],
+            "mode": "smart"
         }
     """
     # Verify list exists
@@ -446,24 +448,66 @@ async def check_duplicate_field(
             detail=f"List with id {list_id} not found"
         )
 
-    # Case-insensitive query for existing field
-    # Uses func.lower() for PostgreSQL compatibility and database-level atomic operation
-    stmt = select(CustomField).where(
-        CustomField.list_id == list_id,
-        func.lower(CustomField.name) == request.name.lower()
-    )
+    # Get all existing fields in this list
+    stmt = select(CustomField).where(CustomField.list_id == list_id)
     result = await db.execute(stmt)
-    existing_field = result.scalar_one_or_none()
+    existing_fields = list(result.scalars().all())
 
-    if existing_field:
-        # Field exists - return full details for rich UI feedback
-        return DuplicateCheckResponse(
-            exists=True,
-            field=CustomFieldResponse.model_validate(existing_field)
-        )
-    else:
-        # Field does not exist
+    # BASIC MODE (backward compatible)
+    if mode == "basic":
+        # Case-insensitive exact match only
+        for field in existing_fields:
+            if field.name.lower() == request.name.lower():
+                return DuplicateCheckResponse(
+                    exists=True,
+                    field=CustomFieldResponse.model_validate(field)
+                )
+
         return DuplicateCheckResponse(
             exists=False,
             field=None
+        )
+
+    # SMART MODE (AI-powered)
+    else:
+        # Initialize detector with dependencies
+        gemini_client = None
+        redis_client = None
+
+        # Try to initialize Gemini client
+        if settings.gemini_api_key:
+            try:
+                gemini_client = GeminiClient(api_key=settings.gemini_api_key)
+            except Exception as e:
+                logger.warning(f"Failed to initialize Gemini client: {e}")
+
+        # Try to initialize Redis client
+        try:
+            redis_client = Redis.from_url(settings.redis_url)
+        except Exception as e:
+            logger.warning(f"Failed to initialize Redis client: {e}")
+
+        # Create detector
+        detector = DuplicateDetector(
+            gemini_client=gemini_client,
+            redis_client=redis_client
+        )
+
+        # Find similar fields
+        similarity_results = await detector.find_similar_fields(
+            field_name=request.name,
+            existing_fields=existing_fields,
+            include_semantic=True
+        )
+
+        # Convert to response format
+        suggestions = [result.to_dict() for result in similarity_results]
+
+        # Filter to only suggestions with score >= 0.60 (threshold)
+        suggestions = [s for s in suggestions if s["score"] >= 0.60]
+
+        return SmartDuplicateCheckResponse(
+            exists=len(suggestions) > 0,
+            suggestions=suggestions,
+            mode="smart"
         )
