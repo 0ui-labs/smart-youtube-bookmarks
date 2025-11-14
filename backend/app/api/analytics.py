@@ -201,16 +201,6 @@ async def _get_unused_schemas(
         HAVING tag_count = 0 OR COUNT(vfv.id) = 0
         ORDER BY fs.name
     """
-    # Subquery: Count field values for each schema
-    value_count_subq = (
-        select(
-            SchemaField.schema_id,
-            func.count(VideoFieldValue.id).label('value_count')
-        )
-        .outerjoin(VideoFieldValue, SchemaField.field_id == VideoFieldValue.field_id)
-        .group_by(SchemaField.schema_id)
-    ).subquery()
-
     # Main query
     stmt = (
         select(
@@ -385,6 +375,9 @@ async def _get_schema_effectiveness(
             continue  # Skip schemas with no videos
 
         # Count filled fields per video
+        # TECHNICAL DEBT: N+1 query pattern (1 query per video)
+        # Acceptable for MVP with <20 schemas and <1000 videos (<20k queries worst case)
+        # TODO: Optimize with window functions or CTE for larger datasets
         total_filled = 0
         for video_id in video_ids:
             filled_stmt = (
