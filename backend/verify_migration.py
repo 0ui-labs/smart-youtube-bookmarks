@@ -9,14 +9,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from sqlalchemy import text
-from app.core.database import async_session_maker
+from app.core.database import AsyncSessionLocal
 
 
 async def verify_migration():
     """Verify pg_trgm extension and GIN index exist."""
     print("=== Verifying pg_trgm Migration ===\n")
 
-    async with async_session_maker() as session:
+    async with AsyncSessionLocal() as session:
         try:
             # Check pg_trgm extension
             result = await session.execute(
@@ -30,22 +30,22 @@ async def verify_migration():
                 print("✗ pg_trgm extension NOT found")
                 return False
 
-            # Check GIN index
+            # Check composite GIN index
             result = await session.execute(
                 text("""
                     SELECT indexname, indexdef
                     FROM pg_indexes
                     WHERE tablename = 'video_field_values'
-                      AND indexname = 'idx_vfv_text_trgm';
+                      AND indexname = 'idx_vfv_field_text_trgm';
                 """)
             )
             idx_row = result.fetchone()
 
             if idx_row:
-                print(f"✓ GIN index 'idx_vfv_text_trgm' exists")
+                print(f"✓ Composite GIN index 'idx_vfv_field_text_trgm' exists")
                 print(f"  Index definition: {idx_row[1]}")
             else:
-                print("✗ GIN index 'idx_vfv_text_trgm' NOT found")
+                print("✗ Composite GIN index 'idx_vfv_field_text_trgm' NOT found")
                 return False
 
             # List all indexes on video_field_values
