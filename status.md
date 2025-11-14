@@ -66,44 +66,44 @@ This file maintains **two separate lists**: PLAN and LOG.
 
 ### React Query Optimization
 
-1.  [x] Apply best practices with queryOptions() helper 
-2.  [x] Change onSuccess to onSettled with async/await 
-3.  [x] Optimize QueryClient defaults 
-4.  [x] Add mutation keys to all mutations 
-5.  [x] Add error logging callbacks 
-6.  [x] Update test suite to match new config
+9.  [x] Apply best practices with queryOptions() helper 
+10. [x] Change onSuccess to onSettled with async/await 
+11. [x] Optimize QueryClient defaults 
+12. [x] Add mutation keys to all mutations 
+13. [x] Add error logging callbacks 
+14. [x] Update test suite to match new config
 
 ### Frontend
 
-1.  [x] Create CollapsibleSidebar component with mobile drawer 
-2.  [x] Create Tag store with Zustand for multi-select filtering
-3.  [x] Create TagNavigation component with tag list and multi-select
-4.  [x] Create useTags React Query hook for API calls 
-5.  [x] Integrate TagNavigation into VideosPage with layout
-6.  [x] Connect tag filter state to useVideos hook 
-7.  [x] Migrate App.tsx to React Router v6 
-8.  [x] Update App.tsx default route to /videos 
-9.  [x] Hide Lists/Dashboard navigation from UI 
+15.  [x] Create CollapsibleSidebar component with mobile drawer 
+16. [x] Create Tag store with Zustand for multi-select filtering
+17. [x] Create TagNavigation component with tag list and multi-select
+18. [x] Create useTags React Query hook for API calls 
+19. [x] Integrate TagNavigation into VideosPage with layout
+20. [x] Connect tag filter state to useVideos hook 
+21. [x] Migrate App.tsx to React Router v6 
+22. [x] Update App.tsx default route to /videos 
+23. [x] Hide Lists/Dashboard navigation from UI 
 
 ### UI Cleanup
 
-1.  [x] Add feature flags to hide Add Video, CSV Upload, CSV Export buttons 
-2.  [x] Create table settings store with thumbnail size and column visibility 
-3.  [x] Implement TableSettingsDropdown component 
-4.  [x] Replace Actions column with three-dot menu 
-5.  [x] Make table rows clickable (except menu) 
-6.  [x] Create ConfirmDeleteModal component 
-7.  [x] Add Plus icon to page header
-8.  [x] Implement thumbnail size CSS classes (small/medium/large)
-9.  [x] Create large thumbnail grid layout
+24. [x] Add feature flags to hide Add Video, CSV Upload, CSV Export buttons 
+25. [x] Create table settings store with thumbnail size and column visibility 
+26. [x] Implement TableSettingsDropdown component 
+27. [x] Replace Actions column with three-dot menu 
+28. [x] Make table rows clickable (except menu) 
+29. [x] Create ConfirmDeleteModal component 
+30. [x] Add Plus icon to page header
+31. [x] Implement thumbnail size CSS classes (small/medium/large)
+32. [x] Create large thumbnail grid layout
 
 ### Grid View Enhancement
 
-1.  [x] Add independent grid column control (2, 3, 4, 5 columns) 
-2.  [x] Create GridColumnControl component 
-3.  [x] Separate grid/list view settings (gridColumns vs thumbnailSize) 
-4.  [x] Add three-dot menu to Grid View cards (Thread #12) 
-5.  [x] Merge grid-view-three-dot-menu feature branch to main 
+33.  [x] Add independent grid column control (2, 3, 4, 5 columns) 
+34. [x] Create GridColumnControl component 
+35. [x] Separate grid/list view settings (gridColumns vs thumbnailSize) 
+36. [x] Add three-dot menu to Grid View cards (Thread #12) 
+37.  [x] Merge grid-view-three-dot-menu feature branch to main 
 
 ### Advanced Features
 
@@ -195,26 +195,26 @@ This file maintains **two separate lists**: PLAN and LOG.
 
 **Phase 1: MVP - Backend (Database + Models + API)**
 
-1.  [x] Create Alembic migration for 4 new tables (custom_fields, field_schemas, schema_fields, video_field_values)
-2.  [x] Create CustomField SQLAlchemy model with field_type enum and JSONB config 
-3.  [x] Create FieldSchema SQLAlchemy model (2025-11-05 22:43 - 2025-11-06 00:20)
-4.  [x] Create SchemaField join table model with display_order and show_on_card 
-5.   [x] Create VideoFieldValue model with typed value columns (text, numeric, boolean) 
-6.   [x] Extend Tag model with schema_id foreign key (completed in Task #98)
-7.   [x] Create CustomField Pydantic schemas (Create, Update, Response)
-8.   [x] Create FieldSchema Pydantic schemas (Create, Update, Response with fields) 
-9.   [x] Implement custom fields CRUD endpoints (GET, POST, PUT, DELETE)
-10.  [x] Implement duplicate field check endpoint (POST /custom-fields/check-duplicate)
-11.  [x] Implement field schemas CRUD endpoints (GET, POST, PUT, DELETE)
-12.  [x] Implement schema-fields endpoints (add/remove fields to schema)
-13.  [x] Extend Tag endpoints with schema_id support (PUT /tags/{id}) 
-14.  [x] Extend Video GET endpoint to include field_values with union logic 
-15.  [x] Implement video field values batch update endpoint (PUT /videos/{id}/fields)  
-16.  [x] Extract field value validation logic into reusable module 
-17.  [x] Implement multi-tag field union query with conflict resolution 
-18.  [x] Add database indexes for performance - Decision: SKIP boolean index (YAGNI, 0% query frequency) 
-19.  [x] Write backend unit tests (duplicate check, validation, union logic, conflict resolution) 
-20.  [x] Write backend integration tests (create tag+schema+field flow, cascade deletes) 
+96.  [x] Create Alembic migration for 4 new tables (custom_fields, field_schemas, schema_fields, video_field_values)
+97.  [x] Create CustomField SQLAlchemy model with field_type enum and JSONB config 
+98.  [x] Create FieldSchema SQLAlchemy model (2025-11-05 22:43 - 2025-11-06 00:20)
+99.  [x] Create SchemaField join table model with display_order and show_on_card 
+100. [x] Create VideoFieldValue model with typed value columns (text, numeric, boolean) 
+101. [x] Extend Tag model with schema_id foreign key (completed in Task #98)
+102. [x] Create CustomField Pydantic schemas (Create, Update, Response)
+103. [x] Create FieldSchema Pydantic schemas (Create, Update, Response with fields) 
+104. [x] Implement custom fields CRUD endpoints (GET, POST, PUT, DELETE)
+105. [x] Implement duplicate field check endpoint (POST /custom-fields/check-duplicate)
+106. [x] Implement field schemas CRUD endpoints (GET, POST, PUT, DELETE)
+107. [x] Implement schema-fields endpoints (add/remove fields to schema)
+108. [x] Extend Tag endpoints with schema_id support (PUT /tags/{id}) 
+109. [x] Extend Video GET endpoint to include field_values with union logic 
+110. [x] Implement video field values batch update endpoint (PUT /videos/{id}/fields)  
+111. [x] Extract field value validation logic into reusable module 
+112. [x] Implement multi-tag field union query with conflict resolution 
+113. [x] Add database indexes for performance - Decision: SKIP boolean index (YAGNI, 0% query frequency) 
+114. [x] Write backend unit tests (duplicate check, validation, union logic, conflict resolution) 
+115. [x] Write backend integration tests (create tag+schema+field flow, cascade deletes) 
 
 **Phase 1: MVP - Frontend (Components + UI)**
 
@@ -246,8 +246,8 @@ This file maintains **two separate lists**: PLAN and LOG.
 138. [x] Create FieldsList component for global field overview
 139. [x] Add field actions (edit, delete, show usage count)
 140. [x] Implement schema templates (predefined common schemas) (2025-11-14 12:27)
-141. [ ] Add bulk operations (apply schema to multiple tags)
-142. [ ] Create analytics views (most-used fields, unused schemas)
+141. [x] Add bulk operations (apply schema to multiple tags) (2025-11-14 15:17)
+142. [x] Create analytics views (most-used fields, unused schemas) (2025-11-14 19:13)
 
 **Phase 3: Advanced Features**
 
