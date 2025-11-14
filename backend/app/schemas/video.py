@@ -5,10 +5,11 @@ Includes enhanced URL validation with security checks.
 """
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Optional, List
 from uuid import UUID
 from urllib.parse import urlparse
 import re
+from enum import Enum
 
 from pydantic import BaseModel, Field, AfterValidator, ConfigDict
 
@@ -19,6 +20,64 @@ if TYPE_CHECKING:
 
 # Import existing CustomFieldResponse from Task #64 (REF #5: DRY principle)
 from .custom_field import CustomFieldResponse
+
+
+class FieldFilterOperator(str, Enum):
+    """Filter operators for different field types."""
+    # Numeric (rating)
+    EQ = "eq"          # Equal to
+    GT = "gt"          # Greater than
+    GTE = "gte"        # Greater than or equal
+    LT = "lt"          # Less than
+    LTE = "lte"        # Less than or equal
+    BETWEEN = "between"  # Between min and max
+
+    # Text/Select
+    CONTAINS = "contains"  # Text contains (case-insensitive)
+    EXACT = "exact"        # Exact match (case-sensitive)
+    IN = "in"              # One of (for select options)
+
+    # Boolean
+    IS = "is"  # True or False
+
+
+class FieldFilter(BaseModel):
+    """Single field filter specification."""
+    field_id: UUID = Field(..., description="UUID of custom field to filter by")
+    operator: FieldFilterOperator = Field(..., description="Filter operator")
+    value: Optional[str | int | bool] = Field(None, description="Filter value")
+    value_min: Optional[int] = Field(None, description="Min value for BETWEEN")
+    value_max: Optional[int] = Field(None, description="Max value for BETWEEN")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"field_id": "550e8400-e29b-41d4-a716-446655440000", "operator": "gte", "value": 4},
+                {"field_id": "550e8400-e29b-41d4-a716-446655440000", "operator": "contains", "value": "tutorial"},
+                {"field_id": "550e8400-e29b-41d4-a716-446655440000", "operator": "in", "value": "great,good"},
+                {"field_id": "550e8400-e29b-41d4-a716-446655440000", "operator": "is", "value": True},
+            ]
+        }
+    )
+
+
+class VideoFilterRequest(BaseModel):
+    """Request body for POST /videos/filter endpoint."""
+    tags: Optional[List[str]] = Field(None, description="Tag names for OR filtering")
+    field_filters: Optional[List[FieldFilter]] = Field(None, description="Field filters (AND logic)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "tags": ["Python", "Tutorial"],
+                    "field_filters": [
+                        {"field_id": "550e8400-e29b-41d4-a716-446655440000", "operator": "gte", "value": 4}
+                    ]
+                }
+            ]
+        }
+    )
 
 
 def validate_youtube_url(url: str) -> str:
