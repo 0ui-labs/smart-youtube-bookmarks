@@ -12,6 +12,7 @@ import { SchemaCreationDialog } from '@/components/schemas/SchemaCreationDialog'
 import { FieldsList } from '@/components/settings/FieldsList'
 import { FieldEditDialog } from '@/components/settings/FieldEditDialog'
 import { ConfirmDeleteFieldModal } from '@/components/settings/ConfirmDeleteFieldModal'
+import { AnalyticsView } from '@/components/analytics/AnalyticsView'
 import { Button } from '@/components/ui/button'
 import {
   Tabs,
@@ -27,7 +28,8 @@ import type { CustomField } from '@/types/customField'
  *
  * Provides tabbed interface for:
  * - Schemas: Manage field schema templates (Task #135)
- * - Fields: Manage custom field definitions (Future)
+ * - Fields: Manage custom field definitions (Task #139)
+ * - Analytics: View field/schema usage statistics (Task #142)
  *
  * Architecture:
  * - Uses shadcn/ui Tabs for navigation
@@ -42,7 +44,7 @@ import type { CustomField } from '@/types/customField'
  * <Route path="/settings/schemas" element={<SettingsPage />} />
  */
 export function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'schemas' | 'fields'>('schemas')
+  const [activeTab, setActiveTab] = useState<'schemas' | 'fields' | 'analytics'>('schemas')
 
   // ✨ FIX #4: Fetch lists dynamically instead of hardcoded listId
   const { data: lists, isLoading: isListsLoading, isError: isListsError } = useLists()
@@ -172,10 +174,11 @@ export function SettingsPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'schemas' | 'fields')}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'schemas' | 'fields' | 'analytics')}>
           <TabsList className="mb-6">
             <TabsTrigger value="schemas">Schemas</TabsTrigger>
             <TabsTrigger value="fields">Fields</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
           {/* Schemas Tab */}
@@ -216,6 +219,11 @@ export function SettingsPage() {
                 </p>
               </div>
             )}
+          </TabsContent>
+
+          {/* Analytics Tab - Task #142 Step 14 */}
+          <TabsContent value="analytics">
+            <AnalyticsView />
           </TabsContent>
         </Tabs>
       </main>
