@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { AnalyticsResponse } from '@/types/analytics'
 
 /**
  * Axios instance configured for the backend API.
@@ -43,3 +44,14 @@ api.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+/**
+ * Get analytics for custom fields usage in a list.
+ *
+ * @param listId - UUID of the bookmark list
+ * @returns Analytics data with all metrics
+ */
+export const getAnalytics = async (listId: string): Promise<AnalyticsResponse> => {
+  const { data } = await api.get<AnalyticsResponse>(`/lists/${listId}/analytics`)
+  return data
+}
