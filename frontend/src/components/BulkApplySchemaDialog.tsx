@@ -175,7 +175,7 @@ export function BulkApplySchemaDialog({
                         {/* Current Schema Indicator */}
                         {hasExistingSchema && (
                           <span className="text-xs text-muted-foreground">
-                            (aktuell: Video Quality)
+                            (hat Schema)
                           </span>
                         )}
                       </div>

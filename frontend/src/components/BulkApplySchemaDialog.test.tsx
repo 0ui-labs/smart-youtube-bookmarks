@@ -130,7 +130,7 @@ describe('BulkApplySchemaDialog', () => {
       )
 
       // Tag 2 already has schema-1
-      expect(screen.getByText(/aktuell: Video Quality/i)).toBeInTheDocument()
+      expect(screen.getByText(/hat Schema/i)).toBeInTheDocument()
     })
   })
 
