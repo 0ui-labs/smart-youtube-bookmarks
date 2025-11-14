@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { TagsSchema, TagSchema, type Tag, type TagCreate } from '@/types/tag'
+import type {
+  BulkApplySchemaRequest,
+  BulkApplySchemaResponse,
+  TagUpdateResult
+} from '@/types/bulk'
 
 /**
  * Query options factory for tags
@@ -73,6 +78,121 @@ export const useCreateTag = () => {
       // Invalidate and refetch to ensure UI consistency
       // This runs on both success and error to handle edge cases
       await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey })
+    },
+  })
+}
+
+/**
+ * Hook to apply schema to multiple tags in bulk
+ *
+ * Uses frontend-side batch processing with Promise.allSettled for partial failure handling.
+ * Each tag is updated individually via PUT /api/tags/{tag_id}.
+ *
+ * @returns Mutation hook with progress tracking and error details
+ *
+ * @example
+ * ```tsx
+ * const bulkApply = useBulkApplySchema()
+ *
+ * bulkApply.mutate({
+ *   tagIds: ['uuid1', 'uuid2', 'uuid3'],
+ *   schemaId: 'schema-uuid' // or null to unbind
+ * })
+ *
+ * // Access results
+ * if (bulkApply.data) {
+ *   console.log(`${bulkApply.data.successCount} of ${bulkApply.data.totalRequested} updated`)
+ *   bulkApply.data.results.filter(r => !r.success).forEach(failure => {
+ *     console.error(`Failed to update ${failure.tagName}: ${failure.error}`)
+ *   })
+ * }
+ * ```
+ */
+export const useBulkApplySchema = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation<
+    BulkApplySchemaResponse,
+    Error,
+    BulkApplySchemaRequest,
+    { previousTags: Tag[] | undefined }
+  >({
+    mutationKey: ['bulkApplySchema'],
+    mutationFn: async ({ tagIds, schemaId }: BulkApplySchemaRequest) => {
+      // Fetch current tags to get names for error reporting
+      const currentTags = queryClient.getQueryData<Tag[]>(tagsOptions().queryKey) || []
+      const tagMap = new Map(currentTags.map(t => [t.id, t]))
+
+      // Execute all updates in parallel with Promise.all
+      const updatePromises = tagIds.map(async (tagId): Promise<TagUpdateResult> => {
+        try {
+          await api.put(`/tags/${tagId}`, { schema_id: schemaId })
+          return {
+            tagId,
+            tagName: tagMap.get(tagId)?.name || 'Unknown',
+            success: true,
+          }
+        } catch (error: any) {
+          return {
+            tagId,
+            tagName: tagMap.get(tagId)?.name || 'Unknown',
+            success: false,
+            error: error.response?.data?.detail || error.message || 'Unknown error',
+          }
+        }
+      })
+
+      const results = await Promise.all(updatePromises)
+
+      const successCount = results.filter(r => r.success).length
+      const failureCount = results.filter(r => !r.success).length
+
+      return {
+        successCount,
+        failureCount,
+        totalRequested: tagIds.length,
+        results,
+      }
+    },
+
+    // Optimistic updates
+    onMutate: async ({ tagIds, schemaId }) => {
+      // Cancel outgoing queries to prevent overwrites
+      await queryClient.cancelQueries({ queryKey: tagsOptions().queryKey })
+
+      // Snapshot previous state for rollback
+      const previousTags = queryClient.getQueryData<Tag[]>(tagsOptions().queryKey)
+
+      // Optimistically update tags
+      if (previousTags) {
+        queryClient.setQueryData<Tag[]>(
+          tagsOptions().queryKey,
+          previousTags.map(tag =>
+            tagIds.includes(tag.id)
+              ? { ...tag, schema_id: schemaId }
+              : tag
+          )
+        )
+      }
+
+      return { previousTags }
+    },
+
+    // Rollback on error
+    // Note: This only rolls back the optimistic updates, not individual tag failures.
+    // Individual failures are captured in the response and handled by the UI.
+    onError: (error, _variables, context) => {
+      console.error('Bulk schema application failed:', error)
+      if (context?.previousTags) {
+        queryClient.setQueryData(tagsOptions().queryKey, context.previousTags)
+      }
+    },
+
+    // Always invalidate to ensure consistency
+    // REF MCP Improvement: Invalidate both tags AND schemas to keep schema usage counts accurate
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey })
+      queryClient.invalidateQueries({ queryKey: ['schemas'] })
     },
   })
 }
