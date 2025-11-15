@@ -26,6 +26,24 @@ const VideoResponseSchema = z.object({
 })
 
 /**
+ * Options for useVideos hook
+ *
+ * Supports filtering by tags and sorting by fields.
+ */
+export interface UseVideosOptions {
+  /** Array of tag names for OR filtering (videos with ANY of the specified tags) */
+  tags?: string[]
+  /** Field to sort by: "title" | "duration" | "created_at" | "field:<field_id>" */
+  sortBy?: string
+  /** Sort order: "asc" (default) | "desc" */
+  sortOrder?: "asc" | "desc"
+  /** Custom refetch interval in milliseconds */
+  refetchInterval?: number
+  /** Whether to refetch in background */
+  refetchIntervalInBackground?: boolean
+}
+
+/**
  * Query Key Factory for video-related queries
  *
  * Provides consistent, type-safe query keys for React Query.
@@ -56,6 +74,24 @@ export const videoKeys = {
   filtered: (listId: string, tagNames: string[]) =>
     // Sort tagNames alphabetically for consistent cache keys regardless of selection order
     [...videoKeys.list(listId), { tags: [...tagNames].sort() }] as const,
+  /** Key for videos with filtering and/or sorting options */
+  withOptions: (listId: string, options: UseVideosOptions) => {
+    const { tags, sortBy, sortOrder } = options
+    const queryParams: Record<string, any> = {}
+
+    // Include tags in query key (sorted for consistency)
+    if (tags && tags.length > 0) {
+      queryParams.tags = [...tags].sort()
+    }
+
+    // Include sort params in query key
+    if (sortBy) {
+      queryParams.sortBy = sortBy
+      queryParams.sortOrder = sortOrder || 'asc'
+    }
+
+    return [...videoKeys.list(listId), queryParams] as const
+  },
   /** Base key for all field values queries */
   fieldValues: () => [...videoKeys.all, 'field-values'] as const,
   /** Key for field values of a specific video */
@@ -88,43 +124,82 @@ export interface BulkUploadResponse {
 }
 
 /**
- * Fetch videos for a list with optional tag filtering
+ * Fetch videos for a list with optional tag filtering and sorting
  *
  * @param listId - UUID of the list to fetch videos from
- * @param tagNames - Optional array of tag names for OR filtering (videos with ANY of the specified tags)
- * @param options - Optional query options (refetchInterval, etc.)
+ * @param options - Optional filtering and sorting options
  * @returns Query result with videos array
  *
  * @example
  * ```tsx
- * // All videos
+ * // All videos (no filtering or sorting)
  * const { data: videos } = useVideos(listId)
  *
  * // Filter by tags (OR logic: videos with Python OR JavaScript)
- * const { data: videos } = useVideos(listId, ['Python', 'JavaScript'])
+ * const { data: videos } = useVideos(listId, { tags: ['Python', 'JavaScript'] })
+ *
+ * // Sort by title ascending
+ * const { data: videos } = useVideos(listId, { sortBy: 'title', sortOrder: 'asc' })
+ *
+ * // Sort by custom field descending
+ * const { data: videos } = useVideos(listId, { sortBy: 'field:abc-123', sortOrder: 'desc' })
+ *
+ * // Combine filtering and sorting
+ * const { data: videos } = useVideos(listId, {
+ *   tags: ['Python'],
+ *   sortBy: 'created_at',
+ *   sortOrder: 'desc'
+ * })
  *
  * // With auto-refetch for live updates
- * const { data: videos } = useVideos(listId, undefined, { refetchInterval: 2000 })
+ * const { data: videos } = useVideos(listId, { refetchInterval: 2000 })
+ * ```
+ *
+ * @deprecated Second parameter (tagNames: string[]) - Use options.tags instead
+ * ```tsx
+ * // Old API (still supported for backward compatibility)
+ * const { data: videos } = useVideos(listId, ['Python', 'JavaScript'])
+ *
+ * // New API (recommended)
+ * const { data: videos } = useVideos(listId, { tags: ['Python', 'JavaScript'] })
  * ```
  */
 export const useVideos = (
   listId: string,
-  tagNames?: string[],
-  options?: { refetchInterval?: number; refetchIntervalInBackground?: boolean }
+  optionsOrTagNames?: UseVideosOptions | string[],
+  legacyOptions?: { refetchInterval?: number; refetchIntervalInBackground?: boolean }
 ) => {
+  // Backward compatibility: Handle both old and new API signatures
+  // Old API: useVideos(listId, ['tag1', 'tag2'], { refetchInterval: 2000 })
+  // New API: useVideos(listId, { tags: ['tag1', 'tag2'], sortBy: 'title', refetchInterval: 2000 })
+  const options: UseVideosOptions = Array.isArray(optionsOrTagNames)
+    ? { tags: optionsOrTagNames, ...legacyOptions }
+    : { ...optionsOrTagNames }
+
+  const { tags, sortBy, sortOrder = 'asc', refetchInterval, refetchIntervalInBackground } = options
+
+  // Determine query key based on whether we have any options
+  const hasOptions = (tags && tags.length > 0) || sortBy
+  const queryKey = hasOptions
+    ? videoKeys.withOptions(listId, { tags, sortBy, sortOrder })
+    : videoKeys.list(listId)
+
   return useQuery({
-    queryKey:
-      tagNames && tagNames.length > 0
-        ? videoKeys.filtered(listId, tagNames)
-        : videoKeys.list(listId),
+    queryKey,
     queryFn: async () => {
-      // Build query params for tag filtering
+      // Build query params for filtering and sorting
       const params = new URLSearchParams()
 
-      // Add multiple 'tags' query params for OR filtering
+      // Add tag filters (OR filtering)
       // Backend expects: ?tags=Python&tags=JavaScript
-      if (tagNames && tagNames.length > 0) {
-        tagNames.forEach((tag) => params.append('tags', tag))
+      if (tags && tags.length > 0) {
+        tags.forEach((tag) => params.append('tags', tag))
+      }
+
+      // Add sorting parameters
+      if (sortBy) {
+        params.append('sort_by', sortBy)
+        params.append('sort_order', sortOrder)
       }
 
       const queryString = params.toString()
@@ -140,9 +215,10 @@ export const useVideos = (
     refetchOnWindowFocus: false,
     refetchOnMount: true, // Refetch on mount to get latest data including tags
     refetchOnReconnect: false,
-    staleTime: options?.refetchInterval ? 0 : 5 * 60 * 1000, // 5 minutes - allow periodic updates
+    staleTime: refetchInterval ? 0 : 5 * 60 * 1000, // 5 minutes - allow periodic updates
     // Allow custom refetch interval for live updates
-    ...options,
+    refetchInterval,
+    refetchIntervalInBackground,
   })
 }
 
