@@ -1451,6 +1451,10 @@ async def bulk_upload_videos(
                         ))
                 await db.commit()
 
+            # Capture created video count before processing field values
+            # (defensive programming - ensures job count reflects actual created videos)
+            created_count = len(created_videos)
+
             # === Apply field values to created videos (SINGLE LOCATION) ===
             if field_columns and created_videos:
                 await _process_field_values(
@@ -1463,7 +1467,7 @@ async def bulk_upload_videos(
                 await db.commit()
 
             # Create processing job if videos were created
-            await _enqueue_video_processing(db, list_id, len(created_videos))
+            await _enqueue_video_processing(db, list_id, created_count)
 
         return BulkUploadResponse(
             created_count=len(created_videos),

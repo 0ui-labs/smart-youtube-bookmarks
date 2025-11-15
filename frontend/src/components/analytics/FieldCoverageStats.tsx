@@ -54,6 +54,9 @@ export function FieldCoverageStats({ data }: FieldCoverageStatsProps) {
     return 'bg-red-500'
   }
 
+  // Sort data by coverage percentage ascending (problems first)
+  const sortedData = [...data].sort((a, b) => a.coverage_percentage - b.coverage_percentage)
+
   return (
     <Card>
       <CardHeader>
@@ -75,7 +78,7 @@ export function FieldCoverageStats({ data }: FieldCoverageStatsProps) {
               </tr>
             </thead>
             <tbody>
-              {data.map((field) => (
+              {sortedData.map((field) => (
                 <tr key={field.field_id} className="border-b hover:bg-gray-50">
                   <td className="p-3">
                     <div className="flex items-center gap-2">

@@ -21,6 +21,14 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Add NOT NULL constraints to video_tags join table
     # These columns should never be NULL since they're foreign keys in a join table
+
+    # Clean up any NULL values before adding constraints (safety measure)
+    # Delete orphaned rows where either FK is NULL
+    op.execute(
+        "DELETE FROM video_tags WHERE video_id IS NULL OR tag_id IS NULL"
+    )
+
+    # Now safe to add NOT NULL constraints
     op.alter_column('video_tags', 'video_id',
                     existing_type=sa.UUID(),
                     nullable=False)

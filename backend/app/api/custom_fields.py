@@ -485,40 +485,46 @@ async def check_duplicate_field(
         gemini_client = None
         redis_client = None
 
-        # Try to initialize Gemini client
-        if settings.gemini_api_key:
-            try:
-                gemini_client = GeminiClient(api_key=settings.gemini_api_key)
-            except Exception as e:
-                logger.warning(f"Failed to initialize Gemini client: {e}")
-
-        # Try to initialize Redis client
         try:
-            redis_client = Redis.from_url(settings.redis_url)
-        except Exception as e:
-            logger.warning(f"Failed to initialize Redis client: {e}")
+            # Try to initialize Gemini client
+            if settings.gemini_api_key:
+                try:
+                    gemini_client = GeminiClient(api_key=settings.gemini_api_key)
+                except Exception as e:
+                    logger.warning(f"Failed to initialize Gemini client: {e}")
 
-        # Create detector
-        detector = DuplicateDetector(
-            gemini_client=gemini_client,
-            redis_client=redis_client
-        )
+            # Try to initialize Redis client
+            try:
+                redis_client = Redis.from_url(settings.redis_url)
+            except Exception as e:
+                logger.warning(f"Failed to initialize Redis client: {e}")
 
-        # Find similar fields
-        similarity_results = await detector.find_similar_fields(
-            field_name=request.name,
-            existing_fields=existing_fields,
-            include_semantic=True
-        )
+            # Create detector
+            detector = DuplicateDetector(
+                gemini_client=gemini_client,
+                redis_client=redis_client
+            )
 
-        # Convert to response format
-        suggestions = [result.to_dict() for result in similarity_results]
+            # Find similar fields
+            similarity_results = await detector.find_similar_fields(
+                field_name=request.name,
+                existing_fields=existing_fields,
+                include_semantic=True
+            )
 
-        # Filter to only suggestions with score >= 0.60 (threshold)
-        suggestions = [s for s in suggestions if s["score"] >= 0.60]
+            # Convert to response format
+            suggestions = [result.to_dict() for result in similarity_results]
 
-        return SmartDuplicateCheckResponse(
-            exists=len(suggestions) > 0,
-            suggestions=suggestions,
-            mode="smart"
-        )
+            # Filter to only suggestions with score >= 0.60 (threshold)
+            suggestions = [s for s in suggestions if s["score"] >= 0.60]
+
+            return SmartDuplicateCheckResponse(
+                exists=len(suggestions) > 0,
+                suggestions=suggestions,
+                mode="smart"
+            )
+
+        finally:
+            # Clean up Redis connection to prevent resource leak
+            if redis_client:
+                await redis_client.close()

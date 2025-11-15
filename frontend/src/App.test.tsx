@@ -39,15 +39,18 @@ vi.mock('./hooks/useVideos', () => ({
     isLoading: false,
     error: null,
   })),
+  useCreateVideo: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useDeleteVideo: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  exportVideosCSV: vi.fn(),
+  useAssignTags: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+
+vi.mock('./hooks/useVideosFilter', () => ({
   useVideosFilter: vi.fn(() => ({
     data: [],
     isLoading: false,
     error: null,
   })),
-  useCreateVideo: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useDeleteVideo: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  exportVideosCSV: vi.fn(),
-  useAssignTags: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 vi.mock('./hooks/useTags', () => ({
