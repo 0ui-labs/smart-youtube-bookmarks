@@ -288,24 +288,30 @@ async def batch_update_schema_fields(
         )
 
     # Perform UPSERT for each field (ON CONFLICT DO UPDATE)
-    from sqlalchemy.dialects.postgresql import insert
+    # Using raw SQL to bypass SQLAlchemy ORM issues
+    from sqlalchemy import text
 
     for item in request.fields:
-        stmt = insert(SchemaField).values(
-            schema_id=schema_id,
-            field_id=item.field_id,
-            display_order=item.display_order,
-            show_on_card=item.show_on_card
-        ).on_conflict_do_update(
-            index_elements=['schema_id', 'field_id'],
-            set_={
-                'display_order': item.display_order,
-                'show_on_card': item.show_on_card
-            }
-        )
-        await db.execute(stmt)
+        sql = text("""
+            INSERT INTO schema_fields (schema_id, field_id, display_order, show_on_card)
+            VALUES (:schema_id, :field_id, :display_order, :show_on_card)
+            ON CONFLICT (schema_id, field_id)
+            DO UPDATE SET
+                display_order = EXCLUDED.display_order,
+                show_on_card = EXCLUDED.show_on_card
+        """)
+        await db.execute(sql, {
+            'schema_id': schema_id,
+            'field_id': item.field_id,
+            'display_order': item.display_order,
+            'show_on_card': item.show_on_card
+        })
 
     await db.commit()
+
+    # Expire session cache to force fresh reload from database
+    # (raw SQL bypasses ORM, so cached objects are stale)
+    db.expire_all()
 
     # Query updated schema_fields with eager loading
     updated_stmt = (
