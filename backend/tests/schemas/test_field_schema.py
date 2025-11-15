@@ -17,7 +17,7 @@ from datetime import datetime
 from pydantic import ValidationError
 
 from app.schemas.field_schema import (
-    SchemaFieldItem,
+    SchemaFieldInput,
     FieldSchemaCreate,
     FieldSchemaUpdate,
     SchemaFieldResponse,
@@ -49,7 +49,7 @@ def test_create_schema_with_single_field():
         name="Simple Schema",
         description="A schema with one field",
         fields=[
-            SchemaFieldItem(
+            SchemaFieldInput(
                 field_id=field_id,
                 display_order=0,
                 show_on_card=True
@@ -74,10 +74,10 @@ def test_create_schema_with_exactly_three_show_on_card():
         name="Full Schema",
         description="Schema with 3 visible fields",
         fields=[
-            SchemaFieldItem(field_id=field1_id, display_order=0, show_on_card=True),
-            SchemaFieldItem(field_id=field2_id, display_order=1, show_on_card=True),
-            SchemaFieldItem(field_id=field3_id, display_order=2, show_on_card=True),
-            SchemaFieldItem(field_id=field4_id, display_order=3, show_on_card=False),
+            SchemaFieldInput(field_id=field1_id, display_order=0, show_on_card=True),
+            SchemaFieldInput(field_id=field2_id, display_order=1, show_on_card=True),
+            SchemaFieldInput(field_id=field3_id, display_order=2, show_on_card=True),
+            SchemaFieldInput(field_id=field4_id, display_order=3, show_on_card=False),
         ]
     )
     assert len(schema.fields) == 4
@@ -86,9 +86,9 @@ def test_create_schema_with_exactly_three_show_on_card():
 
 
 def test_schema_field_item_with_all_fields():
-    """Test creating a valid SchemaFieldItem with all fields."""
+    """Test creating a valid SchemaFieldInput with all fields."""
     field_id = uuid4()
-    item = SchemaFieldItem(
+    item = SchemaFieldInput(
         field_id=field_id,
         display_order=5,
         show_on_card=False
@@ -113,10 +113,10 @@ def test_show_on_card_limit_exceeded():
         FieldSchemaCreate(
             name="Invalid Schema",
             fields=[
-                SchemaFieldItem(field_id=field1_id, display_order=0, show_on_card=True),
-                SchemaFieldItem(field_id=field2_id, display_order=1, show_on_card=True),
-                SchemaFieldItem(field_id=field3_id, display_order=2, show_on_card=True),
-                SchemaFieldItem(field_id=field4_id, display_order=3, show_on_card=True),
+                SchemaFieldInput(field_id=field1_id, display_order=0, show_on_card=True),
+                SchemaFieldInput(field_id=field2_id, display_order=1, show_on_card=True),
+                SchemaFieldInput(field_id=field3_id, display_order=2, show_on_card=True),
+                SchemaFieldInput(field_id=field4_id, display_order=3, show_on_card=True),
             ]
         )
 
@@ -136,9 +136,9 @@ def test_show_on_card_limit_exactly_three():
     schema = FieldSchemaCreate(
         name="Valid Schema",
         fields=[
-            SchemaFieldItem(field_id=field1_id, display_order=0, show_on_card=True),
-            SchemaFieldItem(field_id=field2_id, display_order=1, show_on_card=True),
-            SchemaFieldItem(field_id=field3_id, display_order=2, show_on_card=True),
+            SchemaFieldInput(field_id=field1_id, display_order=0, show_on_card=True),
+            SchemaFieldInput(field_id=field2_id, display_order=1, show_on_card=True),
+            SchemaFieldInput(field_id=field3_id, display_order=2, show_on_card=True),
         ]
     )
     assert len([f for f in schema.fields if f.show_on_card]) == 3
@@ -153,8 +153,8 @@ def test_duplicate_display_order():
         FieldSchemaCreate(
             name="Invalid Schema",
             fields=[
-                SchemaFieldItem(field_id=field1_id, display_order=0, show_on_card=False),
-                SchemaFieldItem(field_id=field2_id, display_order=0, show_on_card=False),
+                SchemaFieldInput(field_id=field1_id, display_order=0, show_on_card=False),
+                SchemaFieldInput(field_id=field2_id, display_order=0, show_on_card=False),
             ]
         )
 
@@ -172,8 +172,8 @@ def test_duplicate_field_ids():
         FieldSchemaCreate(
             name="Invalid Schema",
             fields=[
-                SchemaFieldItem(field_id=field_id, display_order=0, show_on_card=False),
-                SchemaFieldItem(field_id=field_id, display_order=1, show_on_card=False),
+                SchemaFieldInput(field_id=field_id, display_order=0, show_on_card=False),
+                SchemaFieldInput(field_id=field_id, display_order=1, show_on_card=False),
             ]
         )
 
@@ -189,7 +189,7 @@ def test_negative_display_order():
     field_id = uuid4()
 
     with pytest.raises(ValidationError) as exc_info:
-        SchemaFieldItem(
+        SchemaFieldInput(
             field_id=field_id,
             display_order=-1,
             show_on_card=False
@@ -210,10 +210,10 @@ def test_multiple_validators_pass_with_valid_data():
         name="Complex Valid Schema",
         description="Tests all validators",
         fields=[
-            SchemaFieldItem(field_id=field1_id, display_order=0, show_on_card=True),
-            SchemaFieldItem(field_id=field2_id, display_order=1, show_on_card=True),
-            SchemaFieldItem(field_id=field3_id, display_order=5, show_on_card=False),
-            SchemaFieldItem(field_id=field4_id, display_order=10, show_on_card=False),
+            SchemaFieldInput(field_id=field1_id, display_order=0, show_on_card=True),
+            SchemaFieldInput(field_id=field2_id, display_order=1, show_on_card=True),
+            SchemaFieldInput(field_id=field3_id, display_order=5, show_on_card=False),
+            SchemaFieldInput(field_id=field4_id, display_order=10, show_on_card=False),
         ]
     )
     assert len(schema.fields) == 4
@@ -230,9 +230,9 @@ def test_duplicate_display_order_with_three_fields():
         FieldSchemaCreate(
             name="Invalid Schema",
             fields=[
-                SchemaFieldItem(field_id=field1_id, display_order=1, show_on_card=False),
-                SchemaFieldItem(field_id=field2_id, display_order=1, show_on_card=False),
-                SchemaFieldItem(field_id=field3_id, display_order=1, show_on_card=False),
+                SchemaFieldInput(field_id=field1_id, display_order=1, show_on_card=False),
+                SchemaFieldInput(field_id=field2_id, display_order=1, show_on_card=False),
+                SchemaFieldInput(field_id=field3_id, display_order=1, show_on_card=False),
             ]
         )
 
@@ -250,10 +250,10 @@ def test_validator_order_show_on_card_before_duplicates():
         FieldSchemaCreate(
             name="Invalid Schema",
             fields=[
-                SchemaFieldItem(field_id=field_id, display_order=0, show_on_card=True),
-                SchemaFieldItem(field_id=field_id, display_order=1, show_on_card=True),
-                SchemaFieldItem(field_id=field_id, display_order=2, show_on_card=True),
-                SchemaFieldItem(field_id=field_id, display_order=3, show_on_card=True),
+                SchemaFieldInput(field_id=field_id, display_order=0, show_on_card=True),
+                SchemaFieldInput(field_id=field_id, display_order=1, show_on_card=True),
+                SchemaFieldInput(field_id=field_id, display_order=2, show_on_card=True),
+                SchemaFieldInput(field_id=field_id, display_order=3, show_on_card=True),
             ]
         )
 
@@ -307,6 +307,7 @@ def test_update_with_both_fields():
 def test_schema_field_response_with_nested_custom_field():
     """Test SchemaFieldResponse serializes with nested CustomFieldResponse."""
     field_id = uuid4()
+    schema_id = uuid4()
     custom_field = CustomFieldResponse(
         id=field_id,
         list_id=uuid4(),
@@ -319,6 +320,7 @@ def test_schema_field_response_with_nested_custom_field():
 
     schema_field = SchemaFieldResponse(
         field_id=field_id,
+        schema_id=schema_id,
         field=custom_field,
         display_order=0,
         show_on_card=True
@@ -379,6 +381,7 @@ def test_field_schema_response_with_multiple_nested_fields():
 
     schema_field1 = SchemaFieldResponse(
         field_id=field1_id,
+        schema_id=schema_id,
         field=custom_field1,
         display_order=0,
         show_on_card=True
@@ -386,6 +389,7 @@ def test_field_schema_response_with_multiple_nested_fields():
 
     schema_field2 = SchemaFieldResponse(
         field_id=field2_id,
+        schema_id=schema_id,
         field=custom_field2,
         display_order=1,
         show_on_card=False
@@ -441,7 +445,7 @@ def test_large_fields_list():
     fields = []
     for i in range(10):
         fields.append(
-            SchemaFieldItem(
+            SchemaFieldInput(
                 field_id=uuid4(),
                 display_order=i,
                 show_on_card=(i < 3)  # Only first 3 show on card
