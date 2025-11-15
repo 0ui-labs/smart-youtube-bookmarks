@@ -1379,7 +1379,8 @@ async def export_videos_csv(
                 # Extract value based on field type
                 if field.field_type == 'rating':
                     value = field_value.value_numeric
-                    row.append(str(int(value)) if value is not None else '')
+                    # Preserve float precision (e.g., 4.5) - do not cast to int
+                    row.append(str(value) if value is not None else '')
                 elif field.field_type in ('select', 'text'):
                     value = field_value.value_text
                     row.append(value if value is not None else '')
