@@ -394,13 +394,15 @@ async def _get_schema_effectiveness(
             total_filled += filled_count
 
         avg_fields_filled = total_filled / len(video_ids) if video_ids else 0.0
-        completion_percentage = (avg_fields_filled / field_count * 100) if field_count > 0 else 0.0
+        # Round avg first, then compute completion from rounded value to satisfy validator
+        rounded_avg = round(avg_fields_filled, 2)
+        completion_percentage = (rounded_avg / field_count * 100) if field_count > 0 else 0.0
 
         stats.append(SchemaEffectivenessStat(
             schema_id=str(schema.id),
             schema_name=schema.name,
             field_count=field_count,
-            avg_fields_filled=round(avg_fields_filled, 2),
+            avg_fields_filled=rounded_avg,
             completion_percentage=round(completion_percentage, 2),
             video_count=len(video_ids)
         ))

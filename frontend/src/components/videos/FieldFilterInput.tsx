@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useFieldFilterStore, ActiveFilter } from '@/stores/fieldFilterStore';
+import { useFieldFilterStore, ActiveFilter, FilterOperator } from '@/stores/fieldFilterStore';
 import { useCustomFields } from '@/hooks/useCustomFields';
 
 interface FieldFilterInputProps {
@@ -65,7 +65,7 @@ export function FieldFilterInput({
         <Select
           value={filter.operator}
           onValueChange={(op) =>
-            updateFilter(filter.id, { operator: op as any })
+            updateFilter(filter.id, { operator: op as FilterOperator })
           }
         >
           <SelectTrigger className="w-[70px] h-7">

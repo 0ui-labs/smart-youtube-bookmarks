@@ -113,8 +113,16 @@ https://youtube.com/watch?v=testVideo02,4,high,false"""
     # Step 4: Modify CSV (simulate user editing in Excel)
     # Change video1: rating 3->5, quality medium->high, recommended true->false
     # Change video2: rating 4->2, quality high->low, recommended false->true
-    modified_csv = exported_csv.replace(',3,medium,true', ',5,high,false')
-    modified_csv = modified_csv.replace(',4,high,false', ',2,low,true')
+    # Parse CSV and modify specific rows by URL to avoid unintended replacements
+    lines = exported_csv.split('\n')
+    modified_lines = []
+    for line in lines:
+        if 'testVideo01' in line and ',3,medium,true' in line:
+            line = line.replace(',3,medium,true', ',5,high,false')
+        elif 'testVideo02' in line and ',4,high,false' in line:
+            line = line.replace(',4,high,false', ',2,low,true')
+        modified_lines.append(line)
+    modified_csv = '\n'.join(modified_lines)
 
     # Step 5: Re-import modified CSV
     modified_file = io.BytesIO(modified_csv.encode('utf-8'))
@@ -151,14 +159,26 @@ https://youtube.com/watch?v=testVideo02,4,high,false"""
             elif 'testVideo02' in url:
                 all_values['testVideo02'] = row
 
-    # Check if updated values exist
-    # Note: This test may need adjustment based on actual duplicate handling
-    # For now, we verify that at least the import succeeded
-    assert len(final_rows) >= 2
+    # Verify modified values for both videos
+    # Note: Current implementation may create duplicates on re-import
+    # We verify that rows with the NEW values exist
+    video1_final = next((row for row in final_rows if 'testVideo01' in row['url']), None)
+    video2_final = next((row for row in final_rows if 'testVideo02' in row['url']), None)
 
-    # Verify the values contain either testVideo01 or testVideo02
-    urls = [row['url'] for row in final_rows]
-    assert any('testVideo01' in url for url in urls) or any('testVideo02' in url for url in urls)
+    # Both videos should exist
+    assert video1_final is not None, "testVideo01 should exist after re-import"
+    assert video2_final is not None, "testVideo02 should exist after re-import"
+
+    # Verify modified values (the most recent import should have these values)
+    # Video1: changed from 3,medium,true to 5,high,false
+    assert video1_final['field_Overall Rating'] == '5', "Video1 rating should be updated to 5"
+    assert video1_final['field_Quality'] == 'high', "Video1 quality should be updated to high"
+    assert video1_final['field_Recommended'] == 'false', "Video1 recommended should be updated to false"
+
+    # Video2: changed from 4,high,false to 2,low,true
+    assert video2_final['field_Overall Rating'] == '2', "Video2 rating should be updated to 2"
+    assert video2_final['field_Quality'] == 'low', "Video2 quality should be updated to low"
+    assert video2_final['field_Recommended'] == 'true', "Video2 recommended should be updated to true"
 
 
 @pytest.mark.asyncio
@@ -224,12 +244,16 @@ async def test_csv_roundtrip_with_new_videos(
 
     assert reimport_response.status_code == 201
 
-    # Verify both videos exist
+    # Verify both videos exist (should be exactly 2 - original + new)
     stmt = select(Video).where(Video.list_id == list_obj.id)
     result = await test_db.execute(stmt)
     videos = result.scalars().all()
-    # May have duplicates depending on implementation
-    assert len(videos) >= 2
+    assert len(videos) == 2, f"Expected exactly 2 videos, got {len(videos)}"
+
+    # Verify both testVideo01 and testVideo02 exist
+    youtube_ids = {v.youtube_id for v in videos}
+    assert 'testVideo01' in youtube_ids, "Original video testVideo01 should exist"
+    assert 'testVideo02' in youtube_ids, "New video testVideo02 should exist"
 
 
 @pytest.mark.asyncio

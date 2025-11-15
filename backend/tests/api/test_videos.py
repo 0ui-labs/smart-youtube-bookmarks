@@ -280,6 +280,11 @@ https://www.youtube.com/watch?v=9bZkp7q19f0"""
         videos = videos_response.json()
         assert len(videos) == 3
 
+        # Verify videos start in "pending" state (ARQ-driven processing)
+        for video in videos:
+            assert video["processing_status"] == "pending"
+            assert video["title"] is None  # Metadata not fetched yet
+
 
 @pytest.mark.asyncio
 async def test_bulk_upload_csv_with_failures(client, test_list, monkeypatch):
@@ -1557,8 +1562,7 @@ async def test_default_sort_created_at_desc(client: AsyncClient, test_db: AsyncS
     # Update titles using UPDATE statement
     from uuid import UUID
     from sqlalchemy import update
-    from app.models.video import Video
-    
+
     await test_db.execute(update(Video).where(Video.id == UUID(old_id)).values(title="Old Video"))
     await test_db.execute(update(Video).where(Video.id == UUID(new_id)).values(title="New Video"))
     await test_db.commit()

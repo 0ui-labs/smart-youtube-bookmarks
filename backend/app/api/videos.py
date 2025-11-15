@@ -1179,8 +1179,8 @@ async def _process_field_values(
                 logger.info(f"Applied {len(field_updates)} field values for video {video.youtube_id}")
 
             except Exception as e:
-                # Log error but don't fail video creation
-                logger.error(f"Failed to apply field values for video {video.youtube_id}: {e}")
+                # Log error with stack trace but don't fail video creation
+                logger.exception(f"Failed to apply field values for video {video.youtube_id}: {e}")
                 failures.append(BulkUploadFailure(
                     row=0,  # Row number not easily tracked here
                     url=f"https://youtube.com/watch?v={video.youtube_id}",
