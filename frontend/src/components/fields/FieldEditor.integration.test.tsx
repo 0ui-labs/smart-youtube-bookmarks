@@ -1,6 +1,6 @@
 // frontend/src/components/fields/FieldEditor.integration.test.tsx
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -42,6 +42,10 @@ describe('FieldEditor Integration', () => {
     vi.clearAllMocks()
     mockState.mutate.mockClear()
     mockState.isPending = false
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('renders rating field with correct initial value', () => {

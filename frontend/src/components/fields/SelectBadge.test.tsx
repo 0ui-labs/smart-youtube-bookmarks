@@ -118,8 +118,6 @@ describe('SelectBadge', () => {
       const user = userEvent.setup()
 
       // REF MCP #4: Test that stopPropagation is called to prevent VideoCard click
-      const mockStopPropagation = vi.fn()
-
       render(
         <SelectBadge
           value="good"
