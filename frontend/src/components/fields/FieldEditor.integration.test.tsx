@@ -26,13 +26,13 @@ vi.mock('@/hooks/useVideos', () => ({
   }),
 }))
 
-// Use fake timers for debounce testing
-vi.useFakeTimers()
-
 describe('FieldEditor Integration', () => {
   let queryClient: QueryClient
 
   beforeEach(() => {
+    // Use fake timers for debounce testing
+    vi.useFakeTimers()
+
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },

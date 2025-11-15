@@ -182,6 +182,111 @@ def extract_youtube_id(url: str) -> str:
     raise ValueError("Could not extract YouTube video ID from URL")
 
 
+async def _apply_sorting(
+    stmt,
+    sort_by: Optional[str],
+    sort_order: str,
+    db: AsyncSession
+):
+    """
+    Apply sorting to a video query statement.
+
+    Handles both standard column sorting and custom field sorting.
+    Uses NULLS LAST for both ASC and DESC to ensure sorted values appear first.
+
+    Args:
+        stmt: SQLAlchemy Select statement
+        sort_by: Column or field to sort by (format: "field:<uuid>" for custom fields)
+        sort_order: "asc" or "desc"
+        db: Database session for field lookup
+
+    Returns:
+        Modified Select statement with sorting applied
+
+    Raises:
+        HTTPException: If sort_by is invalid or field not found
+    """
+    if not sort_by:
+        # Default sorting: created_at descending (newest first)
+        return stmt.order_by(desc(Video.created_at))
+
+    if sort_by.startswith("field:"):
+        # Field-based sorting
+        field_id_str = sort_by.split(":", 1)[1]
+        try:
+            field_id = UUID(field_id_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid field_id in sort_by parameter"
+            )
+
+        # Validate field exists
+        field_result = await db.execute(
+            select(CustomField).where(CustomField.id == field_id)
+        )
+        field = field_result.scalar_one_or_none()
+        if not field:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Custom field not found"
+            )
+
+        # LEFT JOIN to video_field_values and sort by typed column
+        stmt = stmt.outerjoin(
+            VideoFieldValue,
+            and_(
+                VideoFieldValue.video_id == Video.id,
+                VideoFieldValue.field_id == field_id
+            )
+        )
+
+        # Determine sort column based on field type
+        if field.field_type == "rating":
+            sort_column = VideoFieldValue.value_numeric
+        elif field.field_type in ("select", "text"):
+            sort_column = VideoFieldValue.value_text
+        elif field.field_type == "boolean":
+            sort_column = VideoFieldValue.value_boolean
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported field type: {field.field_type}"
+            )
+
+        # Apply ORDER BY with explicit NULL handling
+        # CRITICAL: Use .nulls_last() for BOTH asc AND desc
+        # Rationale: Users always want sorted values first, empty values last
+        if sort_order == "desc":
+            stmt = stmt.order_by(desc(sort_column).nulls_last())
+        else:
+            stmt = stmt.order_by(asc(sort_column).nulls_last())
+
+    else:
+        # Standard column sorting (title, duration, created_at, channel)
+        valid_columns = {
+            "title": Video.title,
+            "duration": Video.duration,
+            "created_at": Video.created_at,
+            "channel": Video.channel
+        }
+
+        if sort_by not in valid_columns:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by column: {sort_by}. Valid options: {', '.join(valid_columns.keys())}"
+            )
+
+        sort_column = valid_columns[sort_by]
+        # Apply nulls_last for both directions on standard columns too
+        if sort_order == "desc":
+            stmt = stmt.order_by(desc(sort_column).nulls_last())
+        else:
+            stmt = stmt.order_by(asc(sort_column).nulls_last())
+
+    return stmt
+
+
 @router.post(
     "/lists/{list_id}/videos",
     response_model=VideoResponse,
@@ -359,83 +464,7 @@ async def get_videos_in_list(
             )
 
     # Apply sorting
-    if sort_by:
-        if sort_by.startswith("field:"):
-            # Field-based sorting
-            field_id_str = sort_by.split(":", 1)[1]
-            try:
-                field_id = UUID(field_id_str)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid field_id in sort_by parameter"
-                )
-
-            # Validate field exists
-            field_result = await db.execute(
-                select(CustomField).where(CustomField.id == field_id)
-            )
-            field = field_result.scalar_one_or_none()
-            if not field:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Custom field not found"
-                )
-
-            # LEFT JOIN to video_field_values and sort by typed column
-            stmt = stmt.outerjoin(
-                VideoFieldValue,
-                and_(
-                    VideoFieldValue.video_id == Video.id,
-                    VideoFieldValue.field_id == field_id
-                )
-            )
-
-            # Determine sort column based on field type
-            if field.field_type == "rating":
-                sort_column = VideoFieldValue.value_numeric
-            elif field.field_type in ("select", "text"):
-                sort_column = VideoFieldValue.value_text
-            elif field.field_type == "boolean":
-                sort_column = VideoFieldValue.value_boolean
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Unsupported field type: {field.field_type}"
-                )
-
-            # Apply ORDER BY with explicit NULL handling
-            # CRITICAL: Use .nulls_last() for BOTH asc AND desc
-            # Rationale: Users always want sorted values first, empty values last
-            if sort_order == "desc":
-                stmt = stmt.order_by(desc(sort_column).nulls_last())
-            else:
-                stmt = stmt.order_by(asc(sort_column).nulls_last())
-
-        else:
-            # Standard column sorting (title, duration, created_at, channel)
-            valid_columns = {
-                "title": Video.title,
-                "duration": Video.duration,
-                "created_at": Video.created_at,
-                "channel": Video.channel
-            }
-
-            if sort_by not in valid_columns:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid sort_by column: {sort_by}. Valid options: {', '.join(valid_columns.keys())}"
-                )
-
-            sort_column = valid_columns[sort_by]
-            # Apply nulls_last for both directions on standard columns too
-            if sort_order == "desc":
-                stmt = stmt.order_by(desc(sort_column).nulls_last())
-            else:
-                stmt = stmt.order_by(asc(sort_column).nulls_last())
-    else:
-        # Default sorting: created_at descending (newest first)
-        stmt = stmt.order_by(desc(Video.created_at))
+    stmt = await _apply_sorting(stmt, sort_by, sort_order, db)
 
     # Execute query
     result = await db.execute(stmt)
@@ -699,81 +728,12 @@ async def filter_videos_in_list(
         stmt = stmt.distinct()
 
     # Step 5: Apply sorting
-    if filter_request.sort_by:
-        sort_by = filter_request.sort_by
-        sort_order = filter_request.sort_order or "asc"
-
-        if sort_by.startswith("field:"):
-            # Field-based sorting
-            field_id_str = sort_by.split(":", 1)[1]
-            try:
-                field_id = UUID(field_id_str)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid field_id in sort_by parameter"
-                )
-
-            # Validate field exists
-            field_result = await db.execute(
-                select(CustomField).where(CustomField.id == field_id)
-            )
-            field = field_result.scalar_one_or_none()
-            if not field:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Custom field not found"
-                )
-
-            # LEFT JOIN to video_field_values and sort by typed column
-            stmt = stmt.outerjoin(
-                VideoFieldValue,
-                and_(
-                    VideoFieldValue.video_id == Video.id,
-                    VideoFieldValue.field_id == field_id
-                )
-            )
-
-            # Determine sort column based on field type
-            if field.field_type == "rating":
-                sort_column = VideoFieldValue.value_numeric
-            elif field.field_type in ("select", "text"):
-                sort_column = VideoFieldValue.value_text
-            elif field.field_type == "boolean":
-                sort_column = VideoFieldValue.value_boolean
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Unsupported field type: {field.field_type}"
-                )
-
-            # Apply ORDER BY with explicit NULL handling
-            if sort_order == "desc":
-                stmt = stmt.order_by(desc(sort_column).nulls_last())
-            else:
-                stmt = stmt.order_by(asc(sort_column).nulls_last())
-
-        else:
-            # Standard column sorting (title, duration, created_at, channel)
-            valid_columns = {
-                "title": Video.title,
-                "duration": Video.duration,
-                "created_at": Video.created_at,
-                "channel": Video.channel
-            }
-
-            if sort_by not in valid_columns:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid sort_by column: {sort_by}. Valid options: {', '.join(valid_columns.keys())}"
-                )
-
-            sort_column = valid_columns[sort_by]
-            # Apply nulls_last for both directions
-            if sort_order == "desc":
-                stmt = stmt.order_by(desc(sort_column).nulls_last())
-            else:
-                stmt = stmt.order_by(asc(sort_column).nulls_last())
+    stmt = await _apply_sorting(
+        stmt,
+        filter_request.sort_by,
+        filter_request.sort_order or "asc",
+        db
+    )
 
     # Step 6: Execute query
     result = await db.execute(stmt)
@@ -1180,7 +1140,7 @@ async def _process_field_values(
 
             except Exception as e:
                 # Log error with stack trace but don't fail video creation
-                logger.exception(f"Failed to apply field values for video {video.youtube_id}: {e}")
+                logger.exception(f"Failed to apply field values for video {video.youtube_id}")
                 failures.append(BulkUploadFailure(
                     row=0,  # Row number not easily tracked here
                     url=f"https://youtube.com/watch?v={video.youtube_id}",
