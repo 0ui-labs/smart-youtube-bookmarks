@@ -252,7 +252,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 **Phase 3: Advanced Features**
 
 143. [x] Implement AI-powered duplicate detection (Levenshtein + semantic similarity)
-144. [ ] Add field-based filtering to video list UI
+144. [x] Add field-based filtering to video list UI (2025-11-15 09:57)
 145. [ ] Implement field-based sorting
 146. [ ] Extend CSV export to include custom field values
 147. [ ] Implement CSV import for field values
@@ -330,4 +330,4 @@ The LOG file contains 76 detailed entries documenting all completed tasks, imple
 
 ---
 
-**Last Updated:** 2025-11-14
+**Last Updated:** 2025-11-15
