@@ -8,6 +8,9 @@ import {
 } from '@tanstack/react-table'
 import axios from 'axios'
 import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV, useAssignTags } from '@/hooks/useVideos'
+import { useVideosFilter } from '@/hooks/useVideosFilter'
+import { useFieldFilterStore } from '@/stores/fieldFilterStore'
+import { FilterBar } from '@/components/videos/FilterBar'
 import { CSVUpload } from './CSVUpload'
 import { ProgressBar } from './ProgressBar'
 import { formatDuration } from '@/utils/formatDuration'
@@ -196,13 +199,31 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   // Extract tag names for API filtering
   const selectedTagNames = selectedTags.map(tag => tag.name)
 
-  // Fetch videos filtered by selected tag names (OR logic)
-  // No polling needed - single videos get metadata synchronously
-  // Bulk uploads use WebSocket for live updates
-  const { data: videos = [], isLoading, error } = useVideos(
+  // Get active field-based filters from store
+  const activeFilters = useFieldFilterStore((state) => state.activeFilters)
+
+  // Fetch videos with both tag filters and field filters
+  // Falls back to useVideos if no field filters are active
+  const hasFieldFilters = activeFilters.length > 0
+  const hasTagFilters = selectedTagNames.length > 0
+
+  // Use new filter hook if field filters are active, otherwise fallback to old hook
+  const { data: filteredVideos = [], isLoading: filterLoading, error: filterError } = useVideosFilter({
     listId,
-    selectedTagNames.length > 0 ? selectedTagNames : undefined
+    tags: hasTagFilters ? selectedTagNames : undefined,
+    fieldFilters: hasFieldFilters ? activeFilters : undefined,
+    enabled: hasFieldFilters || hasTagFilters,
+  })
+
+  const { data: allVideos = [], isLoading: allLoading, error: allError } = useVideos(
+    listId,
+    undefined // No tag filter for fallback
   )
+
+  // Use filtered results if filters are active, otherwise show all videos
+  const videos = hasFieldFilters || hasTagFilters ? filteredVideos : allVideos
+  const isLoading = hasFieldFilters || hasTagFilters ? filterLoading : allLoading
+  const error = hasFieldFilters || hasTagFilters ? filterError : allError
   const createVideo = useCreateVideo(listId)
   const assignTags = useAssignTags()
 
@@ -627,6 +648,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           <TableSettingsDropdown />
         </div>
       </div>
+
+      {/* Field-Based Filter Bar - Task #145 */}
+      <FilterBar listId={listId} />
 
       {/* WebSocket Connection Status Banner - Only show when jobs are active */}
       {reconnecting && jobProgress.size > 0 && (
