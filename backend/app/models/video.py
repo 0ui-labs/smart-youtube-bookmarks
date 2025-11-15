@@ -47,7 +47,8 @@ class Video(BaseModel):
         "VideoFieldValue",
         back_populates="video",
         cascade="all, delete-orphan",
-        passive_deletes=True  # Trust DB CASCADE (REF MCP, consistent with CustomField)
+        passive_deletes=True,  # Trust DB CASCADE (REF MCP, consistent with CustomField)
+        uselist=True  # Explicit list relationship (unique constraint may confuse SQLAlchemy)
     )
 
     __table_args__ = (

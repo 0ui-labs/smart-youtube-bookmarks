@@ -1270,18 +1270,26 @@ async def export_videos_csv(
     db: AsyncSession = Depends(get_db)
 ) -> StreamingResponse:
     """
-    Export all videos in a list to CSV format.
+    Export all videos in a list to CSV format with custom field values.
 
-    CSV format:
+    **CSV Format (Extended):**
     ```
-    youtube_id,status,created_at
-    VIDEO_ID_1,pending,2025-10-28T10:00:00
-    VIDEO_ID_2,completed,2025-10-27T15:30:00
+    # Custom Fields: Overall Rating (rating, 1-5), Presentation (select: bad|good|great)
+    youtube_id,status,created_at,field_Overall_Rating,field_Presentation
+    dQw4w9WgXcQ,completed,2025-11-08T10:00:00,5,great
+    jNQXAC9IVRw,pending,2025-11-08T11:00:00,,
     ```
 
-    - Validates list exists (404 if not found)
-    - Returns CSV file as downloadable attachment
-    - Empty lists return CSV with header only
+    **Field Columns:**
+    - Named `field_<field_name>` (e.g., "field_Overall_Rating")
+    - Sorted alphabetically after standard columns
+    - Empty values exported as empty string (not "NULL")
+    - Metadata comment line includes field types for reference
+
+    **Performance:**
+    - Optimized for lists up to 1000 videos × 20 fields
+    - Single query with eager loading (prevents N+1)
+    - Target: < 2s for 100 videos × 10 fields
 
     Args:
         list_id: UUID of the bookmark list
@@ -1293,7 +1301,7 @@ async def export_videos_csv(
     Raises:
         HTTPException 404: List not found
     """
-    # Validate list exists
+    # === STEP 1: Validate list exists ===
     result = await db.execute(
         select(BookmarkList).where(BookmarkList.id == list_id)
     )
@@ -1305,30 +1313,84 @@ async def export_videos_csv(
             detail=f"List with id {list_id} not found"
         )
 
-    # Get all videos
-    result = await db.execute(
+    # === STEP 2: Get all custom fields for this list (for header generation) ===
+    fields_stmt = (
+        select(CustomField)
+        .where(CustomField.list_id == list_id)
+        .order_by(CustomField.name)  # Alphabetical order for consistent columns
+    )
+    fields_result = await db.execute(fields_stmt)
+    custom_fields = list(fields_result.scalars().all())
+
+    # === STEP 3: Get all videos with field values (eager loading) ===
+    videos_stmt = (
         select(Video)
         .where(Video.list_id == list_id)
+        .options(selectinload(Video.field_values).selectinload(VideoFieldValue.field))
         .order_by(Video.created_at)
     )
-    videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
+    videos_result = await db.execute(videos_stmt)
+    videos = list(videos_result.scalars().all())
 
-    # Generate CSV
+    # === STEP 4: Generate CSV with dynamic field columns ===
     output = io.StringIO()
     writer = csv.writer(output)
 
-    # Write header
-    writer.writerow(['youtube_id', 'status', 'created_at'])
+    # Generate metadata comment line (optional, for human reference)
+    if custom_fields:
+        field_metadata = ', '.join(
+            f"{field.name} ({field.field_type}" +
+            (f", {field.config.get('max_rating')}" if field.field_type == 'rating' else "") +
+            (f": {'|'.join(field.config.get('options', []))}" if field.field_type == 'select' else "") +
+            ")"
+            for field in custom_fields
+        )
+        output.write(f"# Custom Fields: {field_metadata}\n")
 
-    # Write video rows
+    # Write header row
+    header = ['youtube_id', 'status', 'created_at']
+    # Add field columns: field_<field_name>
+    field_columns = [f"field_{field.name}" for field in custom_fields]
+    header.extend(field_columns)
+    writer.writerow(header)
+
+    # === STEP 5: Write video rows with field values ===
     for video in videos:
-        writer.writerow([
+        # Standard columns
+        row = [
             video.youtube_id,
             video.processing_status,
             video.created_at.isoformat()
-        ])
+        ]
 
-    # Create streaming response
+        # Build field values lookup
+        field_values_map = {
+            fv.field_id: fv for fv in (video.field_values or [])
+        }
+
+        # Add field value columns (match order of header)
+        for field in custom_fields:
+            field_value = field_values_map.get(field.id)
+
+            if field_value is None:
+                # No value set → empty string
+                row.append('')
+            else:
+                # Extract value based on field type
+                if field.field_type == 'rating':
+                    value = field_value.value_numeric
+                    row.append(str(int(value)) if value is not None else '')
+                elif field.field_type in ('select', 'text'):
+                    value = field_value.value_text
+                    row.append(value if value is not None else '')
+                elif field.field_type == 'boolean':
+                    value = field_value.value_boolean
+                    # Export as "true"/"false" for CSV readability
+                    row.append('true' if value is True else 'false' if value is False else '')
+
+        writer.writerow(row)
+
+    # === STEP 6: Create streaming response ===
     csv_content = output.getvalue()
 
     return StreamingResponse(
