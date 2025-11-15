@@ -72,8 +72,8 @@ async def test_csv_export_import_roundtrip(
 
     # Step 2: Create videos with initial field values via CSV import
     initial_csv = """url,field_Overall Rating,field_Quality,field_Recommended
-https://youtube.com/watch?v=video1,3,medium,true
-https://youtube.com/watch?v=video2,4,high,false"""
+https://youtube.com/watch?v=testVideo01,3,medium,true
+https://youtube.com/watch?v=testVideo02,4,high,false"""
 
     csv_file = io.BytesIO(initial_csv.encode('utf-8'))
     import_response = await client.post(
@@ -97,9 +97,9 @@ https://youtube.com/watch?v=video2,4,high,false"""
 
     assert len(exported_rows) == 2
 
-    # Find video1 and video2 rows
-    video1_row = next(row for row in exported_rows if row['youtube_id'] == 'video1')
-    video2_row = next(row for row in exported_rows if row['youtube_id'] == 'video2')
+    # Find testVideo01 and testVideo02 rows
+    video1_row = next(row for row in exported_rows if 'testVideo01' in row['url'])
+    video2_row = next(row for row in exported_rows if 'testVideo02' in row['url'])
 
     # Verify initial values
     assert video1_row['field_Overall Rating'] == '3'
@@ -143,14 +143,22 @@ https://youtube.com/watch?v=video2,4,high,false"""
     # We'll check that the modified values exist somewhere
     all_values = {}
     for row in final_rows:
-        youtube_id = row['youtube_id']
-        if youtube_id in ['video1', 'video2']:
-            all_values[youtube_id] = row
+        url = row['url']
+        if 'testVideo01' in url or 'testVideo02' in url:
+            # Extract video ID from URL for indexing
+            if 'testVideo01' in url:
+                all_values['testVideo01'] = row
+            elif 'testVideo02' in url:
+                all_values['testVideo02'] = row
 
     # Check if updated values exist
     # Note: This test may need adjustment based on actual duplicate handling
     # For now, we verify that at least the import succeeded
     assert len(final_rows) >= 2
+
+    # Verify the values contain either testVideo01 or testVideo02
+    urls = [row['url'] for row in final_rows]
+    assert any('testVideo01' in url for url in urls) or any('testVideo02' in url for url in urls)
 
 
 @pytest.mark.asyncio
@@ -176,10 +184,10 @@ async def test_csv_roundtrip_with_new_videos(
     test_db.add(rating_field)
     await test_db.commit()
 
-    # Create initial video
+    # Create initial video (use 11-char YouTube ID)
     video1 = Video(
         list_id=list_obj.id,
-        youtube_id="video1",
+        youtube_id="testVideo01",
         processing_status="completed"
     )
     test_db.add(video1)
@@ -202,8 +210,8 @@ async def test_csv_roundtrip_with_new_videos(
     # Modify CSV: Add a new video
     lines = [line for line in exported_csv.split('\n') if not line.startswith('#')]
     csv_lines = lines[:]
-    # Add new video row
-    csv_lines.append('video2,completed,' + csv_lines[1].split(',', 2)[2].split(',')[0] + ',5')
+    # Add new video row with proper URL format
+    csv_lines.append('https://www.youtube.com/watch?v=testVideo02,completed,2025-11-15T12:00:00,5')
 
     modified_csv = '\n'.join(csv_lines)
 
@@ -253,10 +261,10 @@ async def test_csv_roundtrip_preserves_empty_fields(
     test_db.add_all([rating_field, select_field])
     await test_db.commit()
 
-    # Create video with only rating (no quality)
+    # Create video with only rating (no quality) - use 11-char YouTube ID
     video1 = Video(
         list_id=list_obj.id,
-        youtube_id="video1",
+        youtube_id="testVideo01",
         processing_status="completed"
     )
     test_db.add(video1)

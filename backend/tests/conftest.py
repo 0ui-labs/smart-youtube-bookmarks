@@ -2,6 +2,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import NullPool
+from unittest.mock import AsyncMock, patch
 
 from app.main import app
 from app.core.database import get_db
@@ -56,16 +57,26 @@ async def test_db(test_engine):
 
 
 @pytest.fixture
-async def client(test_db):
-    """Create test client with database override."""
+async def mock_arq_pool():
+    """Mock ARQ pool to avoid Redis connection in tests."""
+    mock_pool = AsyncMock()
+    mock_pool.enqueue_job = AsyncMock(return_value=None)
+    return mock_pool
+
+
+@pytest.fixture
+async def client(test_db, mock_arq_pool):
+    """Create test client with database override and mocked ARQ."""
     async def override_get_db():
         yield test_db
 
     app.dependency_overrides[get_db] = override_get_db
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    # Mock get_arq_pool to avoid Redis connection
+    with patch('app.api.videos.get_arq_pool', return_value=mock_arq_pool):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
 
     app.dependency_overrides.clear()
 

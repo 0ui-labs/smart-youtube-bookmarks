@@ -97,7 +97,7 @@ class TestCSVExportWithFields:
         reader = csv.DictReader(io.StringIO(csv_text))
 
         # Verify header includes field columns
-        assert 'youtube_id' in reader.fieldnames
+        assert 'url' in reader.fieldnames
         assert 'field_Overall Rating' in reader.fieldnames
         assert 'field_Presentation' in reader.fieldnames
 

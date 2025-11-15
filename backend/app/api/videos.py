@@ -1314,7 +1314,12 @@ async def bulk_upload_videos(
     try:
         content = await file.read()
         csv_string = content.decode('utf-8')
-        csv_file = io.StringIO(csv_string)
+
+        # Skip comment lines (starting with #) for import compatibility with exported CSVs
+        csv_lines = [line for line in csv_string.split('\n') if not line.startswith('#')]
+        clean_csv_string = '\n'.join(csv_lines)
+
+        csv_file = io.StringIO(clean_csv_string)
         reader = csv.DictReader(csv_file)
 
         # Validate header
@@ -1528,11 +1533,30 @@ async def export_videos_csv(
     videos_stmt = (
         select(Video)
         .where(Video.list_id == list_id)
-        .options(selectinload(Video.field_values).selectinload(VideoFieldValue.field))
+        .options(selectinload(Video.field_values))
         .order_by(Video.created_at)
     )
     videos_result = await db.execute(videos_stmt)
     videos = list(videos_result.scalars().all())
+
+    # === STEP 3.5: Load all field values for all videos in one query (performance optimization) ===
+    if videos:
+        video_ids = [v.id for v in videos]
+        field_values_stmt = (
+            select(VideoFieldValue)
+            .where(VideoFieldValue.video_id.in_(video_ids))
+        )
+        field_values_result = await db.execute(field_values_stmt)
+        all_field_values = field_values_result.scalars().all()
+
+        # Build a map of video_id -> list of field values
+        video_field_values_map = {}
+        for fv in all_field_values:
+            if fv.video_id not in video_field_values_map:
+                video_field_values_map[fv.video_id] = []
+            video_field_values_map[fv.video_id].append(fv)
+    else:
+        video_field_values_map = {}
 
     # === STEP 4: Generate CSV with dynamic field columns ===
     output = io.StringIO()
@@ -1550,7 +1574,8 @@ async def export_videos_csv(
         output.write(f"# Custom Fields: {field_metadata}\n")
 
     # Write header row
-    header = ['youtube_id', 'status', 'created_at']
+    # Use 'url' instead of 'youtube_id' for import compatibility
+    header = ['url', 'status', 'created_at']
     # Add field columns: field_<field_name>
     field_columns = [f"field_{field.name}" for field in custom_fields]
     header.extend(field_columns)
@@ -1559,15 +1584,18 @@ async def export_videos_csv(
     # === STEP 5: Write video rows with field values ===
     for video in videos:
         # Standard columns
+        # Convert youtube_id to full URL for import compatibility
+        video_url = f"https://www.youtube.com/watch?v={video.youtube_id}"
         row = [
-            video.youtube_id,
+            video_url,
             video.processing_status,
             video.created_at.isoformat()
         ]
 
-        # Build field values lookup
+        # Build field values lookup from pre-loaded map
+        video_field_values = video_field_values_map.get(video.id, [])
         field_values_map = {
-            fv.field_id: fv for fv in (video.field_values or [])
+            fv.field_id: fv for fv in video_field_values
         }
 
         # Add field value columns (match order of header)
