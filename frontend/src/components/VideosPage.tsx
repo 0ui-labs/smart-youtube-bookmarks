@@ -199,6 +199,10 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   // Extract tag names for API filtering
   const selectedTagNames = selectedTags.map(tag => tag.name)
 
+  // TASK 4: Parse sort parameters from URL query params
+  const sortBy = searchParams.get('sort_by') || undefined
+  const sortOrder = (searchParams.get('sort_order') || 'asc') as 'asc' | 'desc'
+
   // Get active field-based filters from store
   const activeFilters = useFieldFilterStore((state) => state.activeFilters)
 
@@ -217,7 +221,11 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   const { data: allVideos = [], isLoading: allLoading, error: allError } = useVideos(
     listId,
-    undefined // No tag filter for fallback
+    {
+      tags: undefined,
+      sortBy,
+      sortOrder,
+    }
   )
 
   // Use filtered results if filters are active, otherwise show all videos
@@ -235,6 +243,21 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const historyError = null
 
   const deleteVideo = useDeleteVideo(listId)
+
+  // TASK 4: Handlers to update sort state in URL
+  const handleSortChange = (newSortBy: string, newSortOrder: 'asc' | 'desc') => {
+    const params = new URLSearchParams(searchParams)
+    params.set('sort_by', newSortBy)
+    params.set('sort_order', newSortOrder)
+    setSearchParams(params, { replace: true })
+  }
+
+  const handleClearSort = () => {
+    const params = new URLSearchParams(searchParams)
+    params.delete('sort_by')
+    params.delete('sort_order')
+    setSearchParams(params, { replace: true })
+  }
 
   // URL Sync: Parse tag names from URL on mount and sync to store
   useEffect(() => {
@@ -314,6 +337,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         columnHelper.accessor('thumbnail_url', {
           id: 'thumbnail',
           header: 'Vorschau',
+          enableSorting: false, // TASK 5: Disable sorting on thumbnail
           cell: (info) => {
             const thumbnailUrl = info.getValue()
             const row = info.row.original
@@ -326,7 +350,20 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         // Column 2: Title + Channel
         columnHelper.accessor('title', {
           id: 'title',
-          header: 'Titel',
+          header: ({ column }) => (
+            <button
+              onClick={column.getToggleSortingHandler()}
+              className="flex items-center gap-2 hover:text-blue-600 transition-colors"
+            >
+              Titel
+              {column.getIsSorted() && (
+                <span aria-label={column.getIsSorted() === 'asc' ? 'Aufsteigend sortiert' : 'Absteigend sortiert'}>
+                  {column.getIsSorted() === 'asc' ? '↑' : '↓'}
+                </span>
+              )}
+            </button>
+          ),
+          enableSorting: true, // TASK 5: Enable sorting on title
           cell: (info) => {
             const row = info.row.original
             const title = info.getValue() || `Video ${row.youtube_id}`
@@ -353,7 +390,20 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         // Column 3: Duration
         columnHelper.accessor('duration', {
           id: 'duration',
-          header: 'Dauer',
+          header: ({ column }) => (
+            <button
+              onClick={column.getToggleSortingHandler()}
+              className="flex items-center gap-2 hover:text-blue-600 transition-colors"
+            >
+              Dauer
+              {column.getIsSorted() && (
+                <span aria-label={column.getIsSorted() === 'asc' ? 'Aufsteigend sortiert' : 'Absteigend sortiert'}>
+                  {column.getIsSorted() === 'asc' ? '↑' : '↓'}
+                </span>
+              )}
+            </button>
+          ),
+          enableSorting: true, // TASK 5: Enable sorting on duration
           cell: (info) => {
             const duration = info.getValue()
             return (
@@ -429,13 +479,34 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         return visibleColumns[columnId]
       })
     },
-    [visibleColumns]
+    [visibleColumns, sortBy, sortOrder] // TASK 5: Add sort params to dependencies
   )
 
+  // TASK 5: Configure TanStack Table with manual sorting
   const table = useReactTable({
     data: videos,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    manualSorting: true, // Backend handles sorting
+    state: {
+      sorting: sortBy
+        ? [{ id: sortBy, desc: sortOrder === 'desc' }]
+        : [],
+    },
+    onSortingChange: (updater) => {
+      const newSorting = typeof updater === 'function'
+        ? updater(sortBy ? [{ id: sortBy, desc: sortOrder === 'desc' }] : [])
+        : updater
+
+      if (newSorting.length > 0) {
+        const sort = newSorting[0]
+        if (sort) {
+          handleSortChange(sort.id, sort.desc ? 'desc' : 'asc')
+        }
+      } else {
+        handleClearSort()
+      }
+    },
   })
 
   const validateYoutubeUrl = (url: string): boolean => {
