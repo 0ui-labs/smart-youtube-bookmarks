@@ -210,6 +210,47 @@ R4I_YaFYv3M
 b-IXXlnLeuI
 ```
 
+**CSV Import with Custom Fields:**
+
+You can include custom field values in your CSV using the `field_<field_name>` column format:
+
+```csv
+url,field_Overall_Rating,field_Presentation
+https://youtube.com/watch?v=dQw4w9WgXcQ,5,great
+https://youtu.be/jNQXAC9IVRw,3,good
+```
+
+- **Field Columns:** Named `field_<field_name>` (e.g., `field_Overall_Rating`)
+- **Case Insensitive:** Column names match fields regardless of case
+- **Validation:** Values validated per field type (rating, select, text, boolean)
+- **Empty Values:** Empty fields are skipped (not an error)
+- **Boolean Format:** Accepts `true`/`false`/`1`/`0`/`yes`/`no` (case-insensitive)
+- **Error Handling:** Videos are created even if field values fail validation (partial success)
+
+**Exporting Videos with Custom Fields:**
+
+GET `/api/lists/{list_id}/export/csv` now includes custom field values as dynamic columns:
+
+```csv
+# Custom Fields: Overall Rating (rating, 5), Presentation (select: bad|good|great)
+url,status,created_at,field_Overall_Rating,field_Presentation
+https://youtube.com/watch?v=dQw4w9WgXcQ,completed,2025-11-08T10:00:00,5,great
+https://youtu.be/jNQXAC9IVRw,pending,2025-11-08T11:00:00,3,
+```
+
+- **Metadata Comment:** First line shows field types for reference
+- **Dynamic Columns:** Field columns generated from list's custom fields
+- **Alphabetically Sorted:** Field columns appear in alphabetical order
+- **Empty Values:** Empty fields exported as empty string (not NULL)
+- **Roundtrip Compatible:** Exported CSVs can be re-imported with modifications
+
+**Excel/Sheets Workflow:**
+1. Export CSV from application
+2. Open in Excel/Google Sheets
+3. Edit field values (ratings, select options, booleans)
+4. Save CSV (UTF-8 encoding)
+5. Re-import CSV to update field values
+
 ### Monitoring Progress
 
 - **Live Updates:** Progress bar shows current status (0-100%)
