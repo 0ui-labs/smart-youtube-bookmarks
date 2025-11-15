@@ -6,6 +6,7 @@ from video transcripts using Google Gemini API with Pydantic schemas.
 """
 
 import pytest
+import pytest_asyncio
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
@@ -122,7 +123,7 @@ class TestGeminiClientTokenManagement:
 # Fixtures
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def gemini_client():
     """
     Fixture providing a GeminiClient instance for testing.
