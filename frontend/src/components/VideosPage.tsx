@@ -216,6 +216,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     listId,
     tags: hasTagFilters ? selectedTagNames : undefined,
     fieldFilters: hasFieldFilters ? activeFilters : undefined,
+    sortBy,
+    sortOrder,
     enabled: hasFieldFilters || hasTagFilters,
   })
 

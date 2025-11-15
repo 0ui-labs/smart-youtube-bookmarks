@@ -80,6 +80,8 @@ class VideoFilterRequest(BaseModel):
     """Request body for POST /videos/filter endpoint."""
     tags: Optional[list[str]] = Field(None, description="Tag names for OR filtering")
     field_filters: Optional[list[FieldFilter]] = Field(None, description="Field filters (AND logic)")
+    sort_by: Optional[str] = Field(None, description="Sort column: 'title', 'duration', 'created_at', 'channel', or 'field:<field_id>'")
+    sort_order: Optional[Literal["asc", "desc"]] = Field("asc", description="Sort direction")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -88,7 +90,9 @@ class VideoFilterRequest(BaseModel):
                     "tags": ["Python", "Tutorial"],
                     "field_filters": [
                         {"field_id": "550e8400-e29b-41d4-a716-446655440000", "operator": "gte", "value": 4}
-                    ]
+                    ],
+                    "sort_by": "title",
+                    "sort_order": "asc"
                 }
             ]
         }

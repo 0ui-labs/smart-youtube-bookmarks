@@ -694,14 +694,91 @@ async def filter_videos_in_list(
         # Use distinct() to prevent duplicates from multiple JOINs
         stmt = stmt.distinct()
 
-    # Step 5: Execute query
+    # Step 5: Apply sorting
+    if filter_request.sort_by:
+        sort_by = filter_request.sort_by
+        sort_order = filter_request.sort_order or "asc"
+
+        if sort_by.startswith("field:"):
+            # Field-based sorting
+            field_id_str = sort_by.split(":", 1)[1]
+            try:
+                field_id = UUID(field_id_str)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid field_id in sort_by parameter"
+                )
+
+            # Validate field exists
+            field_result = await db.execute(
+                select(CustomField).where(CustomField.id == field_id)
+            )
+            field = field_result.scalar_one_or_none()
+            if not field:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Custom field not found"
+                )
+
+            # LEFT JOIN to video_field_values and sort by typed column
+            stmt = stmt.outerjoin(
+                VideoFieldValue,
+                and_(
+                    VideoFieldValue.video_id == Video.id,
+                    VideoFieldValue.field_id == field_id
+                )
+            )
+
+            # Determine sort column based on field type
+            if field.field_type == "rating":
+                sort_column = VideoFieldValue.value_numeric
+            elif field.field_type in ("select", "text"):
+                sort_column = VideoFieldValue.value_text
+            elif field.field_type == "boolean":
+                sort_column = VideoFieldValue.value_boolean
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported field type: {field.field_type}"
+                )
+
+            # Apply ORDER BY with explicit NULL handling
+            if sort_order == "desc":
+                stmt = stmt.order_by(desc(sort_column).nulls_last())
+            else:
+                stmt = stmt.order_by(asc(sort_column).nulls_last())
+
+        else:
+            # Standard column sorting (title, duration, created_at, channel)
+            valid_columns = {
+                "title": Video.title,
+                "duration": Video.duration,
+                "created_at": Video.created_at,
+                "channel": Video.channel
+            }
+
+            if sort_by not in valid_columns:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid sort_by column: {sort_by}. Valid options: {', '.join(valid_columns.keys())}"
+                )
+
+            sort_column = valid_columns[sort_by]
+            # Apply nulls_last for both directions
+            if sort_order == "desc":
+                stmt = stmt.order_by(desc(sort_column).nulls_last())
+            else:
+                stmt = stmt.order_by(asc(sort_column).nulls_last())
+
+    # Step 6: Execute query
     result = await db.execute(stmt)
     videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
 
     if not videos:
         return []
 
-    # Step 6: Load tags for all videos (prevent N+1)
+    # Step 7: Load tags for all videos (prevent N+1)
     video_ids = [video.id for video in videos]
 
     # First, get video-tag associations
@@ -738,10 +815,10 @@ async def filter_videos_in_list(
     for video in videos:
         video.__dict__['tags'] = tags_by_video.get(video.id, [])
 
-    # Step 7: Batch-load applicable fields for ALL videos
+    # Step 8: Batch-load applicable fields for ALL videos
     applicable_fields_by_video = await get_available_fields_for_videos(videos, db)
 
-    # Step 8: Batch load field values
+    # Step 9: Batch load field values
     if video_ids:
         # Fetch all field values for all videos in one query
         field_values_stmt = (

@@ -7,6 +7,8 @@ interface UseVideosFilterOptions {
   listId: string;
   tags?: string[];
   fieldFilters?: ActiveFilter[];
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   enabled?: boolean;  // Allow disabling the query
 }
 
@@ -118,14 +120,18 @@ export function useVideosFilter({
   listId,
   tags,
   fieldFilters,
+  sortBy,
+  sortOrder = 'asc',
   enabled = true,
 }: UseVideosFilterOptions) {
   return useQuery({
-    queryKey: ['videos', 'filter', listId, tags, fieldFilters],
+    queryKey: ['videos', 'filter', listId, tags, fieldFilters, sortBy, sortOrder],
     queryFn: async () => {
       const requestBody: {
         tags?: string[];
         field_filters?: BackendFieldFilter[];
+        sort_by?: string;
+        sort_order?: 'asc' | 'desc';
       } = {};
 
       // Add tags if provided
@@ -136,6 +142,12 @@ export function useVideosFilter({
       // Add field filters if provided (convert to backend format)
       if (fieldFilters && fieldFilters.length > 0) {
         requestBody.field_filters = convertToBackendFilters(fieldFilters);
+      }
+
+      // Add sorting parameters if provided
+      if (sortBy) {
+        requestBody.sort_by = sortBy;
+        requestBody.sort_order = sortOrder;
       }
 
       const response = await api.post<VideoResponse[]>(
