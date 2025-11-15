@@ -17,7 +17,7 @@
  * ```
  */
 import React from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/command';
 import { useFieldFilterStore } from '@/stores/fieldFilterStore';
 import { useCustomFields } from '@/hooks/useCustomFields';
+import { FieldFilterInput } from './FieldFilterInput';
 
 interface FilterBarProps {
   listId: string;
@@ -84,20 +85,6 @@ export function FilterBar({ listId }: FilterBarProps) {
     setOpen(false);
   };
 
-  /**
-   * Format filter value for display
-   * Handles different value types (single value, range, etc.)
-   */
-  const formatFilterValue = (filter: (typeof activeFilters)[0]): string => {
-    if (filter.value !== undefined) {
-      return String(filter.value);
-    }
-    if (filter.valueMin !== undefined && filter.valueMax !== undefined) {
-      return `${filter.valueMin}-${filter.valueMax}`;
-    }
-    return '';
-  };
-
   if (isLoading) {
     return <div className="p-4 border-b">Loading filters...</div>;
   }
@@ -114,19 +101,11 @@ export function FilterBar({ listId }: FilterBarProps) {
 
         {activeFilters.map((filter) => (
           <Badge key={filter.id} variant="secondary" className="gap-1 pr-1">
-            <span className="text-sm">
-              {filter.fieldName} {filter.operator}{' '}
-              {formatFilterValue(filter)}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4 p-0 hover:bg-transparent"
-              onClick={() => removeFilter(filter.id)}
-              aria-label={`Remove ${filter.fieldName} filter`}
-            >
-              <X className="h-3 w-3" />
-            </Button>
+            <FieldFilterInput
+              filter={filter}
+              listId={listId}
+              onRemove={() => removeFilter(filter.id)}
+            />
           </Badge>
         ))}
       </div>
