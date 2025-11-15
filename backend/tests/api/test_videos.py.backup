@@ -973,13 +973,21 @@ async def test_sort_by_title_descending(client: AsyncClient, test_db: AsyncSessi
         json={"url": "https://www.youtube.com/watch?v=MikeVideo01"}
     )
 
-    # Update titles using UPDATE statement
-    from sqlalchemy import update
+    # Update titles directly in the database
+    from sqlalchemy import select
     from app.models.video import Video
 
-    await test_db.execute(update(Video).where(Video.youtube_id == "ZuluVideo01").values(title="Zulu Video"))
-    await test_db.execute(update(Video).where(Video.youtube_id == "AlphaVideo1").values(title="Alpha Video"))
-    await test_db.execute(update(Video).where(Video.youtube_id == "MikeVideo01").values(title="Mike Video"))
+    result = await test_db.execute(select(Video).where(Video.list_id == test_list.id))
+    videos = result.scalars().all()
+
+    for video in videos:
+        if video.youtube_id == "ZuluVideo01":
+            video.title = "Zulu Video"
+        elif video.youtube_id == "AlphaVideo1":
+            video.title = "Alpha Video"
+        elif video.youtube_id == "MikeVideo01":
+            video.title = "Mike Video"
+
     await test_db.commit()
 
     # Test sorting by title descending
@@ -1010,13 +1018,24 @@ async def test_sort_by_duration_ascending(client: AsyncClient, test_db: AsyncSes
         json={"url": "https://www.youtube.com/watch?v=MediumVideo"}
     )
 
-    # Update durations using UPDATE statement (in seconds)
-    from sqlalchemy import update
+    # Update durations directly in the database (in seconds)
+    from sqlalchemy import select
     from app.models.video import Video
 
-    await test_db.execute(update(Video).where(Video.youtube_id == "LongVideo01").values(title="Long Video", duration=600))
-    await test_db.execute(update(Video).where(Video.youtube_id == "ShortVideo1").values(title="Short Video", duration=120))
-    await test_db.execute(update(Video).where(Video.youtube_id == "MediumVideo").values(title="Medium Video", duration=300))
+    result = await test_db.execute(select(Video).where(Video.list_id == test_list.id))
+    videos = result.scalars().all()
+
+    for video in videos:
+        if video.youtube_id == "LongVideo01":
+            video.duration = 600  # 10 minutes
+            video.title = "Long Video"
+        elif video.youtube_id == "ShortVideo1":
+            video.duration = 120  # 2 minutes
+            video.title = "Short Video"
+        elif video.youtube_id == "MediumVideo":
+            video.duration = 300  # 5 minutes
+            video.title = "Medium Video"
+
     await test_db.commit()
 
     # Test sorting by duration ascending
@@ -1050,13 +1069,24 @@ async def test_sort_by_duration_descending(client: AsyncClient, test_db: AsyncSe
         json={"url": "https://www.youtube.com/watch?v=MediumVideo"}
     )
 
-    # Update durations using UPDATE statement (in seconds)
-    from sqlalchemy import update
+    # Update durations directly in the database (in seconds)
+    from sqlalchemy import select
     from app.models.video import Video
 
-    await test_db.execute(update(Video).where(Video.youtube_id == "LongVideo01").values(title="Long Video", duration=600))
-    await test_db.execute(update(Video).where(Video.youtube_id == "ShortVideo1").values(title="Short Video", duration=120))
-    await test_db.execute(update(Video).where(Video.youtube_id == "MediumVideo").values(title="Medium Video", duration=300))
+    result = await test_db.execute(select(Video).where(Video.list_id == test_list.id))
+    videos = result.scalars().all()
+
+    for video in videos:
+        if video.youtube_id == "LongVideo01":
+            video.duration = 600  # 10 minutes
+            video.title = "Long Video"
+        elif video.youtube_id == "ShortVideo1":
+            video.duration = 120  # 2 minutes
+            video.title = "Short Video"
+        elif video.youtube_id == "MediumVideo":
+            video.duration = 300  # 5 minutes
+            video.title = "Medium Video"
+
     await test_db.commit()
 
     # Test sorting by duration descending
@@ -1078,7 +1108,7 @@ async def test_sort_by_field_rating_descending(client: AsyncClient, test_db: Asy
     """Test sorting videos by rating field (highest first) with NULLS LAST."""
     from app.models.video_field_value import VideoFieldValue
     from uuid import UUID
-    from sqlalchemy import select, update
+    from sqlalchemy import select
     from app.models.video import Video
 
     # Create rating field
@@ -1124,10 +1154,17 @@ async def test_sort_by_field_rating_descending(client: AsyncClient, test_db: Asy
     test_db.add(value_high)
     test_db.add(value_low)
 
-    # Update titles using UPDATE statement
-    await test_db.execute(update(Video).where(Video.id == UUID(video_high_id)).values(title="High Quality"))
-    await test_db.execute(update(Video).where(Video.id == UUID(video_low_id)).values(title="Low Quality"))
-    await test_db.execute(update(Video).where(Video.id == UUID(video_no_rating_id)).values(title="No Rating"))
+    # Update titles
+    result = await test_db.execute(select(Video).where(Video.list_id == test_list.id))
+    videos = result.scalars().all()
+    for video in videos:
+        if video.id == UUID(video_high_id):
+            video.title = "High Quality"
+        elif video.id == UUID(video_low_id):
+            video.title = "Low Quality"
+        elif video.id == UUID(video_no_rating_id):
+            video.title = "No Rating"
+
     await test_db.commit()
 
     # Test sorting by rating field descending
@@ -1150,7 +1187,7 @@ async def test_sort_by_field_rating_ascending_nulls_last(client: AsyncClient, te
     """Test sorting videos by rating field ascending with NULLS LAST (empties at end)."""
     from app.models.video_field_value import VideoFieldValue
     from uuid import UUID
-    from sqlalchemy import select, update
+    from sqlalchemy import select
     from app.models.video import Video
 
     # Create rating field
@@ -1196,10 +1233,17 @@ async def test_sort_by_field_rating_ascending_nulls_last(client: AsyncClient, te
     test_db.add(value_v1)
     test_db.add(value_v3)
 
-    # Update titles using UPDATE statement
-    await test_db.execute(update(Video).where(Video.id == UUID(v1_id)).values(title="Video 1"))
-    await test_db.execute(update(Video).where(Video.id == UUID(v2_id)).values(title="Video 2"))
-    await test_db.execute(update(Video).where(Video.id == UUID(v3_id)).values(title="Video 3"))
+    # Update titles
+    result = await test_db.execute(select(Video).where(Video.list_id == test_list.id))
+    videos = result.scalars().all()
+    for video in videos:
+        if video.id == UUID(v1_id):
+            video.title = "Video 1"
+        elif video.id == UUID(v2_id):
+            video.title = "Video 2"
+        elif video.id == UUID(v3_id):
+            video.title = "Video 3"
+
     await test_db.commit()
 
     # Test sorting by rating field ascending (NULLS LAST)
@@ -1222,7 +1266,7 @@ async def test_sort_by_field_select_ascending(client: AsyncClient, test_db: Asyn
     """Test sorting videos by select field (alphabetical)."""
     from app.models.video_field_value import VideoFieldValue
     from uuid import UUID
-    from sqlalchemy import select, update
+    from sqlalchemy import select
     from app.models.video import Video
 
     # Create select field
@@ -1274,10 +1318,17 @@ async def test_sort_by_field_select_ascending(client: AsyncClient, test_db: Asyn
     test_db.add(value_low)
     test_db.add(value_medium)
 
-    # Update titles using UPDATE statement
-    await test_db.execute(update(Video).where(Video.id == UUID(video_high_id)).values(title="High Priority"))
-    await test_db.execute(update(Video).where(Video.id == UUID(video_low_id)).values(title="Low Priority"))
-    await test_db.execute(update(Video).where(Video.id == UUID(video_medium_id)).values(title="Medium Priority"))
+    # Update titles
+    result = await test_db.execute(select(Video).where(Video.list_id == test_list.id))
+    videos = result.scalars().all()
+    for video in videos:
+        if video.id == UUID(video_high_id):
+            video.title = "High Priority"
+        elif video.id == UUID(video_low_id):
+            video.title = "Low Priority"
+        elif video.id == UUID(video_medium_id):
+            video.title = "Medium Priority"
+
     await test_db.commit()
 
     # Test sorting by select field ascending (alphabetical)
@@ -1317,19 +1368,12 @@ async def test_sort_by_invalid_column(client: AsyncClient, test_db: AsyncSession
     assert "Invalid sort_by column" in response.json()["detail"]
 
 
-@pytest.mark.skip(reason="PostgreSQL DISTINCT + ORDER BY limitation with joined tables - requires subquery fix")
 @pytest.mark.asyncio
 async def test_sort_combined_with_tag_filter(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
-    """Test that sorting works correctly with tag filtering.
-
-    NOTE: This test is skipped due to a PostgreSQL limitation: when using DISTINCT with tag filtering,
-    ORDER BY expressions on joined tables (like video_field_values) must appear in the SELECT list.
-    This requires a more complex query strategy (subquery or CTE). The basic functionality works,
-    but combining tag filtering with field-based sorting needs additional implementation.
-    """
+    """Test that sorting works correctly with tag filtering."""
     from app.models.video_field_value import VideoFieldValue
     from uuid import UUID
-    from sqlalchemy import select, update
+    from sqlalchemy import select
     from app.models.video import Video
 
     # Create rating field
@@ -1392,10 +1436,17 @@ async def test_sort_combined_with_tag_filter(client: AsyncClient, test_db: Async
     test_db.add(value_v2)
     test_db.add(value_v3)
 
-    # Update titles using UPDATE statement
-    await test_db.execute(update(Video).where(Video.id == UUID(v1_id)).values(title="Low Rated"))
-    await test_db.execute(update(Video).where(Video.id == UUID(v2_id)).values(title="High Rated"))
-    await test_db.execute(update(Video).where(Video.id == UUID(v3_id)).values(title="No Tag"))
+    # Update titles
+    result = await test_db.execute(select(Video).where(Video.list_id == test_list.id))
+    videos = result.scalars().all()
+    for video in videos:
+        if video.id == UUID(v1_id):
+            video.title = "Low Rated"
+        elif video.id == UUID(v2_id):
+            video.title = "High Rated"
+        elif video.id == UUID(v3_id):
+            video.title = "No Tag"
+
     await test_db.commit()
 
     # Test filtering by Python tag and sorting by rating descending
@@ -1434,13 +1485,16 @@ async def test_default_sort_created_at_desc(client: AsyncClient, test_db: AsyncS
     )
     new_id = new_response.json()["id"]
 
-    # Update titles using UPDATE statement
+    # Update titles
     from uuid import UUID
-    from sqlalchemy import update
-    from app.models.video import Video
-    
-    await test_db.execute(update(Video).where(Video.id == UUID(old_id)).values(title="Old Video"))
-    await test_db.execute(update(Video).where(Video.id == UUID(new_id)).values(title="New Video"))
+    result = await test_db.execute(select(Video).where(Video.list_id == test_list.id))
+    videos = result.scalars().all()
+    for video in videos:
+        if video.id == UUID(old_id):
+            video.title = "Old Video"
+        elif video.id == UUID(new_id):
+            video.title = "New Video"
+
     await test_db.commit()
 
     # Test default sorting (no sort params)

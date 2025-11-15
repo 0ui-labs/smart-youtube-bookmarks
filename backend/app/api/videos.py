@@ -355,7 +355,7 @@ async def get_videos_in_list(
             stmt = (
                 stmt.join(Video.tags)
                 .where(func.lower(Tag.name).in_(normalized_tags))
-                .distinct()
+                .distinct()  # DISTINCT must come before ORDER BY for PostgreSQL
             )
 
     # Apply sorting
