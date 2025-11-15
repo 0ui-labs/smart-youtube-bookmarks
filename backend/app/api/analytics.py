@@ -170,7 +170,7 @@ async def _get_most_used_fields(
             field_type=row.field_type,
             usage_count=row.usage_count,
             total_videos=total_videos,
-            usage_percentage=round((row.usage_count / total_videos * 100), 1) if total_videos > 0 else 0.0
+            usage_percentage=round((row.usage_count / total_videos * 100), 2) if total_videos > 0 else 0.0
         )
         for row in rows
     ]
@@ -297,7 +297,7 @@ async def _get_field_coverage(
             field_type=row.field_type,
             videos_with_values=row.videos_with_values,
             total_videos=total_videos,
-            coverage_percentage=round((row.videos_with_values / total_videos * 100), 1) if total_videos > 0 else 0.0
+            coverage_percentage=round((row.videos_with_values / total_videos * 100), 2) if total_videos > 0 else 0.0
         )
         for row in rows
     ]
@@ -400,8 +400,8 @@ async def _get_schema_effectiveness(
             schema_id=str(schema.id),
             schema_name=schema.name,
             field_count=field_count,
-            avg_fields_filled=round(avg_fields_filled, 1),
-            completion_percentage=round(completion_percentage, 1),
+            avg_fields_filled=round(avg_fields_filled, 2),
+            completion_percentage=round(completion_percentage, 2),
             video_count=len(video_ids)
         ))
 

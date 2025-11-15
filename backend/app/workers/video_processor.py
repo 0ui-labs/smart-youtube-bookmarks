@@ -70,11 +70,13 @@ async def process_video(
         video = await db.get(Video, UUID(video_id))
         if not video:
             logger.error(f"Video {video_id} not found")
+            await _update_job_progress(db, job_id, success=False)
             return {"status": "error", "message": "Video not found"}
 
         # Idempotency check - skip if already completed
         if video.processing_status == "completed":
             logger.info(f"Video {video_id} already processed")
+            await _update_job_progress(db, job_id, success=True)
             return {"status": "already_completed", "video_id": video_id}
 
         # Mark as processing
@@ -184,7 +186,7 @@ async def process_video_list(
                 job_id
             )
 
-            if result['status'] == 'success':
+            if result['status'] in ('success', 'already_completed'):
                 processed_count += 1
             else:
                 failed_count += 1

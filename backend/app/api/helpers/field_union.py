@@ -108,8 +108,8 @@ def compute_field_union_with_conflicts(
             is_conflicting = field_key in conflicting_names
 
             if is_conflicting:
-                # This field name has type conflicts → use schema prefix
-                registry_key = f"{schema_name}:{field.name}".lower()
+                # This field name has type conflicts → use schema_id prefix (unique)
+                registry_key = f"{schema_id}:{field.name}".lower()
             else:
                 # No conflict → use original name
                 registry_key = field_key

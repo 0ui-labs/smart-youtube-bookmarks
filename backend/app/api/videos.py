@@ -266,12 +266,12 @@ async def add_video_to_list(
         )
 
     except Exception as e:
-        # Fallback: Create with pending status if YouTube API fails
+        # Fallback: Create with pending status if YouTube API fails (allows retry via background worker)
         logger.warning(f"Failed to fetch YouTube metadata for {youtube_id}: {e}")
         new_video = Video(
             list_id=list_id,
             youtube_id=youtube_id,
-            processing_status="failed",
+            processing_status="pending",
             error_message=f"Could not fetch video metadata: {str(e)}"
         )
 
@@ -530,12 +530,16 @@ async def get_videos_in_list(
 
                 # Create response dict (Pydantic will serialize)
                 field_values_response.append({
+                    'id': field_value.id if field_value else None,
+                    'video_id': video.id,
                     'field_id': field.id,
+                    'field_name': field.name,
                     'field': field,  # CustomField ORM object
                     'value': value,
                     'schema_name': schema_name,
                     'show_on_card': show_on_card,
-                    'display_order': display_order
+                    'display_order': display_order,
+                    'updated_at': field_value.updated_at if field_value else None
                 })
 
             # Assign to video (FastAPI will serialize via VideoResponse schema)
@@ -864,12 +868,16 @@ async def filter_videos_in_list(
 
                 # Create response dict (Pydantic will serialize)
                 field_values_response.append({
+                    'id': field_value.id if field_value else None,
+                    'video_id': video.id,
                     'field_id': field.id,
+                    'field_name': field.name,
                     'field': field,  # CustomField ORM object
                     'value': value,
                     'schema_name': schema_name,
                     'show_on_card': show_on_card,
-                    'display_order': display_order
+                    'display_order': display_order,
+                    'updated_at': field_value.updated_at if field_value else None
                 })
 
             # Assign to video (FastAPI will serialize via VideoResponse schema)
@@ -952,12 +960,16 @@ async def get_video_by_id(
 
         # Create response dict (Pydantic will serialize)
         field_values_response.append({
+            'id': field_value.id if field_value else None,
+            'video_id': video.id,
             'field_id': field.id,
+            'field_name': field.name,
             'field': field,  # CustomField ORM object
             'value': value,
             'schema_name': schema_name,
             'show_on_card': show_on_card,
-            'display_order': display_order
+            'display_order': display_order,
+            'updated_at': field_value.updated_at if field_value else None
         })
 
     # Step 5: Attach available_fields and field_values to video object for Pydantic
@@ -2052,12 +2064,16 @@ async def batch_update_video_field_values(
 
         field_values_response.append(
             VideoFieldValueResponse(
+                id=fv.id,
+                video_id=fv.video_id,
                 field_id=fv.field_id,
+                field_name=fv.field.name,
                 field=CustomFieldResponse.model_validate(fv.field),
                 value=value,
                 schema_name=None,  # Not applicable for direct update
                 show_on_card=False,  # Not applicable for direct update
-                display_order=0  # Not applicable for direct update
+                display_order=0,  # Not applicable for direct update
+                updated_at=fv.updated_at
             )
         )
 

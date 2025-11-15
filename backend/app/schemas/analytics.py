@@ -151,10 +151,10 @@ class SchemaEffectivenessStat(BaseModel):
                 f"avg_fields_filled ({self.avg_fields_filled:.2f}) cannot exceed field_count ({self.field_count})"
             )
 
-        # Validate percentage calculation (allow small floating point error)
+        # Validate percentage calculation (allow rounding error up to 0.1 for 2-decimal precision)
         if self.field_count > 0:
             expected_percentage = (self.avg_fields_filled / self.field_count) * 100
-            if abs(self.completion_percentage - expected_percentage) > 0.01:
+            if abs(self.completion_percentage - expected_percentage) > 0.1:
                 raise ValueError(
                     f"completion_percentage ({self.completion_percentage:.2f}) does not match calculated value "
                     f"({expected_percentage:.2f}) from avg_fields_filled/field_count"
