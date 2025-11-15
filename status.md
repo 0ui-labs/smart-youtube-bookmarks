@@ -253,7 +253,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 
 143. [x] Implement AI-powered duplicate detection (Levenshtein + semantic similarity)
 144. [x] Add field-based filtering to video list UI (2025-11-15 09:57)
-145. [ ] Implement field-based sorting
+145. [x] Implement field-based sorting
 146. [ ] Extend CSV export to include custom field values
 147. [ ] Implement CSV import for field values
 
