@@ -5,7 +5,7 @@ Includes enhanced URL validation with security checks.
 """
 
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Literal
 from uuid import UUID
 from urllib.parse import urlparse
 import re
