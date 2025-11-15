@@ -576,7 +576,14 @@ async def filter_videos_in_list(
 
             elif operator == FieldFilterOperator.CONTAINS:
                 # Text contains (case-insensitive) - Uses GIN index!
-                stmt = stmt.where(vfv_alias.value_text.ilike(f"%{field_filter.value}%"))
+                # Escape special ILIKE characters (%, _, \) to prevent SQL injection
+                escaped_value = (
+                    str(field_filter.value)
+                    .replace('\\', '\\\\')
+                    .replace('%', '\\%')
+                    .replace('_', '\\_')
+                )
+                stmt = stmt.where(vfv_alias.value_text.ilike(f"%{escaped_value}%"))
 
             elif operator == FieldFilterOperator.EXACT:
                 # Exact match (case-sensitive)
@@ -584,8 +591,14 @@ async def filter_videos_in_list(
 
             elif operator == FieldFilterOperator.IN:
                 # One of (comma-separated values)
+                # Validate value is string before calling split()
+                if not isinstance(field_filter.value, str):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="IN operator requires comma-separated string value"
+                    )
                 # Parse comma-separated string into list
-                values = [v.strip() for v in str(field_filter.value).split(',') if v.strip()]
+                values = [v.strip() for v in field_filter.value.split(',') if v.strip()]
                 stmt = stmt.where(vfv_alias.value_text.in_(values))
 
             elif operator == FieldFilterOperator.IS:
