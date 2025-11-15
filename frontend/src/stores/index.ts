@@ -17,3 +17,7 @@ export type { ThumbnailSize, VisibleColumns, ViewMode, GridColumnCount } from '.
 
 // Tag Store
 export { useTagStore } from './tagStore';
+
+// Field Filter Store
+export { useFieldFilterStore } from './fieldFilterStore';
+export type { ActiveFilter, FilterOperator } from './fieldFilterStore';
