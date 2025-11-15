@@ -1,13 +1,26 @@
 """Tests for ARQ video processor worker."""
 import pytest
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 from app.models import Video, BookmarkList, ProcessingJob
 from app.workers.video_processor import process_video
 
 
 @pytest.mark.asyncio
-async def test_process_video_updates_status_to_processing(arq_context, test_db, test_user):
+@patch('app.workers.video_processor.YouTubeClient')
+async def test_process_video_updates_status_to_processing(mock_youtube_client, arq_context, test_db, test_user):
     """Test video processing marks video as 'processing'."""
+    # Arrange: Mock YouTube client
+    mock_client_instance = AsyncMock()
+    mock_client_instance.get_video_metadata.return_value = {
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "duration": "PT5M30S",
+        "published_at": "2024-01-01T00:00:00Z"
+    }
+    mock_youtube_client.return_value = mock_client_instance
+
     # Arrange: Create test list first (foreign key requirement)
     bookmark_list = BookmarkList(
         name="Test List",
@@ -144,8 +157,20 @@ async def test_process_video_marks_failed_on_exception(arq_context, test_db, tes
 
 
 @pytest.mark.asyncio
-async def test_process_video_fetches_youtube_metadata(arq_context, test_db, test_user):
+@patch('app.workers.video_processor.YouTubeClient')
+async def test_process_video_fetches_youtube_metadata(mock_youtube_client, arq_context, test_db, test_user):
     """Test video processing fetches and stores YouTube metadata."""
+    # Arrange: Mock YouTube client
+    mock_client_instance = AsyncMock()
+    mock_client_instance.get_video_metadata.return_value = {
+        "title": "Rick Astley - Never Gonna Give You Up",
+        "channel": "Rick Astley",
+        "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+        "duration": "PT3M33S",
+        "published_at": "2009-10-25T06:57:33Z"
+    }
+    mock_youtube_client.return_value = mock_client_instance
+
     # Arrange: Create test list
     bookmark_list = BookmarkList(
         name="Test List",

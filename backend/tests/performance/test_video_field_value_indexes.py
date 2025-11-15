@@ -31,13 +31,12 @@ from app.models.video_field_value import VideoFieldValue
 from app.models.user import User
 
 
-# REF MCP Improvement #3: Cache reset fixture (DISCARD TEMP)
-# Ensures each test starts with clean PostgreSQL cache for accurate benchmarks
+# REF MCP Improvement #3: Cache reset fixture (DISCARD TEMP removed)
+# Note: DISCARD TEMP cannot be run inside a transaction in PostgreSQL
+# Tests will rely on ANALYZE to update statistics instead
 @pytest.fixture(autouse=True)
 async def reset_cache(test_db: AsyncSession):
-    """Reset PostgreSQL cache before each test to prevent contamination."""
-    await test_db.execute(text("DISCARD TEMP;"))
-    await test_db.commit()
+    """Placeholder for cache reset - DISCARD TEMP cannot run in transaction."""
     yield
 
 
