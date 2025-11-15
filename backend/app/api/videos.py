@@ -1085,6 +1085,177 @@ async def delete_video(
     return None
 
 
+async def _process_field_values(
+    db: AsyncSession,
+    created_videos: list[Video],
+    csv_rows: list[dict],
+    field_columns: dict,
+    failures: list[BulkUploadFailure]
+) -> None:
+    """
+    Process and apply field values from CSV rows to created videos.
+
+    This helper function parses field values from CSV rows, validates them,
+    and applies them using the batch update helper function.
+
+    Args:
+        db: Database session
+        created_videos: List of successfully created Video objects
+        csv_rows: List of raw CSV row dictionaries
+        field_columns: Dict mapping column_name -> CustomField
+        failures: List to append failures to (modified in-place)
+    """
+    from app.schemas.video_field_value import FieldValueUpdate
+
+    # Process field values for each video
+    for idx, video in enumerate(created_videos):
+        # Get CSV row for this video
+        if idx >= len(csv_rows):
+            continue
+
+        row_data = csv_rows[idx]
+        field_updates = []
+
+        for column_name, field in field_columns.items():
+            raw_value = row_data.get(column_name, '').strip()
+
+            # Skip empty values (not an error, just unset)
+            if not raw_value:
+                continue
+
+            # Parse value based on field type
+            try:
+                if field.field_type == 'rating':
+                    # Parse as float to support decimal ratings
+                    parsed_value = float(raw_value)
+                    validate_field_value(parsed_value, field.field_type, field.config)
+                    field_updates.append(FieldValueUpdate(field_id=field.id, value=parsed_value))
+
+                elif field.field_type == 'select':
+                    # Validate against options list (case-sensitive in validation)
+                    validate_field_value(raw_value, field.field_type, field.config)
+                    field_updates.append(FieldValueUpdate(field_id=field.id, value=raw_value))
+
+                elif field.field_type == 'text':
+                    # Validate max_length if configured
+                    validate_field_value(raw_value, field.field_type, field.config)
+                    field_updates.append(FieldValueUpdate(field_id=field.id, value=raw_value))
+
+                elif field.field_type == 'boolean':
+                    # Parse "true"/"false"/"1"/"0" (case-insensitive)
+                    lower_value = raw_value.lower()
+                    if lower_value in ('true', '1', 'yes'):
+                        parsed_value = True
+                    elif lower_value in ('false', '0', 'no', ''):
+                        parsed_value = False
+                    else:
+                        raise ValueError(f"Invalid boolean value: '{raw_value}'. Use 'true'/'false' or '1'/'0'.")
+                    field_updates.append(FieldValueUpdate(field_id=field.id, value=parsed_value))
+
+            except (ValueError, FieldValidationError) as e:
+                # Log validation error but continue processing
+                logger.warning(f"Field validation error for video {video.youtube_id}, field '{field.name}': {e}")
+
+        # Apply field updates via batch update helper
+        if field_updates:
+            try:
+                # Create batch update request
+                update_request = BatchUpdateFieldValuesRequest(field_values=field_updates)
+
+                # Call batch update logic directly (avoid HTTP overhead)
+                await _apply_field_values_batch(db, video.id, update_request)
+
+                logger.info(f"Applied {len(field_updates)} field values for video {video.youtube_id}")
+
+            except Exception as e:
+                # Log error but don't fail video creation
+                logger.error(f"Failed to apply field values for video {video.youtube_id}: {e}")
+                failures.append(BulkUploadFailure(
+                    row=0,  # Row number not easily tracked here
+                    url=f"https://youtube.com/watch?v={video.youtube_id}",
+                    error=f"Video created, but field values failed: {str(e)}"
+                ))
+
+
+async def _apply_field_values_batch(
+    db: AsyncSession,
+    video_id: UUID,
+    request: BatchUpdateFieldValuesRequest
+) -> None:
+    """
+    Apply batch field value updates to a video (helper for CSV import).
+
+    This is the core logic from Task #72's PUT /api/videos/{id}/fields endpoint,
+    extracted for reuse in CSV import flow.
+
+    Args:
+        db: Database session
+        video_id: UUID of video to update
+        request: Batch update request with field_id/value pairs
+
+    Raises:
+        HTTPException: If validation fails (404, 400, 422)
+    """
+    # Step 1: Fetch all CustomFields for validation
+    field_ids = [update.field_id for update in request.field_values]
+
+    fields_stmt = select(CustomField).where(CustomField.id.in_(field_ids))
+    fields_result = await db.execute(fields_stmt)
+    fields = {field.id: field for field in fields_result.scalars().all()}
+
+    # Validate all field_ids exist
+    invalid_field_ids = [fid for fid in field_ids if fid not in fields]
+    if invalid_field_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid field_id(s): {invalid_field_ids}"
+        )
+
+    # Step 2: Validate values against field types
+    for update in request.field_values:
+        field = fields[update.field_id]
+        validate_field_value(update.value, field.field_type, field.config)
+
+    # Step 3: Prepare upsert data
+    upsert_data = []
+    for update in request.field_values:
+        field = fields[update.field_id]
+
+        value_text = None
+        value_numeric = None
+        value_boolean = None
+
+        if field.field_type == 'rating':
+            value_numeric = update.value
+        elif field.field_type in ('select', 'text'):
+            value_text = update.value
+        elif field.field_type == 'boolean':
+            value_boolean = update.value
+
+        upsert_data.append({
+            'video_id': video_id,
+            'field_id': update.field_id,
+            'value_text': value_text,
+            'value_numeric': value_numeric,
+            'value_boolean': value_boolean
+        })
+
+    # Step 4: Execute PostgreSQL UPSERT
+    stmt = pg_insert(VideoFieldValue).values(upsert_data)
+    stmt = stmt.on_conflict_do_update(
+        constraint='uq_video_field_values_video_field',
+        set_={
+            'value_text': stmt.excluded.value_text,
+            'value_numeric': stmt.excluded.value_numeric,
+            'value_boolean': stmt.excluded.value_boolean,
+            'updated_at': func.now()
+        }
+    )
+
+    await db.execute(stmt)
+    # Note: No commit here - caller handles transaction
+
+
 @router.post(
     "/lists/{list_id}/videos/bulk",
     response_model=BulkUploadResponse,
@@ -1096,28 +1267,33 @@ async def bulk_upload_videos(
     db: AsyncSession = Depends(get_db)
 ) -> BulkUploadResponse:
     """
-    Bulk upload videos from CSV file.
+    Bulk upload videos from CSV file with optional custom field values.
 
-    CSV format:
+    **CSV Format (Extended):**
     ```
-    url
-    https://www.youtube.com/watch?v=VIDEO_ID_1
-    https://youtu.be/VIDEO_ID_2
+    url,field_Overall_Rating,field_Presentation
+    https://youtube.com/watch?v=dQw4w9WgXcQ,5,great
+    https://youtu.be/jNQXAC9IVRw,3,good
     ```
 
-    - Validates list exists (404 if not found)
-    - Validates CSV header must be "url"
-    - Processes each row, collecting failures
-    - Returns created_count, failed_count, and failure details
-    - Commits all valid videos in single transaction
+    **Field Columns:**
+    - Format: `field_<field_name>` (case-insensitive matching)
+    - Values validated per field type (rating: int, select: option, text: max_length, boolean: true/false)
+    - Invalid field values logged as warnings, video still created
+    - Field updates applied via batch update endpoint (Task #72)
+
+    **Validation:**
+    - URL column required (422 if missing)
+    - Field columns optional (videos created even if field validation fails)
+    - Row-level error handling: Continue processing on field errors
 
     Args:
         list_id: UUID of the bookmark list
-        file: CSV file with YouTube URLs
+        file: CSV file with YouTube URLs and optional field columns
         db: Database session
 
     Returns:
-        BulkUploadResponse: Statistics and failure details
+        BulkUploadResponse: Statistics with created_count, failed_count, failures list
 
     Raises:
         HTTPException 404: List not found
@@ -1149,7 +1325,28 @@ async def bulk_upload_videos(
                 detail="CSV must have 'url' header column"
             )
 
+        # === NEW: Detect field columns in CSV header ===
+        # Step 1: Get all custom fields for this list
+        fields_stmt = select(CustomField).where(CustomField.list_id == list_id)
+        fields_result = await db.execute(fields_stmt)
+        all_fields = {field.name.lower(): field for field in fields_result.scalars().all()}
+
+        # Step 2: Detect field columns in CSV header
+        field_columns = {}  # column_name -> CustomField
+        for column_name in reader.fieldnames:
+            if column_name.lower().startswith('field_'):
+                # Extract field name (remove "field_" prefix)
+                field_name = column_name[6:].strip().lower()  # "field_Overall_Rating" -> "overall_rating"
+
+                # Try to match to existing field (case-insensitive)
+                if field_name in all_fields:
+                    field_columns[column_name] = all_fields[field_name]
+                    logger.info(f"Detected field column: {column_name} -> {all_fields[field_name].name}")
+                else:
+                    logger.warning(f"Unknown field column '{column_name}' (no matching custom field), will be ignored")
+
         videos_to_create = []
+        csv_rows = []  # Store raw CSV rows for field value processing
         failures = []
         row_num = 1  # Start at 1 (header is row 0)
 
@@ -1183,6 +1380,8 @@ async def bulk_upload_videos(
                     "youtube_id": youtube_id,
                     "row": row_num,
                 })
+                # Store raw CSV row for field value processing
+                csv_rows.append(row)
 
             except ValueError as e:
                 failures.append(BulkUploadFailure(
@@ -1211,20 +1410,24 @@ async def bulk_upload_videos(
             videos_to_create = video_objects
 
         # Bulk insert valid videos (all with pending status)
+        created_videos = []  # Track successfully created videos
         if videos_to_create:
             db.add_all(videos_to_create)
             try:
                 await db.commit()
+                created_videos = videos_to_create  # All created successfully
             except IntegrityError:
                 # Handle duplicates with existing videos in DB
                 await db.rollback()
                 # Retry one by one to identify which failed
                 created = 0
+                created_videos = []
                 for video in videos_to_create:
                     try:
                         db.add(video)
                         await db.flush()
                         created += 1
+                        created_videos.append(video)
                     except IntegrityError:
                         await db.rollback()
                         failures.append(BulkUploadFailure(
@@ -1234,6 +1437,17 @@ async def bulk_upload_videos(
                         ))
                 await db.commit()
 
+                # === NEW: Apply field values to created videos ===
+                if field_columns and created_videos:
+                    await _process_field_values(
+                        db=db,
+                        created_videos=created_videos,
+                        csv_rows=csv_rows,
+                        field_columns=field_columns,
+                        failures=failures
+                    )
+                    await db.commit()
+
                 # Create processing job if videos were created
                 await _enqueue_video_processing(db, list_id, created)
 
@@ -1242,6 +1456,17 @@ async def bulk_upload_videos(
                     failed_count=len(failures),
                     failures=failures
                 )
+
+        # === NEW: Apply field values to created videos ===
+        if field_columns and created_videos:
+            await _process_field_values(
+                db=db,
+                created_videos=created_videos,
+                csv_rows=csv_rows,
+                field_columns=field_columns,
+                failures=failures
+            )
+            await db.commit()
 
         # Create processing job if videos were created
         await _enqueue_video_processing(db, list_id, len(videos_to_create))
