@@ -853,17 +853,17 @@ async def test_filter_videos_tags_and_fields(
     test_db: AsyncSession,
     test_user
 ):
-    """Filter videos with Tag 'Python' AND Rating >= 4."""
-    # Arrange: Create tag
-    tag_resp = await client.post("/api/tags", json={"name": "Python"})
+    """Filter videos with Tag 'Rust' AND Rating >= 4."""
+    # Arrange: Create tag (use unique name to avoid conflicts with other tests)
+    tag_resp = await client.post("/api/tags", json={"name": "Rust"})
     tag_id = tag_resp.json()["id"]
 
     # Create videos
-    video1 = await create_test_video(test_db, test_list.id, "VIDEO_PYTHON_HIGH", "Python high rating")
-    video2 = await create_test_video(test_db, test_list.id, "VIDEO_PYTHON_LOW", "Python low rating")
+    video1 = await create_test_video(test_db, test_list.id, "VIDEO_RUST_HIGH", "Rust high rating")
+    video2 = await create_test_video(test_db, test_list.id, "VIDEO_RUST_LOW", "Rust low rating")
     video3 = await create_test_video(test_db, test_list.id, "VIDEO_JS_HIGH", "JavaScript high rating")
 
-    # Assign Python tag to video1 and video2
+    # Assign Rust tag to video1 and video2
     await client.post(f"/api/videos/{video1.id}/tags", json={"tag_ids": [tag_id]})
     await client.post(f"/api/videos/{video2.id}/tags", json={"tag_ids": [tag_id]})
 
@@ -872,11 +872,11 @@ async def test_filter_videos_tags_and_fields(
     await set_field_value(test_db, video2.id, test_field_rating.id, value_numeric=2)
     await set_field_value(test_db, video3.id, test_field_rating.id, value_numeric=5)
 
-    # Act: Filter for tag "Python" AND rating >= 4
+    # Act: Filter for tag "Rust" AND rating >= 4
     response = await client.post(
         f"/api/lists/{test_list.id}/videos/filter",
         json={
-            "tags": ["Python"],
+            "tags": ["Rust"],
             "field_filters": [
                 {
                     "field_id": str(test_field_rating.id),
@@ -887,11 +887,11 @@ async def test_filter_videos_tags_and_fields(
         }
     )
 
-    # Assert: Only video1 matches (Python tag AND rating >= 4)
+    # Assert: Only video1 matches (Rust tag AND rating >= 4)
     assert response.status_code == 200
     videos = response.json()
     assert len(videos) == 1
-    assert videos[0]["title"] == "Python high rating"
+    assert videos[0]["title"] == "Rust high rating"
 
 
 # ============================================================================

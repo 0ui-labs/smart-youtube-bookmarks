@@ -301,7 +301,7 @@ async def add_video_to_list(
 @router.get("/lists/{list_id}/videos", response_model=List[VideoResponse])
 async def get_videos_in_list(
     list_id: UUID,
-    tags: Annotated[Optional[List[str]], Query(max_items=10)] = None,
+    tags: Annotated[Optional[List[str]], Query(max_length=10)] = None,
     db: AsyncSession = Depends(get_db)
 ) -> List[Video]:
     """
@@ -810,8 +810,8 @@ async def get_video_by_id(
 
 @router.get("/videos", response_model=List[VideoResponse])
 async def list_all_videos(
-    tags: Annotated[Optional[List[str]], Query(max_items=10)] = None,
-    tags_all: Annotated[Optional[List[str]], Query(max_items=10)] = None,
+    tags: Annotated[Optional[List[str]], Query(max_length=10)] = None,
+    tags_all: Annotated[Optional[List[str]], Query(max_length=10)] = None,
     db: AsyncSession = Depends(get_db)
 ) -> List[Video]:
     """
@@ -879,6 +879,11 @@ async def list_all_videos(
     # Assign tags to videos
     for video in videos:
         video.__dict__['tags'] = tags_by_video.get(video.id, [])
+
+    # Assign empty field_values to all videos (this endpoint doesn't support field filtering)
+    # This prevents MissingGreenlet error when VideoResponse tries to access field_values
+    for video in videos:
+        video.__dict__['field_values'] = []
 
     return list(videos)
 

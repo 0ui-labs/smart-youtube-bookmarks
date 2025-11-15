@@ -51,6 +51,16 @@ async def create_tag(
     db.add(new_tag)
     await db.commit()
     await db.refresh(new_tag)
+
+    # Eager load schema relationship to avoid lazy loading issues in response serialization
+    # Re-query with selectinload to ensure schema is loaded
+    stmt = (
+        select(Tag)
+        .options(selectinload(Tag.schema))
+        .where(Tag.id == new_tag.id)
+    )
+    new_tag = (await db.execute(stmt)).scalar_one()
+
     return new_tag
 
 
