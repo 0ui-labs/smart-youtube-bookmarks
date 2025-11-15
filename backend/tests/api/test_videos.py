@@ -912,20 +912,33 @@ async def test_sort_by_title_ascending(client: AsyncClient, test_db: AsyncSessio
     """Test sorting videos by title in ascending order (A-Z)."""
     from sqlalchemy import select, update
     from app.models.video import Video
+    from unittest.mock import AsyncMock, patch
 
-    # Create videos with different titles
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=ZuluVideo01"}
-    )
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=AlphaVideo1"}
-    )
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=MikeVideo01"}
-    )
+    # Mock YouTube client
+    mock_youtube_client = AsyncMock()
+    mock_youtube_client.get_video_metadata = AsyncMock(return_value={
+        "youtube_id": "test123",
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "duration": "PT5M",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "published_at": "2024-01-01T00:00:00Z"
+    })
+
+    with patch('app.api.videos.YouTubeClient', return_value=mock_youtube_client):
+        # Create videos with different titles
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=ZuluVideo01"}
+        )
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=AlphaVideo1"}
+        )
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=MikeVideo01"}
+        )
 
     # Update titles using UPDATE statement (bypasses ORM)
     await test_db.execute(
@@ -959,19 +972,33 @@ async def test_sort_by_title_ascending(client: AsyncClient, test_db: AsyncSessio
 @pytest.mark.asyncio
 async def test_sort_by_title_descending(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
     """Test sorting videos by title in descending order (Z-A)."""
-    # Create videos with different titles
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=AlphaVideo1"}
-    )
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=ZuluVideo01"}
-    )
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=MikeVideo01"}
-    )
+    from unittest.mock import AsyncMock, patch
+
+    # Mock YouTube client
+    mock_youtube_client = AsyncMock()
+    mock_youtube_client.get_video_metadata = AsyncMock(return_value={
+        "youtube_id": "test123",
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "duration": "PT5M",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "published_at": "2024-01-01T00:00:00Z"
+    })
+
+    with patch('app.api.videos.YouTubeClient', return_value=mock_youtube_client):
+        # Create videos with different titles
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=AlphaVideo1"}
+        )
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=ZuluVideo01"}
+        )
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=MikeVideo01"}
+        )
 
     # Update titles using UPDATE statement
     from sqlalchemy import update
@@ -996,19 +1023,33 @@ async def test_sort_by_title_descending(client: AsyncClient, test_db: AsyncSessi
 @pytest.mark.asyncio
 async def test_sort_by_duration_ascending(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
     """Test sorting videos by duration in ascending order (shortest first)."""
-    # Create videos
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=LongVideo01"}
-    )
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=ShortVideo1"}
-    )
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=MediumVideo"}
-    )
+    from unittest.mock import AsyncMock, patch
+
+    # Mock YouTube client
+    mock_youtube_client = AsyncMock()
+    mock_youtube_client.get_video_metadata = AsyncMock(return_value={
+        "youtube_id": "test123",
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "duration": "PT5M",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "published_at": "2024-01-01T00:00:00Z"
+    })
+
+    with patch('app.api.videos.YouTubeClient', return_value=mock_youtube_client):
+        # Create videos
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=LongVideo01"}
+        )
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=ShortVideo1"}
+        )
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=MediumVideo"}
+        )
 
     # Update durations using UPDATE statement (in seconds)
     from sqlalchemy import update
@@ -1036,19 +1077,33 @@ async def test_sort_by_duration_ascending(client: AsyncClient, test_db: AsyncSes
 @pytest.mark.asyncio
 async def test_sort_by_duration_descending(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
     """Test sorting videos by duration in descending order (longest first)."""
-    # Create videos
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=ShortVideo1"}
-    )
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=LongVideo01"}
-    )
-    await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=MediumVideo"}
-    )
+    from unittest.mock import AsyncMock, patch
+
+    # Mock YouTube client
+    mock_youtube_client = AsyncMock()
+    mock_youtube_client.get_video_metadata = AsyncMock(return_value={
+        "youtube_id": "test123",
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "duration": "PT5M",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "published_at": "2024-01-01T00:00:00Z"
+    })
+
+    with patch('app.api.videos.YouTubeClient', return_value=mock_youtube_client):
+        # Create videos
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=ShortVideo1"}
+        )
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=LongVideo01"}
+        )
+        await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=MediumVideo"}
+        )
 
     # Update durations using UPDATE statement (in seconds)
     from sqlalchemy import update
@@ -1080,6 +1135,7 @@ async def test_sort_by_field_rating_descending(client: AsyncClient, test_db: Asy
     from uuid import UUID
     from sqlalchemy import select, update
     from app.models.video import Video
+    from unittest.mock import AsyncMock, patch
 
     # Create rating field
     field_response = await client.post(
@@ -1092,19 +1148,31 @@ async def test_sort_by_field_rating_descending(client: AsyncClient, test_db: Asy
     )
     field_id = field_response.json()["id"]
 
-    # Create videos
-    video_high_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=HighQuality"}
-    )
-    video_low_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=LowQuality1"}
-    )
-    video_no_rating_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=NoRating001"}
-    )
+    # Mock YouTube client
+    mock_youtube_client = AsyncMock()
+    mock_youtube_client.get_video_metadata = AsyncMock(return_value={
+        "youtube_id": "test123",
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "duration": "PT5M",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "published_at": "2024-01-01T00:00:00Z"
+    })
+
+    with patch('app.api.videos.YouTubeClient', return_value=mock_youtube_client):
+        # Create videos
+        video_high_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=HighQuality"}
+        )
+        video_low_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=LowQuality1"}
+        )
+        video_no_rating_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=NoRating001"}
+        )
 
     video_high_id = video_high_response.json()["id"]
     video_low_id = video_low_response.json()["id"]
@@ -1152,6 +1220,7 @@ async def test_sort_by_field_rating_ascending_nulls_last(client: AsyncClient, te
     from uuid import UUID
     from sqlalchemy import select, update
     from app.models.video import Video
+    from unittest.mock import AsyncMock, patch
 
     # Create rating field
     field_response = await client.post(
@@ -1164,19 +1233,31 @@ async def test_sort_by_field_rating_ascending_nulls_last(client: AsyncClient, te
     )
     field_id = field_response.json()["id"]
 
-    # Create videos
-    v1_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=Video1Rate1"}
-    )
-    v2_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=Video2NoRat"}
-    )
-    v3_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=Video3Rate1"}
-    )
+    # Mock YouTube client
+    mock_youtube_client = AsyncMock()
+    mock_youtube_client.get_video_metadata = AsyncMock(return_value={
+        "youtube_id": "test123",
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "duration": "PT5M",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "published_at": "2024-01-01T00:00:00Z"
+    })
+
+    with patch('app.api.videos.YouTubeClient', return_value=mock_youtube_client):
+        # Create videos
+        v1_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=Video1Rate1"}
+        )
+        v2_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=Video2NoRat"}
+        )
+        v3_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=Video3Rate1"}
+        )
 
     v1_id = v1_response.json()["id"]
     v2_id = v2_response.json()["id"]
@@ -1224,6 +1305,7 @@ async def test_sort_by_field_select_ascending(client: AsyncClient, test_db: Asyn
     from uuid import UUID
     from sqlalchemy import select, update
     from app.models.video import Video
+    from unittest.mock import AsyncMock, patch
 
     # Create select field
     field_response = await client.post(
@@ -1236,19 +1318,31 @@ async def test_sort_by_field_select_ascending(client: AsyncClient, test_db: Asyn
     )
     field_id = field_response.json()["id"]
 
-    # Create videos
-    video_high_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=HighPriorit"}
-    )
-    video_low_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=LowPriority"}
-    )
-    video_medium_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=MediumPrior"}
-    )
+    # Mock YouTube client
+    mock_youtube_client = AsyncMock()
+    mock_youtube_client.get_video_metadata = AsyncMock(return_value={
+        "youtube_id": "test123",
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "duration": "PT5M",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "published_at": "2024-01-01T00:00:00Z"
+    })
+
+    with patch('app.api.videos.YouTubeClient', return_value=mock_youtube_client):
+        # Create videos
+        video_high_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=HighPriorit"}
+        )
+        video_low_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=LowPriority"}
+        )
+        video_medium_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=MediumPrior"}
+        )
 
     video_high_id = video_high_response.json()["id"]
     video_low_id = video_low_response.json()["id"]
@@ -1331,6 +1425,7 @@ async def test_sort_combined_with_tag_filter(client: AsyncClient, test_db: Async
     from uuid import UUID
     from sqlalchemy import select, update
     from app.models.video import Video
+    from unittest.mock import AsyncMock, patch
 
     # Create rating field
     field_response = await client.post(
@@ -1350,19 +1445,31 @@ async def test_sort_combined_with_tag_filter(client: AsyncClient, test_db: Async
     )
     tag_id = tag_response.json()["id"]
 
-    # Create videos
-    v1_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=LowRatedPy1"}
-    )
-    v2_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=HighRatedP1"}
-    )
-    v3_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=NoTagVideo1"}
-    )
+    # Mock YouTube client
+    mock_youtube_client = AsyncMock()
+    mock_youtube_client.get_video_metadata = AsyncMock(return_value={
+        "youtube_id": "test123",
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "duration": "PT5M",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "published_at": "2024-01-01T00:00:00Z"
+    })
+
+    with patch('app.api.videos.YouTubeClient', return_value=mock_youtube_client):
+        # Create videos
+        v1_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=LowRatedPy1"}
+        )
+        v2_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=HighRatedP1"}
+        )
+        v3_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=NoTagVideo1"}
+        )
 
     v1_id = v1_response.json()["id"]
     v2_id = v2_response.json()["id"]
@@ -1418,21 +1525,34 @@ async def test_default_sort_created_at_desc(client: AsyncClient, test_db: AsyncS
     import asyncio
     from sqlalchemy import select
     from app.models.video import Video
+    from unittest.mock import AsyncMock, patch
 
-    # Create videos with slight delay to ensure different timestamps
-    old_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=OldVideo001"}
-    )
-    old_id = old_response.json()["id"]
+    # Mock YouTube client
+    mock_youtube_client = AsyncMock()
+    mock_youtube_client.get_video_metadata = AsyncMock(return_value={
+        "youtube_id": "test123",
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "duration": "PT5M",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "published_at": "2024-01-01T00:00:00Z"
+    })
 
-    await asyncio.sleep(0.1)  # Ensure different timestamps
+    with patch('app.api.videos.YouTubeClient', return_value=mock_youtube_client):
+        # Create videos with slight delay to ensure different timestamps
+        old_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=OldVideo001"}
+        )
+        old_id = old_response.json()["id"]
 
-    new_response = await client.post(
-        f"/api/lists/{test_list.id}/videos",
-        json={"url": "https://www.youtube.com/watch?v=NewVideo001"}
-    )
-    new_id = new_response.json()["id"]
+        await asyncio.sleep(0.1)  # Ensure different timestamps
+
+        new_response = await client.post(
+            f"/api/lists/{test_list.id}/videos",
+            json={"url": "https://www.youtube.com/watch?v=NewVideo001"}
+        )
+        new_id = new_response.json()["id"]
 
     # Update titles using UPDATE statement
     from uuid import UUID
