@@ -5,13 +5,13 @@ Includes enhanced URL validation with security checks.
 """
 
 from datetime import datetime
-from typing import Annotated, Optional, List
+from typing import Annotated, Optional
 from uuid import UUID
 from urllib.parse import urlparse
 import re
 from enum import Enum
 
-from pydantic import BaseModel, Field, AfterValidator, ConfigDict
+from pydantic import BaseModel, Field, AfterValidator, ConfigDict, model_validator
 
 # Import for circular dependency resolution (TYPE_CHECKING)
 from typing import TYPE_CHECKING
@@ -49,6 +49,20 @@ class FieldFilter(BaseModel):
     value_min: Optional[int] = Field(None, description="Min value for BETWEEN")
     value_max: Optional[int] = Field(None, description="Max value for BETWEEN")
 
+    @model_validator(mode='after')
+    def validate_operator_values(self) -> 'FieldFilter':
+        """Validate that required values are present for each operator."""
+        if self.operator == FieldFilterOperator.BETWEEN:
+            if self.value_min is None or self.value_max is None:
+                raise ValueError("BETWEEN operator requires both value_min and value_max")
+            if self.value_min > self.value_max:
+                raise ValueError("value_min must be <= value_max")
+        else:
+            # All other operators require value field
+            if self.value is None:
+                raise ValueError(f"{self.operator.value} operator requires 'value' field")
+        return self
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -56,6 +70,7 @@ class FieldFilter(BaseModel):
                 {"field_id": "550e8400-e29b-41d4-a716-446655440000", "operator": "contains", "value": "tutorial"},
                 {"field_id": "550e8400-e29b-41d4-a716-446655440000", "operator": "in", "value": "great,good"},
                 {"field_id": "550e8400-e29b-41d4-a716-446655440000", "operator": "is", "value": True},
+                {"field_id": "550e8400-e29b-41d4-a716-446655440000", "operator": "between", "value_min": 3, "value_max": 5},
             ]
         }
     )
@@ -63,8 +78,8 @@ class FieldFilter(BaseModel):
 
 class VideoFilterRequest(BaseModel):
     """Request body for POST /videos/filter endpoint."""
-    tags: Optional[List[str]] = Field(None, description="Tag names for OR filtering")
-    field_filters: Optional[List[FieldFilter]] = Field(None, description="Field filters (AND logic)")
+    tags: Optional[list[str]] = Field(None, description="Tag names for OR filtering")
+    field_filters: Optional[list[FieldFilter]] = Field(None, description="Field filters (AND logic)")
 
     model_config = ConfigDict(
         json_schema_extra={
