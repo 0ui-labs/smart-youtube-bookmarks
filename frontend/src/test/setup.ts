@@ -90,3 +90,32 @@ if (!global.ResizeObserver) {
     disconnect() {}
   } as any;
 }
+
+// Mock matchMedia (required by embla-carousel)
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // deprecated
+    removeListener: vi.fn(), // deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
+
+// Mock IntersectionObserver (required by embla-carousel)
+if (!global.IntersectionObserver) {
+  global.IntersectionObserver = class IntersectionObserver {
+    constructor(callback: IntersectionObserverCallback) {}
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() { return []; }
+    get root() { return null; }
+    get rootMargin() { return ''; }
+    get thresholds() { return []; }
+  } as any;
+}

@@ -1,10 +1,12 @@
 /**
  * Tests für VideosPage Component
  * Task #24 - Feature Flags für Button Visibility
+ * Task #146 Section 7 - Sort State Management and URL Sync
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { renderWithRouter } from '@/test/renderWithRouter'
 import { VideosPage } from './VideosPage'
 
@@ -17,14 +19,27 @@ vi.mock('@/hooks/useVideos', () => ({
   })),
   useCreateVideo: vi.fn(() => ({
     mutateAsync: vi.fn(),
+    isPending: false,
   })),
   useUpdateVideo: vi.fn(() => ({
     mutate: vi.fn(),
   })),
   useDeleteVideo: vi.fn(() => ({
     mutate: vi.fn(),
+    isPending: false,
   })),
   exportVideosCSV: vi.fn(),
+  useAssignTags: vi.fn(() => ({
+    mutateAsync: vi.fn(),
+  })),
+}))
+
+vi.mock('@/hooks/useVideosFilter', () => ({
+  useVideosFilter: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
 }))
 
 vi.mock('@/hooks/useTags', () => ({
@@ -33,14 +48,49 @@ vi.mock('@/hooks/useTags', () => ({
     isLoading: false,
     error: null,
   })),
+  useCreateTag: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+  })),
 }))
 
 vi.mock('@/stores/tagStore', () => ({
-  useTagStore: vi.fn(() => ({
-    selectedTags: [],
-    setSelectedTags: vi.fn(),
-    clearTags: vi.fn(),
-  })),
+  useTagStore: vi.fn((selector) => {
+    const state = {
+      selectedTagIds: [],
+      toggleTag: vi.fn(),
+      clearTags: vi.fn(),
+      setSelectedTagIds: vi.fn(),
+    }
+    return selector ? selector(state) : state
+  }),
+}))
+
+vi.mock('@/stores/fieldFilterStore', () => ({
+  useFieldFilterStore: vi.fn((selector) => {
+    const state = {
+      activeFilters: [],
+    }
+    return selector ? selector(state) : state
+  }),
+}))
+
+vi.mock('@/stores/tableSettingsStore', () => ({
+  useTableSettingsStore: vi.fn((selector) => {
+    const state = {
+      visibleColumns: {
+        thumbnail: true,
+        title: true,
+        duration: true,
+        actions: true,
+      },
+      thumbnailSize: 'medium',
+      viewMode: 'list',
+      setViewMode: vi.fn(),
+      gridColumns: 3,
+    }
+    return selector ? selector(state) : state
+  }),
 }))
 
 vi.mock('@/hooks/useWebSocket', () => ({
@@ -139,6 +189,289 @@ describe('VideosPage - Feature Flags (Task #24)', () => {
       // Verify three-dot menu button exists
       const menuButton = screen.getByLabelText('Aktionen')
       expect(menuButton).toBeInTheDocument()
+    })
+  })
+})
+
+describe('VideosPage - Sorting (Task #146 Section 7)', () => {
+  const mockListId = 'test-list-123'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('Column Header Click Updates URL', () => {
+    it('updates URL when clicking on Titel header for ascending sort', async () => {
+      const user = userEvent.setup()
+      const { useVideos } = await import('@/hooks/useVideos')
+
+      const mockVideo = {
+        id: 'video-1',
+        youtube_id: 'abc123',
+        title: 'Test Video A',
+        channel: 'Channel A',
+        duration: 180,
+        thumbnail_url: 'https://example.com/thumb1.jpg',
+        processing_status: 'completed',
+        created_at: '2024-01-01T00:00:00Z',
+      }
+
+      // Mock with some test data so the table renders
+      vi.mocked(useVideos).mockReturnValue({
+        data: [mockVideo],
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Wait for the table to render
+      await waitFor(() => {
+        expect(screen.getByText('Test Video A')).toBeInTheDocument()
+      })
+
+      // Find and click the Titel header button
+      const titleHeader = screen.getByRole('button', { name: /Titel/i })
+      await user.click(titleHeader)
+
+      // Check that sort indicator appears (which confirms sorting is active)
+      await waitFor(() => {
+        expect(screen.getByLabelText('Aufsteigend sortiert')).toBeInTheDocument()
+      })
+    })
+
+    it('updates URL when clicking on Dauer header for ascending sort', async () => {
+      const user = userEvent.setup()
+      const { useVideos } = await import('@/hooks/useVideos')
+
+      const mockVideo = {
+        id: 'video-1',
+        youtube_id: 'abc123',
+        title: 'Test Video A',
+        channel: 'Channel A',
+        duration: 180,
+        thumbnail_url: 'https://example.com/thumb1.jpg',
+        processing_status: 'completed',
+        created_at: '2024-01-01T00:00:00Z',
+      }
+
+      vi.mocked(useVideos).mockReturnValue({
+        data: [mockVideo],
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Wait for the table to render
+      await waitFor(() => {
+        expect(screen.getByText('Test Video A')).toBeInTheDocument()
+      })
+
+      // Find and click the Dauer header button
+      const durationHeader = screen.getByRole('button', { name: /Dauer/i })
+      await user.click(durationHeader)
+
+      // Check that sort indicator appears (which confirms sorting is active)
+      await waitFor(() => {
+        expect(screen.getByLabelText('Aufsteigend sortiert')).toBeInTheDocument()
+      }, { timeout: 3000 })
+    })
+  })
+
+  describe('Sort Direction Toggle', () => {
+    it('toggles sort direction on second click of same column', async () => {
+      const user = userEvent.setup()
+      const { useVideos } = await import('@/hooks/useVideos')
+
+      const mockVideo = {
+        id: 'video-1',
+        youtube_id: 'abc123',
+        title: 'Test Video A',
+        channel: 'Channel A',
+        duration: 180,
+        thumbnail_url: 'https://example.com/thumb1.jpg',
+        processing_status: 'completed',
+        created_at: '2024-01-01T00:00:00Z',
+      }
+
+      vi.mocked(useVideos).mockReturnValue({
+        data: [mockVideo],
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Wait for the table to render
+      await waitFor(() => {
+        expect(screen.getByText('Test Video A')).toBeInTheDocument()
+      })
+
+      const titleHeader = screen.getByRole('button', { name: /Titel/i })
+
+      // First click: ascending
+      await user.click(titleHeader)
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Aufsteigend sortiert')).toBeInTheDocument()
+      }, { timeout: 3000 })
+
+      // Wait for state to stabilize before second click
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Second click: descending
+      await user.click(titleHeader)
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Absteigend sortiert')).toBeInTheDocument()
+      }, { timeout: 3000 })
+    })
+  })
+
+  describe('Sort State Parsed from URL on Mount', () => {
+    it('parses sort params from URL and shows sort indicator on mount', async () => {
+      const { useVideos } = await import('@/hooks/useVideos')
+
+      const mockVideo = {
+        id: 'video-1',
+        youtube_id: 'abc123',
+        title: 'Test Video A',
+        channel: 'Channel A',
+        duration: 180,
+        thumbnail_url: 'https://example.com/thumb1.jpg',
+        processing_status: 'completed',
+        created_at: '2024-01-01T00:00:00Z',
+      }
+
+      vi.mocked(useVideos).mockReturnValue({
+        data: [mockVideo],
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(
+        <VideosPage listId={mockListId} />,
+        { initialEntries: ['/videos?sort_by=duration&sort_order=desc'] }
+      )
+
+      // Wait for the table to render
+      await waitFor(() => {
+        expect(screen.getByText('Test Video A')).toBeInTheDocument()
+      })
+
+      // Should show descending sort indicator on duration column
+      await waitFor(() => {
+        expect(screen.getByLabelText('Absteigend sortiert')).toBeInTheDocument()
+      })
+    })
+
+    it('parses ascending sort from URL and shows correct indicator', async () => {
+      const { useVideos } = await import('@/hooks/useVideos')
+
+      const mockVideo = {
+        id: 'video-1',
+        youtube_id: 'abc123',
+        title: 'Test Video A',
+        channel: 'Channel A',
+        duration: 180,
+        thumbnail_url: 'https://example.com/thumb1.jpg',
+        processing_status: 'completed',
+        created_at: '2024-01-01T00:00:00Z',
+      }
+
+      vi.mocked(useVideos).mockReturnValue({
+        data: [mockVideo],
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(
+        <VideosPage listId={mockListId} />,
+        { initialEntries: ['/videos?sort_by=title&sort_order=asc'] }
+      )
+
+      // Wait for the table to render
+      await waitFor(() => {
+        expect(screen.getByText('Test Video A')).toBeInTheDocument()
+      })
+
+      // Should show ascending sort indicator on title column
+      await waitFor(() => {
+        expect(screen.getByLabelText('Aufsteigend sortiert')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Sort Indicator Display', () => {
+    it('shows correct sort indicator for active column and direction', async () => {
+      const { useVideos } = await import('@/hooks/useVideos')
+
+      const mockVideo = {
+        id: 'video-1',
+        youtube_id: 'abc123',
+        title: 'Test Video A',
+        channel: 'Channel A',
+        duration: 180,
+        thumbnail_url: 'https://example.com/thumb1.jpg',
+        processing_status: 'completed',
+        created_at: '2024-01-01T00:00:00Z',
+      }
+
+      vi.mocked(useVideos).mockReturnValue({
+        data: [mockVideo],
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(
+        <VideosPage listId={mockListId} />,
+        { initialEntries: ['/videos?sort_by=duration&sort_order=asc'] }
+      )
+
+      // Wait for the table to render
+      await waitFor(() => {
+        expect(screen.getByText('Test Video A')).toBeInTheDocument()
+      })
+
+      // Should show ascending indicator (↑)
+      await waitFor(() => {
+        const indicator = screen.getByLabelText('Aufsteigend sortiert')
+        expect(indicator).toBeInTheDocument()
+        expect(indicator.textContent).toBe('↑')
+      })
+    })
+
+    it('does not show sort indicator when no sort is active', async () => {
+      const { useVideos } = await import('@/hooks/useVideos')
+
+      const mockVideo = {
+        id: 'video-1',
+        youtube_id: 'abc123',
+        title: 'Test Video A',
+        channel: 'Channel A',
+        duration: 180,
+        thumbnail_url: 'https://example.com/thumb1.jpg',
+        processing_status: 'completed',
+        created_at: '2024-01-01T00:00:00Z',
+      }
+
+      vi.mocked(useVideos).mockReturnValue({
+        data: [mockVideo],
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Wait for the table to render
+      await waitFor(() => {
+        expect(screen.getByText('Test Video A')).toBeInTheDocument()
+      })
+
+      // Should not have any sort indicators
+      expect(screen.queryByLabelText('Aufsteigend sortiert')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Absteigend sortiert')).not.toBeInTheDocument()
     })
   })
 })
