@@ -94,7 +94,8 @@ class FieldSchema(BaseModel):
         uselist=True,  # Override inference (composite PK makes SQLAlchemy think one-to-one)
         back_populates="schema",
         cascade="all, delete-orphan",  # Deleting schema removes from join table
-        passive_deletes=True  # Trust DB CASCADE for performance (REF MCP 2025-11-05)
+        passive_deletes=True,  # Trust DB CASCADE for performance (REF MCP 2025-11-05)
+        order_by="SchemaField.display_order"  # Ensure consistent ordering by display_order
     )
 
     tags: Mapped[list["Tag"]] = relationship(

@@ -125,7 +125,7 @@ def validate_field_value(
 
         # Length check (optional)
         max_len = config.get('max_length')
-        if max_len and len(value) > max_len:
+        if max_len is not None and len(value) > max_len:
             raise FieldValidationError(
                 f"Text exceeds max length {max_len} ({len(value)} chars)"
             )

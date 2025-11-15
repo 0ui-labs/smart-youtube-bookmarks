@@ -255,6 +255,38 @@ async def batch_update_schema_fields(
             detail=f"One or more field_ids not found or belong to different list: {[str(fid)[:8] + '...' for fid in missing_field_ids]}"
         )
 
+    # Validate show_on_card limit INCLUDING existing untouched rows
+    # Query existing schema_fields for this schema
+    existing_schema_fields_stmt = select(SchemaField).where(
+        SchemaField.schema_id == schema_id
+    )
+    existing_schema_fields_result = await db.execute(existing_schema_fields_stmt)
+    existing_schema_fields = existing_schema_fields_result.scalars().all()
+
+    # Build map of existing show_on_card values
+    existing_show_on_card = {sf.field_id: sf.show_on_card for sf in existing_schema_fields}
+
+    # Calculate final show_on_card count after batch update
+    final_show_on_card = set()
+    request_field_ids = {item.field_id for item in request.fields}
+
+    # Include untouched fields that have show_on_card=True
+    for field_id, show_on_card in existing_show_on_card.items():
+        if field_id not in request_field_ids and show_on_card:
+            final_show_on_card.add(field_id)
+
+    # Include fields from request that have show_on_card=True
+    for item in request.fields:
+        if item.show_on_card:
+            final_show_on_card.add(item.field_id)
+
+    if len(final_show_on_card) > 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Batch update would result in {len(final_show_on_card)} fields with show_on_card=true. "
+                   f"Maximum is 3. Please set show_on_card=false for {len(final_show_on_card) - 3} fields."
+        )
+
     # Perform UPSERT for each field (ON CONFLICT DO UPDATE)
     from sqlalchemy.dialects.postgresql import insert
 

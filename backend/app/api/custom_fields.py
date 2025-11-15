@@ -291,6 +291,17 @@ async def update_custom_field(
                 detail=f"Field '{field_update.name}' already exists in this list"
             )
 
+    # Validate config against field_type for partial updates
+    # Handle both config-only and field_type-only updates to prevent invalid combinations
+    from app.schemas.custom_field import _validate_config_for_type
+
+    if field_update.config is not None and field_update.field_type is None:
+        # Config-only update: validate new config against existing field_type
+        _validate_config_for_type(field.field_type, field_update.config)
+    elif field_update.field_type is not None and field_update.config is None:
+        # Field_type-only update: validate existing config against new field_type
+        _validate_config_for_type(field_update.field_type, field.config)
+
     # Update fields using Pydantic's exclude_unset (only updates provided fields)
     # REF MCP: model_dump(exclude_unset=True) returns only fields explicitly set in request
     # This is more compact and maintainable than manual if-chains

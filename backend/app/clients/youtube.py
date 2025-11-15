@@ -200,6 +200,10 @@ class YouTubeClient:
 
             except NoTranscriptFound:
                 continue  # Try next language
+            except (TranscriptsDisabled, VideoUnavailable) as e:
+                # Permanent failures - don't try other languages
+                logger.debug(f"Transcript unavailable for {video_id}: {type(e).__name__}")
+                break  # Exit loop and return None
 
         # No transcript in any language - cache the miss
         if self.redis:
