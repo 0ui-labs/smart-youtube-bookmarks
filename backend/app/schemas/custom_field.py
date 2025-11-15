@@ -409,7 +409,7 @@ class SmartSuggestion(BaseModel):
         le=1.0,
         description="Similarity score (0.0-1.0, higher = more similar)"
     )
-    similarity_type: Literal["exact", "levenshtein", "semantic", "no_match"] = Field(
+    similarity_type: Literal["exact", "levenshtein", "semantic"] = Field(
         ...,
         description="Type of similarity detected"
     )
@@ -462,6 +462,6 @@ class SmartDuplicateCheckResponse(BaseModel):
         description="List of similar fields ranked by score (highest first)"
     )
     mode: Literal["basic", "smart"] = Field(
-        default="basic",
+        default="smart",
         description="Detection mode used"
     )

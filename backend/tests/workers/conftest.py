@@ -1,7 +1,7 @@
 """Pytest fixtures for ARQ worker tests."""
 import pytest
 from unittest.mock import AsyncMock
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 @pytest.fixture
@@ -13,7 +13,7 @@ def arq_context(test_db):
     return {
         'job_id': 'test-job-123',
         'job_try': 1,
-        'enqueue_time': datetime.utcnow(),
+        'enqueue_time': datetime.now(timezone.utc),
         'redis': AsyncMock(),
         'db': test_db  # Injected by on_job_start in production
     }
@@ -25,7 +25,7 @@ def retry_context(test_db):
     return {
         'job_id': 'test-job-retry',
         'job_try': 3,  # Third retry attempt
-        'enqueue_time': datetime.utcnow(),
+        'enqueue_time': datetime.now(timezone.utc),
         'redis': AsyncMock(),
         'db': test_db
     }

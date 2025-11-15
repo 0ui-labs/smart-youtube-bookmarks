@@ -86,12 +86,17 @@ class BatchUpdateFieldValuesRequest(BaseModel):
         Raises:
             ValueError: If duplicate field_id found
         """
-        field_ids = [update.field_id for update in v]
-        duplicates = {fid for fid in field_ids if field_ids.count(fid) > 1}
+        seen: set = set()
+        duplicates: set = set()
+        for update in v:
+            if update.field_id in seen:
+                duplicates.add(update.field_id)
+            else:
+                seen.add(update.field_id)
 
         if duplicates:
             # Convert UUIDs to strings for error message
-            duplicate_str = ', '.join(str(fid) for fid in duplicates)
+            duplicate_str = ", ".join(str(fid) for fid in duplicates)
             raise ValueError(
                 f"Duplicate field_id in request: {duplicate_str}. "
                 "Each field can only be updated once per request."

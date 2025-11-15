@@ -2,4 +2,4 @@
 from .youtube import YouTubeClient
 from .gemini import GeminiClient
 
-__all__ = ["YouTubeClient", "GeminiClient"]
+__all__ = ["GeminiClient", "YouTubeClient"]

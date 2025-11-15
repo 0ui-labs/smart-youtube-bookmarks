@@ -79,9 +79,17 @@ async def get_arq_pool() -> ArqRedis:
         # Double-check: another coroutine might have initialized it
         if _arq_pool is None:
             # Parse Redis DSN manually (RedisSettings.from_dsn() doesn't exist)
+            from urllib.parse import parse_qs
             redis_dsn = urlparse(settings.redis_url)
-            db_str = redis_dsn.path.lstrip('/') if redis_dsn.path else ''
-            redis_db = int(db_str) if db_str.isdigit() else 0  # Safe int conversion
+
+            # Try to get db from query string first (e.g., ?db=5)
+            query_params = parse_qs(redis_dsn.query)
+            if 'db' in query_params and query_params['db']:
+                redis_db = int(query_params['db'][0])
+            else:
+                # Fall back to path (e.g., /5)
+                db_str = redis_dsn.path.lstrip('/') if redis_dsn.path else ''
+                redis_db = int(db_str) if db_str.isdigit() else 0  # Safe int conversion
 
             redis_settings = RedisSettings(
                 host=redis_dsn.hostname or 'localhost',

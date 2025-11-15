@@ -15,7 +15,6 @@ from app.models.list import BookmarkList
 @pytest.mark.asyncio
 async def test_batch_update_success_all_fields(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test successful batch update of all fields in schema."""
@@ -81,7 +80,6 @@ async def test_batch_update_success_all_fields(
 @pytest.mark.asyncio
 async def test_batch_update_partial_fields(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test batch update of only some fields in schema."""
@@ -137,7 +135,6 @@ async def test_batch_update_partial_fields(
 @pytest.mark.asyncio
 async def test_batch_update_toggle_show_on_card(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test toggling show_on_card flags in batch update."""
@@ -194,7 +191,6 @@ async def test_batch_update_toggle_show_on_card(
 @pytest.mark.asyncio
 async def test_batch_update_reorder_display_order(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test reordering fields via batch update."""
@@ -254,7 +250,6 @@ async def test_batch_update_reorder_display_order(
 @pytest.mark.asyncio
 async def test_batch_update_max_3_show_on_card_enforcement(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test that max 3 show_on_card constraint is enforced."""
@@ -308,7 +303,6 @@ async def test_batch_update_max_3_show_on_card_enforcement(
 @pytest.mark.asyncio
 async def test_batch_update_duplicate_display_order_error(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test that duplicate display_order values are rejected."""
@@ -361,7 +355,6 @@ async def test_batch_update_duplicate_display_order_error(
 @pytest.mark.asyncio
 async def test_batch_update_invalid_field_id_error(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test that invalid field_id is rejected."""
@@ -390,7 +383,6 @@ async def test_batch_update_invalid_field_id_error(
 @pytest.mark.asyncio
 async def test_batch_update_field_from_different_list_error(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test that field from different list is rejected (security check)."""
@@ -436,7 +428,6 @@ async def test_batch_update_field_from_different_list_error(
 @pytest.mark.asyncio
 async def test_batch_update_schema_not_found_error(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test that non-existent schema returns 404."""
@@ -459,7 +450,6 @@ async def test_batch_update_schema_not_found_error(
 @pytest.mark.asyncio
 async def test_batch_update_empty_list_error(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test that empty fields list is rejected (min_length=1)."""
@@ -482,7 +472,6 @@ async def test_batch_update_empty_list_error(
 @pytest.mark.asyncio
 async def test_batch_update_batch_size_limit_50(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test that batch size limit of 50 is enforced."""
@@ -510,7 +499,6 @@ async def test_batch_update_batch_size_limit_50(
 @pytest.mark.asyncio
 async def test_batch_update_upsert_creates_missing_associations(
     client: AsyncClient,
-    test_db,
     test_list: BookmarkList
 ):
     """Test that UPSERT creates missing schema_field associations."""

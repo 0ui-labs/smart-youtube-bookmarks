@@ -96,13 +96,13 @@ async def start_processing(
             logger.info(f"Enqueued {len(pending_videos)} videos for processing (job {job.id})")
         except Exception as e:
             # Mark job as failed if ANY enqueue fails
-            logger.error(f"Failed to enqueue jobs for list {list_id}: {e}")
+            logger.exception("Failed to enqueue jobs for list %s", list_id)
             job.status = "failed"
-            job.error_message = f"Failed to enqueue jobs: {str(e)}"
+            job.error_message = f"Failed to enqueue jobs: {e!s}"
             await db.commit()
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to start processing: {str(e)}"
+                detail=f"Failed to start processing: {e!s}"
             )
 
         return JobResponse(

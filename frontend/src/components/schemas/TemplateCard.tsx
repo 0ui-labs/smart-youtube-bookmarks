@@ -37,8 +37,8 @@ export function TemplateCard({ template, onUseTemplate, onPreview }: TemplateCar
 
       <CardContent>
         <div className="text-sm text-muted-foreground mb-4">
-          {template.fields.length} field{template.fields.length !== 1 ? 's' : ''} •{' '}
-          {template.fields.filter(f => f.show_on_card).length} shown on card
+          {(template.fields ?? []).length} field{(template.fields ?? []).length !== 1 ? 's' : ''} •{' '}
+          {(template.fields ?? []).filter(f => f.show_on_card).length} shown on card
         </div>
 
         <div className="flex gap-2">

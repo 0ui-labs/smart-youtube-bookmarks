@@ -39,6 +39,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # Remove NOT NULL constraints
+    # WARNING: This downgrade is not fully reversible.
+    # Any rows deleted during upgrade (with NULL video_id or tag_id) cannot be restored.
+    # Those orphaned relationships are permanently lost.
     op.alter_column('video_tags', 'tag_id',
                     existing_type=sa.UUID(),
                     nullable=True)

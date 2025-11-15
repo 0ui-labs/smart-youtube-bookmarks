@@ -116,11 +116,13 @@ def downgrade() -> None:
     op.drop_index('idx_video_field_values_video_field', table_name='video_field_values')
     op.drop_index('idx_video_field_values_field_text', table_name='video_field_values')
     op.drop_index('idx_video_field_values_field_numeric', table_name='video_field_values')
+    op.drop_constraint('uq_video_field_values_video_field', 'video_field_values', type_='unique')
     op.drop_table('video_field_values')
 
     # 3. Drop schema_fields join table
     op.drop_index('idx_schema_fields_field_id', table_name='schema_fields')
     op.drop_index('idx_schema_fields_schema_id', table_name='schema_fields')
+    op.drop_constraint('pk_schema_fields', 'schema_fields', type_='primary')
     op.drop_table('schema_fields')
 
     # 2. Drop field_schemas table
@@ -129,4 +131,6 @@ def downgrade() -> None:
 
     # 1. Drop custom_fields table
     op.drop_index('idx_custom_fields_list_id', table_name='custom_fields')
+    op.drop_constraint('ck_custom_fields_field_type', 'custom_fields', type_='check')
+    op.drop_constraint('uq_custom_fields_list_name', 'custom_fields', type_='unique')
     op.drop_table('custom_fields')

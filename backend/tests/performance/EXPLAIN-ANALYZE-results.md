@@ -21,7 +21,7 @@
 
 **Index Used:** `idx_video_field_values_field_numeric` ✅
 
-```
+```text
 Bitmap Heap Scan on video_field_values  (cost=5.64..42.64 rows=133 width=71) (actual time=0.088..0.177 rows=400 loops=1)
   Recheck Cond: ((field_id = 'a6eb16f1-88c5-4049-888c-5af4bfaf78bc'::uuid) AND (value_numeric >= '4'::numeric))
   Heap Blocks: exact=35
@@ -40,7 +40,7 @@ Execution Time: 0.219 ms
 
 **Index Used:** `idx_video_field_values_field_text` ✅
 
-```
+```text
 Bitmap Heap Scan on video_field_values  (cost=4.62..41.18 rows=33 width=71) (actual time=0.017..0.047 rows=100 loops=1)
   Recheck Cond: ((field_id = 'cbe96966-52cd-4824-848b-b845893b714b'::uuid) AND (value_text = 'option_5'::text))
   Heap Blocks: exact=35
@@ -59,7 +59,7 @@ Execution Time: 0.068 ms
 
 **Index Used:** `idx_video_field_values_video_field` ✅
 
-```
+```text
 Bitmap Heap Scan on video_field_values  (cost=4.30..13.71 rows=3 width=71) (actual time=0.012..0.012 rows=3 loops=1)
   Recheck Cond: (video_id = '2c47a69e-ae29-4dcd-921e-9c01d9d3b053'::uuid)
   Heap Blocks: exact=1
@@ -79,7 +79,7 @@ Execution Time: 0.041 ms
 
 **Index Used:** `idx_video_field_values_field_text` (partial match) ⚠️
 
-```
+```text
 Bitmap Heap Scan on video_field_values  (cost=15.82..63.32 rows=167 width=71) (actual time=0.043..0.148 rows=500 loops=1)
   Recheck Cond: (field_id = '0619a468-a2d5-4048-8fad-8f3d4be7290c'::uuid)
   Filter: value_boolean
@@ -106,7 +106,7 @@ Execution Time: 0.189 ms
 
 All indexes found on `video_field_values` table:
 
-```
+```text
   - idx_video_field_values_field_numeric
   - idx_video_field_values_field_text
   - idx_video_field_values_video_field

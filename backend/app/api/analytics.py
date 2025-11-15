@@ -208,6 +208,7 @@ async def _get_unused_schemas(
             FieldSchema.name,
             func.count(func.distinct(SchemaField.field_id)).label('field_count'),
             func.count(func.distinct(Tag.id)).label('tag_count'),
+            func.count(VideoFieldValue.id).label('value_count'),
             func.max(VideoFieldValue.updated_at).label('last_used')
         )
         .outerjoin(SchemaField, FieldSchema.id == SchemaField.schema_id)
@@ -224,15 +225,6 @@ async def _get_unused_schemas(
     # Filter unused: tag_count = 0 OR no values
     unused = []
     for row in rows:
-        # Count actual field values for this schema
-        values_stmt = (
-            select(func.count(VideoFieldValue.id))
-            .join(SchemaField, VideoFieldValue.field_id == SchemaField.field_id)
-            .where(SchemaField.schema_id == row.id)
-        )
-        value_count_result = await db.execute(values_stmt)
-        value_count = value_count_result.scalar() or 0
-
         if row.tag_count == 0:
             unused.append(UnusedSchemaStat(
                 schema_id=str(row.id),
@@ -242,7 +234,7 @@ async def _get_unused_schemas(
                 last_used=row.last_used,
                 reason="no_tags"
             ))
-        elif value_count == 0:
+        elif row.value_count == 0:
             unused.append(UnusedSchemaStat(
                 schema_id=str(row.id),
                 schema_name=row.name,

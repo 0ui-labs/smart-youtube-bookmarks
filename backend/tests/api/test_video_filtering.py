@@ -5,7 +5,7 @@ from app.models.video import Video
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_by_tags_or(client: AsyncClient, test_db: AsyncSession, test_list, test_user):
+async def test_filter_videos_by_tags_or(client: AsyncClient, test_db: AsyncSession, test_list):
     """Test filtering videos by tags with OR logic (any matching tag)."""
     # Arrange: Create tags
     tag1_resp = await client.post("/api/tags", json={"name": "Python"})
@@ -51,7 +51,7 @@ async def test_filter_videos_by_tags_or(client: AsyncClient, test_db: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_by_tags_and(client: AsyncClient, test_db: AsyncSession, test_list, test_user):
+async def test_filter_videos_by_tags_and(client: AsyncClient, test_db: AsyncSession, test_list):
     """Test filtering videos by tags with AND logic (all tags required)."""
     # Arrange: Create tags (use different names than OR test to avoid conflicts)
     tag1_resp = await client.post("/api/tags", json={"name": "JavaScript"})
@@ -97,7 +97,7 @@ async def test_filter_videos_by_tags_and(client: AsyncClient, test_db: AsyncSess
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_by_tags_or_case_insensitive(client: AsyncClient, test_db: AsyncSession, test_list, test_user):
+async def test_filter_videos_by_tags_or_case_insensitive(client: AsyncClient, test_db: AsyncSession, test_list):
     """Test filtering videos by tags with OR logic is case-insensitive."""
     # Arrange: Create tags with UPPERCASE names
     tag1_resp = await client.post("/api/tags", json={"name": "GOLANG"})
@@ -143,7 +143,7 @@ async def test_filter_videos_by_tags_or_case_insensitive(client: AsyncClient, te
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_by_tags_and_case_insensitive(client: AsyncClient, test_db: AsyncSession, test_list, test_user):
+async def test_filter_videos_by_tags_and_case_insensitive(client: AsyncClient, test_db: AsyncSession, test_list):
     """Test filtering videos by tags with AND logic is case-insensitive."""
     # Arrange: Create tags with MixedCase names
     tag1_resp = await client.post("/api/tags", json={"name": "MachineLearning"})
@@ -179,7 +179,7 @@ async def test_filter_videos_by_tags_and_case_insensitive(client: AsyncClient, t
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_or_too_many_tags(client: AsyncClient, test_db: AsyncSession, test_list, test_user):
+async def test_filter_videos_or_too_many_tags(client: AsyncClient, test_db: AsyncSession, test_list):
     """Test OR filter with more than 10 tags returns 422 validation error."""
     # Act: Try to filter with 11 tags (exceeds max of 10)
     tags_list = [f"Tag{i}" for i in range(11)]
@@ -197,7 +197,7 @@ async def test_filter_videos_or_too_many_tags(client: AsyncClient, test_db: Asyn
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_and_too_many_tags(client: AsyncClient, test_db: AsyncSession, test_list, test_user):
+async def test_filter_videos_and_too_many_tags(client: AsyncClient, test_db: AsyncSession, test_list):
     """Test AND filter with more than 10 tags returns 422 validation error."""
     # Act: Try to filter with 11 tags (exceeds max of 10)
     tags_list = [f"Tag{i}" for i in range(11)]
@@ -214,7 +214,7 @@ async def test_filter_videos_and_too_many_tags(client: AsyncClient, test_db: Asy
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_exactly_10_tags(client: AsyncClient, test_db: AsyncSession, test_list, test_user):
+async def test_filter_videos_exactly_10_tags(client: AsyncClient, test_db: AsyncSession, test_list):
     """Test filtering with exactly 10 tags works (boundary test)."""
     # Arrange: Create 10 tags
     tag_ids = []

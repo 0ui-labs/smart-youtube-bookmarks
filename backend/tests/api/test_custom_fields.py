@@ -87,11 +87,10 @@ async def test_list_custom_fields_empty(client: AsyncClient, test_list: Bookmark
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("rating_field", "select_field")
 async def test_list_custom_fields_with_fields(
     client: AsyncClient,
-    test_list: BookmarkList,
-    rating_field: CustomField,
-    select_field: CustomField
+    test_list: BookmarkList
 ):
     """Test listing fields returns all fields ordered by created_at DESC."""
     response = await client.get(f"/api/lists/{test_list.id}/custom-fields")
@@ -173,10 +172,10 @@ async def test_create_custom_field_select(client: AsyncClient, test_list: Bookma
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("rating_field")
 async def test_create_custom_field_duplicate_name(
     client: AsyncClient,
-    test_list: BookmarkList,
-    rating_field: CustomField
+    test_list: BookmarkList
 ):
     """Test creating field with duplicate name (case-insensitive) returns 409."""
     # Try to create field with same name (different case)
@@ -283,11 +282,11 @@ async def test_update_custom_field_full(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("select_field")
 async def test_update_custom_field_duplicate_name(
     client: AsyncClient,
     test_list: BookmarkList,
-    rating_field: CustomField,
-    select_field: CustomField
+    rating_field: CustomField
 ):
     """Test updating field name to duplicate returns 409."""
     # Try to rename rating_field to match select_field name

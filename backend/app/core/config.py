@@ -11,6 +11,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # App environment (must be first for validators to access it)
+    env: str = "development"
+
     # Database
     database_url: str = "postgresql+asyncpg://user:changeme@localhost/youtube_bookmarks"
 
@@ -25,9 +28,6 @@ class Settings(BaseSettings):
     secret_key: str = "your-secret-key-here-change-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
-
-    # App
-    env: str = "development"
 
     # Database connection pool (for ARQ workers)
     db_pool_size: int = 10  # Match ARQ max_jobs
@@ -107,9 +107,10 @@ class Settings(BaseSettings):
             ValueError: If production environment has empty API key
         """
         import logging
+        import os
 
-        # Get env from values being validated
-        env = info.data.get("env", "development")
+        # Get env from environment variable (info.data may not be populated yet)
+        env = os.getenv("ENV", "development")
 
         # Check if API key is empty
         is_empty = not v or not v.strip()

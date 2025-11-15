@@ -156,7 +156,6 @@ async def test_get_schema_fields_schema_not_found(
 @pytest.mark.asyncio
 async def test_post_add_field_success(
     client: AsyncClient,
-    test_db: AsyncSession,
     test_list: BookmarkList,
     test_schema: FieldSchema,
     test_field: CustomField
