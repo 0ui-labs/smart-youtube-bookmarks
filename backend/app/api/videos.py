@@ -1088,7 +1088,7 @@ async def delete_video(
 async def _process_field_values(
     db: AsyncSession,
     created_videos: list[Video],
-    csv_rows: list[dict],
+    csv_rows_map: dict[str, dict],
     field_columns: dict,
     failures: list[BulkUploadFailure]
 ) -> None:
@@ -1101,19 +1101,18 @@ async def _process_field_values(
     Args:
         db: Database session
         created_videos: List of successfully created Video objects
-        csv_rows: List of raw CSV row dictionaries
+        csv_rows_map: Dict mapping youtube_id -> raw CSV row dictionary
         field_columns: Dict mapping column_name -> CustomField
         failures: List to append failures to (modified in-place)
     """
     from app.schemas.video_field_value import FieldValueUpdate
 
     # Process field values for each video
-    for idx, video in enumerate(created_videos):
-        # Get CSV row for this video
-        if idx >= len(csv_rows):
+    for video in created_videos:
+        # Get CSV row for this video by youtube_id
+        row_data = csv_rows_map.get(video.youtube_id)
+        if not row_data:
             continue
-
-        row_data = csv_rows[idx]
         field_updates = []
 
         for column_name, field in field_columns.items():
@@ -1346,7 +1345,7 @@ async def bulk_upload_videos(
                     logger.warning(f"Unknown field column '{column_name}' (no matching custom field), will be ignored")
 
         videos_to_create = []
-        csv_rows = []  # Store raw CSV rows for field value processing
+        csv_rows_map = {}  # Store raw CSV rows by youtube_id for field value processing
         failures = []
         row_num = 1  # Start at 1 (header is row 0)
 
@@ -1380,8 +1379,8 @@ async def bulk_upload_videos(
                     "youtube_id": youtube_id,
                     "row": row_num,
                 })
-                # Store raw CSV row for field value processing
-                csv_rows.append(row)
+                # Store raw CSV row by youtube_id for field value processing
+                csv_rows_map[youtube_id] = row
 
             except ValueError as e:
                 failures.append(BulkUploadFailure(
@@ -1420,13 +1419,11 @@ async def bulk_upload_videos(
                 # Handle duplicates with existing videos in DB
                 await db.rollback()
                 # Retry one by one to identify which failed
-                created = 0
                 created_videos = []
                 for video in videos_to_create:
                     try:
                         db.add(video)
                         await db.flush()
-                        created += 1
                         created_videos.append(video)
                     except IntegrityError:
                         await db.rollback()
@@ -1437,42 +1434,22 @@ async def bulk_upload_videos(
                         ))
                 await db.commit()
 
-                # === NEW: Apply field values to created videos ===
-                if field_columns and created_videos:
-                    await _process_field_values(
-                        db=db,
-                        created_videos=created_videos,
-                        csv_rows=csv_rows,
-                        field_columns=field_columns,
-                        failures=failures
-                    )
-                    await db.commit()
-
-                # Create processing job if videos were created
-                await _enqueue_video_processing(db, list_id, created)
-
-                return BulkUploadResponse(
-                    created_count=created,
-                    failed_count=len(failures),
+            # === Apply field values to created videos (SINGLE LOCATION) ===
+            if field_columns and created_videos:
+                await _process_field_values(
+                    db=db,
+                    created_videos=created_videos,
+                    csv_rows_map=csv_rows_map,
+                    field_columns=field_columns,
                     failures=failures
                 )
+                await db.commit()
 
-        # === NEW: Apply field values to created videos ===
-        if field_columns and created_videos:
-            await _process_field_values(
-                db=db,
-                created_videos=created_videos,
-                csv_rows=csv_rows,
-                field_columns=field_columns,
-                failures=failures
-            )
-            await db.commit()
-
-        # Create processing job if videos were created
-        await _enqueue_video_processing(db, list_id, len(videos_to_create))
+            # Create processing job if videos were created
+            await _enqueue_video_processing(db, list_id, len(created_videos))
 
         return BulkUploadResponse(
-            created_count=len(videos_to_create),
+            created_count=len(created_videos),
             failed_count=len(failures),
             failures=failures
         )
