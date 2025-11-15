@@ -33,16 +33,65 @@ vi.mock('./hooks/useWebSocket', () => ({
   })),
 }));
 
+vi.mock('./hooks/useVideos', () => ({
+  useVideos: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
+  useVideosFilter: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
+  useCreateVideo: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useDeleteVideo: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  exportVideosCSV: vi.fn(),
+  useAssignTags: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+
+vi.mock('./hooks/useTags', () => ({
+  useTags: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
+  useCreateTag: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useDeleteTag: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+
+vi.mock('./stores/fieldFilterStore', () => ({
+  useFieldFilterStore: vi.fn(() => ({
+    activeFilters: [],
+  })),
+}));
+
+vi.mock('./stores/tagStore', () => ({
+  useTagStore: vi.fn(() => ({
+    selectedTagIds: [],
+    setSelectedTagIds: vi.fn(),
+  })),
+}));
+
+vi.mock('./stores/tableSettingsStore', () => ({
+  useTableSettingsStore: vi.fn(() => ({
+    viewMode: 'table',
+    visibleColumns: [],
+    setViewMode: vi.fn(),
+    setVisibleColumns: vi.fn(),
+  })),
+}));
+
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('renders without crashing', () => {
-    const { container } = renderWithRouter(<App />, { initialEntries: ['/'] });
+    renderWithRouter(<App />, { initialEntries: ['/'] });
 
-    // App should render without throwing
-    expect(container).toBeTruthy();
+    // Verify the main heading is rendered (redirects to /videos which shows "Alle Videos")
+    expect(screen.getByRole('heading', { name: /Alle Videos/i })).toBeInTheDocument();
   });
 
   it('redirects root path to /videos', () => {
