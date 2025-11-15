@@ -26,10 +26,10 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, aliased
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from isodate import parse_duration
 from httpx import HTTPError, TimeoutException
@@ -46,7 +46,7 @@ from app.models.schema_field import SchemaField
 from app.models.field_schema import FieldSchema
 from app.models.custom_field import CustomField
 from app.models.video_field_value import VideoFieldValue
-from app.schemas.video import VideoAdd, VideoResponse, BulkUploadResponse, BulkUploadFailure, VideoFieldValueResponse, AvailableFieldResponse
+from app.schemas.video import VideoAdd, VideoResponse, BulkUploadResponse, BulkUploadFailure, VideoFieldValueResponse, AvailableFieldResponse, VideoFilterRequest, FieldFilterOperator
 from app.schemas.video_field_value import (
     BatchUpdateFieldValuesRequest,
     BatchUpdateFieldValuesResponse,
@@ -456,6 +456,250 @@ async def get_videos_in_list(
             video.__dict__['field_values'] = field_values_response
     else:
         # No videos → no field values needed
+        for video in videos:
+            video.__dict__['field_values'] = []
+
+    return list(videos)
+
+
+@router.post("/lists/{list_id}/videos/filter", response_model=list[VideoResponse])
+async def filter_videos_in_list(
+    list_id: UUID,
+    filter_request: VideoFilterRequest,
+    db: AsyncSession = Depends(get_db)
+) -> list[Video]:
+    """
+    Filter videos in a bookmark list by tags and/or custom field values.
+
+    Filtering Logic:
+    - Tags: OR logic (video matches ANY selected tag)
+    - Field filters: AND logic (video matches ALL field filters)
+    - Tags + Field filters: Combined with AND
+
+    Examples:
+        POST /api/lists/{id}/videos/filter
+        Body: {"tags": ["Python"], "field_filters": [{"field_id": "...", "operator": "gte", "value": 4}]}
+        -> Videos with tag "Python" AND rating >= 4
+
+        Body: {"field_filters": [{"field_id": "...", "operator": "contains", "value": "tutorial"}]}
+        -> Videos where field contains "tutorial"
+
+        Body: {"tags": ["Python", "JavaScript"]}
+        -> Videos with Python OR JavaScript tags
+
+    Args:
+        list_id: UUID of the bookmark list
+        filter_request: Filter criteria (tags and/or field filters)
+        db: Database session
+
+    Returns:
+        List[VideoResponse]: Filtered videos
+
+    Raises:
+        HTTPException 404: List not found
+    """
+    # Step 1: Validate list exists
+    result = await db.execute(
+        select(BookmarkList).where(BookmarkList.id == list_id)
+    )
+    bookmark_list = result.scalar_one_or_none()
+
+    if not bookmark_list:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"List with id {list_id} not found"
+        )
+
+    # Step 2: Build base query
+    stmt = select(Video).where(Video.list_id == list_id).order_by(Video.created_at)
+
+    # Step 3: Apply tag filtering (OR logic) - case-insensitive exact match
+    if filter_request.tags and len(filter_request.tags) > 0:
+        # Normalize tag names: strip whitespace and lowercase
+        normalized_tags = [tag.strip().lower() for tag in filter_request.tags if tag and tag.strip()]
+
+        if normalized_tags:
+            # Join to tags and filter by exact case-insensitive match using func.lower
+            stmt = (
+                stmt.join(Video.tags)
+                .where(func.lower(Tag.name).in_(normalized_tags))
+                .distinct()
+            )
+
+    # Step 4: Apply field filtering (AND logic)
+    if filter_request.field_filters and len(filter_request.field_filters) > 0:
+        # IMPORTANT: Use aliased() for multiple field filters to avoid JOIN conflicts
+        for field_filter in filter_request.field_filters:
+            # Create unique alias for this field filter
+            vfv_alias = aliased(VideoFieldValue)
+
+            # Join to video_field_values with field_id constraint
+            stmt = stmt.join(
+                vfv_alias,
+                and_(
+                    vfv_alias.video_id == Video.id,
+                    vfv_alias.field_id == field_filter.field_id
+                )
+            )
+
+            # Apply operator-specific filtering
+            operator = field_filter.operator
+
+            if operator == FieldFilterOperator.EQ:
+                # Equal to (numeric)
+                stmt = stmt.where(vfv_alias.value_numeric == field_filter.value)
+
+            elif operator == FieldFilterOperator.GT:
+                # Greater than (numeric)
+                stmt = stmt.where(vfv_alias.value_numeric > field_filter.value)
+
+            elif operator == FieldFilterOperator.GTE:
+                # Greater than or equal (numeric)
+                stmt = stmt.where(vfv_alias.value_numeric >= field_filter.value)
+
+            elif operator == FieldFilterOperator.LT:
+                # Less than (numeric)
+                stmt = stmt.where(vfv_alias.value_numeric < field_filter.value)
+
+            elif operator == FieldFilterOperator.LTE:
+                # Less than or equal (numeric)
+                stmt = stmt.where(vfv_alias.value_numeric <= field_filter.value)
+
+            elif operator == FieldFilterOperator.BETWEEN:
+                # Between min and max (numeric)
+                stmt = stmt.where(
+                    and_(
+                        vfv_alias.value_numeric >= field_filter.value_min,
+                        vfv_alias.value_numeric <= field_filter.value_max
+                    )
+                )
+
+            elif operator == FieldFilterOperator.CONTAINS:
+                # Text contains (case-insensitive) - Uses GIN index!
+                stmt = stmt.where(vfv_alias.value_text.ilike(f"%{field_filter.value}%"))
+
+            elif operator == FieldFilterOperator.EXACT:
+                # Exact match (case-sensitive)
+                stmt = stmt.where(vfv_alias.value_text == field_filter.value)
+
+            elif operator == FieldFilterOperator.IN:
+                # One of (comma-separated values)
+                # Parse comma-separated string into list
+                values = [v.strip() for v in str(field_filter.value).split(',') if v.strip()]
+                stmt = stmt.where(vfv_alias.value_text.in_(values))
+
+            elif operator == FieldFilterOperator.IS:
+                # Boolean is True/False
+                stmt = stmt.where(vfv_alias.value_boolean == field_filter.value)
+
+        # Use distinct() to prevent duplicates from multiple JOINs
+        stmt = stmt.distinct()
+
+    # Step 5: Execute query
+    result = await db.execute(stmt)
+    videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
+
+    if not videos:
+        return []
+
+    # Step 6: Load tags for all videos (prevent N+1)
+    video_ids = [video.id for video in videos]
+
+    # First, get video-tag associations
+    associations_stmt = select(video_tags).where(video_tags.c.video_id.in_(video_ids))
+    associations_result = await db.execute(associations_stmt)
+    associations = associations_result.all()
+
+    # Get all unique tag IDs
+    tag_ids = list(set(assoc.tag_id for assoc in associations))
+
+    # Load all tags with schema relationship eagerly loaded
+    if tag_ids:
+        tags_stmt = (
+            select(Tag)
+            .options(selectinload(Tag.schema))
+            .where(Tag.id.in_(tag_ids))
+        )
+        tags_result = await db.execute(tags_stmt)
+        tags_by_id = {tag.id: tag for tag in tags_result.scalars().all()}
+    else:
+        tags_by_id = {}
+
+    # Group tags by video_id
+    tags_by_video: dict = {}
+    for assoc in associations:
+        video_id = assoc.video_id
+        tag_id = assoc.tag_id
+        if video_id not in tags_by_video:
+            tags_by_video[video_id] = []
+        if tag_id in tags_by_id:
+            tags_by_video[video_id].append(tags_by_id[tag_id])
+
+    # Assign tags to videos
+    for video in videos:
+        video.__dict__['tags'] = tags_by_video.get(video.id, [])
+
+    # Step 7: Batch-load applicable fields for ALL videos
+    applicable_fields_by_video = await get_available_fields_for_videos(videos, db)
+
+    # Step 8: Batch load field values
+    if video_ids:
+        # Fetch all field values for all videos in one query
+        field_values_stmt = (
+            select(VideoFieldValue)
+            .options(
+                selectinload(VideoFieldValue.field)  # Eager load CustomField
+            )
+            .where(VideoFieldValue.video_id.in_(video_ids))
+        )
+        field_values_result = await db.execute(field_values_stmt)
+        all_field_values = field_values_result.scalars().all()
+
+        # Group field values by video_id
+        field_values_by_video: Dict[UUID, List[VideoFieldValue]] = {}
+        for fv in all_field_values:
+            if fv.video_id not in field_values_by_video:
+                field_values_by_video[fv.video_id] = []
+            field_values_by_video[fv.video_id].append(fv)
+
+        # Build field_values response for each video
+        for video in videos:
+            # Get applicable fields (from batch-loaded data)
+            applicable_fields = applicable_fields_by_video.get(video.id, [])
+
+            # Get actual field values for this video
+            video_field_values = field_values_by_video.get(video.id, [])
+            values_by_field_id = {fv.field_id: fv for fv in video_field_values}
+
+            # Build response list: applicable fields + their values (if set)
+            field_values_response = []
+            for field, schema_name, display_order, show_on_card in applicable_fields:
+                field_value = values_by_field_id.get(field.id)
+
+                # Extract value based on field type
+                value = None
+                if field_value:
+                    if field.field_type == 'rating':
+                        value = field_value.value_numeric  # Can be float
+                    elif field.field_type in ('select', 'text'):
+                        value = field_value.value_text
+                    elif field.field_type == 'boolean':
+                        value = field_value.value_boolean
+
+                # Create response dict (Pydantic will serialize)
+                field_values_response.append({
+                    'field_id': field.id,
+                    'field': field,  # CustomField ORM object
+                    'value': value,
+                    'schema_name': schema_name,
+                    'show_on_card': show_on_card,
+                    'display_order': display_order
+                })
+
+            # Assign to video (FastAPI will serialize via VideoResponse schema)
+            video.__dict__['field_values'] = field_values_response
+    else:
+        # No videos -> no field values needed
         for video in videos:
             video.__dict__['field_values'] = []
 
