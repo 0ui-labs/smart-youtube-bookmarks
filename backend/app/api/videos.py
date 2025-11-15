@@ -16,7 +16,7 @@ Includes:
 
 from uuid import UUID
 import re
-from typing import List, Sequence, Optional, Annotated, Dict, Tuple, Set
+from typing import List, Sequence, Optional, Annotated, Dict, Tuple, Set, Literal
 import csv
 import io
 from datetime import datetime, timezone
@@ -26,7 +26,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, or_, and_
+from sqlalchemy import select, func, or_, and_, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload, aliased
@@ -302,25 +302,32 @@ async def add_video_to_list(
 async def get_videos_in_list(
     list_id: UUID,
     tags: Annotated[Optional[List[str]], Query(max_length=10)] = None,
+    sort_by: Optional[str] = Query(None, description="Sort column: 'title', 'duration', 'created_at', 'channel', or 'field:<field_id>'"),
+    sort_order: Optional[Literal["asc", "desc"]] = Query("asc", description="Sort direction"),
     db: AsyncSession = Depends(get_db)
 ) -> List[Video]:
     """
-    Get all videos in a bookmark list with optional tag filtering.
+    Get all videos in a bookmark list with optional tag filtering and sorting.
 
     Args:
         list_id: UUID of the bookmark list
         tags: Optional list of tag names for OR filtering (case-insensitive)
+        sort_by: Sort column (standard column or 'field:<field_id>')
+        sort_order: Sort direction ('asc' or 'desc')
         db: Database session
 
     Returns:
         List[VideoResponse]: List of videos in the bookmark list
 
     Raises:
-        HTTPException 404: List not found
+        HTTPException 404: List not found or custom field not found
+        HTTPException 400: Invalid sort_by parameter
 
     Examples:
-        - /api/lists/{id}/videos - All videos in list
+        - /api/lists/{id}/videos - All videos in list (default: created_at DESC)
         - /api/lists/{id}/videos?tags=Python&tags=Tutorial - Videos with Python OR Tutorial tags
+        - /api/lists/{id}/videos?sort_by=title&sort_order=asc - Videos sorted by title A-Z
+        - /api/lists/{id}/videos?sort_by=field:uuid-rating-field&sort_order=desc - Videos sorted by rating field
     """
     # Validate list exists
     result = await db.execute(
@@ -335,7 +342,7 @@ async def get_videos_in_list(
         )
 
     # Build query for videos in list
-    stmt = select(Video).where(Video.list_id == list_id).order_by(Video.created_at)
+    stmt = select(Video).where(Video.list_id == list_id)
 
     # Apply tag filtering (OR logic) - case-insensitive exact match
     if tags and len(tags) > 0:
@@ -350,6 +357,85 @@ async def get_videos_in_list(
                 .where(func.lower(Tag.name).in_(normalized_tags))
                 .distinct()
             )
+
+    # Apply sorting
+    if sort_by:
+        if sort_by.startswith("field:"):
+            # Field-based sorting
+            field_id_str = sort_by.split(":", 1)[1]
+            try:
+                field_id = UUID(field_id_str)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid field_id in sort_by parameter"
+                )
+
+            # Validate field exists
+            field_result = await db.execute(
+                select(CustomField).where(CustomField.id == field_id)
+            )
+            field = field_result.scalar_one_or_none()
+            if not field:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Custom field not found"
+                )
+
+            # LEFT JOIN to video_field_values and sort by typed column
+            stmt = stmt.outerjoin(
+                VideoFieldValue,
+                and_(
+                    VideoFieldValue.video_id == Video.id,
+                    VideoFieldValue.field_id == field_id
+                )
+            )
+
+            # Determine sort column based on field type
+            if field.field_type == "rating":
+                sort_column = VideoFieldValue.value_numeric
+            elif field.field_type in ("select", "text"):
+                sort_column = VideoFieldValue.value_text
+            elif field.field_type == "boolean":
+                sort_column = VideoFieldValue.value_boolean
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported field type: {field.field_type}"
+                )
+
+            # Apply ORDER BY with explicit NULL handling
+            # CRITICAL: Use .nulls_last() for BOTH asc AND desc
+            # Rationale: Users always want sorted values first, empty values last
+            if sort_order == "desc":
+                stmt = stmt.order_by(desc(sort_column).nulls_last())
+            else:
+                stmt = stmt.order_by(asc(sort_column).nulls_last())
+
+        else:
+            # Standard column sorting (title, duration, created_at, channel)
+            valid_columns = {
+                "title": Video.title,
+                "duration": Video.duration,
+                "created_at": Video.created_at,
+                "channel": Video.channel
+            }
+
+            if sort_by not in valid_columns:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid sort_by column: {sort_by}. Valid options: {', '.join(valid_columns.keys())}"
+                )
+
+            sort_column = valid_columns[sort_by]
+            # Apply nulls_last for both directions on standard columns too
+            if sort_order == "desc":
+                stmt = stmt.order_by(desc(sort_column).nulls_last())
+            else:
+                stmt = stmt.order_by(asc(sort_column).nulls_last())
+    else:
+        # Default sorting: created_at descending (newest first)
+        stmt = stmt.order_by(desc(Video.created_at))
 
     # Execute query
     result = await db.execute(stmt)
