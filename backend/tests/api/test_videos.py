@@ -554,9 +554,9 @@ async def test_get_videos_filter_by_single_tag(client: AsyncClient, test_db: Asy
     video2_id = video2_response.json()["id"]
     video3_id = video3_response.json()["id"]
 
-    # Create tags
-    python_tag = await client.post("/api/tags", json={"name": "Python", "color": "#3B82F6"})
-    js_tag = await client.post("/api/tags", json={"name": "JavaScript", "color": "#F59E0B"})
+    # Create tags with unique names for this test
+    python_tag = await client.post("/api/tags", json={"name": "SingleTag-Python", "color": "#3B82F6"})
+    js_tag = await client.post("/api/tags", json={"name": "SingleTag-JavaScript", "color": "#F59E0B"})
     python_id = python_tag.json()["id"]
     js_id = js_tag.json()["id"]
 
@@ -566,7 +566,7 @@ async def test_get_videos_filter_by_single_tag(client: AsyncClient, test_db: Asy
     await client.post(f"/api/videos/{video3_id}/tags", json={"tag_ids": [python_id, js_id]})
 
     # Filter by Python tag
-    response = await client.get(f"/api/lists/{test_list.id}/videos?tags=Python")
+    response = await client.get(f"/api/lists/{test_list.id}/videos?tags=SingleTag-Python")
 
     assert response.status_code == 200
     videos = response.json()
@@ -602,10 +602,10 @@ async def test_get_videos_filter_by_multiple_tags_or_logic(client: AsyncClient, 
     video3_id = video3_response.json()["id"]
     video4_id = video4_response.json()["id"]
 
-    # Create tags
-    python_tag = await client.post("/api/tags", json={"name": "Python", "color": "#3B82F6"})
-    tutorial_tag = await client.post("/api/tags", json={"name": "Tutorial", "color": "#10B981"})
-    advanced_tag = await client.post("/api/tags", json={"name": "Advanced", "color": "#EF4444"})
+    # Create tags with unique names for this test
+    python_tag = await client.post("/api/tags", json={"name": "MultiTag-Python", "color": "#3B82F6"})
+    tutorial_tag = await client.post("/api/tags", json={"name": "MultiTag-Tutorial", "color": "#10B981"})
+    advanced_tag = await client.post("/api/tags", json={"name": "MultiTag-Advanced", "color": "#EF4444"})
     python_id = python_tag.json()["id"]
     tutorial_id = tutorial_tag.json()["id"]
     advanced_id = advanced_tag.json()["id"]
@@ -617,7 +617,7 @@ async def test_get_videos_filter_by_multiple_tags_or_logic(client: AsyncClient, 
     await client.post(f"/api/videos/{video4_id}/tags", json={"tag_ids": [advanced_id]})
 
     # Filter by Python OR Tutorial (should return video1, video2, video3)
-    response = await client.get(f"/api/lists/{test_list.id}/videos?tags=Python&tags=Tutorial")
+    response = await client.get(f"/api/lists/{test_list.id}/videos?tags=MultiTag-Python&tags=MultiTag-Tutorial")
 
     assert response.status_code == 200
     videos = response.json()
@@ -639,17 +639,17 @@ async def test_get_videos_filter_case_insensitive(client: AsyncClient, test_db: 
     )
     video_id = video_response.json()["id"]
 
-    # Create tag with mixed case
-    tag = await client.post("/api/tags", json={"name": "PyThOn", "color": "#3B82F6"})
+    # Create tag with mixed case and unique name
+    tag = await client.post("/api/tags", json={"name": "CaseTest-PyThOn", "color": "#3B82F6"})
     tag_id = tag.json()["id"]
 
     # Assign tag
     await client.post(f"/api/videos/{video_id}/tags", json={"tag_ids": [tag_id]})
 
     # Filter with different case variations
-    response1 = await client.get(f"/api/lists/{test_list.id}/videos?tags=python")
-    response2 = await client.get(f"/api/lists/{test_list.id}/videos?tags=PYTHON")
-    response3 = await client.get(f"/api/lists/{test_list.id}/videos?tags=PyThOn")
+    response1 = await client.get(f"/api/lists/{test_list.id}/videos?tags=casetest-python")
+    response2 = await client.get(f"/api/lists/{test_list.id}/videos?tags=CASETEST-PYTHON")
+    response3 = await client.get(f"/api/lists/{test_list.id}/videos?tags=CaseTest-PyThOn")
 
     assert response1.status_code == 200
     assert response2.status_code == 200
@@ -670,12 +670,12 @@ async def test_get_videos_filter_no_matching_tags(client: AsyncClient, test_db: 
     assert video_response.status_code == 201
     video_id = video_response.json()["id"]
 
-    tag = await client.post("/api/tags", json={"name": "Python", "color": "#3B82F6"})
+    tag = await client.post("/api/tags", json={"name": "NoMatch-Python", "color": "#3B82F6"})
     tag_id = tag.json()["id"]
     await client.post(f"/api/videos/{video_id}/tags", json={"tag_ids": [tag_id]})
 
     # Filter by non-existent tag
-    response = await client.get(f"/api/lists/{test_list.id}/videos?tags=NonExistent")
+    response = await client.get(f"/api/lists/{test_list.id}/videos?tags=NonExistent-XYZ")
 
     assert response.status_code == 200
     videos = response.json()
@@ -696,8 +696,8 @@ async def test_get_videos_without_filter_returns_all(client: AsyncClient, test_d
     )
     video1_id = video_with_tag_response.json()["id"]
 
-    # Tag only first video
-    tag = await client.post("/api/tags", json={"name": "Python", "color": "#3B82F6"})
+    # Tag only first video with unique tag name
+    tag = await client.post("/api/tags", json={"name": "AllVideos-Python", "color": "#3B82F6"})
     await client.post(f"/api/videos/{video1_id}/tags", json={"tag_ids": [tag.json()["id"]]})
 
     # Get all videos without filter

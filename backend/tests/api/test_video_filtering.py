@@ -1008,4 +1008,8 @@ async def test_filter_in_operator_type_validation(
 
     # Assert: Should return 422 validation error
     assert response.status_code == 422
-    assert "comma-separated string" in response.json()["detail"].lower()
+    error_detail = response.json()["detail"]
+    # FastAPI returns a list of validation errors
+    assert isinstance(error_detail, list)
+    # Check that the error mentions the operator requires string value
+    assert any("string value" in str(err).lower() for err in error_detail)
