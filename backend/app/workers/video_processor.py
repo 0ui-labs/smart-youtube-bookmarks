@@ -104,6 +104,7 @@ async def process_video(
             # For now, just store YouTube metadata
 
             video.processing_status = "completed"
+            video.error_message = None  # Clear error from previous failed attempts
             await db.flush()
 
             # Get user_id for WebSocket publishing

@@ -31,7 +31,7 @@ def upgrade() -> None:
     # This enables bitmap index scans combining both predicates (2-5x performance improvement)
     op.execute('''
         CREATE INDEX idx_vfv_field_text_trgm ON video_field_values
-        USING gin (field_id, value_text gin_trgm_ops);
+        USING gin (field_id gin_btree_ops, value_text gin_trgm_ops);
     ''')
 
 

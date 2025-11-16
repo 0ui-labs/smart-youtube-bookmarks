@@ -58,27 +58,27 @@ async def start_processing(
         await db.commit()  # CRITICAL: Commit before enqueue (not just flush)
         await db.refresh(job)
 
-        # Fetch schema for Gemini extraction (if list has one)
-        schema_fields = {}
-        if list_obj.schema_id:
-            schema_result = await db.execute(
-                select(Schema).where(Schema.id == list_obj.schema_id)
-            )
-            schema = schema_result.scalar_one_or_none()
-            if schema:
-                schema_fields = schema.fields
-
-        # Get pending videos for enqueueing
-        videos_result = await db.execute(
-            select(Video).where(
-                Video.list_id == list_id,
-                Video.processing_status == "pending"
-            )
-        )
-        pending_videos = videos_result.scalars().all()
-
-        # Enqueue ARQ jobs atomically (all-or-nothing with asyncio.gather)
+        # Wrap all post-commit operations to handle failures (prevents orphaned jobs)
         try:
+            # Fetch schema for Gemini extraction (if list has one)
+            schema_fields = {}
+            if list_obj.schema_id:
+                schema_result = await db.execute(
+                    select(Schema).where(Schema.id == list_obj.schema_id)
+                )
+                schema = schema_result.scalar_one_or_none()
+                if schema:
+                    schema_fields = schema.fields
+
+            # Get pending videos for enqueueing
+            videos_result = await db.execute(
+                select(Video).where(
+                    Video.list_id == list_id,
+                    Video.processing_status == "pending"
+                )
+            )
+            pending_videos = videos_result.scalars().all()
+
             # Build list of enqueue coroutines
             enqueue_tasks = [
                 arq_pool.enqueue_job(
@@ -94,11 +94,12 @@ async def start_processing(
             # Execute all enqueues atomically
             await asyncio.gather(*enqueue_tasks)
             logger.info(f"Enqueued {len(pending_videos)} videos for processing (job {job.id})")
+
         except Exception as e:
-            # Mark job as failed if ANY enqueue fails
+            # Mark job as failed if ANY operation fails (schema fetch, video fetch, or enqueue)
             logger.exception("Failed to enqueue jobs for list %s", list_id)
             job.status = "failed"
-            job.error_message = f"Failed to enqueue jobs: {e!s}"
+            job.error_message = f"Failed to start processing: {e!s}"
             await db.commit()
             raise HTTPException(
                 status_code=500,

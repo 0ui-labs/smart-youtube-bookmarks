@@ -88,6 +88,13 @@ def upgrade() -> None:
     # Unique constraint: one value per field per video
     op.create_unique_constraint('uq_video_field_values_video_field', 'video_field_values', ['video_id', 'field_id'])
 
+    # Check constraint: exactly one value column must be non-null (type safety)
+    op.create_check_constraint(
+        'ck_video_field_values_single_value',
+        'video_field_values',
+        "(value_text IS NOT NULL)::int + (value_numeric IS NOT NULL)::int + (value_boolean IS NOT NULL)::int = 1"
+    )
+
     # CRITICAL: Performance indexes for filtering operations
     # Index 1: Filter by field + numeric value (e.g., "Rating >= 4")
     op.create_index('idx_video_field_values_field_numeric', 'video_field_values', ['field_id', 'value_numeric'])
@@ -95,8 +102,7 @@ def upgrade() -> None:
     # Index 2: Filter by field + text value (e.g., "Presentation = 'great'")
     op.create_index('idx_video_field_values_field_text', 'video_field_values', ['field_id', 'value_text'])
 
-    # Index 3: Lookup all field values for a video (most common query)
-    op.create_index('idx_video_field_values_video_field', 'video_field_values', ['video_id', 'field_id'])
+    # Note: Index on (video_id, field_id) is NOT needed - unique constraint already creates it
 
     # 5. Extend tags table with schema_id
     op.add_column('tags', sa.Column('schema_id', UUID(as_uuid=True), sa.ForeignKey('field_schemas.id', ondelete='SET NULL'), nullable=True))
@@ -113,9 +119,9 @@ def downgrade() -> None:
     op.drop_column('tags', 'schema_id')
 
     # 4. Drop video_field_values table
-    op.drop_index('idx_video_field_values_video_field', table_name='video_field_values')
     op.drop_index('idx_video_field_values_field_text', table_name='video_field_values')
     op.drop_index('idx_video_field_values_field_numeric', table_name='video_field_values')
+    op.drop_constraint('ck_video_field_values_single_value', 'video_field_values', type_='check')
     op.drop_constraint('uq_video_field_values_video_field', 'video_field_values', type_='unique')
     op.drop_table('video_field_values')
 

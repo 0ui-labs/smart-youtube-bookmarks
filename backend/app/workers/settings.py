@@ -1,7 +1,7 @@
 """ARQ worker configuration with lifecycle hooks."""
 from arq.connections import RedisSettings
 from arq.jobs import Job
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.workers.db_manager import sessionmanager, db_session_context
@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Parse Redis DSN
+# Parse Redis DSN (same logic as redis.py for consistency)
 redis_dsn = urlparse(settings.redis_url)
 
 
@@ -56,8 +56,12 @@ async def after_job_end(ctx: dict) -> None:
             await db.commit()
             logger.debug(f"Job {job_id} succeeded - committed transaction")
         else:
-            await db.rollback()
-            logger.debug(f"Job {job_id} failed - rolled back transaction")
+            try:
+                await db.rollback()
+                logger.debug(f"Job {job_id} failed - rolled back transaction")
+            except Exception:
+                # Transaction may have already been rolled back or not started
+                pass
 
     except Exception as e:
         logger.error(f"Error in after_job_end for job {job_id}: {e}")
@@ -76,9 +80,14 @@ async def after_job_end(ctx: dict) -> None:
 class WorkerSettings:
     """ARQ worker configuration."""
 
-    # Parse database number from path, handling edge cases
-    db_str = redis_dsn.path.lstrip('/') if redis_dsn.path else ''
-    redis_db = int(db_str) if db_str.isdigit() else 0
+    # Parse database number with same logic as redis.py (check query params first, then path)
+    query_params = parse_qs(redis_dsn.query)
+    if 'db' in query_params and query_params['db']:
+        redis_db = int(query_params['db'][0])
+    else:
+        # Fall back to path (e.g., /5)
+        db_str = redis_dsn.path.lstrip('/') if redis_dsn.path else ''
+        redis_db = int(db_str) if db_str.isdigit() else 0
 
     redis_settings = RedisSettings(
         host=redis_dsn.hostname or 'localhost',

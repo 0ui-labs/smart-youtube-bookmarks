@@ -82,7 +82,11 @@ def validate_field_value(
     # Validation logic extracted from Task #72 (videos.py:1294-1360)
 
     if field_type == 'rating':
-        # Type check
+        # Type check - reject booleans first (bool is subclass of int in Python)
+        if isinstance(value, bool):
+            raise FieldValidationError(
+                f"Rating value must be numeric, got {type(value).__name__}"
+            )
         if not isinstance(value, (int, float)):
             raise FieldValidationError(
                 f"Rating value must be numeric, got {type(value).__name__}"

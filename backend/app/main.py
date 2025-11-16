@@ -22,8 +22,20 @@ async def lifespan(app: FastAPI):
     Manages Redis client and ARQ pool lifecycle.
     """
     # Startup: Initialize ARQ pool eagerly (not lazy on first request)
-    await get_arq_pool()
+    # If Redis is unavailable, log warning and continue in degraded mode
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        await get_arq_pool()
+    except Exception as e:
+        logger.warning(
+            f"Failed to connect to Redis on startup: {e}. "
+            "Background job processing will be unavailable."
+        )
+
     yield
+
     # Shutdown: Close both Redis client and ARQ pool
     await close_redis_client()
     await close_arq_pool()

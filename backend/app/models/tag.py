@@ -85,7 +85,8 @@ class Tag(BaseModel):
     )
     schema: Mapped[Optional["FieldSchema"]] = relationship(
         "FieldSchema",
-        back_populates="tags"
+        back_populates="tags",
+        lazy='raise'  # Prevent MissingGreenlet - force explicit selectinload in queries
         # No cascade - schema is optional, deleting tag doesn't affect schema
         # No passive_deletes - ON DELETE SET NULL handled by default behavior
     )

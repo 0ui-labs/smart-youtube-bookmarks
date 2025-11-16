@@ -1,5 +1,6 @@
 """Tests for process_video_list ARQ worker (bulk processing)."""
 import pytest
+from unittest.mock import AsyncMock, patch
 from app.models import Video, BookmarkList, ProcessingJob
 from app.workers.video_processor import process_video_list
 
@@ -51,14 +52,29 @@ async def test_process_video_list_processes_multiple_videos(arq_context, test_db
 
     video_ids = [str(video1.id), str(video2.id), str(video3.id)]
 
-    # Act: Process video list
-    result = await process_video_list(
-        arq_context,
-        str(processing_job.id),
-        str(bookmark_list.id),
-        video_ids,
-        {}  # schema_fields
-    )
+    # Mock YouTube API to avoid real API calls in tests
+    mock_metadata = {
+        "video_id": "test",
+        "title": "Test Video",
+        "channel": "Test Channel",
+        "published_at": "2024-01-01T00:00:00Z",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "duration": "PT5M30S"
+    }
+
+    with patch('app.workers.video_processor.YouTubeClient') as MockYouTube:
+        mock_client = AsyncMock()
+        mock_client.get_video_metadata = AsyncMock(return_value=mock_metadata)
+        MockYouTube.return_value = mock_client
+
+        # Act: Process video list
+        result = await process_video_list(
+            arq_context,
+            str(processing_job.id),
+            str(bookmark_list.id),
+            video_ids,
+            {}  # schema_fields
+        )
 
     # Assert: All videos processed
     await test_db.refresh(video1)

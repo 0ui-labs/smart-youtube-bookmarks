@@ -17,7 +17,8 @@ from tenacity import (
     retry,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type
+    retry_if_exception_type,
+    retry_if_exception
 )
 import httpx
 
@@ -29,6 +30,17 @@ TRANSIENT_ERRORS = (
     httpx.TimeoutException,
     httpx.NetworkError,
 )
+
+
+def _should_retry(exception: Exception) -> bool:
+    """Check if exception should trigger retry (transient errors or HTTP 429)"""
+    # Retry on transient network errors
+    if isinstance(exception, TRANSIENT_ERRORS):
+        return True
+    # Retry on HTTP 429 (rate limiting)
+    if isinstance(exception, HTTPError) and exception.res.status_code == 429:
+        return True
+    return False
 
 
 class VideoMetadata(TypedDict):
@@ -53,7 +65,7 @@ class YouTubeClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(TRANSIENT_ERRORS),
+        retry=retry_if_exception(_should_retry),
         reraise=True
     )
     async def get_video_metadata(self, video_id: str) -> VideoMetadata:
@@ -138,7 +150,7 @@ class YouTubeClient:
         except HTTPError as e:
             if e.res.status_code == 403:
                 # Quota exceeded or forbidden - don't retry
-                error_body = e.res.json if hasattr(e.res, 'json') else {}
+                error_body = e.res.json() if hasattr(e.res, 'json') else {}
                 reason = error_body.get('error', {}).get('errors', [{}])[0].get('reason', 'unknown')
                 if reason == 'quotaExceeded':
                     raise ValueError(f"YouTube API quota exceeded for video {video_id}")
@@ -152,7 +164,7 @@ class YouTubeClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(TRANSIENT_ERRORS),
+        retry=retry_if_exception(_should_retry),
         reraise=True
     )
     async def get_video_transcript(self, video_id: str) -> Optional[str]:

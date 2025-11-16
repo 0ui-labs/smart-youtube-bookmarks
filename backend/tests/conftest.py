@@ -65,15 +65,28 @@ async def mock_arq_pool():
 
 
 @pytest.fixture
-async def client(test_db, mock_arq_pool):
-    """Create test client with database override and mocked ARQ."""
+async def mock_redis_client():
+    """Mock Redis client to avoid Redis connection in tests."""
+    mock_redis = AsyncMock()
+    mock_pubsub = AsyncMock()
+    mock_pubsub.subscribe = AsyncMock()
+    mock_pubsub.unsubscribe = AsyncMock()
+    mock_pubsub.listen = AsyncMock(return_value=[])
+    mock_redis.pubsub = AsyncMock(return_value=mock_pubsub)
+    return mock_redis
+
+
+@pytest.fixture
+async def client(test_db, mock_arq_pool, mock_redis_client):
+    """Create test client with database override and mocked ARQ/Redis."""
     async def override_get_db():
         yield test_db
 
     app.dependency_overrides[get_db] = override_get_db
 
-    # Mock get_arq_pool to avoid Redis connection
-    with patch('app.api.videos.get_arq_pool', return_value=mock_arq_pool):
+    # Mock both get_arq_pool and get_redis_client to avoid Redis connection
+    with patch('app.api.videos.get_arq_pool', return_value=mock_arq_pool), \
+         patch('app.core.redis.get_redis_client', return_value=mock_redis_client):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac

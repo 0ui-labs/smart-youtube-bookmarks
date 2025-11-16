@@ -98,6 +98,8 @@ async def test_batch_update_field_values_with_typed_columns(
     assert result["updated_count"] == 4, "Should update 4 field values"
 
     # Assert: Database state - all 4 values exist
+    # Expire ORM cache to read fresh data (API endpoint uses different session)
+    await test_db.expire_all()
     values_stmt = select(VideoFieldValue).where(VideoFieldValue.video_id == test_video.id)
     db_result = await test_db.execute(values_stmt)
     db_values = db_result.scalars().all()
