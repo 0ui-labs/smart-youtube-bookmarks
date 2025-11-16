@@ -916,7 +916,6 @@ async def test_get_videos_field_values_rating_accepts_float(client: AsyncClient,
 async def test_sort_by_title_ascending(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
     """Test sorting videos by title in ascending order (A-Z)."""
     from sqlalchemy import select, update
-    from app.models.video import Video
     from unittest.mock import AsyncMock, patch
 
     # Mock YouTube client
@@ -1007,7 +1006,6 @@ async def test_sort_by_title_descending(client: AsyncClient, test_db: AsyncSessi
 
     # Update titles using UPDATE statement
     from sqlalchemy import update
-    from app.models.video import Video
 
     await test_db.execute(update(Video).where(Video.youtube_id == "ZuluVideo01").values(title="Zulu Video"))
     await test_db.execute(update(Video).where(Video.youtube_id == "AlphaVideo1").values(title="Alpha Video"))
@@ -1058,7 +1056,6 @@ async def test_sort_by_duration_ascending(client: AsyncClient, test_db: AsyncSes
 
     # Update durations using UPDATE statement (in seconds)
     from sqlalchemy import update
-    from app.models.video import Video
 
     await test_db.execute(update(Video).where(Video.youtube_id == "LongVideo01").values(title="Long Video", duration=600))
     await test_db.execute(update(Video).where(Video.youtube_id == "ShortVideo1").values(title="Short Video", duration=120))
@@ -1112,7 +1109,6 @@ async def test_sort_by_duration_descending(client: AsyncClient, test_db: AsyncSe
 
     # Update durations using UPDATE statement (in seconds)
     from sqlalchemy import update
-    from app.models.video import Video
 
     await test_db.execute(update(Video).where(Video.youtube_id == "LongVideo01").values(title="Long Video", duration=600))
     await test_db.execute(update(Video).where(Video.youtube_id == "ShortVideo1").values(title="Short Video", duration=120))
@@ -1139,7 +1135,6 @@ async def test_sort_by_field_rating_descending(client: AsyncClient, test_db: Asy
     from app.models.video_field_value import VideoFieldValue
     from uuid import UUID
     from sqlalchemy import select, update
-    from app.models.video import Video
     from unittest.mock import AsyncMock, patch
 
     # Create rating field
@@ -1224,7 +1219,6 @@ async def test_sort_by_field_rating_ascending_nulls_last(client: AsyncClient, te
     from app.models.video_field_value import VideoFieldValue
     from uuid import UUID
     from sqlalchemy import select, update
-    from app.models.video import Video
     from unittest.mock import AsyncMock, patch
 
     # Create rating field
@@ -1309,7 +1303,6 @@ async def test_sort_by_field_select_ascending(client: AsyncClient, test_db: Asyn
     from app.models.video_field_value import VideoFieldValue
     from uuid import UUID
     from sqlalchemy import select, update
-    from app.models.video import Video
     from unittest.mock import AsyncMock, patch
 
     # Create select field
@@ -1429,7 +1422,6 @@ async def test_sort_combined_with_tag_filter(client: AsyncClient, test_db: Async
     from app.models.video_field_value import VideoFieldValue
     from uuid import UUID
     from sqlalchemy import select, update
-    from app.models.video import Video
     from unittest.mock import AsyncMock, patch
 
     # Create rating field
@@ -1529,7 +1521,6 @@ async def test_default_sort_created_at_desc(client: AsyncClient, test_db: AsyncS
     """Test that default sorting is created_at descending (newest first)."""
     import asyncio
     from sqlalchemy import select
-    from app.models.video import Video
     from unittest.mock import AsyncMock, patch
 
     # Mock YouTube client
