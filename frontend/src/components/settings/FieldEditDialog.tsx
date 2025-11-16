@@ -45,6 +45,29 @@ const editFieldSchema = z.object({
 
 type EditFieldFormData = z.infer<typeof editFieldSchema>
 
+/**
+ * Deep equality comparison for objects
+ * Handles nested objects and arrays recursively
+ * Avoids false positives from property order differences
+ */
+const deepEqual = (obj1: any, obj2: any): boolean => {
+  if (obj1 === obj2) return true
+  if (obj1 == null || obj2 == null) return false
+  if (typeof obj1 !== 'object' || typeof obj2 !== 'object') return false
+
+  const keys1 = Object.keys(obj1)
+  const keys2 = Object.keys(obj2)
+
+  if (keys1.length !== keys2.length) return false
+
+  for (const key of keys1) {
+    if (!keys2.includes(key)) return false
+    if (!deepEqual(obj1[key], obj2[key])) return false
+  }
+
+  return true
+}
+
 interface FieldEditDialogProps {
   open: boolean
   field: CustomFieldResponse | null
@@ -127,7 +150,7 @@ export const FieldEditDialog = ({
       updates.name = trimmedName
     }
 
-    if (JSON.stringify(parsedConfig) !== JSON.stringify(field.config)) {
+    if (!deepEqual(parsedConfig, field.config)) {
       updates.config = parsedConfig
     }
 
