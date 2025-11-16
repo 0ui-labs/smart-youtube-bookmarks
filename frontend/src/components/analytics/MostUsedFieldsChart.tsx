@@ -68,7 +68,7 @@ export function MostUsedFieldsChart({ data }: MostUsedFieldsChartProps) {
             data={data}
             layout="vertical"
             margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-            title="Bar chart showing top 10 most-used custom fields by usage count"
+            aria-label="Bar chart showing top 10 most-used custom fields by usage count"
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis

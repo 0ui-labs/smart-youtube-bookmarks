@@ -145,7 +145,7 @@ export const EditSchemaDialog = ({
             >
               Abbrechen
             </Button>
-            <Button type="submit" disabled={!form.formState.isValid || isLoading}>
+            <Button type="submit" disabled={isLoading}>
               {isLoading ? 'Speichern...' : 'Speichern'}
             </Button>
           </DialogFooter>

@@ -143,9 +143,7 @@ export function TextConfigEditor({
               className="w-32"
               aria-label="Maximale Zeichenanzahl"
               aria-invalid={hasError}
-              aria-describedby={
-                hasError ? 'text-error text-description' : 'text-description'
-              }
+              aria-describedby="text-description"
             />
 
             <span className="text-sm text-muted-foreground">Zeichen</span>

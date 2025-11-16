@@ -71,7 +71,6 @@ export function SchemaEffectivenessChart({ data }: SchemaEffectivenessChartProps
             data={data}
             layout="vertical"
             margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
-            title="Bar chart showing schema effectiveness by completion percentage"
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
@@ -95,7 +94,7 @@ export function SchemaEffectivenessChart({ data }: SchemaEffectivenessChartProps
                   <div
                     className="bg-white p-3 border rounded shadow-lg"
                     role="status"
-                    aria-live="assertive"
+                    aria-live="polite"
                   >
                     <p className="font-semibold">{stat.schema_name}</p>
                     <p className="text-sm text-gray-600">
