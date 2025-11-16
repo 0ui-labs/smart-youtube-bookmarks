@@ -71,9 +71,10 @@ export const FieldEditor = ({
     setLocalValue(newValue)
     setError(null) // Clear previous errors
 
-    // Clear existing timer
+    // Clear existing timer (prevents race conditions)
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
     }
 
     // Debounce save (500ms)
@@ -81,6 +82,10 @@ export const FieldEditor = ({
       updateMutation.mutate(
         [{ field_id: field.id, value: newValue }],
         {
+          onSuccess: () => {
+            // Clear timer after successful mutation
+            debounceTimerRef.current = null
+          },
           onError: (err) => {
             // Parse backend validation error
             const errorMessage = parseValidationError(err)
@@ -88,6 +93,9 @@ export const FieldEditor = ({
 
             // Rollback local value on error
             setLocalValue(value)
+
+            // Clear timer after error
+            debounceTimerRef.current = null
           },
         }
       )

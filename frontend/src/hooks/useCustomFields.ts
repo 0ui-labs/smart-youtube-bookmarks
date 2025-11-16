@@ -161,6 +161,7 @@ export const useCheckDuplicateField = (
 /**
  * React Query mutation hook to create a new custom field
  *
+ * Uses optimistic update to immediately show new field in UI
  * Automatically invalidates custom fields query after successful creation
  * to ensure UI consistency
  *
@@ -192,9 +193,43 @@ export const useCreateCustomField = (listId: string) => {
       // Validate response with Zod schema (consistent with query)
       return CustomFieldSchema.parse(data)
     },
-    onError: (error) => {
-      console.error('Failed to create custom field:', error)
+    // Optimistic update: immediately add to UI with temporary ID
+    onMutate: async (newField) => {
+      // Cancel outgoing refetches (so they don't overwrite optimistic update)
+      await queryClient.cancelQueries({
+        queryKey: customFieldKeys.list(listId),
+      })
+
+      // Snapshot current value for rollback
+      const previous = queryClient.getQueryData<CustomField[]>(
+        customFieldKeys.list(listId)
+      )
+
+      // Optimistically update cache with temporary field
+      queryClient.setQueryData<CustomField[]>(
+        customFieldKeys.list(listId),
+        (old) => [
+          ...(old ?? []),
+          {
+            ...newField,
+            id: 'temp-' + Date.now(), // Temporary ID until backend returns real one
+            list_id: listId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as CustomField,
+        ]
+      )
+
+      return { previous }
     },
+    // Rollback on error
+    onError: (error, _newField, context) => {
+      console.error('Failed to create custom field:', error)
+      if (context?.previous) {
+        queryClient.setQueryData(customFieldKeys.list(listId), context.previous)
+      }
+    },
+    // Refetch to get real ID and server-generated fields
     onSettled: async () => {
       // Invalidate and refetch to ensure UI consistency
       // This runs on both success and error to handle edge cases
@@ -208,6 +243,7 @@ export const useCreateCustomField = (listId: string) => {
 /**
  * React Query mutation hook to update an existing custom field
  *
+ * Uses optimistic update to immediately show changes in UI
  * Supports partial updates (all fields in CustomFieldUpdate are optional)
  * Invalidates query after success to refetch updated data
  *
@@ -249,9 +285,43 @@ export const useUpdateCustomField = (listId: string) => {
       const result = await customFieldsApi.update(listId, fieldId, data)
       return CustomFieldSchema.parse(result)
     },
-    onError: (error) => {
-      console.error('Failed to update custom field:', error)
+    // Optimistic update: immediately apply changes in UI
+    onMutate: async ({ fieldId, data }) => {
+      // Cancel outgoing refetches (so they don't overwrite optimistic update)
+      await queryClient.cancelQueries({
+        queryKey: customFieldKeys.list(listId),
+      })
+
+      // Snapshot current value for rollback
+      const previous = queryClient.getQueryData<CustomField[]>(
+        customFieldKeys.list(listId)
+      )
+
+      // Optimistically update cache
+      queryClient.setQueryData<CustomField[]>(
+        customFieldKeys.list(listId),
+        (old) =>
+          old?.map((field) =>
+            field.id === fieldId
+              ? {
+                  ...field,
+                  ...data,
+                  updated_at: new Date().toISOString(),
+                }
+              : field
+          ) ?? []
+      )
+
+      return { previous }
     },
+    // Rollback on error
+    onError: (error, _variables, context) => {
+      console.error('Failed to update custom field:', error)
+      if (context?.previous) {
+        queryClient.setQueryData(customFieldKeys.list(listId), context.previous)
+      }
+    },
+    // Refetch to ensure server state is correct
     onSettled: async () => {
       await queryClient.invalidateQueries({
         queryKey: customFieldKeys.list(listId),

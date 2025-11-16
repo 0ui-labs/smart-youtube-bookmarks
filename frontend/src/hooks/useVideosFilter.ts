@@ -31,6 +31,7 @@ interface BackendFieldFilter {
  *
  * @param filters - Array of active filters from fieldFilterStore
  * @returns Array of backend-compatible field filters
+ * @throws Error if BETWEEN operator is used without both valueMin and valueMax
  *
  * @example
  * ```ts
@@ -48,15 +49,27 @@ export function convertToBackendFilters(filters: ActiveFilter[]): BackendFieldFi
       operator: f.operator,
     };
 
-    // Add value fields only if they're defined
-    if (f.value !== undefined) {
-      backendFilter.value = f.value;
-    }
-    if (f.valueMin !== undefined) {
+    // BETWEEN operator requires both min and max values
+    if (f.operator === 'between') {
+      if (f.valueMin === undefined || f.valueMax === undefined) {
+        throw new Error(
+          `BETWEEN operator requires both valueMin and valueMax for field "${f.fieldName}" (${f.fieldId})`
+        );
+      }
       backendFilter.value_min = f.valueMin;
-    }
-    if (f.valueMax !== undefined) {
       backendFilter.value_max = f.valueMax;
+    } else {
+      // Other operators use the value field
+      if (f.value !== undefined) {
+        backendFilter.value = f.value;
+      }
+      // Include min/max if they're defined (for potential future operators)
+      if (f.valueMin !== undefined) {
+        backendFilter.value_min = f.valueMin;
+      }
+      if (f.valueMax !== undefined) {
+        backendFilter.value_max = f.valueMax;
+      }
     }
 
     return backendFilter;

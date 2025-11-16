@@ -10,11 +10,17 @@ import { FieldSelector } from './FieldSelector'
 // import { FieldOrderManager } from './FieldOrderManager' // TODO Task #127: Integrate new FieldOrderManager API
 import { useCustomFields } from '@/hooks/useCustomFields'
 import { NewFieldForm } from './NewFieldForm'
+import { validateAllSchemaFields } from '@/validators/schemaValidators'
 
 /**
  * Zod Schema with superRefine for advanced array validation
  * REF MCP Improvement #1: Using superRefine instead of multiple .refine() calls
  * for more precise error messages and better UX
+ *
+ * Validation logic extracted to @/validators/schemaValidators for:
+ * - Better testability (pure functions)
+ * - Reusability across components
+ * - Cleaner separation of concerns
  */
 const schemaFormSchema = z.object({
   name: z.string()
@@ -35,48 +41,8 @@ const schemaFormSchema = z.object({
     .min(1, 'Mindestens ein Feld ist erforderlich')
     .max(20, 'Maximal 20 Felder pro Schema erlaubt')
     .superRefine((fields, ctx) => {
-      // Check 1: Max 3 show_on_card
-      const showOnCardCount = fields.filter(f => f.show_on_card).length
-      if (showOnCardCount > 3) {
-        ctx.addIssue({
-          code: "too_big",
-          maximum: 3,
-          type: "array",
-          inclusive: true,
-          message: "Maximal 3 Felder können auf der Karte angezeigt werden",
-          path: [], // Root level error for entire fields array
-        })
-      }
-
-      // Check 2: Unique display_order with specific field errors
-      const orders = fields.map(f => f.display_order)
-      const duplicateOrders = orders.filter((order, index) =>
-        orders.indexOf(order) !== index
-      )
-      if (duplicateOrders.length > 0) {
-        duplicateOrders.forEach((order) => {
-          const index = orders.lastIndexOf(order)
-          ctx.addIssue({
-            code: "custom",
-            message: `Anzeigereihenfolge ${order} ist bereits vergeben`,
-            path: [index, 'display_order'], // Point to specific field
-          })
-        })
-      }
-
-      // Check 3: Unique field_id with specific field errors
-      const ids = fields.map(f => f.field_id)
-      const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index)
-      if (duplicateIds.length > 0) {
-        duplicateIds.forEach((id) => {
-          const index = ids.lastIndexOf(id)
-          ctx.addIssue({
-            code: "custom",
-            message: "Dieses Feld wurde bereits hinzugefügt",
-            path: [index, 'field_id'], // Point to specific field
-          })
-        })
-      }
+      // Delegate to extracted validators for better testability
+      validateAllSchemaFields(fields, ctx);
     }),
 })
 

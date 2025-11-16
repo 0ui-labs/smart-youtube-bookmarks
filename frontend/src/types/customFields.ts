@@ -70,7 +70,7 @@ export type SelectConfig = {
  */
 export const SelectConfigSchema = z.object({
   options: z.array(z.string().min(1)).min(1),
-})
+}).strict()
 
 /**
  * Configuration for 'rating' field type
@@ -113,7 +113,7 @@ export type RatingConfig = {
  */
 export const RatingConfigSchema = z.object({
   max_rating: z.number().int().min(1).max(10),
-})
+}).strict()
 
 /**
  * Configuration for 'text' field type
@@ -158,7 +158,7 @@ export type TextConfig = {
  */
 export const TextConfigSchema = z.object({
   max_length: z.number().int().min(1).optional(),
-})
+}).strict()
 
 /**
  * Configuration for 'boolean' field type
@@ -244,7 +244,7 @@ export const CustomFieldSchema = z.object({
   config: z.record(z.any()), // Accept any object, validate shape in .refine()
   created_at: z.string(),
   updated_at: z.string(),
-}).refine((data) => {
+}).strict().refine((data) => {
   // REF MCP Improvement #2: Validate config shape matches field_type
   switch (data.field_type) {
     case 'select':
@@ -340,7 +340,7 @@ export const CustomFieldCreateSchema = z.object({
   name: z.string().min(1).max(255),
   field_type: FieldTypeSchema,
   config: z.record(z.any()), // Accept any object, validate shape in .refine()
-}).refine((data) => {
+}).strict().refine((data) => {
   // REF MCP Improvement #2: Validate config shape matches field_type
   switch (data.field_type) {
     case 'select':

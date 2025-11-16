@@ -19,28 +19,70 @@ export const api = axios.create({
 /**
  * Response interceptor for comprehensive error handling.
  *
- * Logs errors with appropriate context:
- * - Server errors (4xx/5xx): logs status, data, and URL
- * - Network errors: logs when request was sent but no response received
- * - Setup errors: logs when request configuration failed
+ * Handles specific HTTP error codes:
+ * - 401 Unauthorized: Redirect to login (future auth implementation)
+ * - 403 Forbidden: User doesn't have permission
+ * - 404 Not Found: Resource doesn't exist
+ * - 500 Internal Server Error: Server-side error
+ * - Network errors: Request sent but no response received
+ * - Setup errors: Request configuration failed
+ *
+ * Global error handling ensures consistent behavior across all API calls.
  */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
       // Server responded with error status (4xx, 5xx)
+      const status = error.response.status
+      const url = error.config?.url
+
       console.error('API Error:', {
-        status: error.response.status,
+        status,
         data: error.response.data,
-        url: error.config?.url,
+        url,
       })
+
+      // Handle specific error codes
+      switch (status) {
+        case 401:
+          // Unauthorized - redirect to login page (when auth is implemented)
+          console.warn('Unauthorized access - authentication required')
+          // TODO: Implement authentication and redirect
+          // window.location.href = '/login'
+          break
+
+        case 403:
+          // Forbidden - user doesn't have permission
+          console.error('Forbidden - insufficient permissions for:', url)
+          break
+
+        case 404:
+          // Not Found - resource doesn't exist
+          console.warn('Resource not found:', url)
+          break
+
+        case 500:
+        case 502:
+        case 503:
+          // Server errors
+          console.error('Server error:', status, '-', url)
+          // TODO: Show global error toast/notification
+          break
+
+        default:
+          // Other client/server errors
+          console.error('Unexpected error status:', status)
+      }
     } else if (error.request) {
       // Request was made but no response received (network error)
       console.error('Network Error:', error.message)
+      // TODO: Show "No internet connection" notification
     } else {
       // Error in request setup
       console.error('Request Setup Error:', error.message)
     }
+
     return Promise.reject(error)
   }
 )

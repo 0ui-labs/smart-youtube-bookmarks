@@ -9,6 +9,22 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 /**
+ * Generate a UUID v4 with fallback for older browsers
+ * Uses crypto.randomUUID() if available, otherwise falls back to Math.random()
+ */
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback: Simple UUID v4 implementation for older browsers
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
  * Field filter operator (matches backend FieldFilterOperator enum)
  */
 export type FilterOperator =
@@ -95,7 +111,7 @@ export const useFieldFilterStore = create<FieldFilterStore>()(
         set((state) => ({
           activeFilters: [
             ...state.activeFilters,
-            { ...filter, id: crypto.randomUUID() }
+            { ...filter, id: generateUUID() }
           ],
         })),
 
