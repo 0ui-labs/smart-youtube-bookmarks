@@ -117,10 +117,18 @@ export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
   }
 
   const handleRetry = (failedTagIds: string[]) => {
-    bulkApply.mutate({
-      tagIds: failedTagIds,
-      schemaId: schema.id,
-    })
+    bulkApply.mutate(
+      {
+        tagIds: failedTagIds,
+        schemaId: schema.id,
+      },
+      {
+        onSuccess: () => {
+          setShowResults(true)
+        },
+        // Errors handled by mutation's onError (rollback)
+      }
+    )
   }
 
   return (

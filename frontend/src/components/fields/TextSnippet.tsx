@@ -40,7 +40,10 @@ export interface TextSnippetProps {
   className?: string
 }
 
-export const TextSnippet = React.forwardRef<HTMLDivElement, TextSnippetProps>(
+export const TextSnippet = React.forwardRef<
+  HTMLDivElement | HTMLInputElement,
+  TextSnippetProps
+>(
   (
     {
       value,
@@ -61,7 +64,7 @@ export const TextSnippet = React.forwardRef<HTMLDivElement, TextSnippetProps>(
       // Read-only mode: display text with optional expand button
       return (
         <div
-          ref={ref}
+          ref={ref as React.Ref<HTMLDivElement>}
           className={cn(
             'inline-flex items-center gap-2 text-sm',
             className
