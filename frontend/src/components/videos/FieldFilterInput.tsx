@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useFieldFilterStore, ActiveFilter, FilterOperator } from '@/stores/fieldFilterStore';
+import { useFieldFilterStore, ActiveFilter } from '@/stores/fieldFilterStore';
 import { useCustomFields } from '@/hooks/useCustomFields';
 
 interface FieldFilterInputProps {
@@ -48,7 +48,10 @@ export function FieldFilterInput({
   onRemove,
 }: FieldFilterInputProps) {
   const { updateFilter } = useFieldFilterStore();
-  const { data: customFields } = useCustomFields(listId);
+  const { data: customFields, isLoading } = useCustomFields(listId);
+
+  // Handle loading state
+  if (isLoading) return null;
 
   const field = customFields?.find((f) => f.id === filter.fieldId);
   if (!field) return null;
@@ -89,12 +92,17 @@ export function FieldFilterInput({
               type="number"
               min={1}
               max={maxRating}
-              value={filter.valueMin || 1}
-              onChange={(e) =>
-                updateFilter(filter.id, {
-                  valueMin: parseInt(e.target.value),
-                })
-              }
+              value={filter.valueMin ?? 1}
+              onChange={(e) => {
+                const parsed = parseInt(e.target.value, 10);
+                if (!isNaN(parsed)) {
+                  const clamped = Math.max(1, Math.min(parsed, maxRating));
+                  const max = filter.valueMax ?? maxRating;
+                  updateFilter(filter.id, {
+                    valueMin: Math.min(clamped, max),
+                  });
+                }
+              }}
               className="w-12 h-7 text-xs"
             />
             <span className="text-xs">-</span>
@@ -102,12 +110,17 @@ export function FieldFilterInput({
               type="number"
               min={1}
               max={maxRating}
-              value={filter.valueMax || maxRating}
-              onChange={(e) =>
-                updateFilter(filter.id, {
-                  valueMax: parseInt(e.target.value),
-                })
-              }
+              value={filter.valueMax ?? maxRating}
+              onChange={(e) => {
+                const parsed = parseInt(e.target.value, 10);
+                if (!isNaN(parsed)) {
+                  const clamped = Math.max(1, Math.min(parsed, maxRating));
+                  const min = filter.valueMin ?? 1;
+                  updateFilter(filter.id, {
+                    valueMax: Math.max(clamped, min),
+                  });
+                }
+              }}
               className="w-12 h-7 text-xs"
             />
           </div>
@@ -116,10 +129,14 @@ export function FieldFilterInput({
             type="number"
             min={1}
             max={maxRating}
-            value={(filter.value as number) || 1}
-            onChange={(e) =>
-              updateFilter(filter.id, { value: parseInt(e.target.value) })
-            }
+            value={typeof filter.value === 'number' ? filter.value : 1}
+            onChange={(e) => {
+              const parsed = parseInt(e.target.value, 10);
+              if (!isNaN(parsed)) {
+                const clamped = Math.max(1, Math.min(parsed, maxRating));
+                updateFilter(filter.id, { value: clamped });
+              }
+            }}
             className="w-12 h-7 text-xs"
           />
         )}
@@ -139,13 +156,14 @@ export function FieldFilterInput({
   // Select Filter (Dropdown)
   if (filter.fieldType === 'select') {
     const options = field.config?.options || [];
+    const selectValue = typeof filter.value === 'string' ? filter.value : undefined;
 
     return (
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">{filter.fieldName}</span>
 
         <Select
-          value={filter.value as string}
+          value={selectValue}
           onValueChange={(val) => updateFilter(filter.id, { value: val })}
         >
           <SelectTrigger className="w-[120px] h-7">
@@ -174,6 +192,8 @@ export function FieldFilterInput({
 
   // Text Filter (Search Input)
   if (filter.fieldType === 'text') {
+    const textValue = typeof filter.value === 'string' ? filter.value : '';
+
     return (
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">{filter.fieldName}</span>
@@ -181,7 +201,7 @@ export function FieldFilterInput({
         <Input
           type="text"
           placeholder="Search..."
-          value={(filter.value as string) || ''}
+          value={textValue}
           onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
           className="w-32 h-7"
         />
@@ -200,19 +220,21 @@ export function FieldFilterInput({
 
   // Boolean Filter (Switch)
   if (filter.fieldType === 'boolean') {
+    const boolValue = typeof filter.value === 'boolean' ? filter.value : false;
+
     return (
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">{filter.fieldName}</span>
 
         <Switch
-          checked={filter.value as boolean}
+          checked={boolValue}
           onCheckedChange={(checked) =>
             updateFilter(filter.id, { value: checked })
           }
         />
 
         <span className="text-xs text-muted-foreground">
-          {filter.value ? 'Yes' : 'No'}
+          {boolValue ? 'Yes' : 'No'}
         </span>
 
         <Button

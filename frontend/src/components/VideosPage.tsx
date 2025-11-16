@@ -201,7 +201,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // TASK 4: Parse sort parameters from URL query params
   const sortBy = searchParams.get('sort_by') || undefined
-  const sortOrder = (searchParams.get('sort_order') || 'asc') as 'asc' | 'desc'
+  const sortOrderParam = searchParams.get('sort_order')
+  const sortOrder: 'asc' | 'desc' = sortOrderParam === 'desc' ? 'desc' : 'asc'
 
   // Get active field-based filters from store
   const activeFilters = useFieldFilterStore((state) => state.activeFilters)

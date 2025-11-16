@@ -70,11 +70,8 @@ export type FieldSchemaUpdate = z.infer<typeof FieldSchemaUpdateSchema>
 // Schema-Field Association Operations
 // ============================================================================
 
-export const SchemaFieldCreateSchema = z.object({
-  field_id: z.string().uuid(),
-  display_order: z.number().int().min(0),
-  show_on_card: z.boolean().default(false),
-})
+// Reuse SchemaFieldItemSchema to avoid duplication
+export const SchemaFieldCreateSchema = SchemaFieldItemSchema
 
 export type SchemaFieldCreate = z.infer<typeof SchemaFieldCreateSchema>
 
