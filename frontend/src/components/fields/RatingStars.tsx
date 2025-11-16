@@ -115,7 +115,8 @@ export const RatingStars = React.memo<RatingStarsProps>(
         {Array.from({ length: maxRating }, (_, i) => {
           const starValue = i + 1
           const isFilled = starValue <= displayValue
-          const isSelected = starValue === (value ?? 0)
+          // REF CodeRabbit: First star focusable when unrated (value is null/0)
+          const isSelected = (value ?? 0) === 0 ? starValue === 1 : starValue === (value ?? 0)
 
           return (
             <button
@@ -136,7 +137,7 @@ export const RatingStars = React.memo<RatingStarsProps>(
               onMouseLeave={() => !readonly && setHoverValue(null)}
               onKeyDown={(e) => handleKeyDown(e, starValue)}
               aria-label={`${starValue} star${starValue > 1 ? 's' : ''}`} // REF MCP #5: ARIA label per button
-              aria-checked={isFilled} // REF MCP #1: Radio pattern - use aria-checked
+              aria-checked={isSelected} // REF CodeRabbit: Only selected star checked (not all filled stars)
               tabIndex={readonly ? -1 : (isSelected ? 0 : -1)} // Roving tabindex: only selected is focusable
             >
               <Star

@@ -66,7 +66,7 @@ export function FieldFilterInput({
           value={filter.operator}
           onValueChange={(op) => {
             // Type guard: Only values from SelectItem are valid FilterOperators
-            if (op === 'gte' || op === 'lte' || op === 'eq') {
+            if (op === 'gte' || op === 'lte' || op === 'eq' || op === 'between') {
               updateFilter(filter.id, { operator: op });
             }
           }}

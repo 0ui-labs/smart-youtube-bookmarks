@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload  # ADD THIS
@@ -5,11 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from typing import Optional
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.tag import Tag
 from app.models.user import User
 from app.models.field_schema import FieldSchema  # ADD THIS
 from app.schemas.tag import TagCreate, TagUpdate, TagResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/tags", tags=["tags"])
 
@@ -53,8 +57,23 @@ async def get_user_for_testing(
         User object
 
     Raises:
-        HTTPException: If no user found
+        HTTPException: If no user found or if called in production
     """
+    # PRODUCTION GUARD: Block this testing helper in production environments
+    if settings.env == "production":
+        logger.error(
+            "get_user_for_testing() called in PRODUCTION environment - this is a security risk!"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Testing helper not available in production environment"
+        )
+
+    # Log usage in development/testing (for visibility)
+    logger.warning(
+        f"get_user_for_testing() called with user_id={user_id or 'None (defaulting to first user)'}"
+    )
+
     if user_id:
         # Use specified user ID
         stmt = select(User).where(User.id == user_id)
