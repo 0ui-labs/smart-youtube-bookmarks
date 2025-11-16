@@ -36,7 +36,7 @@ def mock_youtube_client():
 @pytest.mark.skip(reason="Gemini integration not yet implemented in video_processor (TODO at line 103)")
 @pytest.mark.asyncio
 async def test_process_video_with_gemini_extraction(
-    test_db, test_user, mock_session_factory, mock_youtube_client
+    test_db, test_user, arq_context, mock_youtube_client
 ):
     """
     Test that process_video extracts structured data using Gemini API.
@@ -128,18 +128,14 @@ async def test_process_video_with_gemini_extraction(
     mock_gemini_instance.count_tokens.return_value = 1500  # Mock token count
 
     with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
-        # Mock session factory
-        with patch(
-            "app.workers.video_processor.AsyncSessionLocal", mock_session_factory
-        ):
-            # Act: Process video
-            ctx = {"job_try": 1, "max_tries": 5}
-            result = await process_video(
-                ctx,
-                video_id=str(video.id),
-                list_id=str(bookmark_list.id),
-                schema=schema.fields,
-            )
+        # Act: Process video
+        ctx = {"job_try": 1, "max_tries": 5, "db": arq_context["db"]}
+        result = await process_video(
+            ctx,
+            video_id=str(video.id),
+            list_id=str(bookmark_list.id),
+            schema=schema.fields,
+        )
 
     # Assert: Video was updated with extracted data
     await test_db.refresh(video)
@@ -165,7 +161,7 @@ async def test_process_video_with_gemini_extraction(
 
 @pytest.mark.asyncio
 async def test_process_video_graceful_degradation_without_schema(
-    test_db, test_user, mock_session_factory, mock_youtube_client
+    test_db, test_user, arq_context, mock_youtube_client
 ):
     """
     Test that video processing works WITHOUT Gemini extraction when no schema.
@@ -204,13 +200,11 @@ async def test_process_video_graceful_degradation_without_schema(
     }
     mock_youtube_client.get_video_transcript.return_value = "Test transcript"
 
-    # Mock session factory
-    with patch("app.workers.video_processor.AsyncSessionLocal", mock_session_factory):
-        # Act: Process video
-        ctx = {"job_try": 1, "max_tries": 5}
-        result = await process_video(
-            ctx, video_id=str(video.id), list_id=str(bookmark_list.id), schema={}
-        )
+    # Act: Process video
+    ctx = {"job_try": 1, "max_tries": 5, "db": arq_context["db"]}
+    result = await process_video(
+        ctx, video_id=str(video.id), list_id=str(bookmark_list.id), schema={}, job_id=None
+    )
 
     # Assert: Video processed successfully WITHOUT Gemini extraction
     await test_db.refresh(video)
@@ -223,7 +217,7 @@ async def test_process_video_graceful_degradation_without_schema(
 
 @pytest.mark.asyncio
 async def test_process_video_handles_gemini_errors_gracefully(
-    test_db, test_user, mock_session_factory, mock_youtube_client
+    test_db, test_user, arq_context, mock_youtube_client
 ):
     """
     Test that Gemini extraction errors don't crash video processing.
@@ -282,14 +276,11 @@ async def test_process_video_handles_gemini_errors_gracefully(
     mock_gemini_instance.count_tokens.return_value = 1500
 
     with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
-        with patch(
-            "app.workers.video_processor.AsyncSessionLocal", mock_session_factory
-        ):
-            # Act: Process video
-            ctx = {"job_try": 1, "max_tries": 5}
-            result = await process_video(
-                ctx, video_id=str(video.id), list_id=str(bookmark_list.id), schema=schema.fields
-            )
+        # Act: Process video
+        ctx = {"job_try": 1, "max_tries": 5, "db": arq_context["db"]}
+        result = await process_video(
+            ctx, video_id=str(video.id), list_id=str(bookmark_list.id), schema=schema.fields
+        )
 
     # Assert: Video marked as completed with metadata, extraction error noted
     await test_db.refresh(video)
@@ -303,7 +294,7 @@ async def test_process_video_handles_gemini_errors_gracefully(
 
 @pytest.mark.asyncio
 async def test_process_video_list_propagates_schema_to_extraction(
-    test_db, test_user, mock_session_factory, mock_youtube_client
+    test_db, test_user, arq_context, mock_youtube_client
 ):
     """
     CRITICAL TEST: Verify schema is propagated through the entire pipeline.
@@ -410,16 +401,15 @@ async def test_process_video_list_propagates_schema_to_extraction(
     mock_redis.publish = AsyncMock(return_value=1)
 
     with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
-        with patch("app.workers.video_processor.AsyncSessionLocal", mock_session_factory):
-            # Act: Process videos with schema (NEW PARAMETER)
-            ctx = {"redis": mock_redis}
-            result = await process_video_list(
-                ctx,
-                job_id=str(job.id),
-                list_id=str(bookmark_list.id),
-                video_ids=[str(video1.id), str(video2.id)],
-                schema=schema.fields  # CRITICAL: Pass schema to worker
-            )
+        # Act: Process videos with schema (NEW PARAMETER)
+        ctx = {"redis": mock_redis, "db": arq_context["db"]}
+        result = await process_video_list(
+            ctx,
+            job_id=str(job.id),
+            list_id=str(bookmark_list.id),
+            video_ids=[str(video1.id), str(video2.id)],
+            schema=schema.fields  # CRITICAL: Pass schema to worker
+        )
 
     # Assert: Videos were processed successfully
     await test_db.refresh(video1)

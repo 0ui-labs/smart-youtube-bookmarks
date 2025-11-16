@@ -22,7 +22,7 @@ class ProcessingJob(BaseModel):
     processed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(
-        String(20),
+        String(30),
         nullable=False,
         default="running"
     )
