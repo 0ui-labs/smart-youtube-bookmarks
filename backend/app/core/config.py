@@ -87,6 +87,50 @@ class Settings(BaseSettings):
 
         return v
 
+    @field_validator("youtube_api_key")
+    @classmethod
+    def validate_youtube_api_key(cls, v: str, info) -> str:
+        """
+        Validate YouTube API key at startup.
+
+        In production, require API key to be set (non-empty).
+        In development, allow empty but warn if YouTube features are used.
+
+        Args:
+            v: YouTube API key value
+            info: Validation context
+
+        Returns:
+            Validated API key
+
+        Raises:
+            ValueError: If production environment has empty API key
+        """
+        import logging
+
+        # Get env from values being validated (same pattern as secret_key validator)
+        env = info.data.get("env", "development")
+
+        # Check if API key is empty
+        is_empty = not v or not v.strip()
+
+        # In production, reject empty API key
+        if env == "production" and is_empty:
+            raise ValueError(
+                "YouTube API key is required in production. "
+                "Set YOUTUBE_API_KEY environment variable."
+            )
+
+        # In development, warn if empty (features requiring YouTube API will fail)
+        if is_empty and env == "development":
+            logging.warning(
+                "YouTube API key not set. "
+                "Video metadata fetching will not work. "
+                "Set YOUTUBE_API_KEY environment variable to enable."
+            )
+
+        return v
+
     @field_validator("gemini_api_key")
     @classmethod
     def validate_gemini_api_key(cls, v: str, info) -> str:
@@ -107,10 +151,9 @@ class Settings(BaseSettings):
             ValueError: If production environment has empty API key
         """
         import logging
-        import os
 
-        # Get env from environment variable (info.data may not be populated yet)
-        env = os.getenv("ENV", "development")
+        # Get env from values being validated (same pattern as secret_key validator)
+        env = info.data.get("env", "development")
 
         # Check if API key is empty
         is_empty = not v or not v.strip()

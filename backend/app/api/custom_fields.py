@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis
+from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
 
 from app.core.database import get_db
 from app.core.config import settings
@@ -490,13 +491,20 @@ async def check_duplicate_field(
             if settings.gemini_api_key:
                 try:
                     gemini_client = GeminiClient(api_key=settings.gemini_api_key)
-                except Exception as e:
+                except (ValueError, OSError, RuntimeError) as e:
+                    # ValueError: Invalid API key format
+                    # OSError: Network/connection issues
+                    # RuntimeError: Gemini SDK initialization errors
                     logger.warning(f"Failed to initialize Gemini client: {e}")
 
             # Try to initialize Redis client
             try:
                 redis_client = Redis.from_url(settings.redis_url)
-            except Exception as e:
+            except (RedisError, RedisConnectionError, ValueError, OSError) as e:
+                # RedisError: Redis-specific errors
+                # RedisConnectionError: Connection failures
+                # ValueError: Invalid URL format
+                # OSError: Network issues
                 logger.warning(f"Failed to initialize Redis client: {e}")
 
             # Create detector
