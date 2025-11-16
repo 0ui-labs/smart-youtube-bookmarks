@@ -71,8 +71,12 @@ vi.mock('./hooks/useTags', () => ({
     isLoading: false,
     error: null,
   })),
-  useCreateTag: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useDeleteTag: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useCreateTag: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  useBulkApplySchema: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  tagsOptions: vi.fn(() => ({
+    queryKey: ['tags'],
+    queryFn: vi.fn(),
+  })),
 }));
 
 vi.mock('./stores/fieldFilterStore', () => ({
