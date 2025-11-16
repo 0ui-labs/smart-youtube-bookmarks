@@ -22,9 +22,22 @@ vi.mock('@/hooks/useVideos', () => ({
     isLoading: false,
     error: null,
   })),
-  useCreateVideo: vi.fn(() => ({ mutateAsync: vi.fn() })),
-  useDeleteVideo: vi.fn(() => ({ mutate: vi.fn() })),
+  useCreateVideo: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  useDeleteVideo: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  useBulkUploadVideos: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
   exportVideosCSV: vi.fn(),
+  useAssignTags: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  useUpdateVideoFieldValues: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  parseValidationError: vi.fn((err) => 'Validation error'),
+  videoKeys: {
+    all: ['videos'],
+    lists: () => ['videos', 'list'],
+    list: (listId: string) => ['videos', 'list', listId],
+    filtered: (listId: string, tagNames: string[]) => ['videos', 'list', listId, { tags: tagNames.sort() }],
+    withOptions: (listId: string, options: any) => ['videos', 'list', listId, options],
+    fieldValues: () => ['videos', 'field-values'],
+    videoFieldValues: (videoId: string) => ['videos', 'field-values', videoId],
+  },
 }))
 
 vi.mock('@/hooks/useTags', () => ({

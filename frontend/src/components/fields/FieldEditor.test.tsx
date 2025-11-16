@@ -18,12 +18,32 @@ vi.mock('@/hooks/useVideoFieldValues', () => ({
 
 // Mock parseValidationError from useVideos
 vi.mock('@/hooks/useVideos', () => ({
+  useVideos: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
+  useCreateVideo: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  useDeleteVideo: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  useBulkUploadVideos: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  exportVideosCSV: vi.fn(),
+  useAssignTags: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  useUpdateVideoFieldValues: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
   parseValidationError: vi.fn((err: any) => {
     if (err?.response?.status === 422 && err?.response?.data?.detail?.errors?.length > 0) {
       return err.response.data.detail.errors[0].error
     }
     return 'Validation failed'
   }),
+  videoKeys: {
+    all: ['videos'],
+    lists: () => ['videos', 'list'],
+    list: (listId: string) => ['videos', 'list', listId],
+    filtered: (listId: string, tagNames: string[]) => ['videos', 'list', listId, { tags: tagNames.sort() }],
+    withOptions: (listId: string, options: any) => ['videos', 'list', listId, options],
+    fieldValues: () => ['videos', 'field-values'],
+    videoFieldValues: (videoId: string) => ['videos', 'field-values', videoId],
+  },
 }))
 
 // Add timer mocks at the top level

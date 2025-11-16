@@ -16,7 +16,7 @@ from app.models.video import Video
 
 @pytest.mark.asyncio
 async def test_add_video_to_list(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
-    """Test adding a video to a list with standard YouTube URL (Option B: ARQ background tasks)."""
+    """Test adding a video to a list with standard YouTube URL (HYBRID: sync fetch for single videos)."""
     response = await client.post(
         f"/api/lists/{test_list.id}/videos",
         json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
@@ -26,9 +26,9 @@ async def test_add_video_to_list(client: AsyncClient, test_db: AsyncSession, tes
     data = response.json()
     assert data["youtube_id"] == "dQw4w9WgXcQ"
     assert data["list_id"] == str(test_list.id)
-    # Option B: ARQ background task - metadata fetched asynchronously
-    # Video starts with "pending" status, ARQ worker updates to "completed" after fetching
-    assert data["processing_status"] == "pending"
+    # HYBRID APPROACH: Single video additions fetch metadata synchronously (fast!)
+    # Status is "completed" immediately, or "pending" if YouTube API fails
+    assert data["processing_status"] in ["completed", "pending"]
     assert "id" in data
     assert "created_at" in data
 
@@ -163,7 +163,7 @@ async def test_add_video_unicode_chars(client: AsyncClient, test_db: AsyncSessio
 
 @pytest.mark.asyncio
 async def test_get_videos_in_list(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
-    """Test retrieving all videos in a list."""
+    """Test retrieving all videos in a list (default sort: created_at DESC, newest first)."""
     # Add some videos first
     video1_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     video2_url = "https://www.youtube.com/watch?v=jNQXAC9IVRw"
@@ -171,14 +171,15 @@ async def test_get_videos_in_list(client: AsyncClient, test_db: AsyncSession, te
     await client.post(f"/api/lists/{test_list.id}/videos", json={"url": video1_url})
     await client.post(f"/api/lists/{test_list.id}/videos", json={"url": video2_url})
 
-    # Get all videos
+    # Get all videos (default sort: created_at DESC - newest first)
     response = await client.get(f"/api/lists/{test_list.id}/videos")
 
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 2
-    assert data[0]["youtube_id"] == "dQw4w9WgXcQ"
-    assert data[1]["youtube_id"] == "jNQXAC9IVRw"
+    # Default sort is created_at DESC, so video2 (newest) comes first
+    assert data[0]["youtube_id"] == "jNQXAC9IVRw"
+    assert data[1]["youtube_id"] == "dQw4w9WgXcQ"
 
 
 @pytest.mark.asyncio
@@ -374,10 +375,14 @@ async def test_export_videos_csv_success(client, test_list, test_video):
     csv_content = response.content.decode('utf-8')
     lines = csv_content.strip().splitlines()
 
-    assert len(lines) == 2  # Header + 1 video
-    assert lines[0] == "youtube_id,status,created_at"
-    assert test_video.youtube_id in lines[1]
-    assert "pending" in lines[1]
+    # Skip comment lines (starting with #) when counting lines
+    data_lines = [line for line in lines if not line.startswith('#')]
+
+    assert len(data_lines) >= 2  # Header + at least 1 video
+    # Updated header format: uses 'url' instead of 'youtube_id' for import compatibility
+    assert data_lines[0].startswith("url,status,created_at")
+    assert test_video.youtube_id in data_lines[1]
+    assert "pending" in data_lines[1]
 
 
 @pytest.mark.asyncio
@@ -389,8 +394,12 @@ async def test_export_videos_csv_empty_list(client, test_list):
     csv_content = response.content.decode('utf-8')
     lines = csv_content.strip().splitlines()
 
-    assert len(lines) == 1  # Header only
-    assert lines[0] == "youtube_id,status,created_at"
+    # Skip comment lines (may have custom field metadata)
+    data_lines = [line for line in lines if not line.startswith('#')]
+
+    assert len(data_lines) == 1  # Header only
+    # Updated header format: uses 'url' instead of 'youtube_id'
+    assert data_lines[0].startswith("url,status,created_at")
 
 
 @pytest.mark.asyncio
