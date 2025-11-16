@@ -268,6 +268,10 @@ async def update_tag(
 
     await db.commit()
 
+    # Expire the tag to clear cached relationships
+    # This ensures re-query loads fresh data even with expire_on_commit=False
+    db.expire(tag)
+
     # REF MCP Improvement #4: Re-query with selectinload (no refresh needed)
     # Load nested schema_fields to avoid lazy loading issues
     stmt = (

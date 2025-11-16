@@ -167,13 +167,18 @@ async def test_delete_tag(client: AsyncClient, test_user):
 async def test_update_tag_bind_schema(client: AsyncClient, test_db, test_user, test_list, test_schema):
     """Test binding a schema to a tag."""
     # Create tag via API
-    create_response = await client.post("/api/tags", json={"name": "TestBindSchema", "color": "#FF0000"})
+    create_response = await client.post(
+        "/api/tags",
+        params={"user_id": str(test_user.id)},
+        json={"name": "TestBindSchema", "color": "#FF0000"}
+    )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
 
     # Bind schema
     response = await client.put(
         f"/api/tags/{tag_id}",
+        params={"user_id": str(test_user.id)},
         json={"schema_id": str(test_schema.id)}
     )
 
@@ -201,17 +206,26 @@ async def test_update_tag_change_schema(client: AsyncClient, test_db, test_user,
     await test_db.refresh(schema_b)
 
     # Create tag via API
-    create_response = await client.post("/api/tags", json={"name": "TestChangeSchema"})
+    create_response = await client.post(
+        "/api/tags",
+        params={"user_id": str(test_user.id)},
+        json={"name": "TestChangeSchema"}
+    )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
 
     # Bind to test_schema first
-    bind_response = await client.put(f"/api/tags/{tag_id}", json={"schema_id": str(test_schema.id)})
+    bind_response = await client.put(
+        f"/api/tags/{tag_id}",
+        params={"user_id": str(test_user.id)},
+        json={"schema_id": str(test_schema.id)}
+    )
     assert bind_response.status_code == 200
 
     # Change to schema B
     response = await client.put(
         f"/api/tags/{tag_id}",
+        params={"user_id": str(test_user.id)},
         json={"schema_id": str(schema_b.id)}
     )
 
@@ -227,16 +241,25 @@ async def test_update_tag_change_schema(client: AsyncClient, test_db, test_user,
 async def test_update_tag_unbind_schema(client: AsyncClient, test_db, test_user, test_schema):
     """Test unbinding schema with null."""
     # Create tag via API
-    create_response = await client.post("/api/tags", json={"name": "TestUnbindSchema"})
+    create_response = await client.post(
+        "/api/tags",
+        params={"user_id": str(test_user.id)},
+        json={"name": "TestUnbindSchema"}
+    )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
 
     # Bind schema first
-    await client.put(f"/api/tags/{tag_id}", json={"schema_id": str(test_schema.id)})
+    await client.put(
+        f"/api/tags/{tag_id}",
+        params={"user_id": str(test_user.id)},
+        json={"schema_id": str(test_schema.id)}
+    )
 
     # Unbind schema
     response = await client.put(
         f"/api/tags/{tag_id}",
+        params={"user_id": str(test_user.id)},
         json={"schema_id": None}
     )
 
@@ -252,13 +275,18 @@ async def test_update_tag_invalid_schema_id(client: AsyncClient, test_db, test_u
     from uuid import uuid4
 
     # Create tag via API
-    create_response = await client.post("/api/tags", json={"name": "TestInvalidSchema"})
+    create_response = await client.post(
+        "/api/tags",
+        params={"user_id": str(test_user.id)},
+        json={"name": "TestInvalidSchema"}
+    )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
 
     fake_schema_id = uuid4()
     response = await client.put(
         f"/api/tags/{tag_id}",
+        params={"user_id": str(test_user.id)},
         json={"schema_id": str(fake_schema_id)}
     )
 
@@ -296,13 +324,18 @@ async def test_update_tag_schema_from_different_list(client: AsyncClient, test_d
     await test_db.refresh(other_schema)
 
     # Create tag via API
-    create_response = await client.post("/api/tags", json={"name": "TestDifferentList"})
+    create_response = await client.post(
+        "/api/tags",
+        params={"user_id": str(test_user.id)},
+        json={"name": "TestDifferentList"}
+    )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
 
     # Try to bind schema from other user's list
     response = await client.put(
         f"/api/tags/{tag_id}",
+        params={"user_id": str(test_user.id)},
         json={"schema_id": str(other_schema.id)}
     )
 
@@ -314,18 +347,27 @@ async def test_update_tag_schema_from_different_list(client: AsyncClient, test_d
 async def test_update_tag_name_only_preserves_schema(client: AsyncClient, test_db, test_user, test_schema):
     """Test updating only name doesn't change schema_id."""
     # Create tag via API
-    create_response = await client.post("/api/tags", json={"name": "TestPreserveSchema"})
+    create_response = await client.post(
+        "/api/tags",
+        params={"user_id": str(test_user.id)},
+        json={"name": "TestPreserveSchema"}
+    )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
 
     # Bind schema
-    bind_response = await client.put(f"/api/tags/{tag_id}", json={"schema_id": str(test_schema.id)})
+    bind_response = await client.put(
+        f"/api/tags/{tag_id}",
+        params={"user_id": str(test_user.id)},
+        json={"schema_id": str(test_schema.id)}
+    )
     assert bind_response.status_code == 200
     assert bind_response.json()["schema_id"] == str(test_schema.id)
 
     # Update only name
     response = await client.put(
         f"/api/tags/{tag_id}",
+        params={"user_id": str(test_user.id)},
         json={"name": "NewNamePreserve"}
     )
 

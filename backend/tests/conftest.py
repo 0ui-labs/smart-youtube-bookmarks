@@ -99,7 +99,9 @@ async def client(test_db, mock_arq_pool, mock_redis_client):
     app.dependency_overrides[get_db] = override_get_db
 
     # Mock both get_arq_pool and get_redis_client to avoid Redis connection
+    # Patch for both videos and processing APIs
     with patch('app.api.videos.get_arq_pool', return_value=mock_arq_pool), \
+         patch('app.api.processing.get_arq_pool', return_value=mock_arq_pool), \
          patch('app.core.redis.get_redis_client', return_value=mock_redis_client):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
