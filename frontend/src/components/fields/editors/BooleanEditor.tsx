@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { cn } from '@/lib/utils'
 import { Field, FieldError } from '@/components/ui/field'
 
@@ -31,16 +32,17 @@ export const BooleanEditor = ({
   className,
 }: BooleanEditorProps) => {
   const isChecked = value === true
+  const checkboxId = useId()
 
   return (
     <Field data-invalid={!!error} className={className}>
       <div className="flex items-center gap-2">
         <input
+          id={checkboxId}
           type="checkbox"
           checked={isChecked}
           onChange={(e) => onChange(e.target.checked)}
           disabled={disabled}
-          aria-label={label}
           aria-invalid={!!error}
           className={cn(
             'h-4 w-4 rounded border-gray-300 text-primary',
@@ -50,8 +52,9 @@ export const BooleanEditor = ({
           )}
         />
         <label
+          htmlFor={checkboxId}
           className={cn(
-            'text-sm font-medium leading-none',
+            'text-sm font-medium leading-none cursor-pointer',
             disabled && 'cursor-not-allowed opacity-50',
             error && 'text-red-600'
           )}

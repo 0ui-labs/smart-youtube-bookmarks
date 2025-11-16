@@ -64,9 +64,12 @@ export function FieldFilterInput({
         {/* Operator selector */}
         <Select
           value={filter.operator}
-          onValueChange={(op) =>
-            updateFilter(filter.id, { operator: op as FilterOperator })
-          }
+          onValueChange={(op) => {
+            // Type guard: Only values from SelectItem are valid FilterOperators
+            if (op === 'gte' || op === 'lte' || op === 'eq') {
+              updateFilter(filter.id, { operator: op });
+            }
+          }}
         >
           <SelectTrigger className="w-[70px] h-7">
             <SelectValue />
