@@ -317,10 +317,7 @@ describe('VideosPage - Sorting (Task #146 Section 7)', () => {
         expect(screen.getByLabelText('Aufsteigend sortiert')).toBeInTheDocument()
       }, { timeout: 3000 })
 
-      // Wait for state to stabilize before second click
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      // Second click: descending
+      // Second click: descending (waitFor above ensures first click completed)
       await user.click(titleHeader)
 
       await waitFor(() => {
