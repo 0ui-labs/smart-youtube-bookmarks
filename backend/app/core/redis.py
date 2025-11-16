@@ -5,7 +5,7 @@ Provides singleton Redis client for pub/sub and caching operations.
 """
 
 import asyncio
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 import redis.asyncio as redis
 from arq import create_pool
 from arq.connections import RedisSettings, ArqRedis
@@ -79,13 +79,18 @@ async def get_arq_pool() -> ArqRedis:
         # Double-check: another coroutine might have initialized it
         if _arq_pool is None:
             # Parse Redis DSN manually (RedisSettings.from_dsn() doesn't exist)
-            from urllib.parse import parse_qs
             redis_dsn = urlparse(settings.redis_url)
 
             # Try to get db from query string first (e.g., ?db=5)
             query_params = parse_qs(redis_dsn.query)
             if 'db' in query_params and query_params['db']:
-                redis_db = int(query_params['db'][0])
+                db_value = query_params['db'][0].strip()
+                if not db_value.isdigit():
+                    raise ValueError(f"Invalid Redis database index in query string: {db_value}")
+                try:
+                    redis_db = int(db_value)
+                except ValueError:
+                    raise ValueError(f"Invalid Redis database index in query string: {db_value}")
             else:
                 # Fall back to path (e.g., /5)
                 db_str = redis_dsn.path.lstrip('/') if redis_dsn.path else ''

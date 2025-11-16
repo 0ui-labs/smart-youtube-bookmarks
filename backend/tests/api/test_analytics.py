@@ -7,7 +7,6 @@ Tests cover:
 - Field coverage percentage
 - Schema effectiveness metrics
 - Edge cases (empty lists, no data)
-- Performance (1000 videos)
 """
 import pytest
 from httpx import AsyncClient

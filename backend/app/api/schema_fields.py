@@ -282,7 +282,7 @@ async def batch_update_schema_fields(
 
     if len(final_show_on_card) > 3:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail=f"Batch update would result in {len(final_show_on_card)} fields with show_on_card=true. "
                    f"Maximum is 3. Please set show_on_card=false for {len(final_show_on_card) - 3} fields."
         )

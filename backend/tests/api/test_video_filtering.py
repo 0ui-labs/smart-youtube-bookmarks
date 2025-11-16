@@ -850,8 +850,7 @@ async def test_filter_videos_tags_and_fields(
     client: AsyncClient,
     test_list,
     test_field_rating,
-    test_db: AsyncSession,
-    test_user
+    test_db: AsyncSession
 ):
     """Filter videos with Tag 'Rust' AND Rating >= 4."""
     # Arrange: Create tag (use unique name to avoid conflicts with other tests)

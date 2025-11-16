@@ -366,24 +366,26 @@ async def _get_schema_effectiveness(
         if not video_ids:
             continue  # Skip schemas with no videos
 
-        # Count filled fields per video
-        # TECHNICAL DEBT: N+1 query pattern (1 query per video)
-        # Acceptable for MVP with <20 schemas and <1000 videos (<20k queries worst case)
-        # TODO: Optimize with window functions or CTE for larger datasets
-        total_filled = 0
-        for video_id in video_ids:
-            filled_stmt = (
-                select(func.count(VideoFieldValue.id))
-                .where(
-                    and_(
-                        VideoFieldValue.video_id == video_id,
-                        VideoFieldValue.field_id.in_(field_ids)
-                    )
+        # Count filled fields per video (optimized with GROUP BY)
+        # Fixed N+1 query pattern: single grouped query instead of 1 query per video
+        filled_stmt = (
+            select(
+                VideoFieldValue.video_id,
+                func.count(VideoFieldValue.id).label('filled_count')
+            )
+            .where(
+                and_(
+                    VideoFieldValue.video_id.in_(video_ids),
+                    VideoFieldValue.field_id.in_(field_ids)
                 )
             )
-            filled_result = await db.execute(filled_stmt)
-            filled_count = filled_result.scalar() or 0
-            total_filled += filled_count
+            .group_by(VideoFieldValue.video_id)
+        )
+        filled_result = await db.execute(filled_stmt)
+        filled_counts = {row.video_id: row.filled_count for row in filled_result}
+
+        # Sum filled counts across all videos
+        total_filled = sum(filled_counts.values())
 
         avg_fields_filled = total_filled / len(video_ids) if video_ids else 0.0
         # Round avg first, then compute completion from rounded value to satisfy validator
