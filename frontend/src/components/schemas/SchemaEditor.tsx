@@ -283,8 +283,8 @@ export function SchemaEditor({ listId, onSave, onCancel, initialData }: SchemaEd
             {fieldItems.map((field) => (
               <div key={field.field_id} className="flex items-center gap-3 rounded-md border p-3">
                 <div className="flex-1">
-                  <div className="font-medium">{field.field.name}</div>
-                  <div className="text-sm text-muted-foreground">{field.field.field_type}</div>
+                  <div className="font-medium">{field.field_name}</div>
+                  <div className="text-sm text-muted-foreground">{field.field_type}</div>
                 </div>
               </div>
             ))}

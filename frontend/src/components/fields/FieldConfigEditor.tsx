@@ -16,6 +16,7 @@
  * - Conditional rendering via switch statement
  */
 
+import { useEffect } from 'react'
 import { Control } from 'react-hook-form'
 import { FieldType } from '@/types/customField'
 import { SelectConfigEditor } from './SelectConfigEditor'
@@ -95,6 +96,13 @@ export function FieldConfigEditor({
   control,
   error,
 }: FieldConfigEditorProps) {
+  // Ensure empty config for boolean fields
+  useEffect(() => {
+    if (fieldType === 'boolean' && Object.keys(config).length > 0) {
+      onChange({})
+    }
+  }, [fieldType, config, onChange])
+
   switch (fieldType) {
     case 'select':
       // SelectConfigEditor requires control for useFieldArray
@@ -129,10 +137,7 @@ export function FieldConfigEditor({
 
     case 'boolean':
       // Boolean fields have no configuration
-      // onChange is called with empty object on mount
-      if (Object.keys(config).length > 0) {
-        onChange({}) // Ensure empty config for boolean
-      }
+      // Empty config is ensured via useEffect at component mount
       return null
 
     default:

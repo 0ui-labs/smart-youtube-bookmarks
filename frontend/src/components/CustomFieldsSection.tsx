@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AvailableFieldResponse, VideoFieldValue } from '@/types/video'
 import { FieldDisplay } from '@/components/fields'
 import { Button } from '@/components/ui/button'
@@ -84,13 +84,15 @@ export const CustomFieldsSection = ({
   }, {} as Record<string, AvailableFieldResponse[]>)
 
   // Initialize all schemas as expanded on first render
-  if (availableFields.length > 0 && Object.keys(openSchemas).length === 0) {
-    const initialOpenState = Object.keys(groupedFields).reduce((acc, schemaName) => {
-      acc[schemaName] = true
-      return acc
-    }, {} as Record<string, boolean>)
-    setOpenSchemas(initialOpenState)
-  }
+  useEffect(() => {
+    if (availableFields.length > 0 && Object.keys(openSchemas).length === 0) {
+      const initialOpenState = Object.keys(groupedFields).reduce((acc, schemaName) => {
+        acc[schemaName] = true
+        return acc
+      }, {} as Record<string, boolean>)
+      setOpenSchemas(initialOpenState)
+    }
+  }, [availableFields.length, openSchemas, groupedFields])
 
   // No fields message
   if (availableFields.length === 0) {
