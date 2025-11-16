@@ -185,7 +185,7 @@
 **Beispiel completion:**
 ```markdown
 # time_tracking.csv - CSV-Eintrag:
-2025-11-14,#138,08:30,10:15,105 min
+2025-11-14,#138,08:30,10:15,105
 
 # status.md - PLAN Sektion:
 138. [x] Implement FieldsList component

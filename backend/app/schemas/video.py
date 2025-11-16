@@ -51,16 +51,45 @@ class FieldFilter(BaseModel):
 
     @model_validator(mode='after')
     def validate_operator_values(self) -> 'FieldFilter':
-        """Validate that required values are present for each operator."""
+        """Validate that required values are present and have correct types for each operator."""
+        # BETWEEN operator validation
         if self.operator == FieldFilterOperator.BETWEEN:
             if self.value_min is None or self.value_max is None:
                 raise ValueError("BETWEEN operator requires both value_min and value_max")
+            # Type check: must be int, not bool (bool is subclass of int in Python)
+            if isinstance(self.value_min, bool) or isinstance(self.value_max, bool):
+                raise ValueError("BETWEEN operator requires integer values, not boolean")
+            if not isinstance(self.value_min, int) or not isinstance(self.value_max, int):
+                raise ValueError("BETWEEN operator requires integer values for value_min and value_max")
             if self.value_min > self.value_max:
                 raise ValueError("value_min must be <= value_max")
-        else:
-            # All other operators require value field
+
+        # Numeric comparison operators (for rating fields)
+        elif self.operator in (FieldFilterOperator.GT, FieldFilterOperator.GTE,
+                               FieldFilterOperator.LT, FieldFilterOperator.LTE):
             if self.value is None:
                 raise ValueError(f"{self.operator.value} operator requires 'value' field")
+            # Type check: must be int, not bool
+            if isinstance(self.value, bool):
+                raise ValueError(f"{self.operator.value} operator requires integer value, not boolean")
+            if not isinstance(self.value, int):
+                raise ValueError(f"{self.operator.value} operator requires integer value")
+
+        # Text operators (for text fields)
+        elif self.operator in (FieldFilterOperator.CONTAINS, FieldFilterOperator.EXACT,
+                               FieldFilterOperator.IN):
+            if self.value is None:
+                raise ValueError(f"{self.operator.value} operator requires 'value' field")
+            if not isinstance(self.value, str):
+                raise ValueError(f"{self.operator.value} operator requires string value")
+
+        # Boolean operator (for boolean fields)
+        elif self.operator == FieldFilterOperator.IS:
+            if self.value is None:
+                raise ValueError(f"{self.operator.value} operator requires 'value' field")
+            if not isinstance(self.value, bool):
+                raise ValueError(f"{self.operator.value} operator requires boolean value")
+
         return self
 
     model_config = ConfigDict(
