@@ -97,8 +97,8 @@ describe('FieldDisplay', () => {
       const fieldValue = createRatingFieldValue(4)
       render(<FieldDisplay fieldValue={fieldValue} />)
 
-      // Check for ARIA label (RatingStars component uses role="group")
-      const ratingGroup = screen.getByRole('group', { name: /overall rating/i })
+      // Check for ARIA label (RatingStars component uses role="radiogroup")
+      const ratingGroup = screen.getByRole('radiogroup', { name: /overall rating/i })
       expect(ratingGroup).toBeInTheDocument()
     })
 
@@ -106,8 +106,8 @@ describe('FieldDisplay', () => {
       const fieldValue = createRatingFieldValue(3)
       render(<FieldDisplay fieldValue={fieldValue} />)
 
-      // RatingStars renders buttons for each star (1-5)
-      const starButtons = screen.getAllByRole('button')
+      // RatingStars renders radio buttons for each star (1-5)
+      const starButtons = screen.getAllByRole('radio')
       expect(starButtons).toHaveLength(5) // max_rating = 5
     })
 
@@ -118,7 +118,7 @@ describe('FieldDisplay', () => {
       render(<FieldDisplay fieldValue={fieldValue} onChange={onChange} />)
 
       // Click on star 5
-      const star5Button = screen.getByRole('button', { name: /5 stars/i })
+      const star5Button = screen.getByRole('radio', { name: /5 stars/i })
       star5Button.click()
 
       expect(onChange).toHaveBeenCalledWith(5)
@@ -130,7 +130,7 @@ describe('FieldDisplay', () => {
       render(<FieldDisplay fieldValue={fieldValue} />)
 
       // Should render with 0 stars
-      const ratingGroup = screen.getByRole('group', { name: /overall rating: 0 out of 5/i })
+      const ratingGroup = screen.getByRole('radiogroup', { name: /overall rating: 0 out of 5/i })
       expect(ratingGroup).toBeInTheDocument()
     })
 
@@ -380,8 +380,8 @@ describe('FieldDisplay', () => {
       const ratingField = createRatingFieldValue(4)
       const { rerender } = render(<FieldDisplay fieldValue={ratingField} readonly />)
 
-      // RatingStars in readonly mode: buttons are disabled
-      const starButtons = screen.getAllByRole('button')
+      // RatingStars in readonly mode: radio buttons are disabled
+      const starButtons = screen.getAllByRole('radio')
       starButtons.forEach((button) => {
         expect(button).toBeDisabled()
       })

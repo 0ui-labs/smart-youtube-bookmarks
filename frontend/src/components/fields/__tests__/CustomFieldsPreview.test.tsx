@@ -283,7 +283,7 @@ describe('CustomFieldsPreview - Field Type Rendering', () => {
     expect(screen.getByText('Quality Rating:')).toBeInTheDocument()
 
     // Check stars are rendered (5 star buttons)
-    const stars = screen.getAllByRole('button').filter(btn =>
+    const stars = screen.getAllByRole('radio').filter(btn =>
       btn.getAttribute('aria-label')?.includes('star')
     )
     expect(stars).toHaveLength(5)
@@ -369,7 +369,7 @@ describe('CustomFieldsPreview - Edge Cases', () => {
     expect(screen.getByText('Recommended:')).toBeInTheDocument()
 
     // Rating should show 0 stars filled
-    const stars = screen.getAllByRole('button').filter(btn =>
+    const stars = screen.getAllByRole('radio').filter(btn =>
       btn.getAttribute('aria-label')?.includes('star')
     )
     expect(stars).toHaveLength(5)

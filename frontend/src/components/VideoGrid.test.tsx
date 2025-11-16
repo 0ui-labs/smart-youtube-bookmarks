@@ -1,8 +1,25 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { BrowserRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { VideoGrid } from './VideoGrid'
 import type { VideoResponse } from '@/types/video'
 import type { GridColumnCount } from '@/stores/tableSettingsStore'
+
+// Helper to wrap components with Router and QueryClientProvider
+function Wrapper({ children }: { children: React.ReactNode }) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>{children}</BrowserRouter>
+    </QueryClientProvider>
+  )
+}
 
 const mockVideos: VideoResponse[] = [
   {
@@ -36,7 +53,8 @@ const mockVideos: VideoResponse[] = [
 describe('VideoGrid', () => {
   it('renders grid with responsive columns', () => {
     const { container } = render(
-      <VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />
+      <VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />,
+      { wrapper: Wrapper }
     )
 
     const grid = container.querySelector('.video-grid')
@@ -49,7 +67,8 @@ describe('VideoGrid', () => {
   // REF MCP #6: Responsive gap spacing
   it('uses responsive gap spacing (gap-4 on mobile, gap-6 on desktop)', () => {
     const { container } = render(
-      <VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />
+      <VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />,
+      { wrapper: Wrapper }
     )
 
     const grid = container.querySelector('.video-grid')
@@ -58,7 +77,10 @@ describe('VideoGrid', () => {
   })
 
   it('renders VideoCard for each video', () => {
-    render(<VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />)
+    render(
+      <VideoGrid videos={mockVideos} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />,
+      { wrapper: Wrapper }
+    )
 
     expect(screen.getByText('Video 1')).toBeInTheDocument()
     expect(screen.getByText('Video 2')).toBeInTheDocument()
@@ -67,7 +89,8 @@ describe('VideoGrid', () => {
   // REF MCP #5: Enhanced empty state
   it('shows enhanced empty state when no videos', () => {
     const { container } = render(
-      <VideoGrid videos={[]} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />
+      <VideoGrid videos={[]} gridColumns={3} onVideoClick={vi.fn()} onDeleteVideo={vi.fn()} />,
+      { wrapper: Wrapper }
     )
 
     expect(screen.getByText('Keine Videos im Grid')).toBeInTheDocument()
@@ -87,7 +110,8 @@ describe('VideoGrid', () => {
         videos={mockVideos}
         gridColumns={3}
         onDeleteVideo={onDeleteVideo}
-      />
+      />,
+      { wrapper: Wrapper }
     )
 
     // VideoCard should receive onDeleteVideo prop
@@ -120,7 +144,8 @@ describe('grid column configuration', () => {
         gridColumns={2}
         onVideoClick={vi.fn()}
         onDeleteVideo={vi.fn()}
-      />
+      />,
+      { wrapper: Wrapper }
     )
 
     const grid = container.querySelector('.video-grid')
@@ -141,7 +166,8 @@ describe('grid column configuration', () => {
         gridColumns={3}
         onVideoClick={vi.fn()}
         onDeleteVideo={vi.fn()}
-      />
+      />,
+      { wrapper: Wrapper }
     )
 
     const grid = container.querySelector('.video-grid')
@@ -160,7 +186,8 @@ describe('grid column configuration', () => {
         gridColumns={4}
         onVideoClick={vi.fn()}
         onDeleteVideo={vi.fn()}
-      />
+      />,
+      { wrapper: Wrapper }
     )
 
     const grid = container.querySelector('.video-grid')
@@ -179,7 +206,8 @@ describe('grid column configuration', () => {
         gridColumns={5}
         onVideoClick={vi.fn()}
         onDeleteVideo={vi.fn()}
-      />
+      />,
+      { wrapper: Wrapper }
     )
 
     const grid = container.querySelector('.video-grid')

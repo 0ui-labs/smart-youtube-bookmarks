@@ -30,7 +30,7 @@ describe('RatingStars Component', () => {
   describe('Rendering', () => {
     it('renders correct number of stars based on maxRating', () => {
       render(<RatingStars {...defaultProps} maxRating={5} />)
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       expect(buttons).toHaveLength(5)
     })
 
@@ -69,7 +69,7 @@ describe('RatingStars Component', () => {
 
     it('renders correct number of stars for custom maxRating', () => {
       render(<RatingStars {...defaultProps} maxRating={10} />)
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       expect(buttons).toHaveLength(10)
     })
   })
@@ -79,7 +79,7 @@ describe('RatingStars Component', () => {
       const user = userEvent.setup()
       render(<RatingStars {...defaultProps} />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       await user.click(buttons[4]) // Click 5th star
 
       expect(defaultProps.onChange).toHaveBeenCalledWith(5)
@@ -90,7 +90,7 @@ describe('RatingStars Component', () => {
       const user = userEvent.setup()
       render(<RatingStars {...defaultProps} />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       await user.click(buttons[2]) // Click 3rd star
 
       expect(defaultProps.onChange).toHaveBeenCalledWith(3)
@@ -104,7 +104,7 @@ describe('RatingStars Component', () => {
         <RatingStars {...defaultProps} value={2} maxRating={5} />
       )
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       await user.hover(buttons[4]) // Hover 5th star
 
       const stars = container.querySelectorAll('svg')
@@ -120,7 +120,7 @@ describe('RatingStars Component', () => {
         <RatingStars {...defaultProps} value={2} maxRating={5} />
       )
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       await user.hover(buttons[4])
       await user.unhover(buttons[4])
 
@@ -137,7 +137,7 @@ describe('RatingStars Component', () => {
       const user = userEvent.setup()
       render(<RatingStars {...defaultProps} value={3} maxRating={5} />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons[2].focus() // Focus 3rd star (value=3)
 
       await user.keyboard('{ArrowRight}')
@@ -149,7 +149,7 @@ describe('RatingStars Component', () => {
       const user = userEvent.setup()
       render(<RatingStars {...defaultProps} value={3} maxRating={5} />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons[2].focus() // Focus 3rd star (value=3)
 
       await user.keyboard('{ArrowLeft}')
@@ -161,7 +161,7 @@ describe('RatingStars Component', () => {
       const user = userEvent.setup()
       render(<RatingStars {...defaultProps} value={0} maxRating={5} />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons[0].focus()
 
       await user.keyboard('{ArrowLeft}')
@@ -173,7 +173,7 @@ describe('RatingStars Component', () => {
       const user = userEvent.setup()
       render(<RatingStars {...defaultProps} value={5} maxRating={5} />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons[4].focus()
 
       await user.keyboard('{ArrowRight}')
@@ -185,7 +185,7 @@ describe('RatingStars Component', () => {
       const user = userEvent.setup()
       render(<RatingStars {...defaultProps} value={3} maxRating={5} />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons[2].focus()
 
       await user.keyboard('{Enter}')
@@ -197,7 +197,7 @@ describe('RatingStars Component', () => {
       const user = userEvent.setup()
       render(<RatingStars {...defaultProps} value={3} maxRating={5} />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons[2].focus()
 
       await user.keyboard(' ')
@@ -211,7 +211,7 @@ describe('RatingStars Component', () => {
       const user = userEvent.setup()
       render(<RatingStars {...defaultProps} readonly />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       await user.click(buttons[4])
 
       expect(defaultProps.onChange).not.toHaveBeenCalled()
@@ -220,16 +220,16 @@ describe('RatingStars Component', () => {
     it('disables all buttons in read-only mode', () => {
       render(<RatingStars {...defaultProps} readonly />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons.forEach((button) => {
         expect(button).toBeDisabled()
       })
     })
 
-    it('has role="group" with aria-label', () => {
+    it('has role="radiogroup" with aria-label', () => {
       render(<RatingStars {...defaultProps} readonly />)
 
-      const group = screen.getByRole('group')
+      const group = screen.getByRole('radiogroup')
       expect(group).toHaveAttribute('aria-label')
     })
 
@@ -237,7 +237,7 @@ describe('RatingStars Component', () => {
       const user = userEvent.setup()
       render(<RatingStars {...defaultProps} readonly value={3} />)
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons[2].focus()
 
       await user.keyboard('{ArrowRight}')
@@ -251,7 +251,7 @@ describe('RatingStars Component', () => {
         <RatingStars {...defaultProps} readonly value={2} maxRating={5} />
       )
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       await user.hover(buttons[4])
 
       const stars = container.querySelectorAll('svg')
@@ -299,11 +299,11 @@ describe('RatingStars Component', () => {
   })
 
   describe('REF MCP Improvements', () => {
-    it('REF MCP #1: Has aria-pressed on buttons', () => {
+    it('REF MCP #1: Has aria-checked on radio buttons', () => {
       render(<RatingStars {...defaultProps} maxRating={3} />)
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons.forEach((button) => {
-        expect(button).toHaveAttribute('aria-pressed')
+        expect(button).toHaveAttribute('aria-checked')
       })
     })
 
@@ -327,7 +327,7 @@ describe('RatingStars Component', () => {
         </div>
       )
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       await user.click(buttons[0])
 
       // Parent click should not be triggered
@@ -344,7 +344,7 @@ describe('RatingStars Component', () => {
         </div>
       )
 
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons[0].focus()
 
       await user.keyboard('{ArrowRight}')
@@ -370,7 +370,7 @@ describe('RatingStars Component', () => {
   describe('Accessibility', () => {
     it('has proper group role with aria-label', () => {
       render(<RatingStars {...defaultProps} />)
-      const group = screen.getByRole('group')
+      const group = screen.getByRole('radiogroup')
       expect(group).toHaveAttribute(
         'aria-label',
         expect.stringContaining('Overall Rating')
@@ -379,7 +379,7 @@ describe('RatingStars Component', () => {
 
     it('aria-label includes current value and max rating', () => {
       render(<RatingStars {...defaultProps} value={3} maxRating={5} />)
-      const group = screen.getByRole('group')
+      const group = screen.getByRole('radiogroup')
       expect(group).toHaveAttribute('aria-label', 'Overall Rating: 3 out of 5')
     })
 
@@ -387,23 +387,25 @@ describe('RatingStars Component', () => {
       render(
         <RatingStars {...defaultProps} value={null} maxRating={5} />
       )
-      const group = screen.getByRole('group')
+      const group = screen.getByRole('radiogroup')
       expect(group).toHaveAttribute('aria-label', 'Overall Rating: 0 out of 5')
     })
 
-    it('buttons are focusable when editable', () => {
-      render(<RatingStars {...defaultProps} maxRating={3} />)
-      const buttons = screen.getAllByRole('button')
-      buttons.forEach((button) => {
-        expect(button).toHaveAttribute('tabIndex', '0')
-      })
+    it('uses roving tabindex (only selected radio is focusable)', () => {
+      render(<RatingStars {...defaultProps} value={2} maxRating={3} />)
+      const buttons = screen.getAllByRole('radio')
+
+      // Roving tabindex: only the selected radio (value=2, index 1) is focusable
+      expect(buttons[0]).toHaveAttribute('tabIndex', '-1') // Star 1 (not selected)
+      expect(buttons[1]).toHaveAttribute('tabIndex', '0')  // Star 2 (selected - focusable)
+      expect(buttons[2]).toHaveAttribute('tabIndex', '-1') // Star 3 (not selected)
     })
 
     it('buttons are not focusable when readonly', () => {
       render(
         <RatingStars {...defaultProps} readonly maxRating={3} />
       )
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       buttons.forEach((button) => {
         expect(button).toHaveAttribute('tabIndex', '-1')
       })
@@ -413,13 +415,13 @@ describe('RatingStars Component', () => {
   describe('Edge Cases', () => {
     it('handles maxRating of 1', () => {
       render(<RatingStars {...defaultProps} value={1} maxRating={1} />)
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       expect(buttons).toHaveLength(1)
     })
 
     it('handles maxRating of 10', () => {
       render(<RatingStars {...defaultProps} value={7} maxRating={10} />)
-      const buttons = screen.getAllByRole('button')
+      const buttons = screen.getAllByRole('radio')
       expect(buttons).toHaveLength(10)
     })
 
@@ -440,7 +442,7 @@ describe('RatingStars Component', () => {
       const { container } = render(
         <RatingStars {...defaultProps} className="custom-class" maxRating={3} />
       )
-      const group = container.querySelector('[role="group"]')
+      const group = container.querySelector('[role="radiogroup"]')
       expect(group).toHaveClass('custom-class')
     })
   })

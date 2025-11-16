@@ -1,7 +1,21 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SchemasList } from './SchemasList'
 import type { FieldSchemaResponse } from '@/types/schema'
+
+// Helper to wrap components with QueryClientProvider
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+  return ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  )
+}
 
 const mockSchemas: FieldSchemaResponse[] = [
   {
@@ -51,10 +65,9 @@ describe('SchemasList', () => {
     render(
       <SchemasList
         schemas={mockSchemas}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-        onDuplicate={vi.fn()}
-      />
+        listId="list-1"
+      />,
+      { wrapper: createWrapper() }
     )
 
     expect(screen.getByText('Makeup Tutorial Criteria')).toBeInTheDocument()
@@ -65,31 +78,25 @@ describe('SchemasList', () => {
     const { container } = render(
       <SchemasList
         schemas={mockSchemas}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-        onDuplicate={vi.fn()}
-      />
+        listId="list-1"
+      />,
+      { wrapper: createWrapper() }
     )
 
     const grid = container.querySelector('.grid')
     expect(grid).toBeInTheDocument()
   })
 
-  it('passes action handlers to SchemaCard', () => {
-    const onEdit = vi.fn()
-    const onDelete = vi.fn()
-    const onDuplicate = vi.fn()
-
+  it('renders action menus for all schema cards', () => {
     render(
       <SchemasList
         schemas={mockSchemas}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onDuplicate={onDuplicate}
-      />
+        listId="list-1"
+      />,
+      { wrapper: createWrapper() }
     )
 
-    // Verify cards render (handlers tested in SchemaCard.test.tsx)
+    // Verify cards render with action menus
     expect(screen.getAllByRole('button', { name: /actions for/i })).toHaveLength(2)
   })
 
@@ -97,10 +104,9 @@ describe('SchemasList', () => {
     const { container } = render(
       <SchemasList
         schemas={[]}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-        onDuplicate={vi.fn()}
-      />
+        listId="list-1"
+      />,
+      { wrapper: createWrapper() }
     )
 
     const grid = container.querySelector('.grid')
