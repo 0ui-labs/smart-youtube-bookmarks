@@ -17,7 +17,7 @@ interface ValidationIssue {
   message: string;
   path: (string | number)[];
   maximum?: number;
-  type?: string;
+  type?: 'string' | 'number' | 'bigint' | 'date' | 'array' | 'set';
   inclusive?: boolean;
 }
 
@@ -79,21 +79,29 @@ export function validateShowOnCardLimit(fields: SchemaField[]): ValidationIssue 
  */
 export function validateUniqueDisplayOrder(fields: SchemaField[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  const orders = fields.map(f => f.display_order);
 
-  // Find all duplicate orders
-  const duplicateOrders = orders.filter((order, index) =>
-    orders.indexOf(order) !== index
-  );
+  // Use Map for O(n) complexity instead of O(n²)
+  const orderMap = new Map<number, number[]>();
 
-  // Create an issue for each duplicate (pointing to the last occurrence)
-  duplicateOrders.forEach((order) => {
-    const index = orders.lastIndexOf(order);
-    issues.push({
-      code: 'custom',
-      message: `Anzeigereihenfolge ${order} ist bereits vergeben`,
-      path: [index, 'display_order'], // Point to specific field
-    });
+  // Build map of display_order -> array of indices
+  fields.forEach((field, index) => {
+    const indices = orderMap.get(field.display_order) || [];
+    indices.push(index);
+    orderMap.set(field.display_order, indices);
+  });
+
+  // Emit issues for all duplicates except the first occurrence
+  orderMap.forEach((indices, order) => {
+    if (indices.length > 1) {
+      // Skip first occurrence, report rest as duplicates
+      indices.slice(1).forEach(index => {
+        issues.push({
+          code: 'custom',
+          message: `Anzeigereihenfolge ${order} ist bereits vergeben`,
+          path: [index, 'display_order'],
+        });
+      });
+    }
   });
 
   return issues;
@@ -120,19 +128,29 @@ export function validateUniqueDisplayOrder(fields: SchemaField[]): ValidationIss
  */
 export function validateUniqueFieldIds(fields: SchemaField[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  const ids = fields.map(f => f.field_id);
 
-  // Find all duplicate IDs
-  const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+  // Use Map for O(n) complexity instead of O(n²)
+  const idMap = new Map<string, number[]>();
 
-  // Create an issue for each duplicate (pointing to the last occurrence)
-  duplicateIds.forEach((id) => {
-    const index = ids.lastIndexOf(id);
-    issues.push({
-      code: 'custom',
-      message: 'Dieses Feld wurde bereits hinzugefügt',
-      path: [index, 'field_id'], // Point to specific field
-    });
+  // Build map of field_id -> array of indices
+  fields.forEach((field, index) => {
+    const indices = idMap.get(field.field_id) || [];
+    indices.push(index);
+    idMap.set(field.field_id, indices);
+  });
+
+  // Emit issues for all duplicates except the first occurrence
+  idMap.forEach((indices) => {
+    if (indices.length > 1) {
+      // Skip first occurrence, report rest as duplicates
+      indices.slice(1).forEach(index => {
+        issues.push({
+          code: 'custom',
+          message: 'Dieses Feld wurde bereits hinzugefügt',
+          path: [index, 'field_id'],
+        });
+      });
+    }
   });
 
   return issues;
@@ -161,14 +179,14 @@ export function validateAllSchemaFields(
   // Check 1: Max 3 show_on_card
   const showOnCardIssue = validateShowOnCardLimit(fields);
   if (showOnCardIssue) {
-    ctx.addIssue(showOnCardIssue);
+    ctx.addIssue(showOnCardIssue as any);
   }
 
   // Check 2: Unique display_order
   const displayOrderIssues = validateUniqueDisplayOrder(fields);
-  displayOrderIssues.forEach(issue => ctx.addIssue(issue));
+  displayOrderIssues.forEach(issue => ctx.addIssue(issue as any));
 
   // Check 3: Unique field_id
   const fieldIdIssues = validateUniqueFieldIds(fields);
-  fieldIdIssues.forEach(issue => ctx.addIssue(issue));
+  fieldIdIssues.forEach(issue => ctx.addIssue(issue as any));
 }

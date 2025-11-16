@@ -6,6 +6,14 @@ import type {
   VideoFieldValue,
 } from '@/types/video'
 
+// Mock field metadata lookup for realistic test data
+const mockFieldMetadata = new Map([
+  ['field-1', { name: 'Overall Rating', field_type: 'rating' as const, config: { max_rating: 5 } }],
+  ['field-2', { name: 'Quality', field_type: 'select' as const, config: { options: ['bad', 'good', 'great'] } }],
+  ['field-3', { name: 'Notes', field_type: 'text' as const, config: { max_length: 500 } }],
+  ['field-4', { name: 'Watched', field_type: 'boolean' as const, config: {} }],
+])
+
 // Mock data
 const mockVideoFieldValues: VideoFieldValue[] = [
   {
@@ -126,24 +134,32 @@ export const videosHandlers = [
     // Simulate successful update
     const response: BatchUpdateFieldValuesResponse = {
       updated_count: body.field_values.length,
-      field_values: body.field_values.map((update, index) => ({
-        id: `fv-${index + 1}`,
-        video_id: videoId as string,
-        field_id: update.field_id,
-        field_name: `Field ${index + 1}`,
-        show_on_card: true,
-        field: {
-          id: update.field_id,
-          list_id: 'list-123',
+      field_values: body.field_values.map((update, index) => {
+        const metadata = mockFieldMetadata.get(update.field_id) || {
           name: `Field ${index + 1}`,
-          field_type: 'rating',
-          config: { max_rating: 5 },
-          created_at: '2025-11-06T10:00:00Z',
-          updated_at: '2025-11-06T10:00:00Z',
-        },
-        value: update.value,
-        updated_at: new Date().toISOString(),
-      })),
+          field_type: 'text' as const,
+          config: {},
+        }
+
+        return {
+          id: `fv-${index + 1}`,
+          video_id: videoId as string,
+          field_id: update.field_id,
+          field_name: metadata.name,
+          show_on_card: true,
+          field: {
+            id: update.field_id,
+            list_id: 'list-123',
+            name: metadata.name,
+            field_type: metadata.field_type,
+            config: metadata.config as Record<string, any>,
+            created_at: '2025-11-06T10:00:00Z',
+            updated_at: '2025-11-06T10:00:00Z',
+          },
+          value: update.value,
+          updated_at: new Date().toISOString(),
+        }
+      }) as any,
     }
 
     return HttpResponse.json(response)

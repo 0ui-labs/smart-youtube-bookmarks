@@ -135,7 +135,7 @@ This file maintains **two separate lists**: PLAN and LOG.
 55. [ ] Implement VideoCard progressive badge reveal (skeleton → shimmer → sparkle)
 56. [ ] Add scope-based analysis execution (only relevant analyses run)
 57. [ ] Create toast notification for bulk analysis progress (collapsible)
-58a. [ ] Implement VideoDetailsModal with live AI progress during analysis
+58  [ ] Implement VideoDetailsModal with live AI progress during analysis
 
 **Phase 3: Settings Page - Analysis Management (~4-6h)**
 

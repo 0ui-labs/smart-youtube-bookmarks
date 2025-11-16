@@ -9,14 +9,24 @@ import type {
   ApiErrorResponse,
 } from '@/types/schema'
 
-// Mock field metadata lookup for realistic test data
-const mockFieldMetadata = new Map([
-  ['field-1', { name: 'Presentation', field_type: 'rating' as const, config: { max_rating: 10 } }],
-  ['field-2', { name: 'Content', field_type: 'rating' as const, config: { max_rating: 10 } }],
-  ['field-3', { name: 'Notes', field_type: 'text' as const, config: { max_length: 500 } }],
-  ['field-4', { name: 'Watched', field_type: 'boolean' as const, config: {} }],
-  ['field-5', { name: 'Quality', field_type: 'select' as const, config: { options: ['poor', 'good', 'great'] } }],
-])
+// Counter to prevent ID collisions in tests
+let schemaIdCounter = 0
+
+/**
+ * Validate show_on_card limit (max 3 fields)
+ * @param schema - The schema to validate
+ * @param excludeFieldId - Optional field ID to exclude from count (for updates)
+ * @returns true if limit would be exceeded
+ */
+const validateShowOnCardLimit = (
+  schema: FieldSchemaResponse,
+  excludeFieldId?: string
+): boolean => {
+  const showOnCardCount = schema.schema_fields.filter(
+    (sf) => sf.show_on_card && sf.field_id !== excludeFieldId
+  ).length
+  return showOnCardCount >= 3
+}
 
 // Mock data
 const mockSchemas: FieldSchemaResponse[] = [
@@ -99,8 +109,9 @@ export const schemasHandlers = [
       )
     }
 
+    const schemaId = `schema-${Date.now()}-${++schemaIdCounter}`
     const newSchema: FieldSchemaResponse = {
-      id: `schema-${Date.now()}`,
+      id: schemaId,
       name: body.name,
       description: body.description ?? null,
       list_id: listId as string,
@@ -108,7 +119,7 @@ export const schemasHandlers = [
       updated_at: new Date().toISOString(),
       schema_fields: body.fields?.map((f, index) => ({
         field_id: f.field_id,
-        schema_id: `schema-${Date.now()}`,
+        schema_id: schemaId,
         display_order: f.display_order ?? index,
         show_on_card: f.show_on_card ?? false,
         field: {
@@ -140,10 +151,11 @@ export const schemasHandlers = [
       )
     }
 
-    const updatedSchema = {
-      ...mockSchemas[schemaIndex],
-      name: body.name ?? mockSchemas[schemaIndex].name,
-      description: body.description ?? mockSchemas[schemaIndex].description,
+    const existingSchema = mockSchemas[schemaIndex]!
+    const updatedSchema: FieldSchemaResponse = {
+      ...existingSchema,
+      name: body.name ?? existingSchema.name,
+      description: body.description ?? existingSchema.description,
       updated_at: new Date().toISOString(),
     }
 
@@ -195,8 +207,7 @@ export const schemasHandlers = [
       }
 
       // Check max 3 show_on_card
-      const showOnCardCount = schema.schema_fields.filter((sf) => sf.show_on_card).length
-      if (body.show_on_card && showOnCardCount >= 3) {
+      if (body.show_on_card && validateShowOnCardLimit(schema)) {
         return HttpResponse.json<ApiErrorResponse>(
           { detail: 'Max 3 fields can have show_on_card=true' },
           { status: 409 }
@@ -249,10 +260,7 @@ export const schemasHandlers = [
 
       // Check max 3 show_on_card if toggling
       if (body.show_on_card !== undefined) {
-        const showOnCardCount = schema.schema_fields.filter(
-          (sf) => sf.show_on_card && sf.field_id !== fieldId
-        ).length
-        if (body.show_on_card && showOnCardCount >= 3) {
+        if (body.show_on_card && validateShowOnCardLimit(schema, fieldId as string)) {
           return HttpResponse.json<ApiErrorResponse>(
             { detail: 'Max 3 fields can have show_on_card=true' },
             { status: 409 }
@@ -260,10 +268,11 @@ export const schemasHandlers = [
         }
       }
 
-      const updatedField = {
-        ...schema.schema_fields[fieldIndex],
-        display_order: body.display_order ?? schema.schema_fields[fieldIndex].display_order,
-        show_on_card: body.show_on_card ?? schema.schema_fields[fieldIndex].show_on_card,
+      const existingField = schema.schema_fields[fieldIndex]!
+      const updatedField: SchemaFieldResponse = {
+        ...existingField,
+        display_order: body.display_order ?? existingField.display_order,
+        show_on_card: body.show_on_card ?? existingField.show_on_card,
       }
 
       schema.schema_fields[fieldIndex] = updatedField
