@@ -31,7 +31,7 @@ describe('FieldActionsMenu', () => {
     expect(screen.getByLabelText('Actions for Test Field')).toBeInTheDocument()
   })
 
-  it('renders trigger button with MoreVertical icon', () => {
+  it('renders trigger button', () => {
     render(
       <FieldActionsMenu
         field={mockField}
@@ -107,7 +107,7 @@ describe('FieldActionsMenu', () => {
     expect(deleteItem).toHaveClass('text-red-600')
   })
 
-  it('has separator between Edit and Delete actions', async () => {
+  it('shows both Edit and Delete actions', async () => {
     const user = userEvent.setup({ delay: null })
     render(
       <FieldActionsMenu

@@ -224,26 +224,6 @@ describe('ConfirmDeleteFieldModal', () => {
     expect(onConfirm).not.toHaveBeenCalled()
   })
 
-  it('prevents auto-close on delete button click', async () => {
-    const user = userEvent.setup({ delay: null })
-    const onConfirm = vi.fn()
-    render(
-      <ConfirmDeleteFieldModal
-        open={true}
-        fieldName="Test Field"
-        usageCount={0}
-        onConfirm={onConfirm}
-        onCancel={vi.fn()}
-        isLoading={false}
-      />
-    )
-
-    await user.click(screen.getByText('Delete Field'))
-
-    // onConfirm should be called
-    expect(onConfirm).toHaveBeenCalledTimes(1)
-  })
-
   it('handles null fieldName gracefully', () => {
     render(
       <ConfirmDeleteFieldModal

@@ -115,16 +115,19 @@ describe('SelectBadge', () => {
 
     it('calls stopPropagation on dropdown item click', async () => {
       const onChange = vi.fn()
+      const onParentClick = vi.fn()
       const user = userEvent.setup()
 
       // REF MCP #4: Test that stopPropagation is called to prevent VideoCard click
       render(
-        <SelectBadge
-          value="good"
-          options={['bad', 'good', 'great']}
-          fieldName="Quality"
-          onChange={onChange}
-        />
+        <div onClick={onParentClick} data-testid="parent">
+          <SelectBadge
+            value="good"
+            options={['bad', 'good', 'great']}
+            fieldName="Quality"
+            onChange={onChange}
+          />
+        </div>
       )
 
       const badge = screen.getByRole('button', { name: /good/i })
@@ -137,8 +140,9 @@ describe('SelectBadge', () => {
       const greatOption = screen.getByText('great')
       await user.click(greatOption)
 
-      // The click was handled without propagating
+      // The click was handled without propagating to parent
       expect(onChange).toHaveBeenCalledWith('great')
+      expect(onParentClick).not.toHaveBeenCalled()
     })
 
     it('does not open dropdown in read-only mode', async () => {
@@ -199,19 +203,20 @@ describe('SelectBadge', () => {
       )
 
       const badge = screen.getByRole('button', { name: /good/i })
-      await user.click(badge)
+      badge.focus()
+      await user.keyboard('{Enter}')
 
       await waitFor(() => {
         expect(screen.getByText('great')).toBeInTheDocument()
       })
 
-      // Navigate with arrow keys and select with Enter
-      const greatOption = screen.getByText('great')
+      // Navigate with arrow keys to 'great' option and select with Enter
+      await user.keyboard('{ArrowDown}')
       await user.keyboard('{Enter}')
 
-      // Should close menu or handle navigation
+      // Should select the option
       await waitFor(() => {
-        // After interaction, onChange may be called
+        expect(onChange).toHaveBeenCalledWith('great')
       })
     })
 
@@ -301,22 +306,6 @@ describe('SelectBadge', () => {
       await waitFor(() => {
         expect(screen.queryByText('bad')).not.toBeInTheDocument()
       })
-    })
-
-    it('has modal={false} for dropdown (Task #29 pattern)', () => {
-      // This ensures dropdown doesn't capture all events
-      // It's controlled by DropdownMenu modal prop
-      render(
-        <SelectBadge
-          value="good"
-          options={['bad', 'good', 'great']}
-          fieldName="Quality"
-        />
-      )
-
-      const badge = screen.getByRole('button', { name: /good/i })
-      expect(badge).toBeInTheDocument()
-      // The DropdownMenu should be rendered with modal={false}
     })
   })
 

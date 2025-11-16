@@ -358,20 +358,23 @@ describe('DuplicateWarning', () => {
         field: null,
       })
 
-      // Start with empty field name (no API call)
-      const { rerender } = renderWithQuery(
-        <DuplicateWarning
-          fieldName=""
-          listId="list-123"
-          debounceMs={500}
-        />
-      )
-
-      // Now start typing - fast updates should be debounced
+      // Create single QueryClient for consistent query state
       const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false } }
       })
 
+      // Start with empty field name (no API call)
+      const { rerender } = render(
+        <QueryClientProvider client={queryClient}>
+          <DuplicateWarning
+            fieldName=""
+            listId="list-123"
+            debounceMs={500}
+          />
+        </QueryClientProvider>
+      )
+
+      // Now start typing - fast updates should be debounced
       rerender(
         <QueryClientProvider client={queryClient}>
           <DuplicateWarning

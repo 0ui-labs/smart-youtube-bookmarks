@@ -9,6 +9,15 @@ import type {
   ApiErrorResponse,
 } from '@/types/schema'
 
+// Mock field metadata lookup for realistic test data
+const mockFieldMetadata = new Map([
+  ['field-1', { name: 'Presentation', field_type: 'rating' as const, config: { max_rating: 10 } }],
+  ['field-2', { name: 'Content', field_type: 'rating' as const, config: { max_rating: 10 } }],
+  ['field-3', { name: 'Notes', field_type: 'text' as const, config: { max_length: 500 } }],
+  ['field-4', { name: 'Watched', field_type: 'boolean' as const, config: {} }],
+  ['field-5', { name: 'Quality', field_type: 'select' as const, config: { options: ['poor', 'good', 'great'] } }],
+])
+
 // Mock data
 const mockSchemas: FieldSchemaResponse[] = [
   {

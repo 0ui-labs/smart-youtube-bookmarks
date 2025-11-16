@@ -5,10 +5,11 @@ import { AvailableFieldResponse, VideoFieldValue } from '@/types/video'
 
 // Mock FieldDisplay component
 vi.mock('@/components/fields', () => ({
-  FieldDisplay: ({ fieldValue, onChange }: any) => (
+  FieldDisplay: ({ fieldValue, onChange, onExpand }: any) => (
     <div data-testid={`field-display-${fieldValue.field_id}`}>
       <span>Field: {fieldValue.field.name}</span>
       <button onClick={() => onChange?.(5)}>Change Value</button>
+      {onExpand && <button onClick={onExpand}>Expand</button>}
     </div>
   ),
 }))

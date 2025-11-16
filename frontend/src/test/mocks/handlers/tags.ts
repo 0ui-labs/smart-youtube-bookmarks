@@ -13,6 +13,11 @@ function generateUUID(): string {
 // Mock data
 const mockTags: Tag[] = []
 
+// Reset function for test isolation
+export function resetMockTags() {
+  mockTags.length = 0
+}
+
 export const tagsHandlers = [
   // POST /tags
   http.post('/api/tags', async ({ request }) => {
