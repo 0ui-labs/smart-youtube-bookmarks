@@ -65,7 +65,10 @@ def parse_youtube_duration(iso_duration: str | None) -> int | None:
     try:
         duration_obj = parse_duration(iso_duration)
         return int(duration_obj.total_seconds())
-    except Exception as e:
+    except (ValueError, AttributeError, TypeError) as e:
+        # ValueError: Invalid ISO 8601 format
+        # AttributeError: duration_obj is None or missing total_seconds()
+        # TypeError: Unexpected type passed to parse_duration
         logger.debug(f"Invalid duration format '{iso_duration}': {e}")
         return None
 
@@ -370,7 +373,12 @@ async def add_video_to_list(
             processing_status="completed"  # Already have all data!
         )
 
-    except Exception as e:
+    except (HTTPError, TimeoutException, ValueError, KeyError, OSError) as e:
+        # HTTPError: YouTube API returned error (404, 403, etc.)
+        # TimeoutException: Request timeout
+        # ValueError: Invalid video ID or response format
+        # KeyError: Missing expected fields in API response
+        # OSError: Network connectivity issues
         # Fallback: Create with pending status if YouTube API fails (allows retry via background worker)
         logger.warning(f"Failed to fetch YouTube metadata for {youtube_id}: {e}")
         new_video = Video(
