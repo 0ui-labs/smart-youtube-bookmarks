@@ -39,12 +39,13 @@ export interface RatingStarsProps {
  * Interactive star rating component with keyboard navigation and accessibility.
  *
  * REF MCP Improvements Applied:
- * - #1 (Button Pattern): aria-pressed on all star buttons (NOT radio group)
+ * - #1 (ARIA Pattern): role="radiogroup" with role="radio" buttons (proper rating pattern)
  * - #3 (Keyboard Navigation): Arrow Left/Right, Enter, Space keys
  * - #3 (Event Propagation): stopPropagation on all interactive events
  * - #4 (Performance): Wrapped in React.memo()
  * - #5 (Accessibility): aria-hidden="true" on all Star icons
  * - #5 (Accessibility): Complete ARIA labels with screen reader context
+ * - #6 (Roving Tabindex): Only selected star is focusable for better keyboard UX
  *
  * @example
  * // Editable rating
@@ -107,18 +108,20 @@ export const RatingStars = React.memo<RatingStarsProps>(
     return (
       <div
         className={cn('flex items-center gap-0.5', className)}
-        role="group"
+        role="radiogroup"
         aria-label={`${fieldName}: ${value ?? 0} out of ${maxRating}`} // REF MCP #5: Screen reader context
         onClick={(e) => e.stopPropagation()} // REF MCP #3: Prevent VideoCard click
       >
         {Array.from({ length: maxRating }, (_, i) => {
           const starValue = i + 1
           const isFilled = starValue <= displayValue
+          const isSelected = starValue === (value ?? 0)
 
           return (
             <button
               key={starValue}
               type="button"
+              role="radio"
               disabled={readonly}
               className={cn(
                 'transition-colors duration-150',
@@ -133,8 +136,8 @@ export const RatingStars = React.memo<RatingStarsProps>(
               onMouseLeave={() => !readonly && setHoverValue(null)}
               onKeyDown={(e) => handleKeyDown(e, starValue)}
               aria-label={`${starValue} star${starValue > 1 ? 's' : ''}`} // REF MCP #5: ARIA label per button
-              aria-pressed={isFilled} // REF MCP #1: Button Pattern - indicate pressed state
-              tabIndex={readonly ? -1 : 0}
+              aria-checked={isFilled} // REF MCP #1: Radio pattern - use aria-checked
+              tabIndex={readonly ? -1 : (isSelected ? 0 : -1)} // Roving tabindex: only selected is focusable
             >
               <Star
                 className={cn(
