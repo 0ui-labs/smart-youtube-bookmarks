@@ -28,7 +28,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, or_, and_, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import selectinload, aliased
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from isodate import parse_duration
@@ -1138,7 +1138,12 @@ async def _process_field_values(
 
                 logger.info(f"Applied {len(field_updates)} field values for video {video.youtube_id}")
 
-            except Exception as e:
+            except (ValueError, KeyError, FieldValidationError, SQLAlchemyError) as e:
+                # ValueError: Invalid data/parsing errors
+                # KeyError: Missing keys in data structures
+                # FieldValidationError: Field validation errors
+                # SQLAlchemyError: Database errors (includes IntegrityError)
+
                 # Log error with stack trace but don't fail video creation
                 logger.exception(f"Failed to apply field values for video {video.youtube_id}")
                 failures.append(BulkUploadFailure(
