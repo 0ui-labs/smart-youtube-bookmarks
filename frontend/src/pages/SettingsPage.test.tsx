@@ -70,6 +70,17 @@ vi.mock('@/hooks/useLists', () => ({
   useLists: vi.fn(),
 }))
 
+vi.mock('@/hooks/useCustomFields', () => ({
+  useCustomFields: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
+  useUpdateCustomField: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useDeleteCustomField: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useFieldUsageCounts: vi.fn(() => new Map()),
+}))
+
 import { useSchemas } from '@/hooks/useSchemas'
 import { useLists } from '@/hooks/useLists'
 

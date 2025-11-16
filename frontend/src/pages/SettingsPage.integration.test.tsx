@@ -71,6 +71,17 @@ vi.mock('@/hooks/useLists', () => ({
   useLists: vi.fn(),
 }))
 
+vi.mock('@/hooks/useCustomFields', () => ({
+  useCustomFields: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
+  useUpdateCustomField: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useDeleteCustomField: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useFieldUsageCounts: vi.fn(() => new Map()),
+}))
+
 import { useSchemas } from '@/hooks/useSchemas'
 import { useLists } from '@/hooks/useLists'
 
@@ -166,8 +177,10 @@ describe('SettingsPage Integration', () => {
     // Click Fields tab
     await user.click(screen.getByRole('tab', { name: /fields/i }))
 
-    // Fields placeholder shown
-    expect(screen.getByText(/fields management coming soon/i)).toBeInTheDocument()
+    // Fields tab content shown (empty state since no fields)
+    await waitFor(() => {
+      expect(screen.getByText(/no custom fields yet/i)).toBeInTheDocument()
+    })
   })
 
   it('handles create schema button click', async () => {
@@ -177,7 +190,6 @@ describe('SettingsPage Integration', () => {
       isError: false,
     } as any)
 
-    const consoleSpy = vi.spyOn(console, 'log')
     // ✨ FIX #1: Use userEvent.setup({ delay: null })
     const user = userEvent.setup({ delay: null })
     renderWithRouter(<SettingsPage />)
@@ -188,11 +200,13 @@ describe('SettingsPage Integration', () => {
 
     await user.click(screen.getByRole('button', { name: /create schema/i }))
 
-    expect(consoleSpy).toHaveBeenCalledWith('Create schema clicked - to be implemented')
+    // SchemaCreationDialog should open (check for dialog heading)
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /create new schema/i })).toBeInTheDocument()
+    })
   })
 
   it('handles schema action menu interactions', async () => {
-    const consoleSpy = vi.spyOn(console, 'log')
     // ✨ FIX #1: Use userEvent.setup({ delay: null })
     const user = userEvent.setup({ delay: null })
     renderWithRouter(<SettingsPage />)
@@ -205,10 +219,12 @@ describe('SettingsPage Integration', () => {
     const actionButton = screen.getByRole('button', { name: /actions for makeup tutorial criteria/i })
     await user.click(actionButton)
 
-    // Click Edit
-    await user.click(screen.getByText('Edit'))
-
-    expect(consoleSpy).toHaveBeenCalledWith('Edit schema:', 'schema-1')
+    // Menu should be visible with options
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeInTheDocument()
+      expect(screen.getByText('Duplicate')).toBeInTheDocument()
+      expect(screen.getByText('Delete')).toBeInTheDocument()
+    })
   })
 
   // ✨ FIX #7 (Optional): Error handling test

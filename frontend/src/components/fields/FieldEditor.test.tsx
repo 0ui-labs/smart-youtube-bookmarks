@@ -60,7 +60,7 @@ describe('FieldEditor', () => {
       },
     })
     vi.clearAllMocks()
-    mockState.mutate.mockClear()
+    mockState.mutate = vi.fn()
     mockState.isPending = false
   })
 
@@ -298,28 +298,34 @@ describe('FieldEditor', () => {
       updated_at: '',
     }
 
-    it('shows loading spinner during save', () => {
+    it('shows loading spinner during save', async () => {
       mockState.isPending = true
 
       const { container } = renderWithQueryClient(
         <FieldEditor videoId="video-1" field={ratingField} value={3} />
       )
 
-      // Check for Loader2 icon (animate-spin class)
-      const spinner = container.querySelector('.animate-spin')
-      expect(spinner).toBeTruthy()
+      // Wait for component to render with loading state
+      await waitFor(() => {
+        const spinner = container.querySelector('.animate-spin')
+        expect(spinner).toBeTruthy()
+      })
     })
 
-    it('disables editor during save', () => {
+    it('disables editor during save', async () => {
       mockState.isPending = true
 
       renderWithQueryClient(
         <FieldEditor videoId="video-1" field={ratingField} value={3} />
       )
 
-      const stars = screen.getAllByRole('radio')
-      stars.forEach(star => {
-        expect(star).toBeDisabled()
+      // Wait for stars to render
+      await waitFor(() => {
+        const stars = screen.getAllByRole('radio')
+        expect(stars.length).toBeGreaterThan(0)
+        stars.forEach(star => {
+          expect(star).toBeDisabled()
+        })
       })
     })
   })
