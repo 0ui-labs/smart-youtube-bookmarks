@@ -20,7 +20,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs'
-import { Plus } from 'lucide-react'
+import { Plus, AlertCircle, X } from 'lucide-react'
 import type { CustomField } from '@/types/customField'
 
 /**
@@ -70,6 +70,10 @@ export function SettingsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [fieldToDelete, setFieldToDelete] = useState<CustomField | null>(null)
 
+  // Error states for user feedback
+  const [editError, setEditError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
   // Combine loading states
   const isLoading = isListsLoading || isSchemasLoading || isFieldsLoading
   const isError = isListsError || isSchemasError
@@ -91,13 +95,13 @@ export function SettingsPage() {
       { fieldId, data: updates },
       {
         onSuccess: () => {
-          console.log('Field updated successfully')
+          setEditError(null)
           setEditDialogOpen(false)
           setFieldToEdit(null)
         },
         onError: (error: any) => {
-          const message = error.response?.data?.detail || 'Failed to update field'
-          console.error('Update failed:', message)
+          const message = error.response?.data?.detail || 'Fehler beim Aktualisieren des Feldes'
+          setEditError(message)
           // Keep dialog open on error (don't reset state)
         },
       }
@@ -119,13 +123,13 @@ export function SettingsPage() {
 
     deleteField.mutate(fieldToDelete.id, {
       onSuccess: () => {
-        console.log(`Field "${fieldToDelete.name}" deleted successfully`)
+        setDeleteError(null)
         setDeleteDialogOpen(false)
         setFieldToDelete(null)
       },
       onError: (error: any) => {
-        const message = error.response?.data?.detail || 'Failed to delete field'
-        console.error('Delete failed:', message)
+        const message = error.response?.data?.detail || 'Fehler beim Löschen des Feldes'
+        setDeleteError(message)
         // Keep dialog open on error (don't reset state)
       },
     })
@@ -204,6 +208,38 @@ export function SettingsPage() {
 
           {/* Fields Tab - Task #139 Step 8 */}
           <TabsContent value="fields">
+            {/* Edit Error Alert */}
+            {editError && (
+              <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-red-800">{editError}</p>
+                </div>
+                <button
+                  onClick={() => setEditError(null)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Delete Error Alert */}
+            {deleteError && (
+              <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-red-800">{deleteError}</p>
+                </div>
+                <button
+                  onClick={() => setDeleteError(null)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
             {fields.length > 0 ? (
               <FieldsList
                 fields={fields}

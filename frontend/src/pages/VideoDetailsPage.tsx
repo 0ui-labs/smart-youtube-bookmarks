@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -6,7 +7,7 @@ import { formatDuration } from '@/utils/formatDuration'
 import { CustomFieldsSection } from '@/components/CustomFieldsSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, AlertCircle, X } from 'lucide-react'
 
 /**
  * VideoDetailsPage Component
@@ -38,6 +39,7 @@ export const VideoDetailsPage = () => {
   const { videoId } = useParams<{ videoId: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [updateError, setUpdateError] = useState<string | null>(null)
 
   // Fetch video with available_fields (Task #74)
   const {
@@ -63,11 +65,14 @@ export const VideoDetailsPage = () => {
       return data
     },
     onSuccess: () => {
+      setUpdateError(null)
       // Invalidate to refetch latest data
       queryClient.invalidateQueries({ queryKey: ['videos', videoId] })
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Failed to update field value:', error)
+      const message = error.response?.data?.detail || 'Fehler beim Speichern. Bitte versuchen Sie es erneut.'
+      setUpdateError(message)
     },
   })
 
@@ -123,6 +128,22 @@ export const VideoDetailsPage = () => {
         <ArrowLeft className="mr-2 h-4 w-4" />
         Zurück zur Übersicht
       </Button>
+
+      {/* Error Alert */}
+      {updateError && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm text-red-800">{updateError}</p>
+          </div>
+          <button
+            onClick={() => setUpdateError(null)}
+            className="text-red-600 hover:text-red-800"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Video header */}
       <div className="mb-8">
