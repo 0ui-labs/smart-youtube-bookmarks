@@ -53,8 +53,8 @@ export const ConfirmDeleteSchemaDialog = ({
                           Dieses Schema wird von {usageStats.count} Tag{usageStats.count !== 1 ? 's' : ''} verwendet:
                         </p>
                         <ul className="mt-2 space-y-1">
-                          {usageStats.tagNames.slice(0, 5).map((tagName) => (
-                            <li key={tagName} className="text-sm text-orange-800">
+                          {usageStats.tagNames.slice(0, 5).map((tagName, index) => (
+                            <li key={index} className="text-sm text-orange-800">
                               • {tagName}
                             </li>
                           ))}

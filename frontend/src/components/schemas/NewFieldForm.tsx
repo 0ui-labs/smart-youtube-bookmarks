@@ -315,7 +315,7 @@ export const NewFieldForm = ({
                   <Input
                     id="select-options"
                     placeholder="Option 1, Option 2, Option 3"
-                    defaultValue=""
+                    value={Array.isArray(field.value) ? field.value.join(', ') : ''}
                     onChange={(e) => {
                       const options = e.target.value
                         .split(',')

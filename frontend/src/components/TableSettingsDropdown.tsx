@@ -63,6 +63,16 @@ export const TableSettingsDropdown = () => {
     }
   };
 
+  // Task #131 Step 5: Runtime validation for VideoDetailsView
+  const handleVideoDetailsViewChange = (value: string) => {
+    // Type guard - TypeScript narrows type automatically
+    if (value === 'page' || value === 'modal') {
+      setVideoDetailsView(value); // TypeScript knows value is 'page' | 'modal' here
+    } else {
+      console.warn(`Invalid video details view value: ${value}`);
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -155,7 +165,7 @@ export const TableSettingsDropdown = () => {
           <Label className="text-xs font-medium">Video Details</Label>
           <RadioGroup
             value={videoDetailsView}
-            onValueChange={(value) => setVideoDetailsView(value as 'page' | 'modal')}
+            onValueChange={handleVideoDetailsViewChange}
             className="mt-2 space-y-2"
           >
             <div className="flex items-center gap-2">
