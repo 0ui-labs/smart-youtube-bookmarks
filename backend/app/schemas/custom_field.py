@@ -462,6 +462,6 @@ class SmartDuplicateCheckResponse(BaseModel):
         description="List of similar fields ranked by score (highest first)"
     )
     mode: Literal["basic", "smart"] = Field(
-        default="smart",
+        default="basic",
         description="Detection mode used"
     )
