@@ -58,9 +58,8 @@ export function RatingConfigEditor({
    * Ensures: integer, 1-10 range
    */
   const handleChange = (value: string) => {
-    // Allow empty string for typing experience
+    // Don't allow empty - keep current value visible
     if (value === '') {
-      setLocalError('Bitte geben Sie eine Zahl zwischen 1 und 10 ein')
       return
     }
 

@@ -151,6 +151,17 @@ export function SelectConfigEditor({
                 // Trim whitespace on blur
                 const trimmed = e.target.value.trim()
                 if (trimmed !== field.value) {
+                  // Check for duplicates (excluding current field)
+                  const isDuplicate = fields.some(
+                    (f: any, idx) => idx !== index && f.value.toLowerCase() === trimmed.toLowerCase()
+                  )
+
+                  if (isDuplicate) {
+                    // Revert to original value
+                    handleUpdateOption(index, field.value)
+                    return
+                  }
+
                   handleUpdateOption(index, trimmed)
                 }
               }}
