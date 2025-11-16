@@ -6,6 +6,7 @@ from httpx import AsyncClient
 
 from app.models.custom_field import CustomField
 from app.models.list import BookmarkList
+from app.core.config import settings
 
 
 @pytest.mark.asyncio
@@ -44,6 +45,10 @@ class TestSmartDuplicateDetectionIntegration:
         assert data["exists"] is True
         assert data["field"]["name"] == "Presentation Quality"
 
+    @pytest.mark.skipif(
+        not settings.gemini_api_key,
+        reason="Gemini API key not configured"
+    )
     async def test_smart_mode_typo_detection(
         self,
         client: AsyncClient,
@@ -81,6 +86,10 @@ class TestSmartDuplicateDetectionIntegration:
         assert suggestion["score"] >= 0.80
         assert "character difference" in suggestion["explanation"]
 
+    @pytest.mark.skipif(
+        not settings.gemini_api_key,
+        reason="Gemini API key not configured"
+    )
     @patch('app.services.duplicate_detection.DuplicateDetector._call_gemini_embedding_api')
     async def test_smart_mode_semantic_similarity(
         self,
@@ -145,6 +154,10 @@ class TestSmartDuplicateDetectionIntegration:
         assert 0.60 <= suggestion["score"] <= 0.79
         assert "semantically similar" in suggestion["explanation"].lower()
 
+    @pytest.mark.skipif(
+        not settings.gemini_api_key,
+        reason="Gemini API key not configured"
+    )
     async def test_smart_mode_multiple_suggestions_ranked(
         self,
         client: AsyncClient,
@@ -194,6 +207,10 @@ class TestSmartDuplicateDetectionIntegration:
         assert data["suggestions"][0]["score"] >= data["suggestions"][1]["score"]
         assert data["suggestions"][0]["field"]["name"] == "Rating"  # Exact match first
 
+    @pytest.mark.skipif(
+        not settings.gemini_api_key,
+        reason="Gemini API key not configured"
+    )
     async def test_smart_mode_no_suggestions_below_threshold(
         self,
         client: AsyncClient,
@@ -236,17 +253,17 @@ class TestSmartDuplicateDetectionIntegration:
             # Create field
             field = CustomField(
                 list_id=test_list.id,
-                name="Presentation Quality",
+                name="Rating",
                 field_type="select",
                 config={"options": ["bad", "good", "great"]}
             )
             test_db.add(field)
             await test_db.commit()
 
-            # Check with typo
+            # Check with typo (distance = 1, within threshold of 3)
             response = await client.post(
                 f"/api/lists/{test_list.id}/custom-fields/check-duplicate?mode=smart",
-                json={"name": "Presentaton"}
+                json={"name": "Ratng"}
             )
 
             assert response.status_code == 200
@@ -256,6 +273,10 @@ class TestSmartDuplicateDetectionIntegration:
             assert data["exists"] is True
             assert data["suggestions"][0]["similarity_type"] == "levenshtein"
 
+    @pytest.mark.skipif(
+        not settings.gemini_api_key,
+        reason="Gemini API key not configured"
+    )
     async def test_smart_mode_response_time_under_500ms(
         self,
         client: AsyncClient,

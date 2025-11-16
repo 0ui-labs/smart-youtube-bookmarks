@@ -3,6 +3,7 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import NullPool
 from unittest.mock import AsyncMock, patch
+import asyncio
 
 from app.main import app
 from app.core.database import get_db
@@ -16,6 +17,19 @@ from app.core.config import settings
 # Test database URL
 # Replace the database name in the URL with _test suffix
 TEST_DATABASE_URL = settings.database_url.rsplit('/', 1)[0] + '/youtube_bookmarks_test'
+
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """
+    Create an event loop for the test session.
+
+    This fixture overrides the default pytest-asyncio event loop fixture
+    to use session scope, allowing session-scoped async fixtures.
+    """
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
 
 
 @pytest.fixture(scope="session")
@@ -199,3 +213,47 @@ async def user_factory(test_db: AsyncSession):
     yield _create_user
 
     # Cleanup not needed - test_db rollback handles it
+
+
+@pytest.fixture(autouse=True)
+async def reset_redis_singleton():
+    """
+    Reset Redis singleton instances between tests to prevent event loop issues.
+
+    The Redis client singleton can get attached and fail when connection state
+    is invalid. This fixture ensures clean state between tests.
+    """
+    # Import here to avoid circular dependency
+    import app.core.redis as redis_module
+
+    # Clean up before test
+    if redis_module._redis_client is not None:
+        try:
+            await redis_module._redis_client.aclose()
+        except Exception:
+            pass  # Ignore errors during cleanup
+        redis_module._redis_client = None
+
+    if redis_module._arq_pool is not None:
+        try:
+            await redis_module._arq_pool.close(close_connection_pool=True)
+        except Exception:
+            pass  # Ignore errors during cleanup
+        redis_module._arq_pool = None
+
+    yield
+
+    # Clean up after test
+    if redis_module._redis_client is not None:
+        try:
+            await redis_module._redis_client.aclose()
+        except Exception:
+            pass
+        redis_module._redis_client = None
+
+    if redis_module._arq_pool is not None:
+        try:
+            await redis_module._arq_pool.close(close_connection_pool=True)
+        except Exception:
+            pass
+        redis_module._arq_pool = None
