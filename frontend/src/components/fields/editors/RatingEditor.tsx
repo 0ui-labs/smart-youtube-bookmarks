@@ -97,7 +97,7 @@ export const RatingEditor = ({
                 isSelected && 'ring-2 ring-ring ring-offset-2',
                 disabled && 'cursor-not-allowed'
               )}
-              tabIndex={isSelected ? 0 : -1}
+              tabIndex={isSelected || (value === null && starValue === 1) ? 0 : -1}
             >
               <Star
                 className={cn(

@@ -54,7 +54,8 @@ export interface BooleanCheckboxProps {
 export const BooleanCheckbox = React.memo<BooleanCheckboxProps>(
   ({ value, fieldName, readonly = false, onChange, className = '' }) => {
     const checked = value ?? false // Treat null as false
-    const checkboxId = `checkbox-${fieldName}-${Math.random().toString(36).slice(2, 9)}`
+    const id = React.useId()
+    const checkboxId = `${id}-${fieldName}`
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       e.stopPropagation() // REF MCP #3: Prevent event bubbling

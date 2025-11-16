@@ -104,7 +104,7 @@ export function FieldSelector({ listId, selectedFieldIds, onFieldsSelected }: Fi
               {/* REF MCP Improvement #3: CommandEmpty only for search with no matches */}
               <CommandEmpty>Keine Felder gefunden.</CommandEmpty>
               <CommandGroup className="max-h-64 overflow-auto">
-                {availableFields.map((field) => (
+                {fields.map((field) => (
                   <CommandItem
                     key={field.id}
                     value={field.name}

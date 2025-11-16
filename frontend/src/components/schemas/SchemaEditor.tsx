@@ -162,19 +162,19 @@ export function SchemaEditor({ listId, onSave, onCancel, initialData }: SchemaEd
     const newIndex = fields.findIndex(f => f.id === overId)
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      // Move field in array
+      // Move field in array and update display_order
       move(oldIndex, newIndex)
 
-      // Update display_order values for all fields
-      const reorderedFields = [...fields]
-      const [movedField] = reorderedFields.splice(oldIndex, 1)
-      if (movedField) {
-        reorderedFields.splice(newIndex, 0, movedField)
-
-        reorderedFields.forEach((field, index) => {
-          update(index, { ...field, display_order: index })
+      // After move, update display_order for all fields based on new positions
+      // Use setTimeout to ensure move has completed
+      setTimeout(() => {
+        const currentFields = form.getValues('fields')
+        currentFields.forEach((field, index) => {
+          if (field.display_order !== index) {
+            update(index, { ...field, display_order: index })
+          }
         })
-      }
+      }, 0)
     }
   }
 
