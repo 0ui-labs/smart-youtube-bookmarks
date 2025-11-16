@@ -16,6 +16,71 @@ import {
 import type { FieldSchemaResponse } from '@/types/schema'
 import type { Tag } from '@/types/tag'
 
+// Mock useSchemas hooks
+vi.mock('@/hooks/useSchemas', () => ({
+  useSchemas: vi.fn(),
+  useSchema: vi.fn(),
+  usePrefetchSchema: vi.fn(() => vi.fn()),
+  useCreateSchema: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useUpdateSchema: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useDeleteSchema: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useDuplicateSchema: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useAddFieldToSchema: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useRemoveFieldFromSchema: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useUpdateSchemaField: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useReorderSchemaFields: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useUpdateSchemaFieldsBatch: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useSchemaUsageStats: vi.fn(() => ({ count: 0, tagNames: [] })),
+  schemasOptions: vi.fn(),
+  schemaOptions: vi.fn(),
+  schemasKeys: {
+    all: () => ['schemas'],
+    lists: () => ['schemas', 'list'],
+    list: (listId: string) => ['schemas', 'list', listId],
+    details: () => ['schemas', 'detail'],
+    detail: (schemaId: string) => ['schemas', 'detail', schemaId],
+  },
+}))
+
+// Mock useTags hooks
+vi.mock('@/hooks/useTags')
+
 vi.mock('@/lib/api')
 
 const mockSchema: FieldSchemaResponse = {

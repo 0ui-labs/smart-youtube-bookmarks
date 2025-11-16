@@ -1008,6 +1008,7 @@ async def list_all_videos(
     tags_stmt = (
         select(video_tags.c.video_id, Tag)
         .join(Tag, video_tags.c.tag_id == Tag.id)
+        .options(selectinload(Tag.schema))  # Eager load schema to prevent lazy='raise' error
         .where(video_tags.c.video_id.in_(video_ids))
     )
     tags_result = await db.execute(tags_stmt)
@@ -1760,6 +1761,7 @@ async def assign_tags_to_video(
     # Return all tags for this video
     final_tags_stmt = (
         select(Tag)
+        .options(selectinload(Tag.schema))  # Eager load schema to prevent lazy='raise' error
         .join(video_tags)
         .where(video_tags.c.video_id == video_id)
     )
@@ -1817,6 +1819,7 @@ async def get_video_tags(video_id: UUID, db: AsyncSession = Depends(get_db)):
     # Get tags via junction table
     tags_stmt = (
         select(Tag)
+        .options(selectinload(Tag.schema))  # Eager load schema to prevent lazy='raise' error
         .join(video_tags)
         .where(video_tags.c.video_id == video_id)
     )
