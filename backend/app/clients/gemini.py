@@ -124,19 +124,25 @@ class GeminiClient:
         # Extract with retry logic
         for attempt in range(self.max_retries):
             try:
-                async with self.client.aio as aclient:
-                    response = await aclient.models.generate_content(
-                        model=self.model,
-                        contents=prompt,
-                        config=types.GenerateContentConfig(
-                            response_mime_type="application/json",
-                            response_schema=schema_model,
-                            temperature=temperature,
-                        ),
-                    )
+                aclient = self.client.aio
+                response = await aclient.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=schema_model,
+                        temperature=temperature,
+                    ),
+                )
 
-                    # Return parsed data as Pydantic model
-                    return response.parsed
+                # Get parsed result
+                parsed_result = response.parsed
+
+                # Explicitly close the client to release connections
+                await aclient.aclose()
+
+                # Return parsed data as Pydantic model
+                return parsed_result
 
             except Exception as e:
                 logger.warning(
@@ -172,12 +178,12 @@ class GeminiClient:
             >>> token_count = await client.count_tokens("Hello, world!")
             >>> assert token_count > 0
         """
-        async with self.client.aio as aclient:
-            result = await aclient.models.count_tokens(
-                model=self.model,
-                contents=text,
-            )
-            return result.total_tokens
+        aclient = self.client.aio
+        result = await aclient.models.count_tokens(
+            model=self.model,
+            contents=text,
+        )
+        return result.total_tokens
 
     def _build_extraction_prompt(
         self, transcript: str, schema_model: Type[BaseModel]

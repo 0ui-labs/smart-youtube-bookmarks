@@ -32,8 +32,8 @@ class TestGeminiClientBasicExtraction:
             difficulty_level: str = Field(
                 description="Difficulty: Beginner, Intermediate, or Advanced"
             )
-            summary: Optional[str] = Field(
-                description="Brief 2-3 sentence summary", default=None
+            summary: str = Field(
+                description="Brief 2-3 sentence summary"
             )
 
         # Sample transcript

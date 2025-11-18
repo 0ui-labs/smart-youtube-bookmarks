@@ -150,7 +150,7 @@ class YouTubeClient:
         except HTTPError as e:
             if e.res.status_code == 403:
                 # Quota exceeded or forbidden - don't retry
-                error_body = e.res.json() if hasattr(e.res, 'json') else {}
+                error_body = e.res.json if isinstance(e.res.json, dict) else (e.res.json() if callable(e.res.json) else {})
                 reason = error_body.get('error', {}).get('errors', [{}])[0].get('reason', 'unknown')
                 if reason == 'quotaExceeded':
                     raise ValueError(f"YouTube API quota exceeded for video {video_id}")

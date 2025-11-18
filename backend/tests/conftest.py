@@ -53,7 +53,21 @@ async def test_engine():
 
 
 @pytest.fixture
-async def test_db(test_engine):
+async def test_db_cleanup(test_engine):
+    """Cleanup database before each test."""
+    from app.models.base import Base
+
+    yield  # Run test first
+
+    # Cleanup after test
+    async with async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)() as session:
+        for table in reversed(Base.metadata.sorted_tables):
+            await session.execute(table.delete())
+        await session.commit()
+
+
+@pytest.fixture
+async def test_db(test_engine, test_db_cleanup):
     """Create a test database session."""
     TestSessionLocal = async_sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False
