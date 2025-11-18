@@ -79,15 +79,22 @@ async def test_batch_update_field_values_with_typed_columns(
     await test_db.refresh(text_field)
     await test_db.refresh(boolean_field)
 
+    # Store IDs before making API calls (objects become detached after commit)
+    rating_field_id = rating_field.id
+    select_field_id = select_field.id
+    text_field_id = text_field.id
+    boolean_field_id = boolean_field.id
+    video_id = test_video.id
+
     # Act: Batch update all 4 field values (Task #72 endpoint)
     response = await client.put(
-        f"/api/videos/{test_video.id}/fields",
+        f"/api/videos/{video_id}/fields",
         json={
             "field_values": [
-                {"field_id": str(rating_field.id), "value": 4.5},
-                {"field_id": str(select_field.id), "value": "great"},
-                {"field_id": str(text_field.id), "value": "Excellent tutorial with clear examples"},
-                {"field_id": str(boolean_field.id), "value": True}
+                {"field_id": str(rating_field_id), "value": 4.5},
+                {"field_id": str(select_field_id), "value": "great"},
+                {"field_id": str(text_field_id), "value": "Excellent tutorial with clear examples"},
+                {"field_id": str(boolean_field_id), "value": True}
             ]
         }
     )
@@ -99,55 +106,56 @@ async def test_batch_update_field_values_with_typed_columns(
 
     # Assert: Database state - all 4 values exist
     # Expire ORM cache to read fresh data (API endpoint uses different session)
-    await test_db.expire_all()
-    values_stmt = select(VideoFieldValue).where(VideoFieldValue.video_id == test_video.id)
+    test_db.expire_all()
+    # Use previously stored video_id
+    values_stmt = select(VideoFieldValue).where(VideoFieldValue.video_id == video_id)
     db_result = await test_db.execute(values_stmt)
     db_values = db_result.scalars().all()
     assert len(db_values) == 4, "Should have 4 field values in database"
 
     # Assert: Rating field uses value_numeric
-    rating_value = next(v for v in db_values if v.field_id == rating_field.id)
+    rating_value = next(v for v in db_values if v.field_id == rating_field_id)
     assert rating_value.value_numeric == 4.5, "Rating should use value_numeric column"
     assert rating_value.value_text is None, "Rating should NOT use value_text"
     assert rating_value.value_boolean is None, "Rating should NOT use value_boolean"
 
     # Assert: Select field uses value_text
-    select_value = next(v for v in db_values if v.field_id == select_field.id)
+    select_value = next(v for v in db_values if v.field_id == select_field_id)
     assert select_value.value_text == "great", "Select should use value_text column"
     assert select_value.value_numeric is None, "Select should NOT use value_numeric"
     assert select_value.value_boolean is None, "Select should NOT use value_boolean"
 
     # Assert: Text field uses value_text
-    text_value = next(v for v in db_values if v.field_id == text_field.id)
+    text_value = next(v for v in db_values if v.field_id == text_field_id)
     assert text_value.value_text == "Excellent tutorial with clear examples", "Text should use value_text column"
     assert text_value.value_numeric is None, "Text should NOT use value_numeric"
     assert text_value.value_boolean is None, "Text should NOT use value_boolean"
 
     # Assert: Boolean field uses value_boolean
-    boolean_value = next(v for v in db_values if v.field_id == boolean_field.id)
+    boolean_value = next(v for v in db_values if v.field_id == boolean_field_id)
     assert boolean_value.value_boolean is True, "Boolean should use value_boolean column"
     assert boolean_value.value_text is None, "Boolean should NOT use value_text"
     assert boolean_value.value_numeric is None, "Boolean should NOT use value_numeric"
 
     # Test UPSERT: Update same values again (should not create duplicates)
     update_response = await client.put(
-        f"/api/videos/{test_video.id}/fields",
+        f"/api/videos/{video_id}/fields",
         json={
             "field_values": [
-                {"field_id": str(rating_field.id), "value": 5.0}  # Update rating
+                {"field_id": str(rating_field_id), "value": 5.0}  # Update rating
             ]
         }
     )
     assert update_response.status_code == 200
 
     # Verify still only 4 values (UPSERT worked, no duplicate)
-    values_stmt = select(VideoFieldValue).where(VideoFieldValue.video_id == test_video.id)
+    values_stmt = select(VideoFieldValue).where(VideoFieldValue.video_id == video_id)
     db_result = await test_db.execute(values_stmt)
     db_values = db_result.scalars().all()
     assert len(db_values) == 4, "UPSERT should update, not create duplicate"
 
     # Verify rating was updated
-    rating_value = next(v for v in db_values if v.field_id == rating_field.id)
+    rating_value = next(v for v in db_values if v.field_id == rating_field_id)
     assert rating_value.value_numeric == 5.0, "Rating should be updated to 5.0"
 
 
@@ -270,11 +278,18 @@ async def test_multi_tag_field_union_in_video_detail(
     await test_db.refresh(tutorial_tag)
     await test_db.refresh(python_tag)
 
+    # Store IDs before commit to avoid detached object issues
+    tutorial_tag_id = tutorial_tag.id
+    python_tag_id = python_tag.id
+    video_id = video.id
+
     # Assign both tags to video (need to refresh video to load tags relationship)
     await test_db.refresh(video)
     video.tags.append(tutorial_tag)
     video.tags.append(python_tag)
     await test_db.commit()
+    # Refresh video again after commit to ensure tags are loaded
+    await test_db.refresh(video)
 
     # Set field values (only 2 out of 3 fields filled)
     value1 = VideoFieldValue(

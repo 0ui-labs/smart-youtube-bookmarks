@@ -1151,7 +1151,7 @@ async def _process_field_values(
             continue
         field_updates = []
 
-        for column_name, field in field_columns.items():
+        for column_name, field_data in field_columns.items():
             raw_value = row_data.get(column_name, '').strip()
 
             # Skip empty values (not an error, just unset)
@@ -1160,23 +1160,28 @@ async def _process_field_values(
 
             # Parse value based on field type
             try:
-                if field.field_type == 'rating':
+                field_type = field_data['field_type']
+                field_config = field_data['config']
+                field_id = field_data['id']
+                field_name = field_data['name']
+
+                if field_type == 'rating':
                     # Parse as float to support decimal ratings
                     parsed_value = float(raw_value)
-                    validate_field_value(parsed_value, field.field_type, field.config)
-                    field_updates.append(FieldValueUpdate(field_id=field.id, value=parsed_value))
+                    validate_field_value(parsed_value, field_type, field_config)
+                    field_updates.append(FieldValueUpdate(field_id=field_id, value=parsed_value))
 
-                elif field.field_type == 'select':
+                elif field_type == 'select':
                     # Validate against options list (case-sensitive in validation)
-                    validate_field_value(raw_value, field.field_type, field.config)
-                    field_updates.append(FieldValueUpdate(field_id=field.id, value=raw_value))
+                    validate_field_value(raw_value, field_type, field_config)
+                    field_updates.append(FieldValueUpdate(field_id=field_id, value=raw_value))
 
-                elif field.field_type == 'text':
+                elif field_type == 'text':
                     # Validate max_length if configured
-                    validate_field_value(raw_value, field.field_type, field.config)
-                    field_updates.append(FieldValueUpdate(field_id=field.id, value=raw_value))
+                    validate_field_value(raw_value, field_type, field_config)
+                    field_updates.append(FieldValueUpdate(field_id=field_id, value=raw_value))
 
-                elif field.field_type == 'boolean':
+                elif field_type == 'boolean':
                     # Parse "true"/"false"/"1"/"0" (case-insensitive)
                     lower_value = raw_value.lower()
                     if lower_value in ('true', '1', 'yes'):
@@ -1185,11 +1190,11 @@ async def _process_field_values(
                         parsed_value = False
                     else:
                         raise ValueError(f"Invalid boolean value: '{raw_value}'. Use 'true'/'false' or '1'/'0'.")
-                    field_updates.append(FieldValueUpdate(field_id=field.id, value=parsed_value))
+                    field_updates.append(FieldValueUpdate(field_id=field_id, value=parsed_value))
 
             except (ValueError, FieldValidationError) as e:
                 # Log validation error but continue processing
-                logger.warning(f"Field validation error for video {video.youtube_id}, field '{field.name}': {e}")
+                logger.warning(f"Field validation error for video {video.youtube_id}, field '{field_name}': {e}")
 
         # Apply field updates via batch update helper
         if field_updates:
@@ -1377,7 +1382,7 @@ async def bulk_upload_videos(
         all_fields = {field.name.lower(): field for field in fields_result.scalars().all()}
 
         # Step 2: Detect field columns in CSV header
-        field_columns = {}  # column_name -> CustomField
+        field_columns = {}  # column_name -> dict with field data
         for column_name in reader.fieldnames:
             if column_name.lower().startswith('field_'):
                 # Extract field name (remove "field_" prefix)
@@ -1385,8 +1390,15 @@ async def bulk_upload_videos(
 
                 # Try to match to existing field (case-insensitive)
                 if field_name in all_fields:
-                    field_columns[column_name] = all_fields[field_name]
-                    logger.info(f"Detected field column: {column_name} -> {all_fields[field_name].name}")
+                    field_obj = all_fields[field_name]
+                    # Cache field attributes to avoid detached object issues after commit
+                    field_columns[column_name] = {
+                        'id': field_obj.id,
+                        'name': field_obj.name,
+                        'field_type': field_obj.field_type,
+                        'config': field_obj.config
+                    }
+                    logger.info(f"Detected field column: {column_name} -> {field_obj.name}")
                 else:
                     logger.warning(f"Unknown field column '{column_name}' (no matching custom field), will be ignored")
 
@@ -1461,11 +1473,15 @@ async def bulk_upload_videos(
             try:
                 await db.commit()
                 created_videos = videos_to_create  # All created successfully
+                # Refresh all video objects to prevent detached object issues
+                for video in created_videos:
+                    await db.refresh(video)
             except IntegrityError:
                 # Handle duplicates with existing videos in DB
                 await db.rollback()
                 # Retry one by one to identify which failed
                 created_videos = []
+                existing_videos = []  # Track existing videos for field value updates
                 for video in videos_to_create:
                     try:
                         db.add(video)
@@ -1473,22 +1489,35 @@ async def bulk_upload_videos(
                         created_videos.append(video)
                     except IntegrityError:
                         await db.rollback()
-                        failures.append(BulkUploadFailure(
-                            row=0,  # Row unknown in retry
-                            url=f"https://www.youtube.com/watch?v={video.youtube_id}",
-                            error="Video already exists in this list"
-                        ))
+                        # Load existing video for field value update
+                        existing_stmt = select(Video).where(
+                            Video.list_id == list_id,
+                            Video.youtube_id == video.youtube_id
+                        )
+                        existing_result = await db.execute(existing_stmt)
+                        existing_video = existing_result.scalar_one_or_none()
+                        if existing_video:
+                            existing_videos.append(existing_video)
+                            logger.info(f"Video {video.youtube_id} already exists, will update field values")
                 await db.commit()
+
+                # Refresh all video objects to prevent detached object issues
+                for video in created_videos:
+                    await db.refresh(video)
+                if 'existing_videos' in locals():
+                    for video in existing_videos:
+                        await db.refresh(video)
 
             # Capture created video count before processing field values
             # (defensive programming - ensures job count reflects actual created videos)
             created_count = len(created_videos)
 
-            # === Apply field values to created videos (SINGLE LOCATION) ===
-            if field_columns and created_videos:
+            # === Apply field values to ALL videos (new + existing) (SINGLE LOCATION) ===
+            all_videos = created_videos + (existing_videos if 'existing_videos' in locals() else [])
+            if field_columns and all_videos:
                 await _process_field_values(
                     db=db,
-                    created_videos=created_videos,
+                    created_videos=all_videos,
                     csv_rows_map=csv_rows_map,
                     field_columns=field_columns,
                     failures=failures

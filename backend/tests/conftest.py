@@ -53,21 +53,7 @@ async def test_engine():
 
 
 @pytest.fixture
-async def test_db_cleanup(test_engine):
-    """Cleanup database before each test."""
-    from app.models.base import Base
-
-    yield  # Run test first
-
-    # Cleanup after test
-    async with async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)() as session:
-        for table in reversed(Base.metadata.sorted_tables):
-            await session.execute(table.delete())
-        await session.commit()
-
-
-@pytest.fixture
-async def test_db(test_engine, test_db_cleanup):
+async def test_db(test_engine):
     """Create a test database session."""
     TestSessionLocal = async_sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False
@@ -229,6 +215,19 @@ async def user_factory(test_db: AsyncSession):
     yield _create_user
 
     # Cleanup not needed - test_db rollback handles it
+
+
+@pytest.fixture
+async def arq_context(test_db: AsyncSession):
+    """Create ARQ worker context for testing."""
+    from datetime import datetime, timezone
+    return {
+        "db": test_db,
+        "job_id": "test-job-123",
+        "job_try": 1,
+        "enqueue_time": datetime.now(timezone.utc),
+        "score": 1
+    }
 
 
 @pytest.fixture(autouse=True)

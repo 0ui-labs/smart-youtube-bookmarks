@@ -499,3 +499,166 @@ describe('VideosPage - Sorting (Task #146 Section 7)', () => {
     })
   })
 })
+
+describe('VideosPage - UI Reorganization (US-04)', () => {
+  const mockListId = 'test-list-123'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('Mobile Accessibility', () => {
+    it('renders Settings button in sidebar drawer on mobile viewport', async () => {
+      // Mock window.matchMedia for mobile viewport
+      const matchMediaMock = vi.fn((query) => ({
+        matches: query === '(max-width: 768px)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }))
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        value: matchMediaMock,
+      })
+
+      const { useVideos } = await import('@/hooks/useVideos')
+      vi.mocked(useVideos).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Wait for component to render
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /Videos/i })).toBeInTheDocument()
+      })
+
+      // Settings button should be in the sidebar
+      const settingsButton = screen.getByRole('button', { name: /Settings/i })
+      expect(settingsButton).toBeInTheDocument()
+
+      // Verify it's in the sidebar (complementary landmark)
+      const sidebar = screen.getByRole('complementary')
+      expect(sidebar).toContainElement(settingsButton)
+    })
+  })
+
+  describe('Filter Regression', () => {
+    it('opens Add Filter popover, selects filter, applies it, and shows filtered result', async () => {
+      const user = userEvent.setup()
+      const { useVideos } = await import('@/hooks/useVideos')
+
+      const mockVideos = [
+        {
+          id: 'video-1',
+          youtube_id: 'abc123',
+          title: 'Python Tutorial',
+          channel: 'Code Channel',
+          duration: 600,
+          thumbnail_url: 'https://example.com/thumb1.jpg',
+          processing_status: 'completed',
+          created_at: '2024-01-01T00:00:00Z',
+        },
+        {
+          id: 'video-2',
+          youtube_id: 'def456',
+          title: 'JavaScript Basics',
+          channel: 'Web Dev',
+          duration: 480,
+          thumbnail_url: 'https://example.com/thumb2.jpg',
+          processing_status: 'completed',
+          created_at: '2024-01-02T00:00:00Z',
+        },
+      ]
+
+      vi.mocked(useVideos).mockReturnValue({
+        data: mockVideos,
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Wait for videos to render
+      await waitFor(() => {
+        expect(screen.getByText('Python Tutorial')).toBeInTheDocument()
+        expect(screen.getByText('JavaScript Basics')).toBeInTheDocument()
+      })
+
+      // Click Add Filter button in controls bar
+      const addFilterButton = screen.getByRole('button', { name: /Add Filter/i })
+      await user.click(addFilterButton)
+
+      // Popover should open
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+      })
+
+      // Select a filter field (e.g., Title)
+      const titleOption = screen.getByRole('option', { name: /Title/i })
+      await user.click(titleOption)
+
+      // Enter filter value
+      const filterInput = screen.getByPlaceholderText(/Enter value/i)
+      await user.type(filterInput, 'Python')
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /Apply/i })
+      await user.click(applyButton)
+
+      // Verify filter badge appears in FilterBar
+      await waitFor(() => {
+        expect(screen.getByText('Title: Python')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Keyboard Navigation', () => {
+    it('tabs between Settings and Add Filter controls in correct focus order', async () => {
+      const user = userEvent.setup()
+      const { useVideos } = await import('@/hooks/useVideos')
+
+      vi.mocked(useVideos).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+      } as any)
+
+      renderWithRouter(<VideosPage listId={mockListId} />)
+
+      // Wait for component to render
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /Videos/i })).toBeInTheDocument()
+      })
+
+      const settingsButton = screen.getByRole('button', { name: /Settings/i })
+      const addFilterButton = screen.getByRole('button', { name: /Add Filter/i })
+
+      // Focus should start at Settings button (in sidebar)
+      settingsButton.focus()
+      expect(document.activeElement).toBe(settingsButton)
+
+      // Tab to next focusable element
+      await user.tab()
+
+      // After tabbing through sidebar elements, focus should eventually reach Add Filter in controls
+      // (This is a simplified check - in reality, there might be other focusable elements in between)
+      await waitFor(() => {
+        // Tab until we reach the Add Filter button or a reasonable number of tabs
+        let tabCount = 0
+        const maxTabs = 20
+        while (document.activeElement !== addFilterButton && tabCount < maxTabs) {
+          user.tab()
+          tabCount++
+        }
+        expect(document.activeElement).toBe(addFilterButton)
+      }, { timeout: 5000 })
+    })
+  })
+})

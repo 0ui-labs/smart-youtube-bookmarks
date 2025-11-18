@@ -70,6 +70,9 @@ async def test_csv_export_import_roundtrip(
     await test_db.refresh(select_field)
     await test_db.refresh(bool_field)
 
+    # Store IDs before making API calls (objects become detached after commit)
+    list_id = list_obj.id
+
     # Step 2: Create videos with initial field values via CSV import
     initial_csv = """url,field_Overall Rating,field_Quality,field_Recommended
 https://youtube.com/watch?v=testVideo01,3,medium,true
@@ -77,14 +80,14 @@ https://youtube.com/watch?v=testVideo02,4,high,false"""
 
     csv_file = io.BytesIO(initial_csv.encode('utf-8'))
     import_response = await client.post(
-        f"/api/lists/{list_obj.id}/videos/bulk",
+        f"/api/lists/{list_id}/videos/bulk",
         files={"file": ("initial.csv", csv_file, "text/csv")}
     )
     assert import_response.status_code == 201
     assert import_response.json()['created_count'] == 2
 
     # Step 3: Export to CSV
-    export_response = await client.get(f"/api/lists/{list_obj.id}/export/csv")
+    export_response = await client.get(f"/api/lists/{list_id}/export/csv")
     assert export_response.status_code == 200
 
     exported_csv = export_response.text
@@ -127,7 +130,7 @@ https://youtube.com/watch?v=testVideo02,4,high,false"""
     # Step 5: Re-import modified CSV
     modified_file = io.BytesIO(modified_csv.encode('utf-8'))
     reimport_response = await client.post(
-        f"/api/lists/{list_obj.id}/videos/bulk",
+        f"/api/lists/{list_id}/videos/bulk",
         files={"file": ("modified.csv", modified_file, "text/csv")}
     )
 
@@ -138,7 +141,7 @@ https://youtube.com/watch?v=testVideo02,4,high,false"""
     assert reimport_response.status_code == 201
 
     # Step 6: Export again to verify field values were updated
-    final_export = await client.get(f"/api/lists/{list_obj.id}/export/csv")
+    final_export = await client.get(f"/api/lists/{list_id}/export/csv")
     assert final_export.status_code == 200
 
     final_csv = final_export.text
@@ -221,8 +224,11 @@ async def test_csv_roundtrip_with_new_videos(
     test_db.add(field_value1)
     await test_db.commit()
 
+    # Store IDs before making API calls (objects become detached after commit)
+    list_id = list_obj.id
+
     # Export CSV
-    export_response = await client.get(f"/api/lists/{list_obj.id}/export/csv")
+    export_response = await client.get(f"/api/lists/{list_id}/export/csv")
     assert export_response.status_code == 200
 
     exported_csv = export_response.text
@@ -238,14 +244,14 @@ async def test_csv_roundtrip_with_new_videos(
     # Re-import
     modified_file = io.BytesIO(modified_csv.encode('utf-8'))
     reimport_response = await client.post(
-        f"/api/lists/{list_obj.id}/videos/bulk",
+        f"/api/lists/{list_id}/videos/bulk",
         files={"file": ("modified.csv", modified_file, "text/csv")}
     )
 
     assert reimport_response.status_code == 201
 
     # Verify both videos exist (should be exactly 2 - original + new)
-    stmt = select(Video).where(Video.list_id == list_obj.id)
+    stmt = select(Video).where(Video.list_id == list_id)
     result = await test_db.execute(stmt)
     videos = result.scalars().all()
     assert len(videos) == 2, f"Expected exactly 2 videos, got {len(videos)}"
@@ -302,8 +308,12 @@ async def test_csv_roundtrip_preserves_empty_fields(
     test_db.add(field_value1)
     await test_db.commit()
 
+    # Store IDs before making API calls (objects become detached after commit)
+    list_id = list_obj.id
+    select_field_id = select_field.id
+
     # Export CSV
-    export_response = await client.get(f"/api/lists/{list_obj.id}/export/csv")
+    export_response = await client.get(f"/api/lists/{list_id}/export/csv")
     assert export_response.status_code == 200
 
     exported_csv = export_response.text
@@ -319,14 +329,14 @@ async def test_csv_roundtrip_preserves_empty_fields(
     # Re-import without modification
     reimport_file = io.BytesIO(exported_csv.encode('utf-8'))
     reimport_response = await client.post(
-        f"/api/lists/{list_obj.id}/videos/bulk",
+        f"/api/lists/{list_id}/videos/bulk",
         files={"file": ("reimport.csv", reimport_file, "text/csv")}
     )
 
     assert reimport_response.status_code == 201
 
     # Verify quality field still has no value
-    stmt = select(VideoFieldValue).where(VideoFieldValue.field_id == select_field.id)
+    stmt = select(VideoFieldValue).where(VideoFieldValue.field_id == select_field_id)
     result = await test_db.execute(stmt)
     quality_values = result.scalars().all()
     # Should be empty since we never set it
