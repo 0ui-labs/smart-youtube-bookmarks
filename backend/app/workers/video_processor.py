@@ -307,19 +307,23 @@ async def _update_job_progress(db: AsyncSession, job_id: str, success: bool, red
                 progress_percentage % 5 == 0  # Every 5%
             )
 
+        # Create progress event (with error handling to not block Redis publish)
         if should_create_event:
-            # Create progress event
-            progress_event = JobProgressEvent(
-                job_id=UUID(job_id),
-                progress_data={
-                    "progress": progress_percentage,
-                    "processed": parent_job.processed_count,
-                    "failed": parent_job.failed_count,
-                    "total": parent_job.total_videos,
-                    "status": event_status
-                }
-            )
-            db.add(progress_event)
+            try:
+                progress_event = JobProgressEvent(
+                    job_id=UUID(job_id),
+                    progress_data={
+                        "progress": progress_percentage,
+                        "processed": parent_job.processed_count,
+                        "failed": parent_job.failed_count,
+                        "total": parent_job.total_videos,
+                        "status": event_status
+                    }
+                )
+                db.add(progress_event)
+            except Exception as e:
+                logger.warning(f"Failed to create progress event: {e}")
+                # Continue to Redis publish even if DB write fails
 
         # Publish progress to Redis (with throttling for large batches)
         # For small batches (<= 20 videos), publish every update
