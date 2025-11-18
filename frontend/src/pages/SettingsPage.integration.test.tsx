@@ -71,6 +71,39 @@ vi.mock('@/hooks/useLists', () => ({
   useLists: vi.fn(),
 }))
 
+vi.mock('@/hooks/useTags', () => ({
+  useTags: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
+  useCreateTag: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useUpdateTag: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useDeleteTag: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
+  useBulkApplySchema: vi.fn(() => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    data: null,
+  })),
+  tagsOptions: vi.fn(() => ({
+    queryKey: ['tags'],
+    queryFn: vi.fn(),
+  })),
+}))
+
 vi.mock('@/hooks/useCustomFields', () => ({
   useCustomFields: vi.fn(() => ({
     data: [],
@@ -84,6 +117,7 @@ vi.mock('@/hooks/useCustomFields', () => ({
 
 import { useSchemas } from '@/hooks/useSchemas'
 import { useLists } from '@/hooks/useLists'
+import { useTags } from '@/hooks/useTags'
 
 const mockLists = [
   { id: 'list-1', name: 'My List', created_at: '2025-01-01', updated_at: '2025-01-01' }
@@ -239,6 +273,102 @@ describe('SettingsPage Integration', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/error loading schemas/i)).toBeInTheDocument()
+    })
+  })
+})
+
+describe('SettingsPage - Tags Tab', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  beforeEach(() => {
+    vi.mocked(useLists).mockReturnValue({
+      data: mockLists,
+      isLoading: false,
+      isError: false,
+    } as any)
+
+    vi.mocked(useSchemas).mockReturnValue({
+      data: mockSchemas,
+      isLoading: false,
+      isError: false,
+    } as any)
+
+    vi.mocked(useTags).mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    } as any)
+  })
+
+  it('renders Tags tab and displays TagsList', async () => {
+    const user = userEvent.setup({ delay: null })
+    renderWithRouter(<SettingsPage />)
+
+    const tagsTab = screen.getByRole('tab', { name: /tags/i })
+    expect(tagsTab).toBeInTheDocument()
+
+    await user.click(tagsTab)
+
+    await waitFor(() => {
+      expect(screen.getByText(/manage your tags/i)).toBeInTheDocument()
+    })
+  })
+
+  it('shows tags in the list when data is available', async () => {
+    const mockTags = [
+      {
+        id: 'tag-1',
+        name: 'Python',
+        color: '#3B82F6',
+        schema_id: null,
+        user_id: 'user-1',
+        created_at: '2025-11-18T10:00:00Z',
+        updated_at: '2025-11-18T10:00:00Z',
+      },
+      {
+        id: 'tag-2',
+        name: 'Tutorial',
+        color: '#10B981',
+        schema_id: 'schema-1',
+        user_id: 'user-1',
+        created_at: '2025-11-18T11:00:00Z',
+        updated_at: '2025-11-18T11:00:00Z',
+      },
+    ]
+
+    vi.mocked(useTags).mockReturnValue({
+      data: mockTags,
+      isLoading: false,
+      error: null,
+    } as any)
+
+    const user = userEvent.setup({ delay: null })
+    renderWithRouter(<SettingsPage />)
+
+    await user.click(screen.getByRole('tab', { name: /tags/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Python')).toBeInTheDocument()
+      expect(screen.getByText('Tutorial')).toBeInTheDocument()
+    })
+  })
+
+  it('shows empty state when no tags', async () => {
+    vi.mocked(useTags).mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    } as any)
+
+    const user = userEvent.setup({ delay: null })
+    renderWithRouter(<SettingsPage />)
+
+    await user.click(screen.getByRole('tab', { name: /tags/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/no tags yet/i)).toBeInTheDocument()
     })
   })
 })

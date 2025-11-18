@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSchemas } from '@/hooks/useSchemas'
 import { useLists } from '@/hooks/useLists' // ✨ FIX #4: Import useLists
+import { useTags } from '@/hooks/useTags'
 import {
   useCustomFields,
   useUpdateCustomField,
@@ -10,18 +11,22 @@ import {
 import { SchemasList } from '@/components/SchemasList'
 import { SchemaCreationDialog } from '@/components/schemas/SchemaCreationDialog'
 import { FieldsList } from '@/components/settings/FieldsList'
+import { TagsList } from '@/components/settings/TagsList'
 import { FieldEditDialog } from '@/components/settings/FieldEditDialog'
 import { ConfirmDeleteFieldModal } from '@/components/settings/ConfirmDeleteFieldModal'
+import { EditTagDialog } from '@/components/EditTagDialog'
+import { ConfirmDeleteTagDialog } from '@/components/ConfirmDeleteTagDialog'
 import { AnalyticsView } from '@/components/analytics/AnalyticsView'
 import { Button } from '@/components/ui/button'
 import {
   Tabs,
   TabsContent,
-  TabsList,
+  TabsList as TabsListUI,
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { Plus, AlertCircle, X } from 'lucide-react'
 import type { CustomField } from '@/types/customField'
+import type { Tag } from '@/types/tag'
 
 /**
  * SettingsPage - Centralized settings management
@@ -44,7 +49,7 @@ import type { CustomField } from '@/types/customField'
  * <Route path="/settings/schemas" element={<SettingsPage />} />
  */
 export function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'schemas' | 'fields' | 'analytics'>('schemas')
+  const [activeTab, setActiveTab] = useState<'schemas' | 'fields' | 'tags' | 'analytics'>('schemas')
 
   // ✨ FIX #4: Fetch lists dynamically instead of hardcoded listId
   const { data: lists, isLoading: isListsLoading, isError: isListsError } = useLists()
@@ -59,6 +64,9 @@ export function SettingsPage() {
   const deleteField = useDeleteCustomField(listId)
   const usageCounts = useFieldUsageCounts(listId)
 
+  // Fetch tags for current user (Task 6)
+  const { data: tags = [], isLoading: isTagsLoading } = useTags()
+
   // Schema creation dialog state (Task #140 Step 7)
   const [schemaDialogOpen, setSchemaDialogOpen] = useState(false)
 
@@ -69,6 +77,11 @@ export function SettingsPage() {
   // Delete dialog state (Task #139 Step 8)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [fieldToDelete, setFieldToDelete] = useState<CustomField | null>(null)
+
+  // Tag dialog state (Task 6)
+  const [editTagDialogOpen, setEditTagDialogOpen] = useState(false)
+  const [deleteTagDialogOpen, setDeleteTagDialogOpen] = useState(false)
+  const [selectedTag, setSelectedTag] = useState<Tag | null>(null)
 
   // Error states for user feedback
   const [editError, setEditError] = useState<string | null>(null)
@@ -141,6 +154,18 @@ export function SettingsPage() {
     // TODO: Add toast notification when toast component is available
   }
 
+  // Tag edit handler (Task 6)
+  const handleEditTag = (tag: Tag) => {
+    setSelectedTag(tag)
+    setEditTagDialogOpen(true)
+  }
+
+  // Tag delete handler (Task 6)
+  const handleDeleteTag = (tag: Tag) => {
+    setSelectedTag(tag)
+    setDeleteTagDialogOpen(true)
+  }
+
   // Show loading state
   if (isLoading) {
     return (
@@ -178,12 +203,13 @@ export function SettingsPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'schemas' | 'fields' | 'analytics')}>
-          <TabsList className="mb-6">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'schemas' | 'fields' | 'tags' | 'analytics')}>
+          <TabsListUI className="mb-6">
             <TabsTrigger value="schemas">Schemas</TabsTrigger>
             <TabsTrigger value="fields">Fields</TabsTrigger>
+            <TabsTrigger value="tags">Tags</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          </TabsList>
+          </TabsListUI>
 
           {/* Schemas Tab */}
           <TabsContent value="schemas">
@@ -257,6 +283,30 @@ export function SettingsPage() {
             )}
           </TabsContent>
 
+          {/* Tags Tab - Task 6 */}
+          <TabsContent value="tags">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Tags</h2>
+                <p className="text-muted-foreground">
+                  Manage your tags and their schemas
+                </p>
+              </div>
+
+              {isTagsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <p className="text-muted-foreground">Loading tags...</p>
+                </div>
+              ) : (
+                <TagsList
+                  tags={tags}
+                  onEdit={handleEditTag}
+                  onDelete={handleDeleteTag}
+                />
+              )}
+            </div>
+          </TabsContent>
+
           {/* Analytics Tab - Task #142 Step 14 */}
           <TabsContent value="analytics">
             <AnalyticsView />
@@ -296,6 +346,34 @@ export function SettingsPage() {
         onOpenChange={setSchemaDialogOpen}
         onSchemaCreated={handleSchemaCreated}
       />
+
+      {/* Tag Dialogs - Task 6 */}
+      {selectedTag && (
+        <>
+          <EditTagDialog
+            tag={selectedTag}
+            open={editTagDialogOpen}
+            onClose={() => {
+              setEditTagDialogOpen(false)
+              setSelectedTag(null)
+            }}
+            listId={listId}
+          />
+
+          <ConfirmDeleteTagDialog
+            tag={selectedTag}
+            open={deleteTagDialogOpen}
+            onConfirm={() => {
+              setDeleteTagDialogOpen(false)
+              setSelectedTag(null)
+            }}
+            onCancel={() => {
+              setDeleteTagDialogOpen(false)
+              setSelectedTag(null)
+            }}
+          />
+        </>
+      )}
     </div>
   )
 }
