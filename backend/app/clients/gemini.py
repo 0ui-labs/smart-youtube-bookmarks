@@ -138,9 +138,6 @@ class GeminiClient:
                 # Get parsed result
                 parsed_result = response.parsed
 
-                # Explicitly close the client to release connections
-                await aclient.aclose()
-
                 # Return parsed data as Pydantic model
                 return parsed_result
 

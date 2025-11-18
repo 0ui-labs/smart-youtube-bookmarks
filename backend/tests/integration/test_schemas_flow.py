@@ -126,9 +126,9 @@ async def test_cannot_delete_schema_bound_to_tag(
     )
     schema_id = create_response.json()["id"]
 
-    # Create tag (tags.py endpoint)
+    # Create tag (tags.py endpoint) - pass user_id to ensure correct user association
     tag_data = {"name": "Tutorial"}
-    tag_response = await client.post("/api/tags", json=tag_data)
+    tag_response = await client.post(f"/api/tags?user_id={test_user.id}", json=tag_data)
     tag_id = tag_response.json()["id"]
 
     # Bind schema to tag (Task #70 endpoint - future)

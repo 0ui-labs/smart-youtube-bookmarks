@@ -2,6 +2,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import NullPool
+from sqlalchemy import text
 from unittest.mock import AsyncMock, patch
 import asyncio
 
@@ -54,7 +55,7 @@ async def test_engine():
 
 @pytest.fixture
 async def test_db(test_engine):
-    """Create a test database session."""
+    """Create a test database session with cleanup after each test."""
     TestSessionLocal = async_sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False
     )
@@ -67,6 +68,13 @@ async def test_db(test_engine):
             await session.rollback()
             raise
         finally:
+            # Clean up all data after each test to ensure isolation
+            # Disable foreign key checks, truncate all tables, re-enable
+            await session.execute(text("SET session_replication_role = 'replica'"))
+            for table in reversed(Base.metadata.sorted_tables):
+                await session.execute(text(f'TRUNCATE TABLE "{table.name}" CASCADE'))
+            await session.execute(text("SET session_replication_role = 'origin'"))
+            await session.commit()
             await session.close()
 
 

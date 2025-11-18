@@ -12,6 +12,7 @@ import io
 
 from app.models.list import BookmarkList
 from app.models.video import Video
+from app.models.user import User
 
 
 @pytest.mark.asyncio
@@ -833,7 +834,7 @@ async def test_get_videos_field_values_union_from_multiple_schemas(client: Async
 
 
 @pytest.mark.asyncio
-async def test_get_videos_field_values_rating_accepts_float(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList):
+async def test_get_videos_field_values_rating_accepts_float(client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList, test_user: User):
     """Test that rating field accepts and returns float values (e.g., 4.5)."""
     # Create rating field
     field_response = await client.post(
@@ -859,13 +860,13 @@ async def test_get_videos_field_values_rating_accepts_float(client: AsyncClient,
     )
     schema_id = schema_response.json()["id"]
 
-    # Create tag with schema
+    # Create tag with schema (pass user_id to ensure correct user association)
     tag_response = await client.post(
-        "/api/tags",
+        f"/api/tags?user_id={test_user.id}",
         json={"name": "Rated", "color": "#F59E0B"}
     )
     tag_id = tag_response.json()["id"]
-    await client.put(f"/api/tags/{tag_id}", json={"schema_id": schema_id})
+    await client.put(f"/api/tags/{tag_id}?user_id={test_user.id}", json={"schema_id": schema_id})
 
     # Create video with tag
     video_response = await client.post(
