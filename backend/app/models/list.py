@@ -1,9 +1,17 @@
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from uuid import UUID as PyUUID
 from sqlalchemy import String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from .base import BaseModel
+
+if TYPE_CHECKING:
+    from .user import User
+    from .schema import Schema
+    from .video import Video
+    from .job import ProcessingJob
+    from .custom_field import CustomField
+    from .field_schema import FieldSchema
 
 
 class BookmarkList(BaseModel):
@@ -41,6 +49,18 @@ class BookmarkList(BaseModel):
         "ProcessingJob",
         back_populates="list",
         cascade="all, delete-orphan"
+    )
+    custom_fields: Mapped[list["CustomField"]] = relationship(
+        "CustomField",
+        back_populates="list",
+        cascade="all, delete-orphan",  # Deleting list deletes all custom fields
+        passive_deletes=True  # Trust DB CASCADE (REF MCP)
+    )
+    field_schemas: Mapped[list["FieldSchema"]] = relationship(
+        "FieldSchema",
+        back_populates="list",
+        cascade="all, delete-orphan",  # Deleting list removes all schemas
+        passive_deletes=True  # Trust DB CASCADE for performance
     )
 
     def __repr__(self) -> str:

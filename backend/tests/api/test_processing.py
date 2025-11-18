@@ -3,8 +3,26 @@ from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 
 
+async def ensure_video_pending_status(test_db, list_id):
+    """
+    Helper function to ensure all videos in a list have 'pending' status.
+    This is needed because videos may be created with 'completed' status
+    if YouTube API succeeds, but processing tests require 'pending' videos.
+    """
+    from sqlalchemy import select, update
+    from app.models import Video
+
+    # Update all videos in the list to pending status
+    await test_db.execute(
+        update(Video)
+        .where(Video.list_id == list_id)
+        .values(processing_status='pending')
+    )
+    await test_db.commit()
+
+
 @pytest.mark.asyncio
-async def test_start_processing_job(client):
+async def test_start_processing_job(client, test_db):
     # Create list with video
     list_response = await client.post(
         "/api/lists",
@@ -16,6 +34,9 @@ async def test_start_processing_job(client):
         f"/api/lists/{list_id}/videos",
         json={"url": "https://youtube.com/watch?v=dQw4w9WgXcQ"}
     )
+
+    # Ensure video has pending status for processing
+    await ensure_video_pending_status(test_db, list_id)
 
     # Start processing
     response = await client.post(f"/api/lists/{list_id}/process")
@@ -41,7 +62,7 @@ async def test_start_processing_no_pending_videos(client):
 
 
 @pytest.mark.asyncio
-async def test_get_job_status(client):
+async def test_get_job_status(client, test_db):
     # Create list with video and start processing
     list_response = await client.post(
         "/api/lists",
@@ -53,6 +74,9 @@ async def test_get_job_status(client):
         f"/api/lists/{list_id}/videos",
         json={"url": "https://youtube.com/watch?v=dQw4w9WgXcQ"}
     )
+
+    # Ensure video has pending status for processing
+    await ensure_video_pending_status(test_db, list_id)
 
     job_response = await client.post(f"/api/lists/{list_id}/process")
     job_id = job_response.json()["job_id"]
@@ -75,7 +99,7 @@ async def test_get_job_status_not_found(client):
 
 
 @pytest.mark.asyncio
-async def test_pause_job(client):
+async def test_pause_job(client, test_db):
     # Create list with video and start processing
     list_response = await client.post(
         "/api/lists",
@@ -87,6 +111,9 @@ async def test_pause_job(client):
         f"/api/lists/{list_id}/videos",
         json={"url": "https://youtube.com/watch?v=dQw4w9WgXcQ"}
     )
+
+    # Ensure video has pending status for processing
+    await ensure_video_pending_status(test_db, list_id)
 
     job_response = await client.post(f"/api/lists/{list_id}/process")
     job_id = job_response.json()["job_id"]
@@ -110,7 +137,7 @@ async def test_pause_job_not_found(client):
 
 
 @pytest.mark.asyncio
-async def test_pause_already_paused_job(client):
+async def test_pause_already_paused_job(client, test_db):
     # Create list with video and start processing
     list_response = await client.post(
         "/api/lists",
@@ -122,6 +149,9 @@ async def test_pause_already_paused_job(client):
         f"/api/lists/{list_id}/videos",
         json={"url": "https://youtube.com/watch?v=dQw4w9WgXcQ"}
     )
+
+    # Ensure video has pending status for processing
+    await ensure_video_pending_status(test_db, list_id)
 
     job_response = await client.post(f"/api/lists/{list_id}/process")
     job_id = job_response.json()["job_id"]
@@ -150,6 +180,9 @@ async def test_pause_completed_job(client, test_db):
         f"/api/lists/{list_id}/videos",
         json={"url": "https://youtube.com/watch?v=dQw4w9WgXcQ"}
     )
+
+    # Ensure video has pending status for processing
+    await ensure_video_pending_status(test_db, list_id)
 
     job_response = await client.post(f"/api/lists/{list_id}/process")
     job_id = job_response.json()["job_id"]

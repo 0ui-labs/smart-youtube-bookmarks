@@ -1,28 +1,46 @@
-import { useState } from 'react'
 import { ListsPage } from './components/ListsPage'
 import { VideosPage } from './components/VideosPage'
+import { Dashboard } from './pages/Dashboard'
+import { SettingsPage } from './pages/SettingsPage'
+import { NotFound } from './pages/NotFound'
+import { VideoDetailsPage } from './pages/VideoDetailsPage'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useLists } from './hooks/useLists'
 
 function App() {
-  const [currentView, setCurrentView] = useState<'lists' | 'videos'>('lists')
-  const [selectedListId, setSelectedListId] = useState<string | null>(null)
-
-  const handleSelectList = (listId: string) => {
-    setSelectedListId(listId)
-    setCurrentView('videos')
-  }
-
-  const handleBackToLists = () => {
-    setCurrentView('lists')
-    setSelectedListId(null)
-  }
+  // Listen laden und Zustände auswerten
+  const { data: lists, isLoading, isError } = useLists()
+  const actualListId = lists?.[0]?.id ?? null
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {currentView === 'lists' && <ListsPage onSelectList={handleSelectList} />}
-      {currentView === 'videos' && selectedListId && (
-        <VideosPage listId={selectedListId} onBack={handleBackToLists} />
-      )}
-    </div>
+    <Routes>
+      <Route path="/lists" element={<ListsPage />} />
+      <Route
+        path="/videos"
+        element={
+          isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-600">Lade Listen...</p>
+            </div>
+          ) : isError ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-red-600">Fehler beim Laden der Listen.</p>
+            </div>
+          ) : actualListId ? (
+            <VideosPage listId={actualListId} />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-600">Keine Listen gefunden.</p>
+            </div>
+          )
+        }
+      />
+      <Route path="/videos/:videoId" element={<VideoDetailsPage />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/settings/schemas" element={<SettingsPage />} />
+      <Route path="/" element={<Navigate to="/videos" replace />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   )
 }
 

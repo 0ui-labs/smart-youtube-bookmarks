@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from .base import BaseModel
+from .tag import video_tags
 
 
 class Video(BaseModel):
@@ -37,6 +38,19 @@ class Video(BaseModel):
 
     # Relationships
     list: Mapped["BookmarkList"] = relationship("BookmarkList", back_populates="videos")
+    tags: Mapped[list["Tag"]] = relationship(
+        "Tag",
+        secondary=video_tags,
+        back_populates="videos",
+        uselist=True  # Explicitly ensure list relationship
+    )
+    field_values: Mapped[list["VideoFieldValue"]] = relationship(
+        "VideoFieldValue",
+        back_populates="video",
+        cascade="all, delete-orphan",
+        passive_deletes=True,  # Trust DB CASCADE (REF MCP, consistent with CustomField)
+        uselist=True  # Explicit list relationship (unique constraint may confuse SQLAlchemy)
+    )
 
     __table_args__ = (
         Index("idx_videos_list_id", "list_id"),

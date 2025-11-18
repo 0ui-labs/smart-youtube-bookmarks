@@ -9,8 +9,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import lists, videos, processing, websocket
-from app.core.redis import close_redis_client
+from app.api import lists, videos, processing, websocket, tags, custom_fields, schemas, schema_fields, analytics
+from app.core.redis import close_redis_client, close_arq_pool, get_arq_pool
 
 
 @asynccontextmanager
@@ -19,12 +19,26 @@ async def lifespan(app: FastAPI):
     Application lifespan manager.
 
     Handles startup and shutdown events for the application.
-    Currently manages Redis connection lifecycle.
+    Manages Redis client and ARQ pool lifecycle.
     """
-    # Startup: nothing to do yet
+    # Startup: Initialize ARQ pool eagerly (not lazy on first request)
+    # If Redis is unavailable, log warning and continue in degraded mode
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        await get_arq_pool()
+    except Exception as e:
+        logger.warning(
+            f"Failed to connect to Redis on startup: {e}. "
+            "Background job processing will be unavailable."
+        )
+
     yield
-    # Shutdown: close Redis connection
+
+    # Shutdown: Close both Redis client and ARQ pool
     await close_redis_client()
+    await close_arq_pool()
 
 
 app = FastAPI(title="Smart YouTube Bookmarks", lifespan=lifespan)
@@ -42,6 +56,11 @@ app.include_router(lists.router)
 app.include_router(videos.router)
 app.include_router(processing.router)
 app.include_router(websocket.router, prefix="/api", tags=["websocket"])
+app.include_router(tags.router)
+app.include_router(custom_fields.router)
+app.include_router(schemas.router)
+app.include_router(schema_fields.router)
+app.include_router(analytics.router)
 
 
 @app.get("/api/health")

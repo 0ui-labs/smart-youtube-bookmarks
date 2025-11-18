@@ -2,6 +2,9 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import NullPool
+from sqlalchemy import text
+from unittest.mock import AsyncMock, patch
+import asyncio
 
 from app.main import app
 from app.core.database import get_db
@@ -15,6 +18,19 @@ from app.core.config import settings
 # Test database URL
 # Replace the database name in the URL with _test suffix
 TEST_DATABASE_URL = settings.database_url.rsplit('/', 1)[0] + '/youtube_bookmarks_test'
+
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """
+    Create an event loop for the test session.
+
+    This fixture overrides the default pytest-asyncio event loop fixture
+    to use session scope, allowing session-scoped async fixtures.
+    """
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
 
 
 @pytest.fixture(scope="session")
@@ -39,7 +55,7 @@ async def test_engine():
 
 @pytest.fixture
 async def test_db(test_engine):
-    """Create a test database session."""
+    """Create a test database session with cleanup after each test."""
     TestSessionLocal = async_sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False
     )
@@ -52,20 +68,52 @@ async def test_db(test_engine):
             await session.rollback()
             raise
         finally:
+            # Clean up all data after each test to ensure isolation
+            # Disable foreign key checks, truncate all tables, re-enable
+            await session.execute(text("SET session_replication_role = 'replica'"))
+            for table in reversed(Base.metadata.sorted_tables):
+                await session.execute(text(f'TRUNCATE TABLE "{table.name}" CASCADE'))
+            await session.execute(text("SET session_replication_role = 'origin'"))
+            await session.commit()
             await session.close()
 
 
 @pytest.fixture
-async def client(test_db):
-    """Create test client with database override."""
+async def mock_arq_pool():
+    """Mock ARQ pool to avoid Redis connection in tests."""
+    mock_pool = AsyncMock()
+    mock_pool.enqueue_job = AsyncMock(return_value=None)
+    return mock_pool
+
+
+@pytest.fixture
+async def mock_redis_client():
+    """Mock Redis client to avoid Redis connection in tests."""
+    mock_redis = AsyncMock()
+    mock_pubsub = AsyncMock()
+    mock_pubsub.subscribe = AsyncMock()
+    mock_pubsub.unsubscribe = AsyncMock()
+    mock_pubsub.listen = AsyncMock(return_value=[])
+    mock_redis.pubsub = AsyncMock(return_value=mock_pubsub)
+    return mock_redis
+
+
+@pytest.fixture
+async def client(test_db, mock_arq_pool, mock_redis_client):
+    """Create test client with database override and mocked ARQ/Redis."""
     async def override_get_db():
         yield test_db
 
     app.dependency_overrides[get_db] = override_get_db
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    # Mock both get_arq_pool and get_redis_client to avoid Redis connection
+    # Patch for both videos and processing APIs
+    with patch('app.api.videos.get_arq_pool', return_value=mock_arq_pool), \
+         patch('app.api.processing.get_arq_pool', return_value=mock_arq_pool), \
+         patch('app.core.redis.get_redis_client', return_value=mock_redis_client):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
 
     app.dependency_overrides.clear()
 
@@ -131,6 +179,22 @@ async def mock_session_factory(test_engine):
 
 
 @pytest.fixture
+async def test_schema(test_db: AsyncSession, test_list: BookmarkList):
+    """Create a test field schema."""
+    from app.models.field_schema import FieldSchema
+
+    schema = FieldSchema(
+        list_id=test_list.id,
+        name="Test Schema",
+        description="Test schema for integration tests"
+    )
+    test_db.add(schema)
+    await test_db.commit()
+    await test_db.refresh(schema)
+    return schema
+
+
+@pytest.fixture
 async def user_factory(test_db: AsyncSession):
     """
     Factory fixture for creating multiple test users.
@@ -159,3 +223,60 @@ async def user_factory(test_db: AsyncSession):
     yield _create_user
 
     # Cleanup not needed - test_db rollback handles it
+
+
+@pytest.fixture
+async def arq_context(test_db: AsyncSession):
+    """Create ARQ worker context for testing."""
+    from datetime import datetime, timezone
+    return {
+        "db": test_db,
+        "job_id": "test-job-123",
+        "job_try": 1,
+        "enqueue_time": datetime.now(timezone.utc),
+        "score": 1
+    }
+
+
+@pytest.fixture(autouse=True)
+async def reset_redis_singleton():
+    """
+    Reset Redis singleton instances between tests to prevent event loop issues.
+
+    The Redis client singleton can get attached and fail when connection state
+    is invalid. This fixture ensures clean state between tests.
+    """
+    # Import here to avoid circular dependency
+    import app.core.redis as redis_module
+
+    # Clean up before test
+    if redis_module._redis_client is not None:
+        try:
+            await redis_module._redis_client.aclose()
+        except Exception:
+            pass  # Ignore errors during cleanup
+        redis_module._redis_client = None
+
+    if redis_module._arq_pool is not None:
+        try:
+            await redis_module._arq_pool.close(close_connection_pool=True)
+        except Exception:
+            pass  # Ignore errors during cleanup
+        redis_module._arq_pool = None
+
+    yield
+
+    # Clean up after test
+    if redis_module._redis_client is not None:
+        try:
+            await redis_module._redis_client.aclose()
+        except Exception:
+            pass
+        redis_module._redis_client = None
+
+    if redis_module._arq_pool is not None:
+        try:
+            await redis_module._arq_pool.close(close_connection_pool=True)
+        except Exception:
+            pass
+        redis_module._arq_pool = None

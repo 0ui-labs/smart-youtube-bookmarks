@@ -13,3 +13,10 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 pytest==7.4.4
 pytest-asyncio==0.23.3
+aiogoogle==5.11.0
+youtube-transcript-api==0.6.3
+tenacity==8.2.3
+isodate==0.6.1
+google-genai[aiohttp]==0.3.0
+rapidfuzz==3.10.0  # High-performance Levenshtein distance
+numpy==1.26.4  # For embedding operations
