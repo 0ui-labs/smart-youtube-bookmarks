@@ -20,6 +20,7 @@ import logging
 from typing import List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from uuid import UUID
 
 try:
     from rapidfuzz import fuzz
@@ -61,9 +62,12 @@ class SimilarityResult:
         return {
             "field": {
                 "id": str(self.field.id),
+                "list_id": str(self.field.list_id),
                 "name": self.field.name,
                 "field_type": self.field.field_type,
-                "config": self.field.config
+                "config": self.field.config,
+                "created_at": self.field.created_at.isoformat() if self.field.created_at else None,
+                "updated_at": self.field.updated_at.isoformat() if self.field.updated_at else None
             },
             "score": round(self.score, 2),
             "similarity_type": self.similarity_type.value,
@@ -163,10 +167,6 @@ class DuplicateDetector:
                     explanation=f"Exact match (case-insensitive): '{field.name}'"
                 ))
 
-        # If exact match found, return immediately (no need for fuzzy matching)
-        if results:
-            return results
-
         # Strategy 2: Levenshtein distance (typos)
         levenshtein_results = self._find_levenshtein_matches(
             field_name,
@@ -184,6 +184,15 @@ class DuplicateDetector:
                 results.extend(semantic_results)
             except Exception as e:
                 logger.warning(f"Semantic similarity failed: {e}. Using Levenshtein only.")
+
+        # Deduplicate by field ID (keep highest score for each field)
+        seen_fields: dict[UUID, SimilarityResult] = {}
+        for result in results:
+            field_id = result.field.id
+            if field_id not in seen_fields or result.score > seen_fields[field_id].score:
+                seen_fields[field_id] = result
+
+        results = list(seen_fields.values())
 
         # Sort by score (highest first) and return
         results.sort(key=lambda r: r.score, reverse=True)
@@ -383,8 +392,8 @@ class DuplicateDetector:
             response.raise_for_status()
 
             data = response.json()
-            # CORRECTED: Response is embeddings (plural) with array index
-            embedding = data["embeddings"][0]["values"]
+            # CORRECTED: Response is embedding (singular) for v1beta endpoint
+            embedding = data["embedding"]["values"]
 
             return np.array(embedding, dtype=np.float32)
 

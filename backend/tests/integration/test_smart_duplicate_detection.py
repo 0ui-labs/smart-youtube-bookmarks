@@ -56,10 +56,10 @@ class TestSmartDuplicateDetectionIntegration:
         test_list: BookmarkList
     ):
         """Smart mode should detect typos."""
-        # Create field
+        # Create field (use simple name without extra words for Levenshtein to work)
         field = CustomField(
             list_id=test_list.id,
-            name="Presentation Quality",
+            name="Presentation",
             field_type="select",
             config={"options": ["bad", "good", "great"]}
         )
@@ -81,7 +81,7 @@ class TestSmartDuplicateDetectionIntegration:
         assert len(data["suggestions"]) >= 1
 
         suggestion = data["suggestions"][0]
-        assert suggestion["field"]["name"] == "Presentation Quality"
+        assert suggestion["field"]["name"] == "Presentation"
         assert suggestion["similarity_type"] == "levenshtein"
         assert suggestion["score"] >= 0.80
         assert "character difference" in suggestion["explanation"]

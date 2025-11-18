@@ -185,9 +185,13 @@ async def test_multi_tag_field_union_in_video_detail(
     4. Field deduplication works (Rating appears once, not twice)
     5. No conflict prefix (same name + same type = no conflict)
     """
+    # Store IDs at the start to avoid detached object issues
+    list_id = test_list.id
+    user_id = test_user.id
+
     # Arrange: Create video
     video = Video(
-        list_id=test_list.id,
+        list_id=list_id,
         youtube_id="python_tutorial_001",
         processing_status="completed",
         title="Python Tutorial: Basics"
@@ -195,22 +199,23 @@ async def test_multi_tag_field_union_in_video_detail(
     test_db.add(video)
     await test_db.commit()
     await test_db.refresh(video)
+    video_id = video.id
 
     # Create 3 fields
     presentation_field = CustomField(
-        list_id=test_list.id,
+        list_id=list_id,
         name="Presentation",
         field_type="select",
         config={"options": ["bad", "good", "great"]}
     )
     rating_field = CustomField(
-        list_id=test_list.id,
+        list_id=list_id,
         name="Rating",
         field_type="rating",
         config={"max_rating": 5}
     )
     difficulty_field = CustomField(
-        list_id=test_list.id,
+        list_id=list_id,
         name="Difficulty",
         field_type="select",
         config={"options": ["beginner", "intermediate", "advanced"]}
@@ -220,12 +225,12 @@ async def test_multi_tag_field_union_in_video_detail(
 
     # Create 2 schemas
     tutorial_schema = FieldSchema(
-        list_id=test_list.id,
+        list_id=list_id,
         name="Tutorial Schema",
         description="General tutorial metrics"
     )
     python_schema = FieldSchema(
-        list_id=test_list.id,
+        list_id=list_id,
         name="Python Schema",
         description="Python-specific metrics"
     )
@@ -264,12 +269,12 @@ async def test_multi_tag_field_union_in_video_detail(
 
     # Create 2 tags with schemas (tags use user_id, not list_id)
     tutorial_tag = Tag(
-        user_id=test_user.id,
+        user_id=user_id,
         name="Tutorial",
         schema_id=tutorial_schema.id
     )
     python_tag = Tag(
-        user_id=test_user.id,
+        user_id=user_id,
         name="Python",
         schema_id=python_schema.id
     )
@@ -281,25 +286,33 @@ async def test_multi_tag_field_union_in_video_detail(
     # Store IDs before commit to avoid detached object issues
     tutorial_tag_id = tutorial_tag.id
     python_tag_id = python_tag.id
-    video_id = video.id
 
-    # Assign both tags to video (need to refresh video to load tags relationship)
-    await test_db.refresh(video)
-    video.tags.append(tutorial_tag)
-    video.tags.append(python_tag)
+    # Assign both tags to video via direct insert into join table
+    # (Avoids detached object issues with relationship lazy loading)
+    from app.models.tag import video_tags
+    from sqlalchemy import insert
+
+    await test_db.execute(
+        insert(video_tags).values([
+            {"video_id": video_id, "tag_id": tutorial_tag_id},
+            {"video_id": video_id, "tag_id": python_tag_id}
+        ])
+    )
     await test_db.commit()
-    # Refresh video again after commit to ensure tags are loaded
-    await test_db.refresh(video)
 
     # Set field values (only 2 out of 3 fields filled)
+    # Store field IDs to avoid detached access
+    presentation_field_id = presentation_field.id
+    rating_field_id = rating_field.id
+
     value1 = VideoFieldValue(
-        video_id=video.id,
-        field_id=presentation_field.id,
+        video_id=video_id,
+        field_id=presentation_field_id,
         value_text="great"
     )
     value2 = VideoFieldValue(
-        video_id=video.id,
-        field_id=rating_field.id,
+        video_id=video_id,
+        field_id=rating_field_id,
         value_numeric=4
     )
     # Note: difficulty_field has NO value (should still appear in available_fields)
@@ -307,7 +320,15 @@ async def test_multi_tag_field_union_in_video_detail(
     await test_db.commit()
 
     # Act: GET video detail (Task #74 endpoint)
-    response = await client.get(f"/api/lists/{test_list.id}/videos/{video.id}")
+    # Debug: Verify video exists
+    from sqlalchemy import select
+    verify_stmt = select(Video).where(Video.id == video_id)
+    verify_result = await test_db.execute(verify_stmt)
+    verify_video = verify_result.scalar_one_or_none()
+    assert verify_video is not None, f"Video {video_id} not found in database!"
+    assert verify_video.list_id == list_id, f"Video list_id mismatch: {verify_video.list_id} != {list_id}"
+
+    response = await client.get(f"/api/videos/{video_id}")
 
     # Assert: Response
     assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
