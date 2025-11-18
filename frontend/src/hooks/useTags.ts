@@ -196,3 +196,76 @@ export const useBulkApplySchema = () => {
     },
   })
 }
+
+/**
+ * React Query mutation hook to update an existing tag
+ *
+ * Automatically invalidates tags query after successful update or error
+ *
+ * @returns Mutation result with mutate function
+ *
+ * @example
+ * ```tsx
+ * const updateTag = useUpdateTag()
+ *
+ * updateTag.mutate({
+ *   tagId: 'uuid',
+ *   data: { name: 'New Name', color: '#FF0000', schema_id: 'uuid-or-null' }
+ * })
+ * ```
+ */
+export const useUpdateTag = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationKey: ['updateTag'],
+    mutationFn: async ({ tagId, data }: { tagId: string; data: Partial<TagCreate> }) => {
+      const { data: responseData } = await api.put<Tag>(`/tags/${tagId}`, data)
+      // Validate response with Zod schema
+      return TagSchema.parse(responseData)
+    },
+    onError: (error) => {
+      console.error('Failed to update tag:', error)
+    },
+    onSettled: async () => {
+      // Invalidate tags query to refresh UI
+      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey })
+    },
+  })
+}
+
+/**
+ * React Query mutation hook to delete a tag
+ *
+ * Automatically invalidates tags AND videos queries after successful deletion
+ * to ensure tag badges disappear from video cards
+ *
+ * @returns Mutation result with mutate function
+ *
+ * @example
+ * ```tsx
+ * const deleteTag = useDeleteTag()
+ *
+ * deleteTag.mutate('tag-uuid')
+ * ```
+ */
+export const useDeleteTag = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationKey: ['deleteTag'],
+    mutationFn: async (tagId: string) => {
+      await api.delete(`/tags/${tagId}`)
+      // 204 No Content - no response body
+    },
+    onError: (error) => {
+      console.error('Failed to delete tag:', error)
+    },
+    onSettled: async () => {
+      // Invalidate both tags and videos queries
+      // Videos query needs refresh to remove deleted tag badges
+      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey })
+      await queryClient.invalidateQueries({ queryKey: ['videos'] })
+    },
+  })
+}
