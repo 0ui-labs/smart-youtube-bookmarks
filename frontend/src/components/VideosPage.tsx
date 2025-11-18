@@ -13,6 +13,7 @@ import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV, useAssignTa
 import { useVideosFilter } from '@/hooks/useVideosFilter'
 import { useFieldFilterStore } from '@/stores/fieldFilterStore'
 import { FilterBar } from '@/components/videos/FilterBar'
+import { FilterPopover } from '@/components/videos/FilterPopover'
 import { CSVUpload } from './CSVUpload'
 import { ProgressBar } from './ProgressBar'
 import { formatDuration } from '@/utils/formatDuration'
@@ -735,18 +736,32 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     <div className="flex h-screen">
       {/* Sidebar with TagNavigation */}
       <CollapsibleSidebar>
-        {tagsLoading ? (
-          <div className="p-4 text-sm text-gray-500">Tags werden geladen...</div>
-        ) : tagsError ? (
-          <div className="p-4 text-sm text-red-600">Fehler beim Laden der Tags</div>
-        ) : (
-          <TagNavigation
-            tags={tags}
-            selectedTagIds={selectedTagIds}
-            onTagSelect={toggleTag}
-            onTagCreate={handleCreateTag}
-          />
-        )}
+        <div className="flex flex-col h-full">
+          {tagsLoading ? (
+            <div className="p-4 text-sm text-gray-500">Tags werden geladen...</div>
+          ) : tagsError ? (
+            <div className="p-4 text-sm text-red-600">Fehler beim Laden der Tags</div>
+          ) : (
+            <TagNavigation
+              tags={tags}
+              selectedTagIds={selectedTagIds}
+              onTagSelect={toggleTag}
+              onTagCreate={handleCreateTag}
+            />
+          )}
+
+          {/* Settings Button - Task #8 (moved from controls bar) */}
+          <div className="mt-auto pt-4 border-t border-gray-200">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+              onClick={() => navigate('/settings/schemas')}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+          </div>
+        </div>
       </CollapsibleSidebar>
 
       {/* Main content area */}
@@ -823,15 +838,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
         {/* Right side - View controls */}
         <div className="flex gap-1 items-center flex-shrink-0 ml-auto">
-          {/* Settings Button - Task #135 Step 12 */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/settings/schemas')}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
+          {/* Add Filter Button - Task #9 (moved from FilterBar) */}
+          <FilterPopover listId={listId} />
           {/* View Mode Toggle - Task #32 */}
           <ViewModeToggle viewMode={viewMode} onToggle={setViewMode} />
           {/* Table Settings Dropdown - Task #35 */}
