@@ -26,26 +26,27 @@ import { VideosPage } from '@/components/VideosPage'
 
 const API_BASE = 'http://localhost:8000/api'
 
-const MOCK_LIST_ID = 'list-123e4567-e89b-12d3-a456-426614174000'
-const MOCK_VIDEO_ID = 'video-123e4567-e89b-12d3-a456-426614174001'
-const MOCK_TAG_ID = 'tag-123e4567-e89b-12d3-a456-426614174002'
-const MOCK_SCHEMA_ID = 'schema-123e4567-e89b-12d3-a456-426614174003'
-const MOCK_FIELD_ID = 'field-123e4567-e89b-12d3-a456-426614174004'
+const MOCK_LIST_ID = '123e4567-e89b-12d3-a456-426614174000'
+const MOCK_VIDEO_ID = '223e4567-e89b-12d3-a456-426614174001'
+const MOCK_TAG_ID = '323e4567-e89b-12d3-a456-426614174002'
+const MOCK_SCHEMA_ID = '423e4567-e89b-12d3-a456-426614174003'
+const MOCK_FIELD_ID = '523e4567-e89b-12d3-a456-426614174004'
 
 interface MockVideo {
   id: string
   list_id: string
   youtube_id: string
-  title: string
-  channel: string
-  duration: number
-  thumbnail_url: string
+  title: string | null
+  channel: string | null
+  duration: number | null
+  thumbnail_url: string | null
+  published_at: string | null
   processing_status: 'completed'
   tags: any[]
-  field_values: any[]
+  field_values?: any[]
+  error_message: string | null
   created_at: string
   updated_at: string
-  published_at: string
 }
 
 const createMockVideo = (overrides: Partial<MockVideo> = {}): MockVideo => ({
@@ -56,18 +57,19 @@ const createMockVideo = (overrides: Partial<MockVideo> = {}): MockVideo => ({
   channel: 'Makeup Mastery',
   duration: 360,
   thumbnail_url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg',
+  published_at: '2025-11-07T12:00:00Z',
   processing_status: 'completed',
   tags: [],
   field_values: [],
+  error_message: null,
   created_at: '2025-11-08T10:00:00Z',
   updated_at: '2025-11-08T10:00:00Z',
-  published_at: '2025-11-07T12:00:00Z',
   ...overrides,
 })
 
 const createMockTag = (overrides: any = {}) => ({
   id: MOCK_TAG_ID,
-  user_id: 'user-uuid',
+  user_id: '623e4567-e89b-12d3-a456-426614174005',
   list_id: MOCK_LIST_ID,
   name: 'Makeup Tutorials',
   color: '#FF69B4',
@@ -111,26 +113,27 @@ let mockFields: any[] = []
 
 describe('Custom Fields Flow Integration (Task #134)', () => {
   beforeEach(() => {
-    // Reset test data before each test
-    mockVideos = [createMockVideo()]
-    mockTags = []
-    mockSchemas = []
-    mockFields = []
+    // Reset test data before each test (clear arrays instead of replacing them)
+    mockVideos.length = 0
+    mockVideos.push(createMockVideo())
+    mockTags.length = 0
+    mockSchemas.length = 0
+    mockFields.length = 0
 
     // Extend global MSW server with test-specific handlers
     server.use(
-      // GET /api/lists/{listId}/videos
-      http.get(`${API_BASE}/lists/:listId/videos`, () => {
-        return HttpResponse.json(mockVideos)
-      }),
-
-      // GET /api/lists/{listId}/tags
-      http.get(`${API_BASE}/lists/:listId/tags`, () => {
+      // GET /api/tags
+      http.get('/api/tags', () => {
         return HttpResponse.json(mockTags)
       }),
 
+      // GET /api/lists/{listId}/videos
+      http.get('/api/lists/:listId/videos', () => {
+        return HttpResponse.json(mockVideos)
+      }),
+
       // POST /api/lists/{listId}/tags
-      http.post(`${API_BASE}/lists/:listId/tags`, async ({ request }) => {
+      http.post('/api/lists/:listId/tags', async ({ request }) => {
         const body = await request.json() as any
         const newTag = createMockTag({
           id: MOCK_TAG_ID,
@@ -143,12 +146,12 @@ describe('Custom Fields Flow Integration (Task #134)', () => {
       }),
 
       // GET /api/lists/{listId}/schemas
-      http.get(`${API_BASE}/lists/:listId/schemas`, () => {
+      http.get('/api/lists/:listId/schemas', () => {
         return HttpResponse.json(mockSchemas)
       }),
 
       // POST /api/lists/{listId}/schemas
-      http.post(`${API_BASE}/lists/:listId/schemas`, async ({ request }) => {
+      http.post('/api/lists/:listId/schemas', async ({ request }) => {
         const body = await request.json() as any
         const newSchema = createMockSchema({
           id: MOCK_SCHEMA_ID,
@@ -167,12 +170,12 @@ describe('Custom Fields Flow Integration (Task #134)', () => {
       }),
 
       // GET /api/lists/{listId}/custom-fields
-      http.get(`${API_BASE}/lists/:listId/custom-fields`, () => {
+      http.get('/api/lists/:listId/custom-fields', () => {
         return HttpResponse.json(mockFields)
       }),
 
       // POST /api/lists/{listId}/custom-fields
-      http.post(`${API_BASE}/lists/:listId/custom-fields`, async ({ request }) => {
+      http.post('/api/lists/:listId/custom-fields', async ({ request }) => {
         const body = await request.json() as any
         const newField = createMockField({
           id: MOCK_FIELD_ID,
@@ -185,7 +188,7 @@ describe('Custom Fields Flow Integration (Task #134)', () => {
       }),
 
       // POST /api/lists/{listId}/custom-fields/check-duplicate
-      http.post(`${API_BASE}/lists/:listId/custom-fields/check-duplicate`, async ({ request }) => {
+      http.post('/api/lists/:listId/custom-fields/check-duplicate', async ({ request }) => {
         const body = await request.json() as any
         const existingField = mockFields.find(
           f => f.name.toLowerCase() === body.name.toLowerCase()
@@ -197,7 +200,7 @@ describe('Custom Fields Flow Integration (Task #134)', () => {
       }),
 
       // PUT /api/videos/{videoId}/tags
-      http.put(`${API_BASE}/videos/:videoId/tags`, async ({ request, params }) => {
+      http.put('/api/videos/:videoId/tags', async ({ request, params }) => {
         const body = await request.json() as any
         const video = mockVideos.find(v => v.id === params.videoId)
         if (video) {
@@ -207,7 +210,7 @@ describe('Custom Fields Flow Integration (Task #134)', () => {
       }),
 
       // PUT /api/videos/{videoId}/fields
-      http.put(`${API_BASE}/videos/:videoId/fields`, async ({ request, params }) => {
+      http.put('/api/videos/:videoId/fields', async ({ request, params }) => {
         const body = await request.json() as any
         const video = mockVideos.find(v => v.id === params.videoId)
         if (video) {
@@ -229,10 +232,10 @@ describe('Custom Fields Flow Integration (Task #134)', () => {
   afterEach(() => {
     // Reset handlers (inherited from global setup.ts)
     // Also reset mutable state to prevent test pollution
-    mockVideos = []
-    mockTags = []
-    mockSchemas = []
-    mockFields = []
+    mockVideos.length = 0
+    mockTags.length = 0
+    mockSchemas.length = 0
+    mockFields.length = 0
   })
 
   describe('Test 1: Create tag with new schema and custom field', () => {
@@ -373,7 +376,7 @@ describe('Custom Fields Flow Integration (Task #134)', () => {
 
       // Override handler to return error (using global server)
       server.use(
-        http.post(`${API_BASE}/lists/:listId/custom-fields`, () => {
+        http.post('/api/lists/:listId/custom-fields', () => {
           return HttpResponse.json(
             { detail: 'Validation error: Invalid field_type' },
             { status: 400 }

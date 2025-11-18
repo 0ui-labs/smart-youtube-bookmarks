@@ -19,7 +19,12 @@ export function resetMockTags() {
 }
 
 export const tagsHandlers = [
-  // POST /tags
+  // GET /api/tags - Fetch all tags
+  http.get('/api/tags', () => {
+    return HttpResponse.json(mockTags)
+  }),
+
+  // POST /api/tags
   http.post('/api/tags', async ({ request }) => {
     const body = (await request.json()) as TagCreate
 

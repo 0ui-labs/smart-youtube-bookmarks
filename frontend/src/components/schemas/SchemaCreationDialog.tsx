@@ -13,6 +13,8 @@ import { useTemplateInstantiation } from '@/hooks/useTemplateInstantiation'
 import { Loader2 } from 'lucide-react'
 import type { SchemaTemplate } from '@/constants/schemaTemplates'
 import type { FieldSchemaResponse } from '@/types/customFields'
+import { SchemaEditor, type SchemaFormData } from './SchemaEditor'
+import { useCreateSchema } from '@/hooks/useSchemas'
 
 interface SchemaCreationDialogProps {
   listId: string
@@ -41,8 +43,34 @@ export function SchemaCreationDialog({
     },
   })
 
+  const createSchema = useCreateSchema(listId)
+
   const handleSelectTemplate = (template: SchemaTemplate) => {
     instantiate(template)
+  }
+
+  // Bug #001 Fix: Handlers for "Start from Scratch" tab
+  const handleSchemaCreated = async (schemaData: SchemaFormData) => {
+    try {
+      const newSchema = await createSchema.mutateAsync({
+        name: schemaData.name,
+        description: schemaData.description,
+        fields: schemaData.fields,
+      })
+
+      // Notify parent and close dialog
+      onSchemaCreated(newSchema)
+      onOpenChange(false)
+    } catch (error) {
+      // Error is handled by SchemaEditor component
+      // Re-throw to let SchemaEditor display the error
+      throw error
+    }
+  }
+
+  const handleSchemaCancelled = () => {
+    // Just close the dialog
+    onOpenChange(false)
   }
 
   return (
@@ -92,10 +120,12 @@ export function SchemaCreationDialog({
           </TabsContent>
 
           <TabsContent value="scratch" className="mt-4">
-            {/* TODO: Existing custom schema editor (Task #121) */}
-            <div className="text-center py-12 text-muted-foreground">
-              Custom schema editor (to be implemented in Task #121)
-            </div>
+            {/* Bug #001 Fix: Integrate SchemaEditor for custom schema creation */}
+            <SchemaEditor
+              listId={listId}
+              onSave={handleSchemaCreated}
+              onCancel={handleSchemaCancelled}
+            />
           </TabsContent>
         </Tabs>
       </DialogContent>

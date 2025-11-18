@@ -390,7 +390,7 @@ describe('useDeleteSchema', () => {
 
     const { result } = renderHook(() => useDeleteSchema(mockListId), { wrapper })
 
-    result.current.mutate(mockSchemaId)
+    result.current.mutate({ schemaId: mockSchemaId })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(schemasApi.deleteSchema).toHaveBeenCalledWith(mockListId, mockSchemaId)
@@ -400,7 +400,7 @@ describe('useDeleteSchema', () => {
     vi.mocked(schemasApi.deleteSchema).mockResolvedValueOnce(undefined)
 
     const { result } = renderHook(() => useDeleteSchema(mockListId), { wrapper })
-    result.current.mutate(mockSchemaId)
+    result.current.mutate({ schemaId: mockSchemaId })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 

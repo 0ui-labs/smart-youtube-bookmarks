@@ -189,7 +189,21 @@ async def get_available_fields_for_videos(
 
     for video in videos:
         # Handle case where tags relationship might not be loaded or is None
-        tags = video.tags if video.tags is not None else []
+        # WORKAROUND: SQLAlchemy sometimes has issues with tags relationship
+        # Catch TypeError that occurs when tags is a single Tag object instead of a list
+        try:
+            tags = video.tags if video.tags is not None else []
+
+            # Additional safety: If tags is a single Tag object (not iterable), convert to list
+            if tags and not isinstance(tags, (list, tuple)):
+                tags = [tags]
+        except TypeError as e:
+            # If we get TypeError accessing video.tags, try to get it as a single object
+            if "'Tag' object is not iterable" in str(e):
+                tags = [video.tags] if hasattr(video, 'tags') and video.tags else []
+            else:
+                raise
+
         schema_ids = [tag.schema_id for tag in tags if tag.schema_id is not None]
         if schema_ids:
             video_schemas[video.id] = schema_ids

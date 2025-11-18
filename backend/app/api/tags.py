@@ -122,24 +122,46 @@ async def create_tag(
             detail=f"Tag '{tag.name}' already exists"
         )
 
+    # BUG FIX: Validate schema_id if provided (same logic as update_tag)
+    if tag.schema_id is not None:
+        from app.models.list import BookmarkList
+        from app.models.field_schema import FieldSchema
+        from sqlalchemy import exists
+
+        # Validate schema exists AND belongs to user's list
+        # FIX BUG #002B: Use exists() to avoid loading FieldSchema into session
+        # Loading FieldSchema causes bidirectional relationship sync that clears schema_id
+        schema_exists_stmt = (
+            select(exists().where(
+                FieldSchema.id == tag.schema_id
+            ).where(
+                FieldSchema.list_id.in_(
+                    select(BookmarkList.id).where(BookmarkList.user_id == current_user.id)
+                )
+            ))
+        )
+        schema_exists = (await db.execute(schema_exists_stmt)).scalar()
+
+        if not schema_exists:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Schema mit ID '{str(tag.schema_id)[:8]}...' nicht gefunden oder gehört zu anderer Liste"
+            )
+
     # Create new tag
     new_tag = Tag(
         name=tag.name,
         color=tag.color,
+        schema_id=tag.schema_id,  # Include schema_id (will be preserved!)
         user_id=current_user.id
     )
     db.add(new_tag)
     await db.commit()
     await db.refresh(new_tag)
 
-    # Eager load schema relationship to avoid lazy loading issues in response serialization
-    # Re-query with selectinload to ensure schema is loaded
-    stmt = (
-        select(Tag)
-        .options(selectinload(Tag.schema))
-        .where(Tag.id == new_tag.id)
-    )
-    new_tag = (await db.execute(stmt)).scalar_one()
+    # FIX BUG #002: REMOVED new_tag.schema = None workaround
+    # TagResponse no longer includes 'schema' field, so no lazy-loading occurs
+    # Frontend only needs schema_id - if full schema needed, fetch via GET /api/schemas/{id}
 
     return new_tag
 
@@ -152,17 +174,18 @@ async def list_tags(
     """List all tags for current user."""
     current_user = await get_user_for_testing(db, user_id)
 
-    # Eager load schema relationships (including nested schema_fields)
+    # Load tags (no need to load schema relationship - TagResponse doesn't include it)
     stmt = (
         select(Tag)
-        .options(
-            selectinload(Tag.schema).selectinload(FieldSchema.schema_fields)
-        )
         .where(Tag.user_id == current_user.id)
         .order_by(Tag.name)
     )
     result = await db.execute(stmt)
     tags = result.scalars().all()
+
+    # FIX BUG #002: REMOVED tag.schema = None workaround
+    # TagResponse no longer includes 'schema' field
+
     return list(tags)
 
 
@@ -175,12 +198,9 @@ async def get_tag(
     """Get a specific tag by ID."""
     current_user = await get_user_for_testing(db, user_id)
 
-    # Eager load schema relationship (including nested schema_fields)
+    # Load tag (no need to load schema relationship - TagResponse doesn't include it)
     stmt = (
         select(Tag)
-        .options(
-            selectinload(Tag.schema).selectinload(FieldSchema.schema_fields)
-        )
         .where(Tag.id == tag_id, Tag.user_id == current_user.id)
     )
     result = await db.execute(stmt)
@@ -188,6 +208,9 @@ async def get_tag(
 
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
+
+    # FIX BUG #002: REMOVED tag.schema = None workaround
+    # TagResponse no longer includes 'schema' field
 
     return tag
 
@@ -202,8 +225,8 @@ async def update_tag(
     """Update a tag (rename, change color, or bind/unbind schema)."""
     current_user = await get_user_for_testing(db, user_id)
 
-    # Fetch tag with eager loaded schema (for response)
-    stmt = select(Tag).options(selectinload(Tag.schema)).where(
+    # Fetch tag (no need to load schema - TagResponse doesn't include it)
+    stmt = select(Tag).where(
         Tag.id == tag_id,
         Tag.user_id == current_user.id
     )
@@ -237,19 +260,22 @@ async def update_tag(
 
         if schema_id_value is not None:
             # REF MCP Improvement #3: Validate schema exists AND belongs to user's list in ONE query
+            # FIX BUG #002B: Use exists() to avoid loading FieldSchema into session
             from app.models.list import BookmarkList
+            from sqlalchemy import exists
 
-            schema_stmt = (
-                select(FieldSchema)
-                .join(BookmarkList, FieldSchema.list_id == BookmarkList.id)
-                .where(
-                    FieldSchema.id == schema_id_value,
-                    BookmarkList.user_id == current_user.id
-                )
+            schema_exists_stmt = (
+                select(exists().where(
+                    FieldSchema.id == schema_id_value
+                ).where(
+                    FieldSchema.list_id.in_(
+                        select(BookmarkList.id).where(BookmarkList.user_id == current_user.id)
+                    )
+                ))
             )
-            schema = (await db.execute(schema_stmt)).scalar_one_or_none()
+            schema_exists = (await db.execute(schema_exists_stmt)).scalar()
 
-            if not schema:
+            if not schema_exists:
                 # Combined error: schema not found OR doesn't belong to user's list
                 raise HTTPException(
                     status_code=404,
@@ -268,20 +294,11 @@ async def update_tag(
 
     await db.commit()
 
-    # Expire the tag to clear cached relationships
-    # This ensures re-query loads fresh data even with expire_on_commit=False
-    db.expire(tag)
+    # Refresh tag to get updated data
+    await db.refresh(tag)
 
-    # REF MCP Improvement #4: Re-query with selectinload (no refresh needed)
-    # Load nested schema_fields to avoid lazy loading issues
-    stmt = (
-        select(Tag)
-        .options(
-            selectinload(Tag.schema).selectinload(FieldSchema.schema_fields)
-        )
-        .where(Tag.id == tag_id)
-    )
-    tag = (await db.execute(stmt)).scalar_one_or_none()
+    # FIX BUG #002: REMOVED tag.schema = None workaround
+    # TagResponse no longer includes 'schema' field, so no lazy-loading occurs
 
     return tag
 

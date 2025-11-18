@@ -100,7 +100,7 @@ describe('RatingConfigEditor', () => {
       expect(input).toHaveValue(7)
     })
 
-    it('shows error when input is cleared', async () => {
+    it('does not show error when input is cleared (keeps current value)', async () => {
       const user = userEvent.setup()
       render(
         <RatingConfigEditor
@@ -109,12 +109,13 @@ describe('RatingConfigEditor', () => {
         />
       )
 
-      const input = screen.getByLabelText(/maximale bewertung/i)
+      const input = screen.getByLabelText(/maximale bewertung/i) as HTMLInputElement
       await user.clear(input)
 
-      await waitFor(() => {
-        expect(screen.getByText(/bitte geben sie eine zahl zwischen 1 und 10 ein/i)).toBeInTheDocument()
-      })
+      // Component doesn't allow empty - input keeps its value
+      expect(input.value).toBe('5')
+      // No error should be shown
+      expect(screen.queryByText(/bitte geben sie eine zahl/i)).not.toBeInTheDocument()
     })
   })
 

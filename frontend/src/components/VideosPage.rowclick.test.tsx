@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { VideosPage } from './VideosPage'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -143,6 +144,7 @@ describe('VideosPage - Row Click & Menu Interaction', () => {
 
   describe('Menu Click Isolation', () => {
     it('should NOT open video when clicking menu trigger', async () => {
+      const user = userEvent.setup()
       renderVideosPage()
 
       await waitFor(() => {
@@ -150,7 +152,7 @@ describe('VideosPage - Row Click & Menu Interaction', () => {
       })
 
       const menuButton = screen.getByLabelText('Aktionen')
-      fireEvent.click(menuButton)
+      await user.click(menuButton)
 
       expect(window.open).not.toHaveBeenCalled()
 
@@ -161,9 +163,10 @@ describe('VideosPage - Row Click & Menu Interaction', () => {
     })
 
     it('should NOT open video when clicking delete menu item', async () => {
+      const user = userEvent.setup()
       const { useDeleteVideo } = await import('@/hooks/useVideos')
       const mockMutate = vi.fn()
-      vi.mocked(useDeleteVideo).mockReturnValue({ mutate: mockMutate } as any)
+      vi.mocked(useDeleteVideo).mockReturnValue({ mutate: mockMutate, isPending: false } as any)
 
       renderVideosPage()
 
@@ -173,26 +176,35 @@ describe('VideosPage - Row Click & Menu Interaction', () => {
 
       // Open menu
       const menuButton = screen.getByLabelText('Aktionen')
-      fireEvent.click(menuButton)
+      await user.click(menuButton)
 
       // Click delete
       await waitFor(() => {
         expect(screen.getByText('Löschen')).toBeInTheDocument()
       })
       const deleteItem = screen.getByText('Löschen')
-      fireEvent.click(deleteItem)
+      await user.click(deleteItem)
 
-      // Confirm dialog shown
-      expect(window.confirm).toHaveBeenCalledWith('Video wirklich löschen?')
+      // Confirm dialog shown (using AlertDialog now, not window.confirm)
+      await waitFor(() => {
+        expect(screen.getByText('Video löschen?')).toBeInTheDocument()
+      })
+
+      // Click confirm button in the dialog
+      const confirmButton = screen.getByRole('button', { name: /Löschen/i })
+      await user.click(confirmButton)
 
       // Delete mutation called
-      expect(mockMutate).toHaveBeenCalledWith('video-1')
+      await waitFor(() => {
+        expect(mockMutate).toHaveBeenCalledWith('video-1')
+      })
 
       // Video NOT opened
       expect(window.open).not.toHaveBeenCalled()
     })
 
     it('should close menu when pressing Escape', async () => {
+      const user = userEvent.setup()
       renderVideosPage()
 
       await waitFor(() => {
@@ -201,14 +213,14 @@ describe('VideosPage - Row Click & Menu Interaction', () => {
 
       // Open menu
       const menuButton = screen.getByLabelText('Aktionen')
-      fireEvent.click(menuButton)
+      await user.click(menuButton)
 
       await waitFor(() => {
         expect(screen.getByText('Löschen')).toBeInTheDocument()
       })
 
       // Press Escape
-      fireEvent.keyDown(document, { key: 'Escape' })
+      await user.keyboard('{Escape}')
 
       // Menu should close
       await waitFor(() => {

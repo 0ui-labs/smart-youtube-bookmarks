@@ -7,6 +7,7 @@ interface VideoGridProps {
   videos: VideoResponse[]
   gridColumns: GridColumnCount  // NEW: Dynamic column count from store
   onDeleteVideo?: (video: VideoResponse) => void
+  onVideoClick?: (video: VideoResponse) => void  // NEW: Video click handler
 }
 
 /**
@@ -27,7 +28,7 @@ interface VideoGridProps {
  * - All Tailwind classes explicitly written in object (no template literals)
  * - Pattern from Task #31 (proven working with thumbnailSize)
  */
-export const VideoGrid = ({ videos, gridColumns, onDeleteVideo }: VideoGridProps) => {
+export const VideoGrid = ({ videos, gridColumns, onDeleteVideo, onVideoClick }: VideoGridProps) => {
   // PurgeCSS-safe: All classes explicitly written in object (no template literals)
   // Responsive behavior: mobile 1-2, tablet 2, desktop user choice (2-5)
   // Pattern from Task #31 (proven working with thumbnailSize)
@@ -64,6 +65,7 @@ export const VideoGrid = ({ videos, gridColumns, onDeleteVideo }: VideoGridProps
           key={video.id}
           video={video}
           onDelete={onDeleteVideo ? () => onDeleteVideo(video) : undefined}
+          onCardClick={onVideoClick ? () => onVideoClick(video) : undefined}
         />
       ))}
     </div>

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { CustomFieldsSection } from '@/components/CustomFieldsSection'
 import { Badge } from '@/components/ui/badge'
 import { formatDuration } from '@/utils/formatDuration'
+import { useVideoDetail } from '@/hooks/useVideoDetail'
 
 /**
  * VideoDetailsModal Component
@@ -64,15 +65,26 @@ export const VideoDetailsModal = ({
   listId,
   onFieldChange,
 }: VideoDetailsModalProps) => {
+  // FIX BUG #004: Load video from detail endpoint to get available_fields
+  // The video from list endpoint has available_fields: null
+  // We need to fetch from GET /api/videos/{id} to get the full data
+  const { data: videoDetail, isLoading } = useVideoDetail(
+    video?.id || null,
+    open // Only fetch when modal is open
+  )
+
+  // Use videoDetail if loaded, fallback to prop video for basic info
+  const displayVideo = videoDetail || video
+
   // Early return if no video
-  if (!video) return null
+  if (!displayVideo) return null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Video Header */}
         <DialogHeader>
-          <DialogTitle>{video.title}</DialogTitle>
+          <DialogTitle>{displayVideo.title}</DialogTitle>
         </DialogHeader>
 
         {/* Video Content */}
@@ -80,27 +92,27 @@ export const VideoDetailsModal = ({
           {/* 16:9 Thumbnail */}
           <div className="relative w-full aspect-video bg-gray-100 rounded-md overflow-hidden">
             <img
-              src={video.thumbnail_url || ''}
-              alt={video.title || 'Video thumbnail'}
+              src={displayVideo.thumbnail_url || ''}
+              alt={displayVideo.title || 'Video thumbnail'}
               className="w-full h-full object-cover"
             />
           </div>
 
           {/* Metadata: Duration, Channel */}
           <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600">
-            {video.duration && <span>{formatDuration(video.duration)}</span>}
-            {video.channel && (
+            {displayVideo.duration && <span>{formatDuration(displayVideo.duration)}</span>}
+            {displayVideo.channel && (
               <>
-                {video.duration && <span>•</span>}
-                <span>{video.channel}</span>
+                {displayVideo.duration && <span>•</span>}
+                <span>{displayVideo.channel}</span>
               </>
             )}
           </div>
 
           {/* Tags */}
-          {video.tags && video.tags.length > 0 && (
+          {displayVideo.tags && displayVideo.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {video.tags.map((tag) => (
+              {displayVideo.tags.map((tag) => (
                 <Badge key={tag.id} variant="secondary">
                   {tag.name}
                 </Badge>
@@ -108,14 +120,22 @@ export const VideoDetailsModal = ({
             </div>
           )}
 
+          {/* Loading indicator */}
+          {isLoading && (
+            <div className="text-center text-gray-500">Lade Felder...</div>
+          )}
+
           {/* Custom Fields Section (Reuse from Task #131 Step 2) */}
-          <CustomFieldsSection
-            availableFields={video.available_fields || []}
-            fieldValues={video.field_values || []}
-            videoId={video.id}
-            listId={listId}
-            onFieldChange={onFieldChange}
-          />
+          {/* Only show fields when videoDetail is loaded (has available_fields) */}
+          {!isLoading && (
+            <CustomFieldsSection
+              availableFields={displayVideo.available_fields || []}
+              fieldValues={displayVideo.field_values || []}
+              videoId={displayVideo.id}
+              listId={listId}
+              onFieldChange={onFieldChange}
+            />
+          )}
         </div>
       </DialogContent>
     </Dialog>

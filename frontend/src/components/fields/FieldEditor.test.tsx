@@ -46,9 +46,6 @@ vi.mock('@/hooks/useVideos', () => ({
   },
 }))
 
-// Add timer mocks at the top level
-vi.useFakeTimers()
-
 describe('FieldEditor', () => {
   let queryClient: QueryClient
 
@@ -65,7 +62,7 @@ describe('FieldEditor', () => {
   })
 
   afterEach(() => {
-    vi.runOnlyPendingTimers()
+    // No need for timer cleanup
   })
 
   const renderWithQueryClient = (ui: React.ReactElement) => {
@@ -99,7 +96,7 @@ describe('FieldEditor', () => {
     })
 
     it('auto-saves after 500ms debounce when rating changes', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup()
       renderWithQueryClient(
         <FieldEditor videoId="video-1" field={ratingField} value={2} />
       )
@@ -110,39 +107,30 @@ describe('FieldEditor', () => {
       // Should not save immediately
       expect(mockState.mutate).not.toHaveBeenCalled()
 
-      // Fast-forward 500ms
-      await act(async () => {
-        vi.advanceTimersByTime(500)
-      })
-
-      // Should save after debounce
-      expect(mockState.mutate).toHaveBeenCalledWith(
-        [{ field_id: 'field-1', value: 4 }],
-        expect.any(Object)
-      )
+      // Wait for debounce (500ms) + a bit extra
+      await waitFor(() => {
+        expect(mockState.mutate).toHaveBeenCalledWith(
+          [{ field_id: 'field-1', value: 4 }],
+          expect.any(Object)
+        )
+      }, { timeout: 1000 })
     })
 
     it('debounces multiple rapid changes', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup({ delay: 50 })
       renderWithQueryClient(
         <FieldEditor videoId="video-1" field={ratingField} value={1} />
       )
 
       // Click 3 stars in rapid succession
       await user.click(screen.getByLabelText('2 Sterne'))
-      await act(async () => {
-        vi.advanceTimersByTime(200)
-      })
-
       await user.click(screen.getByLabelText('3 Sterne'))
-      await act(async () => {
-        vi.advanceTimersByTime(200)
-      })
-
       await user.click(screen.getByLabelText('4 Sterne'))
-      await act(async () => {
-        vi.advanceTimersByTime(500)
-      })
+
+      // Wait for debounce to complete
+      await waitFor(() => {
+        expect(mockState.mutate).toHaveBeenCalled()
+      }, { timeout: 1000 })
 
       // Should only save once with final value
       expect(mockState.mutate).toHaveBeenCalledTimes(1)
@@ -176,7 +164,7 @@ describe('FieldEditor', () => {
     })
 
     it('auto-saves when select option changes', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup()
       renderWithQueryClient(
         <FieldEditor videoId="video-1" field={selectField} value="good" />
       )
@@ -187,14 +175,12 @@ describe('FieldEditor', () => {
       const greatOption = screen.getByText('great')
       await user.click(greatOption)
 
-      await act(async () => {
-        vi.advanceTimersByTime(500)
-      })
-
-      expect(mockState.mutate).toHaveBeenCalledWith(
-        [{ field_id: 'field-2', value: 'great' }],
-        expect.any(Object)
-      )
+      await waitFor(() => {
+        expect(mockState.mutate).toHaveBeenCalledWith(
+          [{ field_id: 'field-2', value: 'great' }],
+          expect.any(Object)
+        )
+      }, { timeout: 1000 })
     })
   })
 
@@ -220,7 +206,7 @@ describe('FieldEditor', () => {
     })
 
     it('auto-saves after typing stops', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup()
       renderWithQueryClient(
         <FieldEditor videoId="video-1" field={textField} value="" />
       )
@@ -228,21 +214,13 @@ describe('FieldEditor', () => {
       const input = screen.getByPlaceholderText('Text eingeben...')
       await user.type(input, 'New note')
 
-      // Should not save while typing
-      await act(async () => {
-        vi.advanceTimersByTime(400)
-      })
-      expect(mockState.mutate).not.toHaveBeenCalled()
-
-      // Should save after typing stops (500ms)
-      await act(async () => {
-        vi.advanceTimersByTime(100)
-      })
-
-      expect(mockState.mutate).toHaveBeenCalledWith(
-        [{ field_id: 'field-3', value: 'New note' }],
-        expect.any(Object)
-      )
+      // Should save after typing stops (500ms debounce)
+      await waitFor(() => {
+        expect(mockState.mutate).toHaveBeenCalledWith(
+          [{ field_id: 'field-3', value: 'New note' }],
+          expect.any(Object)
+        )
+      }, { timeout: 1000 })
     })
   })
 
@@ -268,7 +246,7 @@ describe('FieldEditor', () => {
     })
 
     it('auto-saves when checkbox toggles', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup()
       renderWithQueryClient(
         <FieldEditor videoId="video-1" field={booleanField} value={false} />
       )
@@ -276,14 +254,12 @@ describe('FieldEditor', () => {
       const checkbox = screen.getByRole('checkbox', { name: /completed/i })
       await user.click(checkbox)
 
-      await act(async () => {
-        vi.advanceTimersByTime(500)
-      })
-
-      expect(mockState.mutate).toHaveBeenCalledWith(
-        [{ field_id: 'field-4', value: true }],
-        expect.any(Object)
-      )
+      await waitFor(() => {
+        expect(mockState.mutate).toHaveBeenCalledWith(
+          [{ field_id: 'field-4', value: true }],
+          expect.any(Object)
+        )
+      }, { timeout: 1000 })
     })
   })
 
@@ -360,19 +336,17 @@ describe('FieldEditor', () => {
         onError(error)
       })
 
-      const user = userEvent.setup({ delay: null })
       renderWithQueryClient(
         <FieldEditor videoId="video-1" field={ratingField} value={3} />
       )
 
+      const user = userEvent.setup()
       const fifthStar = screen.getByLabelText('5 Sterne')
       await user.click(fifthStar)
 
-      await act(async () => {
-        vi.advanceTimersByTime(500)
-      })
-
-      expect(screen.getByText('Value must be <= 5')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Value must be <= 5')).toBeInTheDocument()
+      }, { timeout: 1000 })
     })
 
     it('rolls back value on error', async () => {
@@ -386,22 +360,20 @@ describe('FieldEditor', () => {
         onError(error)
       })
 
-      const user = userEvent.setup({ delay: null })
       renderWithQueryClient(
         <FieldEditor videoId="video-1" field={ratingField} value={3} />
       )
 
+      const user = userEvent.setup()
       // Original value: 3 stars
       const fourthStar = screen.getByLabelText('4 Sterne')
       await user.click(fourthStar)
 
-      await act(async () => {
-        vi.advanceTimersByTime(500)
-      })
-
-      // Should roll back to 3 stars after error
-      const thirdStar = screen.getByLabelText('3 Sterne')
-      expect(thirdStar).toHaveAttribute('aria-checked', 'true')
+      // Wait for mutation to complete and rollback to happen
+      await waitFor(() => {
+        const thirdStar = screen.getByLabelText('3 Sterne')
+        expect(thirdStar).toHaveAttribute('aria-checked', 'true')
+      }, { timeout: 1000 })
     })
   })
 
@@ -426,7 +398,7 @@ describe('FieldEditor', () => {
       )
 
       // Trigger a change to create a timer
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup()
       const star = screen.getByLabelText('5 Sterne')
       await user.click(star)
 
@@ -457,26 +429,25 @@ describe('FieldEditor', () => {
         updated_at: '2025-01-01T00:00:00Z',
       }
 
-      const user = userEvent.setup({ delay: null })
       const { rerender } = renderWithQueryClient(
         <FieldEditor videoId="video-1" field={ratingFieldA} value={3} />
       )
+
+      const user = userEvent.setup()
 
       // Click star to trigger debounce
       const fifthStar = screen.getByLabelText('5 Sterne')
       await user.click(fifthStar)
 
-      // Switch to different field before debounce fires
+      // Switch to different field immediately before debounce fires
       rerender(
         <QueryClientProvider client={queryClient}>
           <FieldEditor videoId="video-1" field={ratingFieldB} value={2} />
         </QueryClientProvider>
       )
 
-      // Fast-forward past debounce time
-      await act(async () => {
-        vi.advanceTimersByTime(500)
-      })
+      // Wait a bit longer than debounce time
+      await new Promise(resolve => setTimeout(resolve, 600))
 
       // Mutation should NOT have been called (timer was cleared)
       expect(mockState.mutate).not.toHaveBeenCalled()

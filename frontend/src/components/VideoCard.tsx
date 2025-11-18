@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -10,8 +10,6 @@ import {
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
 import { useTagStore } from '@/stores/tagStore'
-import { useTableSettingsStore } from '@/stores/tableSettingsStore'
-import { useUpdateVideoFieldValues } from '@/hooks/useVideoFieldValues'
 
 // Import VideoThumbnail from VideosPage (reuse existing component)
 // REF MCP Improvement #2: Use existing VideoThumbnail API (url, title props)
@@ -20,12 +18,10 @@ import { VideoThumbnail } from './VideosPage'
 // Import CustomFieldsPreview for field value display (Task #89)
 import { CustomFieldsPreview } from './fields'
 
-// Import VideoDetailsModal for modal view (Task #131 Step 4)
-import { VideoDetailsModal } from './VideoDetailsModal'
-
 interface VideoCardProps {
   video: VideoResponse
   onDelete?: (videoId: string) => void
+  onCardClick?: () => void  // NEW: Optional click handler from parent
 }
 
 /**
@@ -56,28 +52,23 @@ interface VideoCardProps {
  * - useNavigate hook for React Router v6 navigation
  * - useTagStore for channel tag filtering with toggle action
  */
-export const VideoCard = ({ video, onDelete }: VideoCardProps) => {
+export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
   const cardRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const { tags, toggleTag } = useTagStore()
 
-  // Task #131 Step 4: Modal state for conditional navigation
-  const [showModal, setShowModal] = useState(false)
-  const videoDetailsView = useTableSettingsStore(state => state.videoDetailsView)
-
-  // Task #131 Step 4: Field mutation for modal updates
-  const updateField = useUpdateVideoFieldValues(video.id)
+  // Modal state removed - now handled at VideosPage level
 
   // Task #6: Navigate to video details page on card click
-  // Task #131 Step 4: Conditional navigation (page vs modal) - REF MCP #6 Early Return
+  // Updated: Use parent callback if provided (Grid view with modal/page logic)
   const handleCardClick = () => {
-    // Early return pattern for clean conditional logic (REF MCP #6)
-    if (videoDetailsView === 'modal') {
-      setShowModal(true)
+    // Use parent callback if provided (VideosPage handles modal/page decision)
+    if (onCardClick) {
+      onCardClick()
       return
     }
 
-    // Default: navigate to page (preserves existing behavior)
+    // Fallback: navigate to page (for standalone usage)
     navigate(`/videos/${video.id}`)
   }
 
@@ -224,17 +215,7 @@ export const VideoCard = ({ video, onDelete }: VideoCardProps) => {
         )}
       </div>
 
-      {/* Task #131 Step 4: VideoDetailsModal for modal view */}
-      <VideoDetailsModal
-        video={video}
-        open={showModal}
-        onOpenChange={setShowModal}
-        listId={video.list_id}
-        onFieldChange={(fieldId, value) => {
-          // Use existing updateField mutation from VideoCard
-          updateField.mutate([{ field_id: fieldId, value }])
-        }}
-      />
+      {/* VideoDetailsModal removed - now rendered at VideosPage level */}
     </div>
   )
 }

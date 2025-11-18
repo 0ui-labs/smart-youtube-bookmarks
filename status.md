@@ -1,6 +1,6 @@
 # Project Status & Task Protocol
 
-**Last Updated:** 2025-11-13 20:20 CET | **Branch:** feature/custom-fields-migration
+**Last Updated:** 2025-11-18 02:30 CET | **Branch:** feature/custom-fields-migration
 
 ---
 
@@ -311,6 +311,83 @@ This file maintains **two separate lists**: PLAN and LOG.
 186. [ ] Task 10: Secret Management - Create documentation for Vault integration
 187. [ ] Task 10: Secret Management - Document secret rotation strategy
 188. [ ] Task 10: Secret Management - Create security compliance checklist
+
+---
+
+## 🐛 Bug Fixes
+
+**Bug #001 - Schema Builder Integration Fix**
+- [x] Fix CreateTagDialog placeholder message (2025-11-17)
+- [x] Fix SchemaCreationDialog "Start from Scratch" tab (2025-11-17)
+- [x] Document prevention strategy and update DoD (2025-11-17)
+- [ ] Write integration tests for schema builder flows
+- [ ] Implement ESLint rule to prevent placeholder messages
+- [ ] Conduct codebase-wide placeholder audit
+
+**Report:** [docs/reports/2025-11-17-bugfix-001-schema-builder-integration.md](docs/reports/2025-11-17-bugfix-001-schema-builder-integration.md)
+**Documentation:** [bugs/001-schema-builder-disabled/](bugs/001-schema-builder-disabled/)
+
+---
+
+**Bug #002 - Tag Schema 500 Error (Critical - P0)**
+- [x] Reproduce bug reliably (2025-11-18)
+- [x] Root cause analysis - Two issues: TagCreate missing schema_id + nested selectinload with string-based join (2025-11-18)
+- [x] Impact analysis - P0 Critical, blocks entire Custom Fields feature (2025-11-18)
+- [x] Pattern recognition - 9 affected locations identified (2025-11-18)
+- [x] Fix strategy - Add schema_id to TagCreate + prevent lazy loading (2025-11-18)
+- [x] Implementation - Modified TagCreate schema + 4 Tag endpoints (2025-11-18)
+- [x] Validation - All endpoints tested and working (2025-11-18)
+- [x] Documentation - Complete bug analysis in bugs/schema-id-500-error/ (2025-11-18)
+- [ ] Write automated regression tests (based on regression-test.md)
+- [ ] Test frontend with new tag-schema functionality
+
+**Report:** [docs/reports/2025-11-18-bugfix-tag-schema-500-error.md](docs/reports/2025-11-18-bugfix-tag-schema-500-error.md)
+**Documentation:** [bugs/schema-id-500-error/](bugs/schema-id-500-error/)
+
+---
+
+**Bug #003 - Video Endpoint Field Values Validation Error**
+- [x] Reproduce bug - GET /videos/{id} ResponseValidationError (2025-11-18)
+- [x] Root cause analysis - field_values included None for id/updated_at (2025-11-18)
+- [x] Fix - Only include fields with actual values (2025-11-18)
+- [x] Apply fix to get_video() detail endpoint (2025-11-18)
+- [x] Apply fix to get_videos_in_list() endpoint (2025-11-18)
+- [x] Apply fix to filter_videos_in_list() endpoint (2025-11-18)
+- [x] Write regression test (2025-11-18)
+
+**Report:** Included in Bug #004 report
+**Status:** ✅ FIXED
+
+---
+
+**Bug #004 - Video Detail Endpoint 500 Error (Field Values Not Iterable)**
+- [x] Reproduce bug - GET /videos/{id} returns 500 Internal Server Error (2025-11-18)
+- [x] Root cause analysis - SQLAlchemy returns single object instead of list (2025-11-18)
+- [x] Debug with systematic debugging skill (2025-11-18)
+- [x] Fix - Manual loading of field_values like tags (2025-11-18)
+- [x] Verify fields are editable (2025-11-18)
+- [x] Write regression test - test_get_video_detail_with_multiple_field_values (2025-11-18)
+- [x] Documentation - Complete bug report (2025-11-18)
+
+**Report:** [docs/reports/2025-11-18-bug004-video-field-values-500-error.md](docs/reports/2025-11-18-bug004-video-field-values-500-error.md)
+**Status:** ✅ FIXED - Custom Fields sind jetzt vollständig funktional!
+
+---
+
+## 🔧 Code Quality Refactorings (2025-11-18)
+
+**Exception Handling & Optimistic Updates**
+- [x] Fix exception-silencing in backend/debug_video.py (finally: break removed)
+- [x] Fix exception-silencing in backend/test_endpoint_direct.py (async for refactored)
+- [x] Remove unused test_list parameter from test_create_tag_with_schema
+- [x] Add optimistic updates to field mutation in VideosPage.tsx
+- [x] Implement error rollback with user notifications
+- [x] Add localization notes to validation.md (DE → EN translations)
+- [x] Update regression-test.md to align with Bug #002 fix (no nested schema)
+
+**Report:** [docs/reports/2025-11-18-code-quality-refactorings.md](docs/reports/2025-11-18-code-quality-refactorings.md)
+**Status:** ✅ COMPLETE
+
 ---
 
 ## 📝 LOG (Chronological Implementation History)

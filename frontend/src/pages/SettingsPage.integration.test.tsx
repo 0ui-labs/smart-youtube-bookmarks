@@ -202,7 +202,7 @@ describe('SettingsPage Integration', () => {
 
     // SchemaCreationDialog should open (check for dialog heading)
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /create new schema/i })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /create schema/i })).toBeInTheDocument()
     })
   })
 
@@ -221,9 +221,9 @@ describe('SettingsPage Integration', () => {
 
     // Menu should be visible with options
     await waitFor(() => {
-      expect(screen.getByText('Edit')).toBeInTheDocument()
-      expect(screen.getByText('Duplicate')).toBeInTheDocument()
-      expect(screen.getByText('Delete')).toBeInTheDocument()
+      expect(screen.getByText('Schema bearbeiten')).toBeInTheDocument()
+      expect(screen.getByText('Schema duplizieren')).toBeInTheDocument()
+      expect(screen.getByText('Schema löschen')).toBeInTheDocument()
     })
   })
 

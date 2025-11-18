@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 from datetime import datetime
 
-from app.schemas.field_schema import FieldSchemaResponse
+# REMOVED: FieldSchemaResponse import - no longer needed since we don't include nested schema
 
 
 class TagBase(BaseModel):
@@ -11,7 +11,7 @@ class TagBase(BaseModel):
 
 
 class TagCreate(TagBase):
-    pass
+    schema_id: UUID | None = None  # BUG FIX: Allow schema binding during creation
 
 
 class TagUpdate(BaseModel):
@@ -23,8 +23,9 @@ class TagUpdate(BaseModel):
 class TagResponse(TagBase):
     id: UUID
     user_id: UUID
-    schema_id: UUID | None = None  # Add schema_id to response
-    schema: FieldSchemaResponse | None = None  # Add nested schema object
+    schema_id: UUID | None = None  # Schema FK (use this instead of nested object)
+    # REMOVED: schema: FieldSchemaResponse | None - Causes lazy-loading issues
+    # Frontend only needs schema_id - if full schema needed, fetch via GET /api/schemas/{id}
     created_at: datetime
     updated_at: datetime
 

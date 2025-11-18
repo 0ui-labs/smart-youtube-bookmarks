@@ -100,7 +100,7 @@ describe('SchemaCard', () => {
       { wrapper: createWrapper() }
     )
 
-    expect(screen.getByText('2 fields')).toBeInTheDocument()
+    expect(screen.getByText('2 Felder')).toBeInTheDocument()
   })
 
   it('renders tag usage count', () => {
@@ -142,10 +142,10 @@ describe('SchemaCard', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /actions for/i }))
-    await user.click(screen.getByText('Edit'))
+    await user.click(screen.getByText('Schema bearbeiten'))
 
     // Verify edit dialog opens (implementation uses internal state management)
-    expect(screen.getByText('Edit')).toBeInTheDocument()
+    expect(screen.getByText('Schema bearbeiten')).toBeInTheDocument()
   })
 
   it('opens delete dialog when delete action clicked', async () => {
@@ -160,10 +160,10 @@ describe('SchemaCard', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /actions for/i }))
-    await user.click(screen.getByText('Delete'))
+    await user.click(screen.getByText('Schema löschen'))
 
     // Verify delete dialog opens
-    expect(screen.getByText('Delete')).toBeInTheDocument()
+    expect(screen.getByText('Schema löschen')).toBeInTheDocument()
   })
 
   it('opens duplicate dialog when duplicate action clicked', async () => {
@@ -178,10 +178,10 @@ describe('SchemaCard', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /actions for/i }))
-    await user.click(screen.getByText('Duplicate'))
+    await user.click(screen.getByText('Schema duplizieren'))
 
     // Verify duplicate dialog opens
-    expect(screen.getByText('Duplicate')).toBeInTheDocument()
+    expect(screen.getByText('Schema duplizieren')).toBeInTheDocument()
   })
 
   it('renders without description when not provided', () => {
@@ -213,6 +213,6 @@ describe('SchemaCard', () => {
       { wrapper: createWrapper() }
     )
 
-    expect(screen.getByText('1 field')).toBeInTheDocument()
+    expect(screen.getByText('1 Feld')).toBeInTheDocument()
   })
 })

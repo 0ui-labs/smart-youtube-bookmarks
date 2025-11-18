@@ -78,20 +78,18 @@ vi.mock('@/hooks/useSchemas', () => ({
   },
 }))
 
-// Mock useTags hooks
-vi.mock('@/hooks/useTags', () => ({
-  useTags: vi.fn(() => ({
-    data: [],
-    isLoading: false,
-    error: null,
-  })),
-  useCreateTag: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
-  useBulkApplySchema: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
-  tagsOptions: vi.fn(() => ({
-    queryKey: ['tags'],
-    queryFn: vi.fn(),
-  })),
-}))
+// Mock useTags hooks - but let useBulkApplySchema use real implementation
+// Only mock tagsOptions to provide consistent query key
+vi.mock('@/hooks/useTags', async () => {
+  const actual = await vi.importActual<typeof import('@/hooks/useTags')>('@/hooks/useTags')
+  return {
+    ...actual,
+    tagsOptions: vi.fn(() => ({
+      queryKey: ['tags'],
+      queryFn: vi.fn(),
+    })),
+  }
+})
 
 vi.mock('@/lib/api')
 
@@ -143,7 +141,10 @@ describe('BulkApplySchema Integration', () => {
 
   beforeEach(() => {
     queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false }
+      },
     })
     vi.clearAllMocks()
 

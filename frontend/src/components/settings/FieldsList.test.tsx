@@ -176,8 +176,13 @@ describe('FieldsList', () => {
     const onEdit = vi.fn();
     render(<FieldsList fields={mockFields} onEdit={onEdit} />);
 
-    const editButtons = screen.getAllByText('Edit');
-    await user.click(editButtons[0]);
+    // Open the dropdown menu first
+    const menuTriggers = screen.getAllByLabelText(/Actions for/i);
+    await user.click(menuTriggers[0]);
+
+    // Now the Edit button should be visible
+    const editButton = screen.getByText('Edit');
+    await user.click(editButton);
 
     expect(onEdit).toHaveBeenCalledWith(mockFields[0]);
     expect(onEdit).toHaveBeenCalledTimes(1);
@@ -189,24 +194,28 @@ describe('FieldsList', () => {
     const onDelete = vi.fn();
     render(<FieldsList fields={mockFields} onDelete={onDelete} />);
 
-    const deleteButtons = screen.getAllByText('Delete');
-    await user.click(deleteButtons[1]);
+    // Open the dropdown menu first (for the second field)
+    const menuTriggers = screen.getAllByLabelText(/Actions for/i);
+    await user.click(menuTriggers[1]);
 
-    expect(onDelete).toHaveBeenCalledWith(mockFields[1]);
+    // Now the Delete button should be visible
+    const deleteButton = screen.getByText('Delete');
+    await user.click(deleteButton);
+
+    expect(onDelete).toHaveBeenCalledWith(mockFields[1].id);
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
   // Test 13: Usage Count Display
   it('displays usage count when showUsageCount is true', () => {
-    const fieldsWithUsage = mockFields.map((field, index) => ({
-      ...field,
-      usage_count: index + 1,
-    }));
+    const usageCounts = new Map<string, number>();
+    usageCounts.set(mockFields[0].id, 1);
+    usageCounts.set(mockFields[1].id, 2);
 
-    render(<FieldsList fields={fieldsWithUsage} showUsageCount={true} />);
+    render(<FieldsList fields={mockFields} showUsageCount={true} usageCounts={usageCounts} />);
 
-    expect(screen.getByText('1 schema')).toBeInTheDocument(); // Singular
-    expect(screen.getByText('2 schemas')).toBeInTheDocument(); // Plural
+    expect(screen.getByText('Used by 1 schema')).toBeInTheDocument(); // Singular
+    expect(screen.getByText('Used by 2 schemas')).toBeInTheDocument(); // Plural
   });
 
   // Test 14: No Results After Filtering

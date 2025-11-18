@@ -816,22 +816,20 @@ async def test_get_videos_field_values_union_from_multiple_schemas(client: Async
     videos = response.json()
     assert len(videos) == 1
 
-    # Verify field union from both schemas
+    # Verify field_values (BUG FIX #003: Should be empty since no values set yet)
     video = videos[0]
     assert "field_values" in video
     field_values = video["field_values"]
 
-    # Should have 2 fields (union from both schemas)
-    assert len(field_values) == 2
-
-    # Verify field names and types
-    field_names = {fv["field"]["name"] for fv in field_values}
-    assert "Overall Rating" in field_names
-    assert "Presentation Quality" in field_names
-
-    field_types = [fv["field"]["field_type"] for fv in field_values]
-    assert "rating" in field_types
-    assert "select" in field_types
+    # FIX: field_values should be EMPTY when no values are set
+    # This test was previously expecting 2 fields with None values, which violated the schema
+    # The correct behavior is:
+    # - field_values: Shows ONLY fields that HAVE been filled (empty in this case)
+    # - available_fields: Shows ALL fields that CAN be filled (not tested in this endpoint)
+    assert len(field_values) == 0, (
+        "field_values should be empty when no values are set. "
+        "Only fields with actual values should be included."
+    )
 
 
 @pytest.mark.asyncio
@@ -1577,3 +1575,246 @@ async def test_default_sort_created_at_desc(client: AsyncClient, test_db: AsyncS
     # Default sort is created_at DESC (newest first)
     assert videos[0]["title"] == "New Video"
     assert videos[1]["title"] == "Old Video"
+
+
+# ============================================================================
+# Video Detail Endpoint Tests
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_get_video_detail_with_available_fields_but_no_values(
+    client: AsyncClient, test_db: AsyncSession, test_user, test_list: BookmarkList
+):
+    """
+    REGRESSION TEST for Bug #003: Video detail endpoint with available fields but no values.
+
+    This test catches the bug where the endpoint includes ALL available fields in field_values,
+    even when they have no value, setting id=None and updated_at=None which violates the schema.
+
+    Expected behavior:
+    - available_fields: Shows ALL fields that CAN be filled (from tag schemas)
+    - field_values: Shows ONLY fields that HAVE been filled (non-empty)
+
+    Bug scenario:
+    - Video has tag with schema (available fields exist)
+    - No field values have been set yet
+    - GET /api/videos/{id} should return:
+      - available_fields: [field1, field2, ...]
+      - field_values: [] (EMPTY - no values set yet)
+
+    Before fix: field_values contains entries with id=None, updated_at=None → ResponseValidationError
+    After fix: field_values is empty (correct!)
+    """
+    from app.models.field_schema import FieldSchema
+    from app.models.schema_field import SchemaField
+    from app.models.custom_field import CustomField
+    from app.models.tag import Tag
+
+    # Create a schema with a custom field
+    schema = FieldSchema(list_id=test_list.id, name="Test Schema")
+    test_db.add(schema)
+    await test_db.commit()
+    await test_db.refresh(schema)
+
+    # Create a custom field
+    custom_field = CustomField(
+        list_id=test_list.id,
+        name="Rating",
+        field_type="rating",
+        config={"max_rating": 5}
+    )
+    test_db.add(custom_field)
+    await test_db.commit()
+    await test_db.refresh(custom_field)
+
+    # Link field to schema
+    schema_field = SchemaField(
+        schema_id=schema.id,
+        field_id=custom_field.id,
+        display_order=1,
+        show_on_card=True
+    )
+    test_db.add(schema_field)
+    await test_db.commit()
+
+    # Create a tag linked to the schema
+    tag = Tag(
+        name="Test Tag",
+        user_id=test_user.id,
+        schema_id=schema.id
+    )
+    test_db.add(tag)
+    await test_db.commit()
+    await test_db.refresh(tag)
+
+    # Create a video
+    video_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=testVidAvail"}
+    )
+    assert video_response.status_code == 201
+    video_id = video_response.json()["id"]
+
+    # Assign tag to video
+    tag_response = await client.post(
+        f"/api/videos/{video_id}/tags",
+        json={"tag_ids": [str(tag.id)]}
+    )
+    assert tag_response.status_code == 200
+
+    # GET video detail (this is where the bug occurs)
+    response = await client.get(f"/api/videos/{video_id}")
+
+    # Should return 200, not 500
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+
+    # CRITICAL: available_fields should show the field (CAN be filled)
+    assert "available_fields" in data
+    assert len(data["available_fields"]) == 1
+    assert data["available_fields"][0]["field_name"] == "Rating"
+    assert data["available_fields"][0]["field_type"] == "rating"
+
+    # CRITICAL: field_values should be EMPTY (no values set yet)
+    assert "field_values" in data
+    assert data["field_values"] == [], (
+        "Bug detected! field_values should be empty when no values are set. "
+        "The endpoint is incorrectly adding available fields to field_values with None values."
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_video_detail_with_multiple_field_values(
+    client: AsyncClient, test_db: AsyncSession, test_user, test_list: BookmarkList
+):
+    """
+    REGRESSION TEST for Bug #004: Video detail endpoint with multiple field values.
+
+    This test catches the bug where SQLAlchemy returns a single VideoFieldValue object
+    instead of a list when there are multiple field values, causing:
+    "TypeError: 'VideoFieldValue' object is not iterable"
+
+    Bug scenario:
+    - Video has tag with schema (available fields exist)
+    - Video has MULTIPLE field values set
+    - GET /api/videos/{id} tries to iterate over field_values
+    - SQLAlchemy returns single object instead of list → TypeError
+
+    Before fix: 500 Internal Server Error - "VideoFieldValue object is not iterable"
+    After fix: 200 OK with all field values returned as a proper list
+    """
+    from app.models.field_schema import FieldSchema
+    from app.models.schema_field import SchemaField
+    from app.models.custom_field import CustomField
+    from app.models.tag import Tag
+    from app.models.video_field_value import VideoFieldValue
+
+    # Create a schema with multiple custom fields
+    schema = FieldSchema(list_id=test_list.id, name="Test Schema")
+    test_db.add(schema)
+    await test_db.commit()
+    await test_db.refresh(schema)
+
+    # Create multiple custom fields
+    rating_field = CustomField(
+        list_id=test_list.id,
+        name="Overall Rating",
+        field_type="rating",
+        config={"max_rating": 5}
+    )
+    select_field = CustomField(
+        list_id=test_list.id,
+        name="Quality",
+        field_type="select",
+        config={"options": ["excellent", "good", "fair"]}
+    )
+    boolean_field = CustomField(
+        list_id=test_list.id,
+        name="Watched",
+        field_type="boolean",
+        config={}
+    )
+    test_db.add_all([rating_field, select_field, boolean_field])
+    await test_db.commit()
+    await test_db.refresh(rating_field)
+    await test_db.refresh(select_field)
+    await test_db.refresh(boolean_field)
+
+    # Link all fields to schema
+    for i, field in enumerate([rating_field, select_field, boolean_field], start=1):
+        schema_field = SchemaField(
+            schema_id=schema.id,
+            field_id=field.id,
+            display_order=i,
+            show_on_card=True
+        )
+        test_db.add(schema_field)
+    await test_db.commit()
+
+    # Create a tag linked to the schema
+    tag = Tag(
+        name="Test Tag With Schema",
+        user_id=test_user.id,
+        schema_id=schema.id
+    )
+    test_db.add(tag)
+    await test_db.commit()
+    await test_db.refresh(tag)
+
+    # Create a video
+    video_response = await client.post(
+        f"/api/lists/{test_list.id}/videos",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}  # Valid YouTube ID format
+    )
+    assert video_response.status_code == 201
+    video_id = video_response.json()["id"]
+
+    # Assign tag to video
+    tag_response = await client.post(
+        f"/api/videos/{video_id}/tags",
+        json={"tag_ids": [str(tag.id)]}
+    )
+    assert tag_response.status_code == 200
+
+    # Set values for MULTIPLE fields (this triggers the bug)
+    update_response = await client.put(
+        f"/api/videos/{video_id}/fields",
+        json={
+            "field_values": [
+                {"field_id": str(rating_field.id), "value": 4},
+                {"field_id": str(select_field.id), "value": "excellent"},
+                {"field_id": str(boolean_field.id), "value": True}
+            ]
+        }
+    )
+    assert update_response.status_code == 200
+
+    # GET video detail (this is where Bug #004 occurs)
+    response = await client.get(f"/api/videos/{video_id}")
+
+    # Should return 200, not 500
+    assert response.status_code == 200, (
+        f"Bug #004 detected! Expected 200, got {response.status_code}: {response.text}. "
+        "SQLAlchemy is likely returning a single VideoFieldValue object instead of a list."
+    )
+    data = response.json()
+
+    # CRITICAL: available_fields should show all 3 fields
+    assert "available_fields" in data
+    assert len(data["available_fields"]) == 3
+
+    # CRITICAL: field_values should contain all 3 field values as a list
+    assert "field_values" in data
+    assert len(data["field_values"]) == 3, (
+        f"Bug #004 detected! Expected 3 field values, got {len(data['field_values'])}. "
+        "SQLAlchemy relationship loading returned single object instead of list."
+    )
+
+    # Verify all field values are present
+    field_values_by_name = {fv["field_name"]: fv for fv in data["field_values"]}
+    assert "Overall Rating" in field_values_by_name
+    assert field_values_by_name["Overall Rating"]["value"] == 4.0
+    assert "Quality" in field_values_by_name
+    assert field_values_by_name["Quality"]["value"] == "excellent"
+    assert "Watched" in field_values_by_name
+    assert field_values_by_name["Watched"]["value"] == 1.0  # Boolean stored as numeric

@@ -90,7 +90,11 @@ class FieldSchema(BaseModel):
 
     schema_fields = relationship(
         "SchemaField",
-        primaryjoin="FieldSchema.id==SchemaField.schema_id",  # Explicit join for composite PK
+        # NOTE: String-based primaryjoin required due to composite PK in SchemaField
+        # Nested selectinload (Tag.schema.schema_fields) does NOT work with this
+        # Tag endpoints only load schema, NOT schema_fields (see tags.py)
+        # Schema endpoints load schema_fields directly (works with string join)
+        primaryjoin="FieldSchema.id==SchemaField.schema_id",
         uselist=True,  # Override inference (composite PK makes SQLAlchemy think one-to-one)
         back_populates="schema",
         cascade="all, delete-orphan",  # Deleting schema removes from join table

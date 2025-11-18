@@ -60,7 +60,7 @@ export const VideoDetailsPage = () => {
   const updateField = useMutation({
     mutationFn: async ({ fieldId, value }: { fieldId: string; value: string | number | boolean }) => {
       const { data } = await api.put(`/videos/${videoId}/fields`, {
-        updates: [{ field_id: fieldId, value }],
+        field_values: [{ field_id: fieldId, value }],  // FIX: Backend expects "field_values" not "updates"
       })
       return data
     },

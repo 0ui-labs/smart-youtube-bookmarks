@@ -29,7 +29,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, or_, and_, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import selectinload, aliased
+from sqlalchemy.orm import selectinload, joinedload, aliased
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from isodate import parse_duration
 from httpx import HTTPError, TimeoutException
@@ -551,13 +551,17 @@ async def get_videos_in_list(
             values_by_field_id = {fv.field_id: fv for fv in video_field_values}
 
             # Build response list: applicable fields + their values (if set)
+            # FIX BUG #003: Only include fields that have actual values (same as detail endpoint)
+            # - available_fields shows ALL fields that CAN be filled
+            # - field_values shows ONLY fields that HAVE been filled
             field_values_response = []
             for field, schema_name, display_order, show_on_card in applicable_fields:
                 field_value = values_by_field_id.get(field.id)
 
-                # ✅ REF #3: Extract value based on field type (float not int)
-                value = None
+                # Only include fields that have values (not None)
                 if field_value:
+                    # ✅ REF #3: Extract value based on field type (float not int)
+                    value = None
                     if field.field_type == 'rating':
                         value = field_value.value_numeric  # Can be float
                     elif field.field_type in ('select', 'text'):
@@ -565,19 +569,19 @@ async def get_videos_in_list(
                     elif field.field_type == 'boolean':
                         value = field_value.value_boolean
 
-                # Create response dict (Pydantic will serialize)
-                field_values_response.append({
-                    'id': field_value.id if field_value else None,
-                    'video_id': video.id,
-                    'field_id': field.id,
-                    'field_name': field.name,
-                    'field': field,  # CustomField ORM object
-                    'value': value,
-                    'schema_name': schema_name,
-                    'show_on_card': show_on_card,
-                    'display_order': display_order,
-                    'updated_at': field_value.updated_at if field_value else None
-                })
+                    # Create response dict (Pydantic will serialize)
+                    field_values_response.append({
+                        'id': field_value.id,  # No longer needs conditional - field_value is guaranteed to exist
+                        'video_id': video.id,
+                        'field_id': field.id,
+                        'field_name': field.name,
+                        'field': field,  # CustomField ORM object
+                        'value': value,
+                        'schema_name': schema_name,
+                        'show_on_card': show_on_card,
+                        'display_order': display_order,
+                        'updated_at': field_value.updated_at  # No longer needs conditional
+                    })
 
             # Assign to video (FastAPI will serialize via VideoResponse schema)
             video.__dict__['field_values'] = field_values_response
@@ -819,14 +823,17 @@ async def filter_videos_in_list(
             video_field_values = field_values_by_video.get(video.id, [])
             values_by_field_id = {fv.field_id: fv for fv in video_field_values}
 
-            # Build response list: applicable fields + their values (if set)
+            # Build response list: ONLY fields that have values set
+            # FIX BUG #003: Only include fields that have actual values (not None)
+            # available_fields shows what CAN be filled, field_values shows what HAS been filled
             field_values_response = []
             for field, schema_name, display_order, show_on_card in applicable_fields:
                 field_value = values_by_field_id.get(field.id)
 
-                # Extract value based on field type
-                value = None
+                # FIX BUG #003: Only append if field_value exists
                 if field_value:
+                    # Extract value based on field type
+                    value = None
                     if field.field_type == 'rating':
                         value = field_value.value_numeric  # Can be float
                     elif field.field_type in ('select', 'text'):
@@ -834,19 +841,19 @@ async def filter_videos_in_list(
                     elif field.field_type == 'boolean':
                         value = field_value.value_boolean
 
-                # Create response dict (Pydantic will serialize)
-                field_values_response.append({
-                    'id': field_value.id if field_value else None,
-                    'video_id': video.id,
-                    'field_id': field.id,
-                    'field_name': field.name,
-                    'field': field,  # CustomField ORM object
-                    'value': value,
-                    'schema_name': schema_name,
-                    'show_on_card': show_on_card,
-                    'display_order': display_order,
-                    'updated_at': field_value.updated_at if field_value else None
-                })
+                    # Create response dict (Pydantic will serialize)
+                    field_values_response.append({
+                        'id': field_value.id,  # Always valid UUID
+                        'video_id': video.id,
+                        'field_id': field.id,
+                        'field_name': field.name,
+                        'field': field,  # CustomField ORM object
+                        'value': value,
+                        'schema_name': schema_name,
+                        'show_on_card': show_on_card,
+                        'display_order': display_order,
+                        'updated_at': field_value.updated_at  # Always valid datetime
+                    })
 
             # Assign to video (FastAPI will serialize via VideoResponse schema)
             video.__dict__['field_values'] = field_values_response
@@ -876,25 +883,45 @@ async def get_video_by_id(
 
     Use Case: Modal/Detail view where user can see and edit all fields.
     """
-    # Step 1: Load video with eager loading for tags and field_values
-    stmt = (
-        select(Video)
-        .where(Video.id == video_id)
-        .options(
-            selectinload(Video.tags).selectinload(Tag.schema),  # For available_fields
-            selectinload(Video.field_values).selectinload(VideoFieldValue.field)  # For field_values
-        )
-    )
+    # Step 1: Load video (field_values and tags loaded separately below)
+    stmt = select(Video).where(Video.id == video_id)
     result = await db.execute(stmt)
     video = result.scalar_one_or_none()
 
     if not video:
         raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
 
-    # Step 2: Get available fields using helper module
+    # Step 2A: Load field_values manually (workaround for SQLAlchemy relationship loading issue)
+    # BUG #004 FIX: SQLAlchemy sometimes returns a single VideoFieldValue object instead of a list
+    # Loading field_values explicitly with eager loading ensures we always get a proper list
+    from app.models.video_field_value import VideoFieldValue
+    from app.models.custom_field import CustomField
+    field_values_stmt = (
+        select(VideoFieldValue)
+        .where(VideoFieldValue.video_id == video_id)
+        .options(selectinload(VideoFieldValue.field))
+    )
+    field_values_result = await db.execute(field_values_stmt)
+    field_values_list = list(field_values_result.scalars().all())
+    video.__dict__['field_values'] = field_values_list
+
+    # Step 2B: Load tags manually (workaround for SQLAlchemy many-to-many loading issue)
+    # SQLAlchemy sometimes returns a single Tag object instead of a list for many-to-many relationships
+    # Loading tags explicitly ensures we always get a proper list
+    from app.models.tag import Tag, video_tags as video_tags_table
+    tags_stmt = (
+        select(Tag)
+        .join(video_tags_table, Tag.id == video_tags_table.c.tag_id)
+        .where(video_tags_table.c.video_id == video_id)
+    )
+    tags_result = await db.execute(tags_stmt)
+    tags_list = list(tags_result.scalars().all())
+    video.__dict__['tags'] = tags_list
+
+    # Step 3: Get available fields using helper module
     available_fields_tuples = await get_available_fields_for_video(video, db)
 
-    # Step 3: Convert tuples to AvailableFieldResponse objects
+    # Step 4: Convert tuples to AvailableFieldResponse objects
     available_fields = [
         AvailableFieldResponse(
             field_id=field.id,
@@ -908,47 +935,75 @@ async def get_video_by_id(
         for field, schema_name, display_order, show_on_card in available_fields_tuples
     ]
 
-    # Step 4: Build field_values response (similar to list endpoint logic)
-    field_values_list = video.field_values if video.field_values is not None else []
+    # Step 5: Build field_values response (similar to list endpoint logic)
+    # FIX BUG #003: Only include fields that have actual values
+    # - available_fields shows ALL fields that CAN be filled
+    # - field_values shows ONLY fields that HAVE been filled
+    # Note: field_values_list already loaded in Step 2A above
     values_by_field_id = {fv.field_id: fv for fv in field_values_list}
 
     field_values_response = []
     for field, schema_name, display_order, show_on_card in available_fields_tuples:
         field_value = values_by_field_id.get(field.id)
 
-        # Extract value based on field type
-        value = None
+        # Only include fields that have values (not None)
         if field_value:
+            # Extract value based on field type
+            value = None
             if field.field_type == 'rating':
-                value = field_value.value_numeric  # Can be float
+                value = field_value.value_numeric
             elif field.field_type in ('select', 'text'):
                 value = field_value.value_text
             elif field.field_type == 'boolean':
                 value = field_value.value_boolean
 
-        # Create response dict (Pydantic will serialize)
-        field_values_response.append({
-            'id': field_value.id if field_value else None,
-            'video_id': video.id,
-            'field_id': field.id,
-            'field_name': field.name,
-            'field': field,  # CustomField ORM object
-            'value': value,
-            'schema_name': schema_name,
-            'show_on_card': show_on_card,
-            'display_order': display_order,
-            'updated_at': field_value.updated_at if field_value else None
-        })
+            field_values_response.append({
+                'id': field_value.id,  # No longer needs conditional - field_value is guaranteed to exist
+                'video_id': video.id,
+                'field_id': field.id,
+                'field_name': field.name,
+                'field': field,
+                'value': value,
+                'schema_name': schema_name,
+                'show_on_card': show_on_card,
+                'display_order': display_order,
+                'updated_at': field_value.updated_at  # No longer needs conditional
+            })
 
-    # Step 5: Attach available_fields and field_values to video object for Pydantic
-    video.__dict__['available_fields'] = available_fields
-    video.__dict__['field_values'] = field_values_response
+    # Step 6: Manually construct response dict (workaround for Pydantic ORM serialization)
+    # Returning the Video ORM object directly causes ResponseValidationError during serialization
+    # Constructing a dict manually with properly serialized tags avoids this issue
+    tags_dicts = [
+        {
+            'id': tag.id,
+            'name': tag.name,
+            'color': tag.color,
+            'user_id': tag.user_id,
+            'schema_id': tag.schema_id,
+            'created_at': tag.created_at,
+            'updated_at': tag.updated_at
+        }
+        for tag in tags_list
+    ]
 
-    # Ensure tags is a list (not None) for Pydantic validation
-    if video.tags is None:
-        video.__dict__['tags'] = []
-
-    return video
+    return {
+        'id': video.id,
+        'list_id': video.list_id,
+        'youtube_id': video.youtube_id,
+        'title': video.title,
+        'channel': video.channel,
+        'duration': video.duration,
+        'published_at': video.published_at,
+        'thumbnail_url': video.thumbnail_url,
+        'extracted_data': video.extracted_data,
+        'processing_status': video.processing_status,
+        'error_message': video.error_message,
+        'created_at': video.created_at,
+        'updated_at': video.updated_at,
+        'tags': tags_dicts,
+        'available_fields': available_fields,
+        'field_values': field_values_response
+    }
 
 
 @router.get("/videos", response_model=List[VideoResponse])

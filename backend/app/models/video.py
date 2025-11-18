@@ -41,7 +41,8 @@ class Video(BaseModel):
     tags: Mapped[list["Tag"]] = relationship(
         "Tag",
         secondary=video_tags,
-        back_populates="videos"
+        back_populates="videos",
+        uselist=True  # Explicitly ensure list relationship
     )
     field_values: Mapped[list["VideoFieldValue"]] = relationship(
         "VideoFieldValue",

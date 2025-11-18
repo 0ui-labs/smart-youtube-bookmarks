@@ -25,8 +25,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { useCreateTag } from '@/hooks/useTags'
 import { SchemaSelector } from './SchemaSelector'
-import { schemasOptions } from '@/hooks/useSchemas'
+import { schemasOptions, useCreateSchema } from '@/hooks/useSchemas'
 import { useQuery } from '@tanstack/react-query'
+import { SchemaEditor, type SchemaFormData } from './schemas/SchemaEditor'
 
 interface CreateTagDialogProps {
   open: boolean
@@ -43,12 +44,36 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
   const [schemaId, setSchemaId] = useState<string | null>(null)
 
   const createTag = useCreateTag()
+  const createSchema = useCreateSchema(listId)
 
   // Task #82 Batch 3: Fetch schemas with dependent query
   const { data: schemas = [], isLoading: isSchemasLoading } = useQuery({
     ...schemasOptions(listId),
     enabled: !!listId,  // REF MCP Improvement #4: Dependent query pattern
   })
+
+  // Bug #001 Fix: Handlers for inline schema creation
+  const handleSchemaCreated = async (schemaData: SchemaFormData) => {
+    try {
+      const newSchema = await createSchema.mutateAsync({
+        name: schemaData.name,
+        description: schemaData.description,
+        fields: schemaData.fields,
+      })
+
+      // Set schemaId to newly created schema
+      setSchemaId(newSchema.id)
+    } catch (error) {
+      // Error is handled by SchemaEditor component
+      // Re-throw to let SchemaEditor display the error
+      throw error
+    }
+  }
+
+  const handleSchemaCancelled = () => {
+    // Reset to "no schema" when user cancels
+    setSchemaId(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,9 +89,9 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
       return
     }
 
-    // Task #82 Batch 3: Validate 'new' mode (Task #83 not implemented yet)
+    // Bug #001 Fix: Validate 'new' mode (edge case protection)
     if (schemaId === 'new') {
-      setError('Bitte schließen Sie die Schema-Erstellung ab oder wählen Sie "Kein Schema"')
+      setError('Bitte erstellen Sie das Schema oder brechen Sie die Erstellung ab')
       return
     }
 
@@ -176,11 +201,15 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
                 Verknüpfen Sie benutzerdefinierte Felder mit diesem Tag
               </p>
 
-              {/* TODO (Task #83): Show SchemaEditor when schemaId === 'new' */}
+              {/* Bug #001 Fix: Show SchemaEditor when schemaId === 'new' */}
               {schemaId === 'new' && (
-                <p className="mt-2 text-sm text-amber-600">
-                  Schema-Editor wird in Task #83 implementiert
-                </p>
+                <div className="mt-4 p-4 border rounded-lg bg-gray-50">
+                  <SchemaEditor
+                    listId={listId}
+                    onSave={handleSchemaCreated}
+                    onCancel={handleSchemaCancelled}
+                  />
+                </div>
               )}
             </div>
           </div>

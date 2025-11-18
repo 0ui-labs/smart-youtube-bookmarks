@@ -6,7 +6,9 @@ import {
   flexRender,
   getCoreRowModel,
 } from '@tanstack/react-table'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
+import { api } from '@/lib/api'
 import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV, useAssignTags } from '@/hooks/useVideos'
 import { useVideosFilter } from '@/hooks/useVideosFilter'
 import { useFieldFilterStore } from '@/stores/fieldFilterStore'
@@ -20,6 +22,7 @@ import { TagNavigation } from '@/components/TagNavigation'
 import { TableSettingsDropdown } from './TableSettingsDropdown'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { CreateTagDialog } from './CreateTagDialog'
+import { VideoDetailsModal } from './VideoDetailsModal'
 import { ViewModeToggle } from './ViewModeToggle'
 import { VideoGrid } from './VideoGrid'
 import { Button } from '@/components/ui/button'
@@ -185,6 +188,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   })
   const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
 
+  // Video Details Modal state (follows pattern of ConfirmDeleteModal)
+  const [videoDetailsModal, setVideoDetailsModal] = useState<{
+    open: boolean
+    video: VideoResponse | null
+  }>({
+    open: false,
+    video: null,
+  })
+
   // Tag integration
   const { data: tags = [], isLoading: tagsLoading, error: tagsError } = useTags()
   // Use useShallow to prevent re-renders when selectedTagIds array has same values
@@ -195,6 +207,87 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // Compute selected tags (no useMemo - simple filter is fast enough per React docs)
   const selectedTags = tags.filter(tag => selectedTagIds.includes(tag.id))
+
+  // Query client for cache invalidation
+  const queryClient = useQueryClient()
+
+  // Mutation for updating field values in video detail modal
+  const updateField = useMutation({
+    mutationFn: async ({ videoId, fieldId, value }: { videoId: string; fieldId: string; value: string | number | boolean }) => {
+      const { data } = await api.put(`/videos/${videoId}/fields`, {
+        field_values: [{ field_id: fieldId, value }],  // FIX: Backend expects "field_values" not "updates"
+      })
+      return data
+    },
+    onMutate: async ({ videoId, fieldId, value }) => {
+      // Cancel outgoing refetches to avoid race conditions
+      await queryClient.cancelQueries({ queryKey: ['video-detail', videoId] })
+      await queryClient.cancelQueries({ queryKey: ['videos', listId] })
+
+      // Snapshot previous value for rollback
+      const previousVideoDetail = queryClient.getQueryData(['video-detail', videoId])
+      const previousVideosList = queryClient.getQueryData(['videos', listId])
+
+      // Optimistically update video detail cache
+      queryClient.setQueryData(['video-detail', videoId], (old: VideoResponse | undefined) => {
+        if (!old) return old
+        return {
+          ...old,
+          field_values: old.field_values?.map((fv) =>
+            fv.field_id === fieldId ? { ...fv, value } : fv
+          ) ?? [],
+        }
+      })
+
+      // Optimistically update videos list cache
+      queryClient.setQueryData(['videos', listId], (old: VideoResponse[] | undefined) => {
+        if (!old) return old
+        return old.map((video) =>
+          video.id === videoId
+            ? {
+                ...video,
+                field_values: video.field_values?.map((fv) =>
+                  fv.field_id === fieldId ? { ...fv, value } : fv
+                ) ?? [],
+              }
+            : video
+        )
+      })
+
+      return { previousVideoDetail, previousVideosList }
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate queries to refetch and sync with server state
+      queryClient.invalidateQueries({ queryKey: ['video-detail', variables.videoId] })
+      queryClient.invalidateQueries({ queryKey: ['videos', listId] })
+    },
+    onError: (error: any, variables, context) => {
+      // Rollback optimistic updates on error
+      if (context?.previousVideoDetail) {
+        queryClient.setQueryData(['video-detail', variables.videoId], context.previousVideoDetail)
+      }
+      if (context?.previousVideosList) {
+        queryClient.setQueryData(['videos', listId], context.previousVideosList)
+      }
+
+      // Log error and notify user
+      console.error('Failed to update field value:', error)
+      // TODO: Replace console.error with toast notification
+      // toast.error('Failed to update field value')
+      alert('Failed to update field value. Please try again.')
+    },
+  })
+
+  // Handle field value changes from video detail modal
+  const handleFieldChange = (fieldId: string, value: string | number | boolean) => {
+    if (videoDetailsModal.video) {
+      updateField.mutate({
+        videoId: videoDetailsModal.video.id,
+        fieldId,
+        value,
+      })
+    }
+  }
 
   // Extract tag names for API filtering
   const selectedTagNames = selectedTags.map(tag => tag.name)
@@ -589,6 +682,29 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     })
   }
 
+  // Handle video card click from Grid View
+  // Opens modal if videoDetailsView is 'modal', otherwise navigates to page
+  const handleGridVideoClick = (video: VideoResponse) => {
+    const videoDetailsView = useTableSettingsStore.getState().videoDetailsView
+
+    if (videoDetailsView === 'modal') {
+      setVideoDetailsModal({
+        open: true,
+        video: video,
+      })
+    } else {
+      // Page mode - navigate to video details page
+      navigate(`/videos/${video.id}`)
+    }
+  }
+
+  // Handle video details modal close
+  const handleVideoDetailsModalClose = () => {
+    setVideoDetailsModal({
+      open: false,
+      video: null,
+    })
+  }
 
   // Quick add handler for Plus icon button
   const handleQuickAdd = () => {
@@ -857,6 +973,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           videos={videos}
           gridColumns={gridColumns}
           onDeleteVideo={handleGridDeleteClick}
+          onVideoClick={handleGridVideoClick}
         />
       ) : (
         // Table View (existing implementation)
@@ -940,6 +1057,21 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         onOpenChange={setIsCreateTagDialogOpen}
         listId={listId}
       />
+
+      {/* Video Details Modal (follows pattern of ConfirmDeleteModal) */}
+      {videoDetailsModal.video && (
+        <VideoDetailsModal
+          video={videoDetailsModal.video}
+          open={videoDetailsModal.open}
+          onOpenChange={(open) => {
+            if (!open) {
+              handleVideoDetailsModalClose()
+            }
+          }}
+          listId={listId}
+          onFieldChange={handleFieldChange}
+        />
+      )}
         </div>
       </div>
     </div>

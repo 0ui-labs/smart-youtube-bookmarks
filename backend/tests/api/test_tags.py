@@ -164,6 +164,50 @@ async def test_delete_tag(client: AsyncClient, test_user):
 # ============================================================================
 
 @pytest.mark.asyncio
+async def test_create_tag_with_schema(client: AsyncClient, test_db, test_user, test_schema):
+    """
+    REGRESSION TEST for Bug #002: Test creating a tag WITH schema_id preserves schema_id.
+
+    This test catches the bug where new_tag.schema = None cleared the schema_id FK.
+    The bug occurred because:
+    1. Tag created with schema_id ✓
+    2. Committed to DB ✓
+    3. new_tag.schema = None called ✗ (triggered FK sync to NULL)
+
+    This test ensures schema_id is NOT NULL after creation.
+    """
+    from app.models.tag import Tag
+
+    # Create tag WITH schema_id during creation (not via update)
+    response = await client.post(
+        "/api/tags",
+        params={"user_id": str(test_user.id)},
+        json={
+            "name": "TagWithSchema",
+            "color": "#FF5733",
+            "schema_id": str(test_schema.id)
+        }
+    )
+
+    # Verify API response
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "TagWithSchema"
+    assert data["schema_id"] == str(test_schema.id), "schema_id must be preserved in API response!"
+
+    # CRITICAL: Verify in database (not just response)
+    # This catches cases where response looks correct but DB is corrupted
+    tag_id = data["id"]
+    from sqlalchemy import select
+    stmt = select(Tag).where(Tag.id == tag_id)
+    result = await test_db.execute(stmt)
+    tag_in_db = result.scalar_one()
+
+    assert tag_in_db.schema_id is not None, "BUG: schema_id was cleared in database!"
+    assert str(tag_in_db.schema_id) == str(test_schema.id), "schema_id mismatch between response and DB"
+
+
+@pytest.mark.asyncio
 async def test_update_tag_bind_schema(client: AsyncClient, test_db, test_user, test_list, test_schema):
     """Test binding a schema to a tag."""
     # Create tag via API
@@ -186,12 +230,8 @@ async def test_update_tag_bind_schema(client: AsyncClient, test_db, test_user, t
     data = response.json()
     assert data["schema_id"] == str(test_schema.id)
 
-    # Note: The nested schema object might be None in test environment due to
-    # SQLAlchemy session/transaction issues with fixtures. The important thing
-    # is that schema_id is set correctly. In production, the selectinload works fine.
-    if data["schema"] is not None:
-        assert data["schema"]["id"] == str(test_schema.id)
-        assert data["schema"]["name"] == test_schema.name
+    # Note: TagResponse no longer includes nested 'schema' object (Bug #002 fix)
+    # Frontend should use schema_id and fetch schema separately if needed
 
 
 @pytest.mark.asyncio
@@ -232,9 +272,7 @@ async def test_update_tag_change_schema(client: AsyncClient, test_db, test_user,
     assert response.status_code == 200
     data = response.json()
     assert data["schema_id"] == str(schema_b.id)
-    # Schema name check - schema object might be None in test
-    if data["schema"] is not None:
-        assert data["schema"]["name"] == "Schema B"
+    # Note: TagResponse no longer includes nested 'schema' object (Bug #002 fix)
 
 
 @pytest.mark.asyncio
@@ -266,7 +304,7 @@ async def test_update_tag_unbind_schema(client: AsyncClient, test_db, test_user,
     assert response.status_code == 200
     data = response.json()
     assert data["schema_id"] is None
-    assert data["schema"] is None
+    # Note: TagResponse no longer includes 'schema' field (Bug #002 fix)
 
 
 @pytest.mark.asyncio
@@ -375,5 +413,4 @@ async def test_update_tag_name_only_preserves_schema(client: AsyncClient, test_d
     data = response.json()
     assert data["name"] == "NewNamePreserve"
     assert data["schema_id"] == str(test_schema.id)  # Schema unchanged
-    if data["schema"] is not None:
-        assert data["schema"]["name"] == test_schema.name
+    # Note: TagResponse no longer includes nested 'schema' object (Bug #002 fix)

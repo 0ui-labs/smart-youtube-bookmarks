@@ -422,7 +422,9 @@ describe('NewFieldForm', () => {
 
       const optionsInput = screen.getByLabelText(/options.*comma-separated/i)
       await user.clear(optionsInput)
-      await user.type(optionsInput, 'Bad, Good, Great')
+      // Use paste instead of type to handle commas correctly
+      await user.click(optionsInput)
+      await user.paste('Bad, Good, Great')
 
       await user.click(screen.getByRole('button', { name: /add field/i }))
 

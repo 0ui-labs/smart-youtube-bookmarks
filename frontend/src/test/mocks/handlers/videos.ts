@@ -55,6 +55,18 @@ const mockVideoFieldValues: VideoFieldValue[] = [
 ]
 
 export const videosHandlers = [
+  // GET /api/lists/:listId/custom-fields - Returns list of custom fields for a list
+  http.get('/api/lists/:listId/custom-fields', () => {
+    // Return empty array by default - tests can override with server.use()
+    return HttpResponse.json([])
+  }),
+
+  // GET /api/lists/:listId/videos - Returns list of videos
+  http.get('/api/lists/:listId/videos', () => {
+    // Return empty array by default - tests can override with server.use()
+    return HttpResponse.json([])
+  }),
+
   // GET /api/videos/:videoId - Returns full video with field_values
   http.get('/api/videos/:videoId', ({ params }) => {
     const { videoId } = params
