@@ -47,7 +47,14 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel'
 
-const columnHelper = createColumnHelper<VideoResponse>()
+// Note: VideoResponse type has optional field_values, but TanStack Table needs explicit type
+// Using Partial to handle cases where backend doesn't return all fields in list view
+type VideoListItem = Omit<VideoResponse, 'field_values' | 'available_fields'> & {
+  field_values?: VideoResponse['field_values']
+  available_fields?: VideoResponse['available_fields']
+}
+
+const columnHelper = createColumnHelper<VideoListItem>()
 
 // Tag Carousel Component with conditional arrow display
 const TagCarousel = () => {
@@ -581,7 +588,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // TASK 5: Configure TanStack Table with manual sorting
   const table = useReactTable({
-    data: videos,
+    data: videos as VideoListItem[],
     columns,
     getCoreRowModel: getCoreRowModel(),
     manualSorting: true, // Backend handles sorting
@@ -978,7 +985,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       ) : viewMode === 'grid' ? (
         // Grid View - Task #32, Task #35 (gridColumns), Task #130 (navigation)
         <VideoGrid
-          videos={videos}
+          videos={videos as VideoResponse[]}
           gridColumns={gridColumns}
           onDeleteVideo={handleGridDeleteClick}
           onVideoClick={handleGridVideoClick}

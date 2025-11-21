@@ -39,7 +39,8 @@ console.log('✓ Added second filter:', useFieldFilterStore.getState().activeFil
 
 // Test 3: Update filter
 console.log('\n--- Test 3: Update filter ---');
-const firstFilterId = useFieldFilterStore.getState().activeFilters[0].id;
+const firstFilter = useFieldFilterStore.getState().activeFilters[0];
+const firstFilterId = firstFilter?.id ?? '';
 useFieldFilterStore.getState().updateFilter(firstFilterId, { value: 5 });
 console.log('✓ Updated filter value to 5:', useFieldFilterStore.getState().activeFilters);
 
@@ -62,7 +63,8 @@ console.log('✓ Added BETWEEN filter:', useFieldFilterStore.getState().activeFi
 
 // Test 6: Remove filter
 console.log('\n--- Test 6: Remove filter ---');
-const secondFilterId = useFieldFilterStore.getState().activeFilters[1].id;
+const secondFilter = useFieldFilterStore.getState().activeFilters[1];
+const secondFilterId = secondFilter?.id ?? '';
 useFieldFilterStore.getState().removeFilter(secondFilterId);
 console.log('✓ Removed second filter:', useFieldFilterStore.getState().activeFilters);
 

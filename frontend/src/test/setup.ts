@@ -84,7 +84,7 @@ if (!Element.prototype.scrollIntoView) {
 // Polyfill for ResizeObserver (required by Radix UI Slider)
 if (!global.ResizeObserver) {
   global.ResizeObserver = class ResizeObserver {
-    constructor(callback: ResizeObserverCallback) {}
+    constructor(_callback: ResizeObserverCallback) {}
     observe() {}
     unobserve() {}
     disconnect() {}
@@ -109,7 +109,7 @@ Object.defineProperty(window, 'matchMedia', {
 // Mock IntersectionObserver (required by embla-carousel)
 if (!global.IntersectionObserver) {
   global.IntersectionObserver = class IntersectionObserver {
-    constructor(callback: IntersectionObserverCallback) {}
+    constructor(_callback: IntersectionObserverCallback) {}
     observe() {}
     unobserve() {}
     disconnect() {}

@@ -40,10 +40,7 @@ export function AnalyticsView() {
   const listId = lists?.[0]?.id || ''
 
   // Fetch analytics for current list (only if listId exists)
-  const { data: analytics, isLoading: isAnalyticsLoading, isError: isAnalyticsError } = useAnalytics(
-    listId,
-    { enabled: !!listId }
-  )
+  const { data: analytics, isLoading: isAnalyticsLoading, isError: isAnalyticsError } = useAnalytics(listId)
 
   // Combine loading/error states
   const isLoading = isListsLoading || isAnalyticsLoading

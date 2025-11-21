@@ -116,7 +116,7 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
         tagId: tag.id,
         data: {
           name: data.name.trim(),
-          color: data.color,
+          color: data.color ?? undefined,
           schema_id: data.schema_id,
         },
       })

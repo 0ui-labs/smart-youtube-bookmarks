@@ -78,14 +78,13 @@ export const FieldDisplay: React.FC<FieldDisplayProps> = ({
   className,
 }) => {
   // Discriminated union switch on field.field_type
-  // TypeScript narrows VideoFieldValue type in each case
+  // Note: Zod unions don't automatically narrow, so we use type assertions
   switch (fieldValue.field.field_type) {
     case 'rating': {
-      // Type is narrowed to RatingFieldValue
       return (
         <RatingStars
-          value={fieldValue.value}
-          maxRating={fieldValue.field.config.max_rating}
+          value={fieldValue.value as number | null}
+          maxRating={(fieldValue.field.config as { max_rating: number }).max_rating}
           fieldName={fieldValue.field_name}
           readonly={readonly}
           onChange={onChange as ((value: number) => void) | undefined}
@@ -95,11 +94,10 @@ export const FieldDisplay: React.FC<FieldDisplayProps> = ({
     }
 
     case 'select': {
-      // Type is narrowed to SelectFieldValue
       return (
         <SelectBadge
-          value={fieldValue.value}
-          options={fieldValue.field.config.options}
+          value={fieldValue.value as string | null}
+          options={(fieldValue.field.config as { options: string[] }).options}
           fieldName={fieldValue.field_name}
           readonly={readonly}
           onChange={onChange as ((value: string) => void) | undefined}
@@ -109,10 +107,9 @@ export const FieldDisplay: React.FC<FieldDisplayProps> = ({
     }
 
     case 'boolean': {
-      // Type is narrowed to BooleanFieldValue
       return (
         <BooleanCheckbox
-          value={fieldValue.value}
+          value={fieldValue.value as boolean | null}
           fieldName={fieldValue.field_name}
           readonly={readonly}
           onChange={onChange as ((value: boolean) => void) | undefined}
@@ -122,24 +119,23 @@ export const FieldDisplay: React.FC<FieldDisplayProps> = ({
     }
 
     case 'text': {
-      // Type is narrowed to TextFieldValue
       return (
         <TextSnippet
-          value={fieldValue.value}
+          value={fieldValue.value as string | null}
           truncateAt={50} // REF MCP #2: Use truncateAt prop (NOT maxLength)
           readOnly={readonly}
           onChange={onChange as ((value: string) => void) | undefined}
           onExpand={onExpand}
-          maxLength={fieldValue.field.config.max_length}
+          maxLength={(fieldValue.field.config as { max_length?: number }).max_length}
           className={className}
         />
       )
     }
 
     default: {
-      // Exhaustiveness check: if a new field type is added, TypeScript will error here
-      const exhaustiveCheck: never = fieldValue.field.field_type
-      console.error('Unknown field type:', exhaustiveCheck)
+      // Runtime safety: log unknown field types
+      // Note: TypeScript thinks this is never reachable, but we keep it for runtime safety
+      console.error('Unknown field type:', (fieldValue.field as { field_type: string }).field_type)
       return null
     }
   }

@@ -62,6 +62,7 @@ export function formatConfigPreview(
       // Exhaustive check - TypeScript will error if new field type is added without handler
       // This code is unreachable in strict mode but provides runtime safety
       const _exhaustive: never = fieldType;
+      void _exhaustive; // Suppress unused variable warning
 
       // Development safety: log warning if somehow reached (e.g., runtime type mismatch)
       console.warn('Unknown field type encountered:', fieldType);

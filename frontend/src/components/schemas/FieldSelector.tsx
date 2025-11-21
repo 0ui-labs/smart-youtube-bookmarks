@@ -40,7 +40,9 @@ export function FieldSelector({ listId, selectedFieldIds, onFieldsSelected }: Fi
   }
 
   const selectedCount = selectedFieldIds.length
-  const availableFields = fields.filter(f => !selectedFieldIds.includes(f.id))
+  // Note: availableFields computed but not currently used in UI
+  const _availableFields = fields.filter(f => !selectedFieldIds.includes(f.id))
+  void _availableFields // Suppress unused warning
 
   // Helper function to get field type display text with proper typing
   const getFieldTypeDisplay = (field: typeof fields[0]) => {

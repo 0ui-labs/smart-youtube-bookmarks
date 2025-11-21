@@ -12,6 +12,16 @@ import { useCustomFields } from '@/hooks/useCustomFields'
 import { NewFieldForm } from './NewFieldForm'
 import { validateAllSchemaFields } from '@/validators/schemaValidators'
 
+// Local type for field items with display metadata
+interface FieldItem {
+  id: string
+  field_id: string
+  display_order: number
+  show_on_card: boolean
+  field_name: string
+  field_type: string
+}
+
 /**
  * Zod Schema with superRefine for advanced array validation
  * REF MCP Improvement #1: Using superRefine instead of multiple .refine() calls
@@ -157,7 +167,8 @@ export function SchemaEditor({ listId, onSave, onCancel, initialData }: SchemaEd
     }
   }
 
-  const handleReorder = (activeId: string, overId: string) => {
+  // TODO Task #127: These handlers will be used when FieldOrderManager is integrated
+  const _handleReorder = (activeId: string, overId: string) => {
     const oldIndex = fields.findIndex(f => f.id === activeId)
     const newIndex = fields.findIndex(f => f.id === overId)
 
@@ -178,7 +189,7 @@ export function SchemaEditor({ listId, onSave, onCancel, initialData }: SchemaEd
     }
   }
 
-  const handleToggleShowOnCard = (fieldId: string, show: boolean) => {
+  const _handleToggleShowOnCard = (fieldId: string, show: boolean) => {
     const index = fields.findIndex(f => f.id === fieldId)
     if (index !== -1) {
       const field = fields[index]
@@ -188,12 +199,17 @@ export function SchemaEditor({ listId, onSave, onCancel, initialData }: SchemaEd
     }
   }
 
-  const handleRemove = (fieldId: string) => {
+  const _handleRemove = (fieldId: string) => {
     const index = fields.findIndex(f => f.id === fieldId)
     if (index !== -1) {
       remove(index)
     }
   }
+
+  // Suppress unused variable warnings for future use
+  void _handleReorder
+  void _handleToggleShowOnCard
+  void _handleRemove
 
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
