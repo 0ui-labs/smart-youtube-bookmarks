@@ -1,7 +1,7 @@
 from typing import Optional, TYPE_CHECKING
 from uuid import UUID as PyUUID
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, ForeignKey, Table, Column, UniqueConstraint, func
+from sqlalchemy import String, DateTime, ForeignKey, Table, Column, UniqueConstraint, func, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import uuid
@@ -65,6 +65,16 @@ class Tag(BaseModel):
         UUID(as_uuid=True),
         ForeignKey('users.id', ondelete='CASCADE'),
         nullable=False
+    )
+
+    # Category vs Label distinction
+    is_video_type: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default='true',
+        index=True,
+        comment="True = video type/category (only one per video), False = label (multiple allowed)"
     )
 
     # Custom Fields Integration

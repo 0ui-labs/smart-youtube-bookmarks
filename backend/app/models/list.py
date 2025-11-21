@@ -37,6 +37,20 @@ class BookmarkList(BaseModel):
         nullable=True
     )
 
+    # Workspace-wide default schema (fields for ALL videos in this list)
+    default_schema_id: Mapped[Optional[PyUUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "field_schemas.id",
+            ondelete="SET NULL",
+            use_alter=True,  # Break circular dependency: bookmarks_lists ↔ field_schemas
+            name="fk_bookmarks_lists_default_schema"  # Required when use_alter=True
+        ),
+        nullable=True,
+        index=True,
+        comment="Workspace-wide schema (fields for all videos)"
+    )
+
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="lists")
     schema: Mapped[Optional["Schema"]] = relationship("Schema", back_populates="lists", lazy="joined")
@@ -60,7 +74,13 @@ class BookmarkList(BaseModel):
         "FieldSchema",
         back_populates="list",
         cascade="all, delete-orphan",  # Deleting list removes all schemas
-        passive_deletes=True  # Trust DB CASCADE for performance
+        passive_deletes=True,  # Trust DB CASCADE for performance
+        foreign_keys="[FieldSchema.list_id]"  # Explicit FK for disambiguation
+    )
+    default_schema: Mapped[Optional["FieldSchema"]] = relationship(
+        "FieldSchema",
+        foreign_keys=[default_schema_id],
+        lazy='raise'  # Prevent MissingGreenlet - force explicit selectinload
     )
 
     def __repr__(self) -> str:

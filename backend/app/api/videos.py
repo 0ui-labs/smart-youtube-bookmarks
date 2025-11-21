@@ -1812,6 +1812,11 @@ async def assign_tags_to_video(
     db: AsyncSession = Depends(get_db)
 ):
     """Assign tags to a video (many-to-many). Returns the updated list of tags."""
+    from app.services.category_validation import (
+        validate_category_assignment,
+        CategoryValidationError,
+    )
+
     # Verify video exists
     video_stmt = select(Video).where(Video.id == video_id)
     video_result = await db.execute(video_stmt)
@@ -1827,6 +1832,29 @@ async def assign_tags_to_video(
 
     if len(tags) != len(request.tag_ids):
         raise HTTPException(status_code=400, detail="One or more tags not found")
+
+    # Load video's existing tags for category validation
+    existing_tags_stmt = (
+        select(Tag)
+        .join(video_tags)
+        .where(video_tags.c.video_id == video_id)
+    )
+    existing_tags_result = await db.execute(existing_tags_stmt)
+    video.__dict__['tags'] = list(existing_tags_result.scalars().all())
+
+    # Validate category assignment (only one category per video)
+    try:
+        validate_category_assignment(video, tags)
+    except CategoryValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": str(e),
+                "existing_category_id": str(e.existing_category_id) if e.existing_category_id else None,
+                "existing_category_name": e.existing_category_name,
+                "new_category_name": e.new_category_name,
+            }
+        ) from e
 
     # Get existing tag associations for this video
     existing_stmt = select(video_tags.c.tag_id).where(video_tags.c.video_id == video_id)

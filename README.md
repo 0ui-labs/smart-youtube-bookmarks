@@ -155,6 +155,13 @@ docker-compose up -d postgres redis
 **3. Setup Backend**
 ```bash
 cd backend
+
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # macOS/Linux
+# .venv\Scripts\activate   # Windows
+
+# Install dependencies
 pip install -r requirements.txt
 
 # Run migrations
@@ -180,6 +187,7 @@ Frontend will be available at **http://localhost:5173**
 **5. Start ARQ Worker (for background processing)**
 ```bash
 cd backend
+source .venv/bin/activate  # Ensure venv is active
 arq app.workers.video_processor.WorkerSettings
 ```
 
@@ -268,6 +276,7 @@ https://youtu.be/jNQXAC9IVRw,pending,2025-11-08T11:00:00,3,
 **Backend (pytest):**
 ```bash
 cd backend
+source .venv/bin/activate        # Ensure venv is active
 pytest                           # All tests
 pytest tests/integration/ -v     # Integration tests
 pytest -k "test_name" -v         # Specific test
@@ -285,6 +294,9 @@ npm run test:coverage            # With coverage
 
 **Backend:**
 ```bash
+cd backend
+source .venv/bin/activate  # Ensure venv is active
+
 # Type checking
 mypy app/
 
@@ -310,9 +322,13 @@ npm run format
 
 ### Database Migrations
 
-**Create migration:**
 ```bash
 cd backend
+source .venv/bin/activate  # Ensure venv is active
+```
+
+**Create migration:**
+```bash
 alembic revision --autogenerate -m "description"
 ```
 

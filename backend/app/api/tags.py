@@ -153,6 +153,7 @@ async def create_tag(
         name=tag.name,
         color=tag.color,
         schema_id=tag.schema_id,  # Include schema_id (will be preserved!)
+        is_video_type=tag.is_video_type,  # Category vs Label distinction
         user_id=current_user.id
     )
     db.add(new_tag)
@@ -291,6 +292,8 @@ async def update_tag(
     if "schema_id" in update_data:
         # Set to new value (could be UUID or None for unbinding)
         tag.schema_id = update_data["schema_id"]
+    if tag_update.is_video_type is not None:
+        tag.is_video_type = tag_update.is_video_type
 
     await db.commit()
 

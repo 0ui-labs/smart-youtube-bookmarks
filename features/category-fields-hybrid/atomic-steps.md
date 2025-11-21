@@ -1093,21 +1093,1334 @@ npm run type-check
 
 ---
 
+## Phase 4: Settings UI Redesign (18 steps, ~8 hours)
+
+### Step 4.1: Create WorkspaceFieldsCard Component - Skeleton
+
+**Time:** 20 min
+**Files:** `frontend/src/components/settings/WorkspaceFieldsCard.tsx` (NEW)
+
+**Task:**
+```typescript
+interface WorkspaceFieldsCardProps {
+  listId: string
+  defaultSchemaId: string | null
+  onEdit: () => void
+}
+
+export function WorkspaceFieldsCard({ listId, defaultSchemaId, onEdit }: WorkspaceFieldsCardProps) {
+  return (
+    <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Home className="h-5 w-5 text-blue-600" />
+          <h3 className="font-medium">Alle Videos</h3>
+        </div>
+        <Button variant="outline" size="sm" onClick={onEdit}>
+          Bearbeiten
+        </Button>
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Diese Felder haben alle Videos
+      </p>
+    </div>
+  )
+}
+```
+
+**Test:** Component renders without errors
+
+**Commit:** `feat(ui): create WorkspaceFieldsCard skeleton`
+
+---
+
+### Step 4.2: Add Field List to WorkspaceFieldsCard
+
+**Time:** 30 min
+**Files:** `frontend/src/components/settings/WorkspaceFieldsCard.tsx`
+
+**Task:**
+```typescript
+// Add to component
+const { data: schema } = useFieldSchema(defaultSchemaId)
+
+// In render:
+{schema?.fields && schema.fields.length > 0 ? (
+  <ul className="mt-3 space-y-1">
+    {schema.fields.map(field => (
+      <li key={field.id} className="text-sm">
+        • {field.name} ({getFieldTypeLabel(field.field_type)})
+      </li>
+    ))}
+  </ul>
+) : (
+  <p className="mt-3 text-sm text-muted-foreground italic">
+    Keine Felder definiert
+  </p>
+)}
+<p className="mt-2 text-xs text-muted-foreground">
+  ({schema?.fields?.length || 0} Felder definiert)
+</p>
+```
+
+**Test:** Shows field list when schema exists, shows empty state when not
+
+**Commit:** `feat(ui): add field list to WorkspaceFieldsCard`
+
+---
+
+### Step 4.3: Create WorkspaceFieldsEditor Component - Dialog Shell
+
+**Time:** 20 min
+**Files:** `frontend/src/components/settings/WorkspaceFieldsEditor.tsx` (NEW)
+
+**Task:**
+```typescript
+interface WorkspaceFieldsEditorProps {
+  listId: string
+  defaultSchemaId: string | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+export function WorkspaceFieldsEditor({ open, onOpenChange }: WorkspaceFieldsEditorProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Informationen für alle Videos</DialogTitle>
+          <DialogDescription>
+            Diese Felder sind für ALLE Videos in diesem Workspace verfügbar.
+          </DialogDescription>
+        </DialogHeader>
+        {/* Fields will go here */}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Abbrechen
+          </Button>
+          <Button>Speichern</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+```
+
+**Test:** Dialog opens and closes
+
+**Commit:** `feat(ui): create WorkspaceFieldsEditor dialog shell`
+
+---
+
+### Step 4.4: Implement WorkspaceFieldsEditor - Field List
+
+**Time:** 45 min
+**Files:** `frontend/src/components/settings/WorkspaceFieldsEditor.tsx`
+
+**Task:**
+```typescript
+// Inside DialogContent:
+<div className="space-y-4">
+  <Alert>
+    <Info className="h-4 w-4" />
+    <AlertDescription>
+      Tipp: Felder die für alle Kategorien nützlich sind (z.B. Bewertung, Notizen)
+    </AlertDescription>
+  </Alert>
+
+  <div className="space-y-2">
+    <Label>Felder:</Label>
+    {fields.map(field => (
+      <div key={field.id} className="flex items-center justify-between rounded border p-2">
+        <span>{field.name} ({getFieldTypeLabel(field.field_type)})</span>
+        <Button variant="ghost" size="icon" onClick={() => handleRemoveField(field.id)}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    ))}
+  </div>
+
+  <Button variant="outline" className="w-full" onClick={() => setShowAddField(true)}>
+    <Plus className="mr-2 h-4 w-4" />
+    Information hinzufügen
+  </Button>
+</div>
+```
+
+**Test:** Shows existing fields, remove button works
+
+**Commit:** `feat(ui): add field list to WorkspaceFieldsEditor`
+
+---
+
+### Step 4.5: Implement WorkspaceFieldsEditor - Add Field
+
+**Time:** 45 min
+**Files:** `frontend/src/components/settings/WorkspaceFieldsEditor.tsx`
+
+**Task:**
+Add inline field creation:
+```typescript
+{showAddField && (
+  <div className="space-y-2 rounded border p-3">
+    <Input
+      placeholder="Feldname"
+      value={newFieldName}
+      onChange={e => setNewFieldName(e.target.value)}
+    />
+    <Select value={newFieldType} onValueChange={setNewFieldType}>
+      <SelectTrigger>
+        <SelectValue placeholder="Typ auswählen" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="text">Text</SelectItem>
+        <SelectItem value="number">Zahl</SelectItem>
+        <SelectItem value="boolean">Ja/Nein</SelectItem>
+        <SelectItem value="rating">Bewertung</SelectItem>
+        <SelectItem value="select">Auswahl</SelectItem>
+      </SelectContent>
+    </Select>
+    <div className="flex gap-2">
+      <Button size="sm" onClick={handleAddField}>Hinzufügen</Button>
+      <Button size="sm" variant="ghost" onClick={() => setShowAddField(false)}>Abbrechen</Button>
+    </div>
+  </div>
+)}
+```
+
+**Test:** Can add new field inline
+
+**Commit:** `feat(ui): add field creation to WorkspaceFieldsEditor`
+
+---
+
+### Step 4.6: Implement WorkspaceFieldsEditor - Save Logic
+
+**Time:** 30 min
+**Files:** `frontend/src/components/settings/WorkspaceFieldsEditor.tsx`
+
+**Task:**
+```typescript
+const saveWorkspaceFields = useUpdateWorkspaceFields()
+
+const handleSave = async () => {
+  await saveWorkspaceFields.mutateAsync({
+    listId,
+    schemaId: defaultSchemaId,
+    fields: localFields
+  })
+  onOpenChange(false)
+}
+```
+
+**Test:** Saving updates schema and closes dialog
+
+**Commit:** `feat(ui): add save logic to WorkspaceFieldsEditor`
+
+---
+
+### Step 4.7: Update TagsList - Filter to Categories Only
+
+**Time:** 30 min
+**Files:** `frontend/src/components/settings/TagsList.tsx`
+
+**Task:**
+```typescript
+// Change hook usage
+const { data: tags } = useTags()
+// To:
+const { data: categories } = useCategories() // Only is_video_type=true
+
+// Update component name and props if needed
+```
+
+**Test:** Only shows tags with `is_video_type=true`
+
+**Commit:** `feat(ui): filter TagsList to show only categories`
+
+---
+
+### Step 4.8: Update TagsList - Show Fields Instead of Schema Name
+
+**Time:** 45 min
+**Files:** `frontend/src/components/settings/TagsList.tsx`
+
+**Task:**
+Change display from "Schema: X" to field list:
+```typescript
+// Before:
+<p className="text-sm text-muted-foreground">
+  Schema: {tag.schema?.name || 'Kein Schema'}
+</p>
+
+// After:
+{tag.schema?.fields && tag.schema.fields.length > 0 ? (
+  <div className="mt-1 text-sm text-muted-foreground">
+    <span>Felder: </span>
+    {tag.schema.fields.slice(0, 3).map(f => f.name).join(' • ')}
+    {tag.schema.fields.length > 3 && ` +${tag.schema.fields.length - 3}`}
+  </div>
+) : (
+  <p className="mt-1 text-sm text-muted-foreground italic">Keine Felder</p>
+)}
+```
+
+**Test:** Shows fields instead of schema name
+
+**Commit:** `feat(ui): show fields instead of schema name in TagsList`
+
+---
+
+### Step 4.9: Update TagsList - Add Video Count
+
+**Time:** 30 min
+**Files:** `frontend/src/components/settings/TagsList.tsx`
+
+**Task:**
+```typescript
+// Add video count to each category
+<p className="text-xs text-muted-foreground">
+  ({category.video_count || 0} Videos)
+</p>
+```
+
+Note: May need to update backend to include `video_count` in TagResponse
+
+**Test:** Shows video count per category
+
+**Commit:** `feat(ui): add video count to TagsList`
+
+---
+
+### Step 4.10: Update TagsList - Add "Typ" Column
+
+**Time:** 30 min
+**Files:** `frontend/src/components/settings/TagsList.tsx`
+
+**Task:**
+Add column to distinguish categories from labels:
+```typescript
+<Badge variant={tag.is_video_type ? "default" : "secondary"}>
+  {tag.is_video_type ? "Kategorie" : "Label"}
+</Badge>
+```
+
+**Test:** Shows type badge for each tag
+
+**Commit:** `feat(ui): add type column to TagsList`
+
+---
+
+### Step 4.11: Update CreateTagDialog - Add Type Selection
+
+**Time:** 30 min
+**Files:** `frontend/src/components/CreateTagDialog.tsx`
+
+**Task:**
+```typescript
+<div className="space-y-2">
+  <Label>Typ</Label>
+  <RadioGroup value={isVideoType ? "category" : "label"} onValueChange={...}>
+    <div className="flex items-center space-x-2">
+      <RadioGroupItem value="category" id="category" />
+      <Label htmlFor="category">Kategorie (nur eine pro Video)</Label>
+    </div>
+    <div className="flex items-center space-x-2">
+      <RadioGroupItem value="label" id="label" />
+      <Label htmlFor="label">Label (mehrere möglich)</Label>
+    </div>
+  </RadioGroup>
+</div>
+```
+
+**Test:** Can create category or label
+
+**Commit:** `feat(ui): add type selection to CreateTagDialog`
+
+---
+
+### Step 4.12: Update EditTagDialog - Add Type Selection
+
+**Time:** 30 min
+**Files:** `frontend/src/components/EditTagDialog.tsx`
+
+**Task:**
+Same as CreateTagDialog, add type toggle with warning:
+```typescript
+{tag.video_count > 0 && isVideoType !== tag.is_video_type && (
+  <Alert variant="warning">
+    <AlertTriangle className="h-4 w-4" />
+    <AlertDescription>
+      {tag.video_count} Videos sind dieser {tag.is_video_type ? 'Kategorie' : 'Label'} zugewiesen.
+      Typänderung kann Auswirkungen haben.
+    </AlertDescription>
+  </Alert>
+)}
+```
+
+**Test:** Can change tag type with warning
+
+**Commit:** `feat(ui): add type selection to EditTagDialog`
+
+---
+
+### Step 4.13: Update EditTagDialog - Show Field Reuse Info
+
+**Time:** 45 min
+**Files:** `frontend/src/components/EditTagDialog.tsx`
+
+**Task:**
+```typescript
+// For each field, show where else it's used:
+{field.used_in_categories && field.used_in_categories.length > 1 && (
+  <p className="text-xs text-muted-foreground">
+    Wird auch verwendet in: {field.used_in_categories.filter(c => c !== tag.name).join(', ')}
+  </p>
+)}
+```
+
+Note: Backend may need to return this info
+
+**Test:** Shows field reuse info
+
+**Commit:** `feat(ui): show field reuse info in EditTagDialog`
+
+---
+
+### Step 4.14: Update SettingsPage - Rename Tags Tab to Kategorien
+
+**Time:** 20 min
+**Files:** `frontend/src/pages/SettingsPage.tsx`
+
+**Task:**
+```typescript
+// Before:
+<TabsTrigger value="tags">Tags</TabsTrigger>
+
+// After:
+<TabsTrigger value="kategorien">Kategorien</TabsTrigger>
+```
+
+**Test:** Tab shows "Kategorien"
+
+**Commit:** `feat(ui): rename Tags tab to Kategorien`
+
+---
+
+### Step 4.15: Update SettingsPage - Add WorkspaceFieldsCard
+
+**Time:** 30 min
+**Files:** `frontend/src/pages/SettingsPage.tsx`
+
+**Task:**
+```typescript
+<TabsContent value="kategorien">
+  <div className="space-y-6">
+    {/* Workspace fields first */}
+    <WorkspaceFieldsCard
+      listId={currentList.id}
+      defaultSchemaId={currentList.default_schema_id}
+      onEdit={() => setWorkspaceEditorOpen(true)}
+    />
+
+    {/* Category list */}
+    <div>
+      <h3 className="mb-4 text-lg font-medium">Kategorien</h3>
+      <TagsList />
+    </div>
+  </div>
+</TabsContent>
+
+<WorkspaceFieldsEditor
+  listId={currentList.id}
+  defaultSchemaId={currentList.default_schema_id}
+  open={workspaceEditorOpen}
+  onOpenChange={setWorkspaceEditorOpen}
+/>
+```
+
+**Test:** WorkspaceFieldsCard appears above categories
+
+**Commit:** `feat(ui): add WorkspaceFieldsCard to SettingsPage`
+
+---
+
+### Step 4.16: Update SettingsPage - Remove/Consolidate Tabs
+
+**Time:** 30 min
+**Files:** `frontend/src/pages/SettingsPage.tsx`
+
+**Task:**
+Remove or hide "Schemas" and "Fields" tabs (functionality moved into Kategorien):
+```typescript
+// Only keep:
+<TabsList>
+  <TabsTrigger value="kategorien">Kategorien</TabsTrigger>
+  <TabsTrigger value="analytics">Analytics</TabsTrigger>
+</TabsList>
+```
+
+**Test:** Only Kategorien and Analytics tabs visible
+
+**Commit:** `feat(ui): consolidate Settings tabs to Kategorien`
+
+---
+
+### Step 4.17: Write WorkspaceFieldsCard Unit Tests
+
+**Time:** 30 min
+**Files:** `frontend/src/components/settings/WorkspaceFieldsCard.test.tsx` (NEW)
+
+**Task:**
+```typescript
+describe('WorkspaceFieldsCard', () => {
+  it('displays workspace name and icon', () => {...})
+  it('shows field list when schema exists', () => {...})
+  it('shows empty state when no schema', () => {...})
+  it('calls onEdit when button clicked', () => {...})
+})
+```
+
+**Test:** All tests pass
+
+**Commit:** `test(ui): add WorkspaceFieldsCard tests`
+
+---
+
+### Step 4.18: Run Phase 4 Verification
+
+**Time:** 30 min
+**Files:** None (testing)
+
+**Task:**
+1. `npm run type-check`
+2. `npm run test`
+3. `npm run lint`
+4. Manual test Settings page
+5. Verify all terminology is German ("Kategorien", "Informationen")
+
+**Test:** All checks pass, UI looks correct
+
+**Commit:** `test: verify Phase 4 Settings UI complete`
+
+---
+
+## Phase 5: Video Detail UI (15 steps, ~8 hours)
+
+### Step 5.1: Create CategorySelector Component - Skeleton
+
+**Time:** 30 min
+**Files:** `frontend/src/components/CategorySelector.tsx` (NEW)
+
+**Task:**
+```typescript
+interface CategorySelectorProps {
+  videoId: string
+  currentCategoryId: string | null
+  onCategoryChange: (categoryId: string | null) => void
+  disabled?: boolean
+}
+
+export function CategorySelector({
+  videoId,
+  currentCategoryId,
+  onCategoryChange,
+  disabled
+}: CategorySelectorProps) {
+  const { data: categories, isLoading } = useCategories()
+
+  return (
+    <div className="space-y-2">
+      <Label>Kategorie</Label>
+      <Select
+        value={currentCategoryId || "none"}
+        onValueChange={(v) => onCategoryChange(v === "none" ? null : v)}
+        disabled={disabled || isLoading}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Keine Kategorie" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">Keine Kategorie</SelectItem>
+          {categories?.map(cat => (
+            <SelectItem key={cat.id} value={cat.id}>
+              <span className="flex items-center gap-2">
+                <span
+                  className="h-3 w-3 rounded-full"
+                  style={{ backgroundColor: cat.color || '#888' }}
+                />
+                {cat.name}
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+```
+
+**Test:** Renders dropdown with categories
+
+**Commit:** `feat(ui): create CategorySelector skeleton`
+
+---
+
+### Step 5.2: Add Clear Button to CategorySelector
+
+**Time:** 20 min
+**Files:** `frontend/src/components/CategorySelector.tsx`
+
+**Task:**
+```typescript
+<div className="relative">
+  <Select ...>
+    ...
+  </Select>
+  {currentCategoryId && (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="absolute right-8 top-1/2 -translate-y-1/2"
+      onClick={() => onCategoryChange(null)}
+      aria-label="Kategorie entfernen"
+    >
+      <X className="h-4 w-4" />
+    </Button>
+  )}
+</div>
+```
+
+**Test:** Clear button appears and works when category selected
+
+**Commit:** `feat(ui): add clear button to CategorySelector`
+
+---
+
+### Step 5.3: Add Loading and Disabled States to CategorySelector
+
+**Time:** 20 min
+**Files:** `frontend/src/components/CategorySelector.tsx`
+
+**Task:**
+```typescript
+{isLoading && (
+  <SelectTrigger disabled>
+    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+    Lade Kategorien...
+  </SelectTrigger>
+)}
+
+{isMutating && (
+  <SelectTrigger disabled>
+    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+    Ändere Kategorie...
+  </SelectTrigger>
+)}
+```
+
+**Test:** Shows loading state during fetch/mutation
+
+**Commit:** `feat(ui): add loading states to CategorySelector`
+
+---
+
+### Step 5.4: Create CategoryChangeWarning Component - Dialog Shell
+
+**Time:** 30 min
+**Files:** `frontend/src/components/CategoryChangeWarning.tsx` (NEW)
+
+**Task:**
+```typescript
+interface CategoryChangeWarningProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  oldCategory: Tag | null
+  newCategory: Tag | null
+  onConfirm: (restoreBackup: boolean) => void
+  onCancel: () => void
+}
+
+export function CategoryChangeWarning({
+  open,
+  onOpenChange,
+  oldCategory,
+  newCategory,
+  onConfirm,
+  onCancel
+}: CategoryChangeWarningProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Kategorie ändern
+          </DialogTitle>
+        </DialogHeader>
+        {/* Content goes here */}
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>Abbrechen</Button>
+          <Button onClick={() => onConfirm(false)}>Kategorie ändern</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+```
+
+**Test:** Dialog renders and buttons work
+
+**Commit:** `feat(ui): create CategoryChangeWarning dialog shell`
+
+---
+
+### Step 5.5: Implement CategoryChangeWarning - Fields To Backup Section
+
+**Time:** 45 min
+**Files:** `frontend/src/components/CategoryChangeWarning.tsx`
+
+**Task:**
+```typescript
+interface CategoryChangeWarningProps {
+  // ...existing props
+  fieldValuesToBackup: FieldValue[]
+  fieldValuesThatPersist: FieldValue[]
+}
+
+// In DialogContent:
+{fieldValuesToBackup.length > 0 && (
+  <div>
+    <p className="text-sm font-medium mb-2">
+      Folgende Werte werden gesichert:
+    </p>
+    <div className="rounded-lg border bg-muted/50 p-3 space-y-1">
+      {fieldValuesToBackup.map(fv => (
+        <div key={fv.id} className="text-sm">
+          • {fv.field.name}: {formatFieldValue(fv)}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+{fieldValuesThatPersist.length > 0 && (
+  <div>
+    <p className="text-sm font-medium mb-2">
+      Die folgenden Felder bleiben:
+    </p>
+    <div className="rounded-lg border bg-green-50 p-3 space-y-1">
+      {fieldValuesThatPersist.map(fv => (
+        <div key={fv.id} className="text-sm text-green-900">
+          • {fv.field.name}: {formatFieldValue(fv)}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+```
+
+**Test:** Shows both sections with correct styling
+
+**Commit:** `feat(ui): add field sections to CategoryChangeWarning`
+
+---
+
+### Step 5.6: Implement CategoryChangeWarning - Restore Checkbox
+
+**Time:** 30 min
+**Files:** `frontend/src/components/CategoryChangeWarning.tsx`
+
+**Task:**
+```typescript
+interface CategoryChangeWarningProps {
+  // ...existing props
+  hasBackup: boolean
+  backupTimestamp?: string
+}
+
+// State:
+const [restoreBackup, setRestoreBackup] = useState(false)
+
+// In DialogContent (when hasBackup):
+{hasBackup && (
+  <>
+    <div className="flex items-start gap-2 rounded-lg bg-blue-50 p-4">
+      <Sparkles className="h-5 w-5 text-blue-500 mt-0.5" />
+      <div>
+        <p className="font-medium">Gesicherte Werte gefunden!</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Du hattest dieses Video schon mal als "{newCategory?.name}" kategorisiert.
+        </p>
+      </div>
+    </div>
+
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="restore"
+        checked={restoreBackup}
+        onCheckedChange={(checked) => setRestoreBackup(checked === true)}
+      />
+      <label htmlFor="restore" className="text-sm cursor-pointer">
+        Gesicherte Werte wiederherstellen
+      </label>
+    </div>
+  </>
+)}
+
+// Update confirm button:
+<Button onClick={() => onConfirm(restoreBackup)}>
+  Kategorie ändern
+</Button>
+```
+
+**Test:** Checkbox appears when backup exists, value passed to onConfirm
+
+**Commit:** `feat(ui): add restore checkbox to CategoryChangeWarning`
+
+---
+
+### Step 5.7: Hook Up CategorySelector with Warning Dialog
+
+**Time:** 45 min
+**Files:** `frontend/src/components/CategorySelector.tsx`
+
+**Task:**
+```typescript
+const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null)
+const [showWarning, setShowWarning] = useState(false)
+
+const handleCategorySelect = (categoryId: string | null) => {
+  if (categoryId === currentCategoryId) return
+
+  // If removing or changing category, show warning
+  if (currentCategoryId !== null || categoryId !== null) {
+    setPendingCategoryId(categoryId)
+    setShowWarning(true)
+  } else {
+    // Direct assignment (no previous category, assigning new)
+    onCategoryChange(categoryId)
+  }
+}
+
+const handleConfirm = (restoreBackup: boolean) => {
+  onCategoryChange(pendingCategoryId)
+  // TODO: Handle restoreBackup
+  setShowWarning(false)
+}
+
+// Include CategoryChangeWarning dialog
+<CategoryChangeWarning
+  open={showWarning}
+  onOpenChange={setShowWarning}
+  oldCategory={currentCategory}
+  newCategory={pendingCategory}
+  hasBackup={/* from API */}
+  onConfirm={handleConfirm}
+  onCancel={() => setShowWarning(false)}
+/>
+```
+
+**Test:** Changing category shows warning, confirm triggers change
+
+**Commit:** `feat(ui): hook up CategorySelector with warning dialog`
+
+---
+
+### Step 5.8: Update VideoDetailsPage - Add CategorySelector
+
+**Time:** 30 min
+**Files:** `frontend/src/pages/VideoDetailsPage.tsx`
+
+**Task:**
+```typescript
+// Add CategorySelector at top of detail view:
+<div className="space-y-6">
+  {/* Category selector */}
+  <CategorySelector
+    videoId={video.id}
+    currentCategoryId={video.category_id}
+    onCategoryChange={handleCategoryChange}
+  />
+
+  {/* Separator */}
+  <Separator />
+
+  {/* Fields section */}
+  <div>
+    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">
+      Informationen
+    </h3>
+    {/* Field inputs */}
+  </div>
+</div>
+```
+
+**Test:** CategorySelector appears in video detail
+
+**Commit:** `feat(ui): add CategorySelector to VideoDetailsPage`
+
+---
+
+### Step 5.9: Update VideoDetailsPage - Remove Tag Badges or Filter to Labels
+
+**Time:** 30 min
+**Files:** `frontend/src/pages/VideoDetailsPage.tsx`
+
+**Task:**
+```typescript
+// Option A: Remove tag badges entirely (category shown in selector)
+
+// Option B: Show only labels (is_video_type=false)
+const labels = video.tags?.filter(t => !t.is_video_type) ?? []
+
+{labels.length > 0 && (
+  <div className="flex flex-wrap gap-2">
+    {labels.map(label => (
+      <Badge key={label.id} style={{ backgroundColor: label.color }}>
+        {label.name}
+      </Badge>
+    ))}
+  </div>
+)}
+```
+
+**Test:** Only labels shown as badges (not categories)
+
+**Commit:** `feat(ui): filter video tags to show only labels`
+
+---
+
+### Step 5.10: Update VideoDetailsPage - Unified Field Display
+
+**Time:** 45 min
+**Files:** `frontend/src/pages/VideoDetailsPage.tsx`
+
+**Task:**
+Show all available fields (workspace + category) without separation:
+```typescript
+const availableFields = useAvailableFields(video.id)
+
+// Render all fields together:
+<div className="space-y-4">
+  {availableFields.map(field => (
+    <FieldInput
+      key={field.id}
+      field={field}
+      value={video.field_values?.find(fv => fv.field_id === field.id)}
+      onChange={(value) => handleFieldChange(field.id, value)}
+    />
+  ))}
+</div>
+```
+
+**Test:** Shows both workspace and category fields together
+
+**Commit:** `feat(ui): show unified field display in VideoDetailsPage`
+
+---
+
+### Step 5.11: Add Toast Notifications for Category Change
+
+**Time:** 20 min
+**Files:** `frontend/src/components/CategorySelector.tsx`
+
+**Task:**
+```typescript
+import { toast } from 'sonner'
+
+const handleConfirm = async (restoreBackup: boolean) => {
+  try {
+    await setVideoCategory.mutateAsync({
+      videoId,
+      categoryId: pendingCategoryId,
+      restoreBackup
+    })
+
+    toast.success('Kategorie geändert', {
+      description: pendingCategoryId
+        ? `Video ist jetzt in "${pendingCategory?.name}"`
+        : 'Kategorie wurde entfernt'
+    })
+
+    if (restoreBackup) {
+      toast.info('Werte wiederhergestellt', {
+        description: `${restoredCount} Werte wurden wiederhergestellt`
+      })
+    }
+  } catch (error) {
+    toast.error('Kategorie konnte nicht geändert werden', {
+      description: error.message
+    })
+  }
+}
+```
+
+**Test:** Toast appears on success/error
+
+**Commit:** `feat(ui): add toast notifications to category change`
+
+---
+
+### Step 5.12: Update VideoDetailsModal - Same Changes
+
+**Time:** 30 min
+**Files:** `frontend/src/components/VideoDetailsModal.tsx`
+
+**Task:**
+Apply same changes as VideoDetailsPage:
+- Add CategorySelector
+- Filter tags to labels only
+- Unified field display
+
+**Test:** Modal has same functionality as page
+
+**Commit:** `feat(ui): update VideoDetailsModal with category selector`
+
+---
+
+### Step 5.13: Write CategorySelector Unit Tests
+
+**Time:** 45 min
+**Files:** `frontend/src/components/CategorySelector.test.tsx` (NEW)
+
+**Task:**
+```typescript
+describe('CategorySelector', () => {
+  it('displays current category', () => {...})
+  it('shows "Keine Kategorie" when no category assigned', () => {...})
+  it('opens dropdown on click', async () => {...})
+  it('shows warning dialog when changing category', async () => {...})
+  it('shows clear button on hover when category assigned', async () => {...})
+  it('disables selector when disabled prop is true', () => {...})
+  it('shows loading state', () => {...})
+})
+```
+
+**Test:** All tests pass
+
+**Commit:** `test(ui): add CategorySelector tests`
+
+---
+
+### Step 5.14: Write CategoryChangeWarning Unit Tests
+
+**Time:** 45 min
+**Files:** `frontend/src/components/CategoryChangeWarning.test.tsx` (NEW)
+
+**Task:**
+```typescript
+describe('CategoryChangeWarning', () => {
+  it('shows fields that will be backed up', () => {...})
+  it('shows fields that will persist', () => {...})
+  it('shows restore checkbox when backup exists', () => {...})
+  it('calls onConfirm with restore=true when checkbox checked', async () => {...})
+  it('calls onCancel when cancel button clicked', async () => {...})
+})
+```
+
+**Test:** All tests pass
+
+**Commit:** `test(ui): add CategoryChangeWarning tests`
+
+---
+
+### Step 5.15: Run Phase 5 Verification
+
+**Time:** 30 min
+**Files:** None (testing)
+
+**Task:**
+1. `npm run type-check`
+2. `npm run test`
+3. `npm run lint`
+4. Manual test video detail page
+5. Test category change flow end-to-end
+6. Verify warning dialog shows correct fields
+7. Test backup restore (if backend ready)
+
+**Test:** All checks pass, category change flow works
+
+**Commit:** `test: verify Phase 5 Video Detail UI complete`
+
+---
+
+## Phase 6: Testing & Polish (12 steps, ~6 hours)
+
+### Step 6.1: Create Backend Backup Service Unit Tests
+
+**Time:** 45 min
+**Files:** `backend/tests/unit/test_field_value_backup.py` (NEW)
+
+**Task:**
+Write tests from testing.md:
+```python
+class TestFieldValueBackupService:
+    def test_backup_creates_json_file(self, tmp_path): ...
+    def test_backup_handles_empty_values(self, tmp_path): ...
+    def test_restore_recreates_field_values(self, tmp_path, mock_db): ...
+    def test_restore_handles_corrupted_file(self, tmp_path, mock_db): ...
+    def test_list_backups_returns_all_for_video(self, tmp_path): ...
+    def test_delete_backup_removes_file(self, tmp_path): ...
+```
+
+**Test:** Run `pytest backend/tests/unit/test_field_value_backup.py`, all pass
+
+**Commit:** `test(backend): add backup service unit tests`
+
+---
+
+### Step 6.2: Create Backend Field Aggregation Unit Tests
+
+**Time:** 30 min
+**Files:** `backend/tests/unit/test_field_aggregation.py` (NEW)
+
+**Task:**
+```python
+class TestFieldAggregationService:
+    async def test_aggregates_workspace_fields_only(self, mock_db): ...
+    async def test_aggregates_workspace_and_category_fields(self, mock_db): ...
+    async def test_deduplicates_shared_fields(self, mock_db): ...
+    async def test_handles_no_schemas(self, mock_db): ...
+```
+
+**Test:** Run `pytest backend/tests/unit/test_field_aggregation.py`, all pass
+
+**Commit:** `test(backend): add field aggregation unit tests`
+
+---
+
+### Step 6.3: Create Backend Category Validation Integration Tests
+
+**Time:** 45 min
+**Files:** `backend/tests/integration/test_category_validation.py` (NEW)
+
+**Task:**
+```python
+class TestCategoryValidation:
+    async def test_can_assign_single_category(self, client, test_video, test_category): ...
+    async def test_cannot_assign_multiple_categories(self, client, test_video, test_categories): ...
+    async def test_cannot_assign_second_category_if_video_has_one(self, ...): ...
+    async def test_can_assign_labels_with_category(self, ...): ...
+    async def test_can_reassign_same_category(self, ...): ...
+```
+
+**Test:** Run `pytest backend/tests/integration/test_category_validation.py`, all pass
+
+**Commit:** `test(backend): add category validation integration tests`
+
+---
+
+### Step 6.4: Create Backend Category Change Integration Tests
+
+**Time:** 45 min
+**Files:** `backend/tests/integration/test_category_change.py` (NEW)
+
+**Task:**
+```python
+class TestCategoryChange:
+    async def test_change_category_creates_backup(self, ...): ...
+    async def test_change_category_detects_existing_backup(self, ...): ...
+    async def test_remove_category_creates_backup(self, ...): ...
+    async def test_change_category_without_values_no_backup(self, ...): ...
+```
+
+**Test:** Run `pytest backend/tests/integration/test_category_change.py`, all pass
+
+**Commit:** `test(backend): add category change integration tests`
+
+---
+
+### Step 6.5: Update Existing Frontend Tests for is_video_type
+
+**Time:** 45 min
+**Files:** All test files with Tag mocks
+
+**Task:**
+Search for Tag mocks and add `is_video_type: true`:
+```bash
+grep -r "const.*Tag.*=.*{" frontend/src --include="*.test.tsx"
+```
+
+Update each mock:
+```typescript
+const mockTag = {
+  id: '1',
+  name: 'Test',
+  color: '#FF0000',
+  is_video_type: true, // ADD THIS
+  // ...
+}
+```
+
+**Test:** `npm run test` - all existing tests pass
+
+**Commit:** `test(frontend): add is_video_type to all Tag mocks`
+
+---
+
+### Step 6.6: Manual E2E Test - Story 001 (First-Time Setup)
+
+**Time:** 30 min
+**Files:** None (manual testing)
+
+**Task:**
+Follow story 001 exactly:
+1. Open app (no categories exist)
+2. Go to Settings → Kategorien
+3. Click "+ Neue Kategorie"
+4. Enter "Keto Rezepte", pick color, save
+5. Click "Bearbeiten" on category
+6. Add field "Kalorien" (Zahl)
+7. Save
+8. Go to video detail
+9. Select "Keto Rezepte" from dropdown
+10. Fill in fields
+11. Save
+
+**Test:** All steps complete successfully
+
+**Commit:** None (manual verification)
+
+---
+
+### Step 6.7: Manual E2E Test - Story 002 (Category Switch)
+
+**Time:** 30 min
+**Files:** None (manual testing)
+
+**Task:**
+Follow story 002 exactly:
+1. Video has category "Keto" with filled values
+2. Open video detail
+3. Change category to "Vegan"
+4. See warning dialog with backed-up values
+5. Confirm
+6. Verify Keto fields hidden, Vegan fields shown
+7. Verify workspace fields persisted
+8. Change back to "Keto"
+9. See restore prompt
+10. Check "Restore values"
+11. Confirm
+12. Verify values restored
+
+**Test:** Backup and restore work correctly
+
+**Commit:** None (manual verification)
+
+---
+
+### Step 6.8: Fix Any Bugs Found in E2E Testing
+
+**Time:** 60 min (variable)
+**Files:** Various (depends on bugs found)
+
+**Task:**
+Fix any issues discovered during E2E testing:
+- UI bugs
+- API errors
+- State management issues
+- Missing error handling
+
+**Test:** Re-run failing scenarios
+
+**Commit:** `fix: [description of fix]` (multiple commits likely)
+
+---
+
+### Step 6.9: Accessibility Audit
+
+**Time:** 30 min
+**Files:** Various component files
+
+**Task:**
+Check all new components:
+- [ ] Keyboard navigation works (Tab, Enter, Escape, Arrow keys)
+- [ ] ARIA labels present (`aria-label`, `aria-expanded`, `aria-selected`)
+- [ ] Focus management (focus returns to trigger after dialog close)
+- [ ] Screen reader announcements (role="status", aria-live)
+
+Fix any issues found.
+
+**Test:** Run `npx axe-core` on components
+
+**Commit:** `fix(a11y): improve accessibility of category components`
+
+---
+
+### Step 6.10: Polish Loading and Error States
+
+**Time:** 30 min
+**Files:** CategorySelector.tsx, CategoryChangeWarning.tsx
+
+**Task:**
+Ensure all states are covered:
+- Loading spinners with descriptive text
+- Error messages are user-friendly (German)
+- Empty states have helpful guidance
+- Transitions are smooth
+
+**Test:** Manually test all states
+
+**Commit:** `fix(ui): polish loading and error states`
+
+---
+
+### Step 6.11: Run Full Test Suite
+
+**Time:** 30 min
+**Files:** None (testing)
+
+**Task:**
+```bash
+# Backend
+cd backend
+pytest --cov=app --cov-report=html
+# Check coverage > 85%
+
+# Frontend
+cd frontend
+npm run test -- --coverage
+# Check coverage > 80%
+
+npm run type-check
+npm run lint
+npm run build
+```
+
+**Test:** All tests pass, coverage meets targets, build succeeds
+
+**Commit:** `test: verify full test suite passing`
+
+---
+
+### Step 6.12: Final Verification and Documentation
+
+**Time:** 30 min
+**Files:** `features/category-fields-hybrid/atomic-steps.md`
+
+**Task:**
+1. Remove false "Implementation Status" section from atomic-steps.md
+2. Update status to reflect actual completion
+3. Document any deviations from plan
+4. Verify all acceptance criteria from plan.md are met
+
+**Test:** All criteria checked
+
+**Commit:** `docs: update implementation status`
+
+---
+
 ## Summary
 
-**Total Steps:** 58 atomic steps across 10 phases
-**Estimated Time:** 35-40 hours
+**Total Steps:** 91 atomic steps across 6 phases
+**Estimated Time:** 45-50 hours
 
 Each step is:
 - ✅ 15-60 minutes
 - ✅ Focused on one thing
 - ✅ Independently committable
 - ✅ Clearly testable
-
-**Remaining Phases (4-6) follow same pattern:**
-- Phase 4: Settings UI (15-20 steps)
-- Phase 5: Video Detail UI (12-15 steps)
-- Phase 6: Testing & Polish (8-10 steps)
 
 ---
 
@@ -1147,49 +2460,8 @@ After each phase (every 10-24 steps):
 
 ## Next Phase
 
-✅ Ready for Phase 11: Research & Validation
-- Validate technical decisions
-- Research best practices
-- Check for existing solutions
-- Confirm approach
-
-
----
-
-## Implementation Status
-
-**Updated:** 2025-11-21
-
-### Phase Completion
-
-| Phase | Status | Commits |
-|-------|--------|---------|
-| Phase 1: Backend Foundation | ✅ COMPLETE | `12f01ad`, `9759a0b`, `18fbeb7` |
-| Phase 2: Backend Services & API | ✅ COMPLETE | (included in Phase 1) |
-| Phase 3: Frontend Types & Hooks | ✅ COMPLETE | `0eecd7b` |
-| Phase 4: Settings UI | ✅ COMPLETE | `0eecd7b` |
-| Phase 5: Video Detail UI | ✅ COMPLETE | `0eecd7b` |
-| Phase 6: Testing & Polish | ✅ COMPLETE | (verified, no changes needed) |
-
-### Key Components Implemented
-
-**Backend:**
-- `is_video_type` field on Tags model
-- `PUT /videos/{id}/category` endpoint
-- Category validation (only is_video_type=true tags allowed)
-- CASCADE delete for video_tags
-
-**Frontend:**
-- `useCategories()` / `useLabels()` hooks
-- `useSetVideoCategory()` mutation hook
-- `CategorySelector` component (dropdown)
-- `CategoryBadge` / `LabelBadge` components
-- Updated `TagsList` with Typ column
-- Updated `EditTagDialog` / `CreateTagDialog` with type selection
-- Updated `VideoDetailsPage` with category/label separation
-
-### Test Coverage
-
-- 16 backend tests (test_video_tags.py) - all passing
-- 43 frontend tests (CategorySelector, VideoDetailsPage) - all passing
+✅ Ready for Implementation
+- Start with Step 1.1
+- Work through all 91 steps sequentially
+- Commit after each step
 

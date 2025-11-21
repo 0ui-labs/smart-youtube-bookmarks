@@ -85,7 +85,8 @@ class FieldSchema(BaseModel):
     # Relationships
     list: Mapped["BookmarkList"] = relationship(
         "BookmarkList",
-        back_populates="field_schemas"
+        back_populates="field_schemas",
+        foreign_keys=[list_id]  # Explicit FK - disambiguate from BookmarkList.default_schema_id
     )
 
     schema_fields = relationship(
