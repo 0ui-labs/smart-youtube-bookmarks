@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { VideoDetailsModal } from '../VideoDetailsModal'
 import { VideoResponse } from '@/types/video'
 
@@ -12,6 +13,38 @@ vi.mock('../CustomFieldsSection', () => ({
     </div>
   ),
 }))
+
+// Mock CategorySelector (already tested separately)
+vi.mock('../CategorySelector', () => ({
+  CategorySelector: () => <div data-testid="category-selector">CategorySelector</div>,
+}))
+
+// Mock hooks to avoid API calls
+vi.mock('@/hooks/useVideoDetail', () => ({
+  useVideoDetail: () => ({ data: null, isLoading: false }),
+}))
+
+vi.mock('@/hooks/useVideos', () => ({
+  useSetVideoCategory: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+}))
+
+// Test wrapper with QueryClient
+function renderWithProviders(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      {ui}
+    </QueryClientProvider>
+  )
+}
 
 describe('VideoDetailsModal', () => {
   const mockOnOpenChange = vi.fn()
@@ -60,7 +93,7 @@ describe('VideoDetailsModal', () => {
   // ============================================================================
 
   it('renders modal when open=true', () => {
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={mockVideo}
         open={true}
@@ -75,7 +108,7 @@ describe('VideoDetailsModal', () => {
   })
 
   it('does not render when open=false', () => {
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={mockVideo}
         open={false}
@@ -92,7 +125,7 @@ describe('VideoDetailsModal', () => {
   it('calls onOpenChange(false) when close button clicked', async () => {
     const user = userEvent.setup()
 
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={mockVideo}
         open={true}
@@ -114,7 +147,7 @@ describe('VideoDetailsModal', () => {
   // ============================================================================
 
   it('displays video title in DialogTitle', () => {
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={mockVideo}
         open={true}
@@ -128,7 +161,7 @@ describe('VideoDetailsModal', () => {
   })
 
   it('renders thumbnail with correct src and alt', () => {
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={mockVideo}
         open={true}
@@ -148,7 +181,7 @@ describe('VideoDetailsModal', () => {
   // ============================================================================
 
   it('displays duration with formatDuration', () => {
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={mockVideo}
         open={true}
@@ -163,7 +196,7 @@ describe('VideoDetailsModal', () => {
   })
 
   it('displays channel name', () => {
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={mockVideo}
         open={true}
@@ -183,7 +216,7 @@ describe('VideoDetailsModal', () => {
       channel: null,
     }
 
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={videoWithoutMetadata}
         open={true}
@@ -203,7 +236,7 @@ describe('VideoDetailsModal', () => {
   // ============================================================================
 
   it('renders all video tags as Badges', () => {
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={mockVideo}
         open={true}
@@ -223,7 +256,7 @@ describe('VideoDetailsModal', () => {
       tags: [],
     }
 
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={videoWithoutTags}
         open={true}
@@ -259,7 +292,7 @@ describe('VideoDetailsModal', () => {
       field_values: [],
     }
 
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={videoWithFields}
         open={true}
@@ -276,7 +309,7 @@ describe('VideoDetailsModal', () => {
   it('calls onFieldChange when field changes in CustomFieldsSection', async () => {
     const user = userEvent.setup()
 
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={mockVideo}
         open={true}
@@ -298,7 +331,7 @@ describe('VideoDetailsModal', () => {
   // ============================================================================
 
   it('returns null when video is null', () => {
-    const { container } = render(
+    const { container } = renderWithProviders(
       <VideoDetailsModal
         video={null}
         open={true}
@@ -317,7 +350,7 @@ describe('VideoDetailsModal', () => {
       thumbnail_url: null,
     }
 
-    render(
+    renderWithProviders(
       <VideoDetailsModal
         video={videoWithoutThumbnail}
         open={true}

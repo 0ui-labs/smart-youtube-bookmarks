@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import { VideoResponse } from '@/types/video'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CustomFieldsSection } from '@/components/CustomFieldsSection'
+import { CategorySelector } from '@/components/CategorySelector'
+import { useSetVideoCategory } from '@/hooks/useVideos'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import { formatDuration } from '@/utils/formatDuration'
 import { useVideoDetail } from '@/hooks/useVideoDetail'
 
@@ -76,6 +80,33 @@ export const VideoDetailsModal = ({
   // Use videoDetail if loaded, fallback to prop video for basic info
   const displayVideo = videoDetail || video
 
+  // Category change mutation (Step 5.12)
+  const setVideoCategory = useSetVideoCategory()
+  const [categoryError, setCategoryError] = useState<string | null>(null)
+
+  // Handle category change
+  const handleCategoryChange = (categoryId: string | null, restoreBackup?: boolean) => {
+    if (!displayVideo?.id) return
+
+    // TODO: Pass restoreBackup to API when endpoint supports it
+    setVideoCategory.mutate(
+      { videoId: displayVideo.id, categoryId, restoreBackup },
+      {
+        onSuccess: () => {
+          setCategoryError(null)
+        },
+        onError: (error: any) => {
+          const message = error.response?.data?.detail || error.message || 'Kategorie konnte nicht geändert werden'
+          setCategoryError(message)
+        },
+      }
+    )
+  }
+
+  // Get current category and labels
+  const currentCategory = displayVideo?.tags?.find((t) => t.is_video_type) ?? null
+  const labels = displayVideo?.tags?.filter((t) => !t.is_video_type) ?? []
+
   // Early return if no video
   if (!displayVideo) return null
 
@@ -109,16 +140,33 @@ export const VideoDetailsModal = ({
             )}
           </div>
 
-          {/* Tags */}
-          {displayVideo.tags && displayVideo.tags.length > 0 && (
+          {/* Labels (only is_video_type=false tags) - Step 5.12 */}
+          {labels.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {displayVideo.tags.map((tag) => (
+              {labels.map((tag) => (
                 <Badge key={tag.id} variant="secondary">
                   {tag.name}
                 </Badge>
               ))}
             </div>
           )}
+
+          {/* Category Selector (Step 5.12) */}
+          <CategorySelector
+            videoId={displayVideo.id}
+            currentCategoryId={currentCategory?.id ?? null}
+            onCategoryChange={handleCategoryChange}
+            isMutating={setVideoCategory.isPending}
+          />
+
+          {/* Category Error */}
+          {categoryError && (
+            <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+              {categoryError}
+            </div>
+          )}
+
+          <Separator />
 
           {/* Loading indicator */}
           {isLoading && (

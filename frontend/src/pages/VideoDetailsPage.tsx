@@ -5,8 +5,11 @@ import { api } from '@/lib/api'
 import { VideoResponseSchema } from '@/types/video'
 import { formatDuration } from '@/utils/formatDuration'
 import { CustomFieldsSection } from '@/components/CustomFieldsSection'
+import { CategorySelector } from '@/components/CategorySelector'
+import { useSetVideoCategory } from '@/hooks/useVideos'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, AlertCircle, X } from 'lucide-react'
 
 /**
@@ -81,12 +84,38 @@ export const VideoDetailsPage = () => {
     updateField.mutate({ fieldId, value })
   }
 
+  // Category change mutation (Step 5.8)
+  const setVideoCategory = useSetVideoCategory()
+
+  // Handle category change
+  const handleCategoryChange = (categoryId: string | null, restoreBackup?: boolean) => {
+    if (!videoId) return
+
+    // TODO: Pass restoreBackup to API when endpoint supports it
+    setVideoCategory.mutate(
+      { videoId, categoryId, restoreBackup },
+      {
+        onSuccess: () => {
+          setUpdateError(null)
+        },
+        onError: (error: any) => {
+          const message = error.response?.data?.detail || error.message || 'Kategorie konnte nicht geändert werden'
+          setUpdateError(message)
+        },
+      }
+    )
+  }
+
   // Handle channel link click with stopPropagation
   const handleChannelClick = (e: React.MouseEvent, channelName: string) => {
     e.stopPropagation()
     // TODO: Navigate to channel filter or search
     console.log('Channel clicked:', channelName)
   }
+
+  // Get current category (is_video_type=true) and labels (is_video_type=false)
+  const currentCategory = video?.tags?.find((t: any) => t.is_video_type) ?? null
+  const labels = video?.tags?.filter((t: any) => !t.is_video_type) ?? []
 
   // Loading state
   if (isLoading) {
@@ -177,10 +206,10 @@ export const VideoDetailsPage = () => {
           </button>
         )}
 
-        {/* Tags */}
-        {video.tags.length > 0 && (
+        {/* Labels (only is_video_type=false tags) - Step 5.9 */}
+        {labels.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-4">
-            {video.tags.map((tag: any) => (
+            {labels.map((tag: any) => (
               <Badge key={tag.id} variant="secondary">
                 {tag.name}
               </Badge>
@@ -188,6 +217,18 @@ export const VideoDetailsPage = () => {
           </div>
         )}
       </div>
+
+      {/* Category Selector (Step 5.8) */}
+      <div className="mb-6">
+        <CategorySelector
+          videoId={video.id}
+          currentCategoryId={currentCategory?.id ?? null}
+          onCategoryChange={handleCategoryChange}
+          isMutating={setVideoCategory.isPending}
+        />
+      </div>
+
+      <Separator className="my-6" />
 
       {/* Custom Fields Section - Grouped by Schema (Task #131 Step 2: Extracted to CustomFieldsSection) */}
       <CustomFieldsSection
