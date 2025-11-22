@@ -1939,6 +1939,150 @@ async def get_video_tags(video_id: UUID, db: AsyncSession = Depends(get_db)):
     return list(tags_result.scalars().all())
 
 
+# === Category Management Endpoint ===
+
+
+class SetCategoryRequest(BaseModel):
+    """Request to set/change a video's category."""
+    category_id: Optional[UUID] = None
+
+
+class SetCategoryResponse(BaseModel):
+    """Response from setting a video's category."""
+    backup_created: bool
+    backup_available: bool
+    restored_count: int = 0
+
+
+@router.put("/videos/{video_id}/category", response_model=SetCategoryResponse)
+async def set_video_category(
+    video_id: UUID,
+    request: SetCategoryRequest,
+    restore_backup: bool = Query(False, description="Restore backup if available for new category"),
+    db: AsyncSession = Depends(get_db)
+) -> SetCategoryResponse:
+    """
+    Set video's category (replaces existing).
+
+    This endpoint handles category changes with backup/restore functionality:
+    - If video has existing category with field values, creates backup before removal
+    - If new category has existing backup and restore_backup=true, restores values
+
+    Args:
+        video_id: UUID of video to update
+        request: SetCategoryRequest with new category_id (null to remove)
+        restore_backup: If true and backup exists for new category, restore values
+        db: Database session
+
+    Returns:
+        SetCategoryResponse with backup_created, backup_available, restored_count
+
+    Raises:
+        HTTPException 404: Video not found
+        HTTPException 400: Tag is not a category (is_video_type=false)
+    """
+    from app.services.field_value_backup import (
+        backup_field_values,
+        restore_field_values,
+        list_backups,
+    )
+
+    # Step 2.18: Get video with tags
+    video_stmt = (
+        select(Video)
+        .where(Video.id == video_id)
+    )
+    video_result = await db.execute(video_stmt)
+    video = video_result.scalar_one_or_none()
+
+    if not video:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Video with id {video_id} not found"
+        )
+
+    # Load video's existing tags to find current category
+    existing_tags_stmt = (
+        select(Tag)
+        .join(video_tags)
+        .where(video_tags.c.video_id == video_id)
+    )
+    existing_tags_result = await db.execute(existing_tags_stmt)
+    existing_tags = list(existing_tags_result.scalars().all())
+
+    # Get current category
+    current_category = next((t for t in existing_tags if t.is_video_type), None)
+
+    # Get new category (if not None)
+    new_category = None
+    if request.category_id:
+        new_category_stmt = select(Tag).where(Tag.id == request.category_id)
+        new_category_result = await db.execute(new_category_stmt)
+        new_category = new_category_result.scalar_one_or_none()
+
+        if not new_category:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tag with id {request.category_id} not found"
+            )
+
+        if not new_category.is_video_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tag '{new_category.name}' is not a category (is_video_type=false). "
+                       f"Use POST /videos/{video_id}/tags for labels."
+            )
+
+    # Early exit if same category (no-op)
+    if current_category and new_category and current_category.id == new_category.id:
+        return SetCategoryResponse(
+            backup_created=False,
+            backup_available=False,
+            restored_count=0
+        )
+
+    # Step 2.19: Create backup if removing category with values
+    backup_created = False
+    if current_category:
+        backup_path = await backup_field_values(video_id, current_category.id, db)
+        backup_created = backup_path is not None
+
+        # Remove old category
+        delete_stmt = video_tags.delete().where(
+            video_tags.c.video_id == video_id,
+            video_tags.c.tag_id == current_category.id
+        )
+        await db.execute(delete_stmt)
+
+    # Step 2.20: Add new category (if not None)
+    restored_count = 0
+    backup_available = False
+
+    if new_category:
+        # Check for existing backup
+        backups = list_backups(video_id)
+        backup_available = any(b.category_id == new_category.id for b in backups)
+
+        # Add new category association
+        insert_stmt = video_tags.insert().values(
+            video_id=video_id,
+            tag_id=new_category.id
+        )
+        await db.execute(insert_stmt)
+
+        # Restore backup if requested and available
+        if restore_backup and backup_available:
+            restored_count = await restore_field_values(video_id, new_category.id, db)
+
+    await db.commit()
+
+    return SetCategoryResponse(
+        backup_created=backup_created,
+        backup_available=backup_available,
+        restored_count=restored_count
+    )
+
+
 @router.put("/videos/{video_id}/fields", response_model=BatchUpdateFieldValuesResponse)
 async def batch_update_video_field_values(
     video_id: UUID,

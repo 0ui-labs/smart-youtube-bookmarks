@@ -60,22 +60,27 @@ async def backup_field_values(
         Path to the backup file, or None if no values to backup
     """
     # Step 2.2: Get category with schema
-    category = await db.get(
-        Tag,
-        category_id,
-        options=[selectinload(Tag.schema)]
-    )
+    # Use select() instead of db.get() to ensure eager loading works
+    # (db.get() can return cached object without the eager load)
+    stmt = select(Tag).where(Tag.id == category_id).options(selectinload(Tag.schema))
+    result = await db.execute(stmt)
+    category = result.scalar_one_or_none()
+
     if not category or not category.schema:
         return None
 
     # Step 2.3: Get field IDs from schema
+    # Use select() instead of db.get() to ensure eager loading works
     from app.models.field_schema import FieldSchema
 
-    schema_with_fields = await db.get(
-        FieldSchema,
-        category.schema.id,
-        options=[selectinload(FieldSchema.schema_fields)]
+    schema_stmt = (
+        select(FieldSchema)
+        .where(FieldSchema.id == category.schema.id)
+        .options(selectinload(FieldSchema.schema_fields))
     )
+    schema_result = await db.execute(schema_stmt)
+    schema_with_fields = schema_result.scalar_one_or_none()
+
     if not schema_with_fields or not schema_with_fields.schema_fields:
         return None
 

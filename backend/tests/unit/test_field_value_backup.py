@@ -117,13 +117,29 @@ class TestBackupFieldValues:
         """
         category, _ = mock_category
 
-        # Mock db.get to return category
-        mock_db.get = AsyncMock(return_value=category)
+        # Mock schema with fields
+        mock_schema = MagicMock()
+        mock_schema.id = category.schema.id
+        mock_schema.schema_fields = category.schema.schema_fields
 
-        # Mock db.execute to return field values
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = mock_field_values
-        mock_db.execute = AsyncMock(return_value=mock_result)
+        # Track call count to return different results for different queries
+        call_count = [0]
+
+        def get_mock_result(*args, **kwargs):
+            call_count[0] += 1
+            mock_result = MagicMock()
+            if call_count[0] == 1:
+                # First call: select(Tag) for category
+                mock_result.scalar_one_or_none.return_value = category
+            elif call_count[0] == 2:
+                # Second call: select(FieldSchema) for schema
+                mock_result.scalar_one_or_none.return_value = mock_schema
+            else:
+                # Third call: select(VideoFieldValue) for field values
+                mock_result.scalars.return_value.all.return_value = mock_field_values
+            return mock_result
+
+        mock_db.execute = AsyncMock(side_effect=get_mock_result)
 
         with patch(
             "app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir
