@@ -23,6 +23,8 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Label } from '@/components/ui/label'
 import { useCreateTag } from '@/hooks/useTags'
 import { SchemaSelector } from './SchemaSelector'
 import { schemasOptions, useCreateSchema } from '@/hooks/useSchemas'
@@ -42,6 +44,9 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
   // Task #82: Schema ID state for SchemaSelector
   // null = "Kein Schema", 'new' = Create new schema, UUID string = Existing schema
   const [schemaId, setSchemaId] = useState<string | null>(null)
+  // Category-Fields Feature: Tag type selection
+  // true = Kategorie (one per video), false = Label (multiple per video)
+  const [isVideoType, setIsVideoType] = useState(true)
 
   const createTag = useCreateTag()
   const createSchema = useCreateSchema(listId)
@@ -100,12 +105,14 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
         name: name.trim(),
         color: color || undefined, // Send undefined if empty
         schema_id: schemaId,  // Task #82 Batch 3: Include schema_id
+        is_video_type: isVideoType, // Category-Fields Feature
       })
 
       // Success - reset form and close dialog
       setName('')
       setColor('#3B82F6')
       setSchemaId(null)
+      setIsVideoType(true)
       setError(null)
       onOpenChange(false)
     } catch (err: any) {
@@ -122,6 +129,7 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
     setName('')
     setColor('#3B82F6')
     setSchemaId(null)
+    setIsVideoType(true)
     setError(null)
     onOpenChange(false)
   }
@@ -158,6 +166,36 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
               {error && (
                 <p className="mt-1 text-sm text-red-600">{error}</p>
               )}
+            </div>
+
+            {/* Type Selection - Category vs Label */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Typ
+              </label>
+              <RadioGroup
+                value={isVideoType ? 'category' : 'label'}
+                onValueChange={(value) => setIsVideoType(value === 'category')}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="category" id="type-category" />
+                  <Label htmlFor="type-category" className="font-normal cursor-pointer">
+                    Kategorie
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="label" id="type-label" />
+                  <Label htmlFor="type-label" className="font-normal cursor-pointer">
+                    Label
+                  </Label>
+                </div>
+              </RadioGroup>
+              <p className="mt-1 text-sm text-gray-500">
+                {isVideoType
+                  ? 'Ein Video kann nur eine Kategorie haben'
+                  : 'Ein Video kann mehrere Labels haben'}
+              </p>
             </div>
 
             {/* Color Picker */}

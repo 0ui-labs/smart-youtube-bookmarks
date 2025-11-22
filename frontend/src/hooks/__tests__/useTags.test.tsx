@@ -19,6 +19,7 @@ const mockTag: Tag = {
   name: 'Python',
   color: '#3B82F6',
   schema_id: null,
+  is_video_type: true,
   user_id: '550e8400-e29b-41d4-a716-446655440001',
   created_at: '2025-11-18T10:00:00Z',
   updated_at: '2025-11-18T10:00:00Z',

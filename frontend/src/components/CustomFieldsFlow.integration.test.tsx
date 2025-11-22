@@ -74,6 +74,7 @@ const createMockTag = (overrides: any = {}) => ({
   name: 'Makeup Tutorials',
   color: '#FF69B4',
   schema_id: null,
+  is_video_type: true,
   created_at: '2025-11-08T10:00:00Z',
   updated_at: '2025-11-08T10:00:00Z',
   ...overrides,

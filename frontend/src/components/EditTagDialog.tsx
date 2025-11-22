@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import type { Tag } from '@/types/tag'
 
 /**
@@ -50,6 +51,7 @@ import type { Tag } from '@/types/tag'
  * - name: Required, 1-100 characters
  * - color: Valid hex color or null
  * - schema_id: Valid UUID or null
+ * - is_video_type: Boolean for category (true) vs label (false)
  */
 const TagFormSchema = z.object({
   name: z.string()
@@ -59,6 +61,7 @@ const TagFormSchema = z.object({
     .regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid color format. Use hex format like #3B82F6')
     .nullable(),
   schema_id: z.string().uuid().nullable(),
+  is_video_type: z.boolean(),
 })
 
 type TagFormData = z.infer<typeof TagFormSchema>
@@ -85,6 +88,7 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
       name: tag.name,
       color: tag.color || '#3B82F6',
       schema_id: tag.schema_id || null,
+      is_video_type: tag.is_video_type,
     },
   })
 
@@ -95,6 +99,7 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
         name: tag.name,
         color: tag.color || '#3B82F6',
         schema_id: tag.schema_id || null,
+        is_video_type: tag.is_video_type,
       })
     }
   }, [tag, open, form])
@@ -106,6 +111,7 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
         name: tag.name,
         color: tag.color || '#3B82F6',
         schema_id: tag.schema_id || null,
+        is_video_type: tag.is_video_type,
       })
     }
   }, [open, tag, form])
@@ -118,6 +124,7 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
           name: data.name.trim(),
           color: data.color ?? undefined,
           schema_id: data.schema_id,
+          is_video_type: data.is_video_type,
         },
       })
       onClose()
@@ -166,9 +173,38 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
             )}
           </div>
 
+          {/* Type Selection - Category vs Label */}
+          <div>
+            <Label className="mb-2 block">Typ</Label>
+            <RadioGroup
+              value={form.watch('is_video_type') ? 'category' : 'label'}
+              onValueChange={(value) => form.setValue('is_video_type', value === 'category')}
+              className="flex gap-4"
+              disabled={updateTag.isPending}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="category" id="edit-type-category" />
+                <Label htmlFor="edit-type-category" className="font-normal cursor-pointer">
+                  Kategorie
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="label" id="edit-type-label" />
+                <Label htmlFor="edit-type-label" className="font-normal cursor-pointer">
+                  Label
+                </Label>
+              </div>
+            </RadioGroup>
+            <p className="mt-1 text-sm text-gray-500">
+              {form.watch('is_video_type')
+                ? 'Ein Video kann nur eine Kategorie haben'
+                : 'Ein Video kann mehrere Labels haben'}
+            </p>
+          </div>
+
           {/* Color Field */}
           <div>
-            <Label htmlFor="edit-tag-color">Color</Label>
+            <Label htmlFor="edit-tag-color">Farbe</Label>
             <div className="flex gap-2">
               <input
                 type="color"

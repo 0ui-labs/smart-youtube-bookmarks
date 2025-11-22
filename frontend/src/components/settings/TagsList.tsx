@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import type { Tag } from '@/types/tag'
 
 interface TagsListProps {
+  /** Categories to display (tags with is_video_type=true) */
   tags: Tag[]
   onEdit: (tag: Tag) => void
   onDelete: (tag: Tag) => void
@@ -10,29 +11,37 @@ interface TagsListProps {
 }
 
 /**
- * Table displaying all tags with actions
+ * Table displaying categories (video types) with actions
  *
  * Features:
- * - Columns: Name, Color (with badge), Schema, Actions
+ * - Columns: Name, Color, Type badge, Schema, Actions
  * - Color shown as colored circle badge with hex code
+ * - Type badge shows "Kategorie" or "Label"
  * - Schema shows "No Schema" if schema_id is null
- * - Loading state with message
- * - Empty state with helpful message
+ * - Loading state with German message
+ * - Empty state with helpful German message
  * - Table rows have hover effect
  *
+ * Note: Parent component should filter tags using useCategories()
+ * to only pass is_video_type=true tags.
+ *
  * @example
+ * ```tsx
+ * const { data: categories } = useCategories()
+ *
  * <TagsList
- *   tags={tags}
+ *   tags={categories}
  *   onEdit={(tag) => setSelectedTag(tag)}
  *   onDelete={(tag) => setDeleteTag(tag)}
  *   isLoading={isLoading}
  * />
+ * ```
  */
 export function TagsList({ tags, onEdit, onDelete, isLoading }: TagsListProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Loading tags...</p>
+        <p className="text-muted-foreground">Lade Kategorien...</p>
       </div>
     )
   }
@@ -41,7 +50,7 @@ export function TagsList({ tags, onEdit, onDelete, isLoading }: TagsListProps) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <p className="text-muted-foreground mb-2">
-          No tags yet. Create your first tag from the sidebar.
+          Noch keine Kategorien. Erstelle deine erste Kategorie mit dem Button oben.
         </p>
       </div>
     )
@@ -56,13 +65,16 @@ export function TagsList({ tags, onEdit, onDelete, isLoading }: TagsListProps) {
               Name
             </th>
             <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-              Color
+              Farbe
             </th>
             <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-              Schema
+              Typ
+            </th>
+            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+              Felder
             </th>
             <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">
-              Actions
+              Aktionen
             </th>
           </tr>
         </thead>
@@ -78,7 +90,7 @@ export function TagsList({ tags, onEdit, onDelete, isLoading }: TagsListProps) {
                   <div
                     className="h-4 w-4 rounded-full border"
                     style={{ backgroundColor: tag.color || '#3B82F6' }}
-                    aria-label={`Color: ${tag.color || '#3B82F6'}`}
+                    aria-label={`Farbe: ${tag.color || '#3B82F6'}`}
                   />
                   <span className="text-sm text-muted-foreground">
                     {tag.color || '#3B82F6'}
@@ -86,10 +98,15 @@ export function TagsList({ tags, onEdit, onDelete, isLoading }: TagsListProps) {
                 </div>
               </td>
               <td className="p-4 align-middle">
+                <Badge variant={tag.is_video_type ? 'default' : 'secondary'}>
+                  {tag.is_video_type ? 'Kategorie' : 'Label'}
+                </Badge>
+              </td>
+              <td className="p-4 align-middle">
                 {tag.schema_id ? (
-                  <Badge variant="secondary">Schema</Badge>
+                  <span className="text-sm text-green-600">Felder konfiguriert</span>
                 ) : (
-                  <span className="text-sm text-muted-foreground">No Schema</span>
+                  <span className="text-sm text-muted-foreground italic">Keine Felder</span>
                 )}
               </td>
               <td className="p-4 align-middle text-right">

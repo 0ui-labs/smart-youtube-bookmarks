@@ -17,6 +17,8 @@ import { ConfirmDeleteFieldModal } from '@/components/settings/ConfirmDeleteFiel
 import { EditTagDialog } from '@/components/EditTagDialog'
 import { ConfirmDeleteTagDialog } from '@/components/ConfirmDeleteTagDialog'
 import { AnalyticsView } from '@/components/analytics/AnalyticsView'
+import { WorkspaceFieldsCard } from '@/components/settings/WorkspaceFieldsCard'
+import { WorkspaceFieldsEditor } from '@/components/settings/WorkspaceFieldsEditor'
 import { Button } from '@/components/ui/button'
 import {
   Tabs,
@@ -49,7 +51,8 @@ import type { Tag } from '@/types/tag'
  * <Route path="/settings/schemas" element={<SettingsPage />} />
  */
 export function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'schemas' | 'fields' | 'tags' | 'analytics'>('schemas')
+  // Category-Fields Feature: Simplified tabs (removed schemas/fields, kept kategorien + analytics)
+  const [activeTab, setActiveTab] = useState<'kategorien' | 'analytics'>('kategorien')
 
   // ✨ FIX #4: Fetch lists dynamically instead of hardcoded listId
   const { data: lists, isLoading: isListsLoading, isError: isListsError } = useLists()
@@ -82,6 +85,9 @@ export function SettingsPage() {
   const [editTagDialogOpen, setEditTagDialogOpen] = useState(false)
   const [deleteTagDialogOpen, setDeleteTagDialogOpen] = useState(false)
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null)
+
+  // Workspace fields editor state (Category-Fields Feature)
+  const [workspaceEditorOpen, setWorkspaceEditorOpen] = useState(false)
 
   // Error states for user feedback
   const [editError, setEditError] = useState<string | null>(null)
@@ -190,24 +196,16 @@ export function SettingsPage() {
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-            {activeTab === 'schemas' && (
-              <Button onClick={handleCreateSchema}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Schema
-              </Button>
-            )}
+            <h1 className="text-2xl font-bold text-gray-900">Einstellungen</h1>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'schemas' | 'fields' | 'tags' | 'analytics')}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'kategorien' | 'analytics')}>
           <TabsListUI className="mb-6">
-            <TabsTrigger value="schemas">Schemas</TabsTrigger>
-            <TabsTrigger value="fields">Fields</TabsTrigger>
-            <TabsTrigger value="tags">Tags</TabsTrigger>
+            <TabsTrigger value="kategorien">Kategorien</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsListUI>
 
@@ -283,19 +281,28 @@ export function SettingsPage() {
             )}
           </TabsContent>
 
-          {/* Tags Tab - Task 6 */}
-          <TabsContent value="tags">
+          {/* Kategorien Tab - Category-Fields Feature */}
+          <TabsContent value="kategorien">
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold tracking-tight">Tags</h2>
+                <h2 className="text-2xl font-bold tracking-tight">Kategorien & Labels</h2>
                 <p className="text-muted-foreground">
-                  Manage your tags and their schemas
+                  Verwalte Kategorien, Labels und deren Felder
                 </p>
               </div>
 
+              {/* Workspace Fields Card - Category-Fields Feature */}
+              {listId && (
+                <WorkspaceFieldsCard
+                  listId={listId}
+                  defaultSchemaId={lists?.[0]?.default_schema_id ?? null}
+                  onEdit={() => setWorkspaceEditorOpen(true)}
+                />
+              )}
+
               {isTagsLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <p className="text-muted-foreground">Loading tags...</p>
+                  <p className="text-muted-foreground">Lade Kategorien...</p>
                 </div>
               ) : (
                 <TagsList
@@ -374,6 +381,14 @@ export function SettingsPage() {
           />
         </>
       )}
+
+      {/* Workspace Fields Editor - Category-Fields Feature */}
+      <WorkspaceFieldsEditor
+        listId={listId}
+        defaultSchemaId={lists?.[0]?.default_schema_id ?? null}
+        open={workspaceEditorOpen}
+        onOpenChange={setWorkspaceEditorOpen}
+      />
     </div>
   )
 }

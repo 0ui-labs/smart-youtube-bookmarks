@@ -518,3 +518,126 @@ export const parseValidationError = (error: any): string => {
   return 'Fehler beim Speichern. Bitte versuchen Sie es erneut.'
 }
 
+/**
+ * Parameters for setting a video's category
+ */
+export interface SetCategoryParams {
+  videoId: string
+  categoryId: string | null
+  restoreBackup?: boolean
+}
+
+/**
+ * Response from category change endpoint
+ */
+export interface SetCategoryResponse {
+  backup_created: boolean
+  backup_available: boolean
+  restored_count?: number
+}
+
+/**
+ * Hook to set or change a video's category
+ *
+ * Categories are tags with is_video_type=true. Only one category can be
+ * assigned per video. Changing categories will backup field values from
+ * the old category.
+ *
+ * @returns Mutation hook for setting video category
+ *
+ * @example
+ * ```tsx
+ * const setCategory = useSetVideoCategory()
+ *
+ * // Assign category
+ * setCategory.mutate({ videoId: 'uuid', categoryId: 'category-uuid' })
+ *
+ * // Remove category
+ * setCategory.mutate({ videoId: 'uuid', categoryId: null })
+ *
+ * // Change category and restore backup if available
+ * setCategory.mutate({ videoId: 'uuid', categoryId: 'new-cat', restoreBackup: true })
+ * ```
+ */
+export const useSetVideoCategory = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation<
+    SetCategoryResponse,
+    Error,
+    SetCategoryParams,
+    { previousVideos: [readonly unknown[], VideoResponse[] | undefined][] }
+  >({
+    mutationKey: ['setVideoCategory'],
+
+    mutationFn: async ({ videoId, categoryId, restoreBackup }: SetCategoryParams) => {
+      const { data } = await api.put<SetCategoryResponse>(`/videos/${videoId}/category`, {
+        category_id: categoryId,
+        restore_backup: restoreBackup ?? false,
+      })
+      return data
+    },
+
+    // Step 3.9: Optimistic update
+    onMutate: async ({ videoId, categoryId }) => {
+      // Cancel outgoing queries to prevent overwrites
+      await queryClient.cancelQueries({ queryKey: videoKeys.all })
+
+      // Snapshot previous state for rollback
+      const previousVideos = queryClient.getQueriesData<VideoResponse[]>({ queryKey: videoKeys.all })
+
+      // Optimistically update the video's tags
+      queryClient.setQueriesData<VideoResponse[]>(
+        { queryKey: videoKeys.all },
+        (oldVideos) => {
+          if (!oldVideos) return oldVideos
+
+          return oldVideos.map((video) => {
+            if (video.id !== videoId) return video
+
+            // Remove old category (is_video_type=true) and add new one
+            const labelsOnly = video.tags.filter(t => !t.is_video_type)
+
+            // If categoryId is null, just keep labels
+            if (!categoryId) {
+              return { ...video, tags: labelsOnly }
+            }
+
+            // Find the new category from cache (tags query)
+            const allTags = queryClient.getQueryData<any[]>(['tags']) ?? []
+            const newCategory = allTags.find(t => t.id === categoryId)
+
+            if (newCategory) {
+              return { ...video, tags: [...labelsOnly, newCategory] }
+            }
+
+            return video
+          })
+        }
+      )
+
+      return { previousVideos }
+    },
+
+    // Step 3.10: Error handling - rollback on error
+    onError: (error, _variables, context) => {
+      console.error('Failed to set video category:', error)
+
+      // Rollback to previous state
+      if (context?.previousVideos) {
+        context.previousVideos.forEach(([queryKey, data]) => {
+          queryClient.setQueryData<VideoResponse[]>(queryKey as any, data)
+        })
+      }
+    },
+
+    // Step 3.11: Query invalidation
+    onSettled: (_data, _error, { videoId }) => {
+      // Invalidate all video queries to refetch with updated category
+      queryClient.invalidateQueries({ queryKey: videoKeys.all })
+      // Also invalidate field values as they may have changed
+      queryClient.invalidateQueries({ queryKey: videoKeys.videoFieldValues(videoId) })
+    },
+  })
+}
+

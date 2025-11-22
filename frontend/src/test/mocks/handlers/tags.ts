@@ -44,6 +44,7 @@ export const tagsHandlers = [
       name: body.name,
       color: body.color || null,
       schema_id: body.schema_id || null,
+      is_video_type: body.is_video_type ?? true, // defaults to true (category)
       user_id: generateUUID(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

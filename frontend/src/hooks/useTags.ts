@@ -47,6 +47,46 @@ export const useTags = () => {
 }
 
 /**
+ * React Query hook to fetch only categories (is_video_type=true)
+ *
+ * Categories are tags that represent video types - only one can be assigned per video.
+ *
+ * @returns Query result with filtered categories array
+ *
+ * @example
+ * ```tsx
+ * const { data: categories, isLoading } = useCategories()
+ * ```
+ */
+export const useCategories = () => {
+  const { data: tags, ...rest } = useTags()
+  return {
+    data: tags?.filter(t => t.is_video_type) ?? [],
+    ...rest
+  }
+}
+
+/**
+ * React Query hook to fetch only labels (is_video_type=false)
+ *
+ * Labels are tags that can be freely assigned - multiple can be assigned per video.
+ *
+ * @returns Query result with filtered labels array
+ *
+ * @example
+ * ```tsx
+ * const { data: labels, isLoading } = useLabels()
+ * ```
+ */
+export const useLabels = () => {
+  const { data: tags, ...rest } = useTags()
+  return {
+    data: tags?.filter(t => !t.is_video_type) ?? [],
+    ...rest
+  }
+}
+
+/**
  * React Query mutation hook to create a new tag
  *
  * Automatically invalidates tags query after successful creation or error

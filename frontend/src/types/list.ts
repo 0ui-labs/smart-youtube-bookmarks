@@ -3,6 +3,7 @@ export interface ListResponse {
   name: string
   description: string | null
   schema_id: string | null
+  default_schema_id: string | null // Workspace-wide schema (fields for all videos)
   video_count: number
   created_at: string
   updated_at: string
