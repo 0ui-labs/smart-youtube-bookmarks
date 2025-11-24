@@ -561,18 +561,14 @@ describe('VideosPage - UI Reorganization (US-04)', () => {
         expect(screen.getByRole('heading', { name: /Videos/i })).toBeInTheDocument()
       })
 
-      // Settings button should be in the sidebar
-      const settingsButton = screen.getByRole('button', { name: /Settings/i })
-      expect(settingsButton).toBeInTheDocument()
-
-      // Verify it's in the sidebar (complementary landmark)
-      const sidebar = screen.getByRole('complementary')
-      expect(sidebar).toContainElement(settingsButton)
+      // Filter button should be in the controls bar
+      const filterButton = screen.getByRole('button', { name: /Filter/i })
+      expect(filterButton).toBeInTheDocument()
     })
   })
 
   describe('Filter Regression', () => {
-    it('renders Add Filter button in controls bar', async () => {
+    it('renders Filter button in controls bar', async () => {
       const { useVideos } = await import('@/hooks/useVideos')
 
       vi.mocked(useVideos).mockReturnValue({
@@ -588,16 +584,12 @@ describe('VideosPage - UI Reorganization (US-04)', () => {
         expect(screen.getByRole('heading', { name: /Videos/i })).toBeInTheDocument()
       })
 
-      // Add Filter button should be in controls bar (not in sidebar)
-      const addFilterButton = screen.getByRole('button', { name: /Add Filter/i })
-      expect(addFilterButton).toBeInTheDocument()
-
-      // Verify it's NOT in the sidebar (complementary landmark)
-      const sidebar = screen.getByRole('complementary')
-      expect(sidebar).not.toContainElement(addFilterButton)
+      // Filter button should be in controls bar
+      const filterButton = screen.getByRole('button', { name: /Filter/i })
+      expect(filterButton).toBeInTheDocument()
     })
 
-    it('opens Add Filter popover on click', async () => {
+    it('opens Filter Settings modal on click', async () => {
       const user = userEvent.setup()
       const { useVideos } = await import('@/hooks/useVideos')
 
@@ -614,19 +606,20 @@ describe('VideosPage - UI Reorganization (US-04)', () => {
         expect(screen.getByRole('heading', { name: /Videos/i })).toBeInTheDocument()
       })
 
-      // Click Add Filter button in controls bar
-      const addFilterButton = screen.getByRole('button', { name: /Add Filter/i })
-      await user.click(addFilterButton)
+      // Click Filter button in controls bar
+      const filterButton = screen.getByRole('button', { name: /Filter/i })
+      await user.click(filterButton)
 
-      // Popover should open with search fields input
+      // Modal should open with "Filter konfigurieren" title
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/Search fields/i)).toBeInTheDocument()
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+        expect(screen.getByText(/Filter konfigurieren/i)).toBeInTheDocument()
       })
     })
   })
 
   describe('Keyboard Navigation', () => {
-    it('both Settings and Add Filter buttons are focusable', async () => {
+    it('Filter button is focusable', async () => {
       const { useVideos } = await import('@/hooks/useVideos')
 
       vi.mocked(useVideos).mockReturnValue({
@@ -642,15 +635,11 @@ describe('VideosPage - UI Reorganization (US-04)', () => {
         expect(screen.getByRole('heading', { name: /Videos/i })).toBeInTheDocument()
       })
 
-      const settingsButton = screen.getByRole('button', { name: /Settings/i })
-      const addFilterButton = screen.getByRole('button', { name: /Add Filter/i })
+      const filterButton = screen.getByRole('button', { name: /Filter/i })
 
-      // Both buttons should be focusable
-      settingsButton.focus()
-      expect(document.activeElement).toBe(settingsButton)
-
-      addFilterButton.focus()
-      expect(document.activeElement).toBe(addFilterButton)
+      // Filter button should be focusable
+      filterButton.focus()
+      expect(document.activeElement).toBe(filterButton)
     })
   })
 })

@@ -13,28 +13,23 @@ import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV, useAssignTa
 import { useVideosFilter } from '@/hooks/useVideosFilter'
 import { useFieldFilterStore } from '@/stores/fieldFilterStore'
 import { FilterBar } from '@/components/videos/FilterBar'
-import { FilterPopover } from '@/components/videos/FilterPopover'
+import { FilterSettingsModal } from '@/components/videos/FilterSettingsModal'
 import { CSVUpload } from './CSVUpload'
 import { ProgressBar } from './ProgressBar'
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
-import { CollapsibleSidebar } from '@/components/CollapsibleSidebar'
-import { TagNavigation } from '@/components/TagNavigation'
-import { ChannelNavigation } from '@/components/ChannelNavigation'
-import { useChannels, useUpdateChannel } from '@/hooks/useChannels'
+import { useChannels } from '@/hooks/useChannels'
 import { TableSettingsDropdown } from './TableSettingsDropdown'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
-import { CreateTagDialog } from './CreateTagDialog'
 import { VideoDetailsModal } from './VideoDetailsModal'
 import { ViewModeToggle } from './ViewModeToggle'
 import { VideoGrid } from './VideoGrid'
-import { Button } from '@/components/ui/button'
 import { useTags } from '@/hooks/useTags'
 import { useTagStore } from '@/stores/tagStore'
 import { useTableSettingsStore } from '@/stores/tableSettingsStore'
 import { useShallow } from 'zustand/react/shallow'
 import { FEATURE_FLAGS } from '@/config/featureFlags'
-import { Plus, Settings, Home, History, ListVideo, Clock, Star } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -196,7 +191,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     videoId: null,
     videoTitle: null,
   })
-  const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
 
   // Channel filter state (YouTube Channels feature)
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null)
@@ -211,14 +205,11 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   })
 
   // Tag integration
-  const { data: tags = [], isLoading: tagsLoading, error: tagsError } = useTags()
+  const { data: tags = [] } = useTags()
   // Channels query (YouTube Channels feature)
-  const { data: channels = [], isLoading: channelsLoading } = useChannels()
-  const updateChannel = useUpdateChannel()
+  const { data: channels = [] } = useChannels()
   // Use useShallow to prevent re-renders when selectedTagIds array has same values
   const selectedTagIds = useTagStore(useShallow((state) => state.selectedTagIds))
-  const toggleTag = useTagStore((state) => state.toggleTag)
-  const clearTags = useTagStore((state) => state.clearTags)
   const setSelectedTagIds = useTagStore((state) => state.setSelectedTagIds)
 
   // Compute selected tags (no useMemo - simple filter is fast enough per React docs)
@@ -428,12 +419,22 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     }
   }, [selectedTags]) // Run when selected tags change
 
-  // URL Sync: Read channel from URL on mount (YouTube Channels feature)
+  // URL Sync: Read channel from URL on mount and when URL changes (YouTube Channels feature)
   useEffect(() => {
     const urlChannelId = searchParams.get('channel')
-    if (!urlChannelId || channels.length === 0) return
 
-    // Verify channel exists
+    // If no channel in URL, clear the selection
+    if (!urlChannelId) {
+      if (selectedChannelId !== null) {
+        setSelectedChannelId(null)
+      }
+      return
+    }
+
+    // Wait for channels to load before validating
+    if (channels.length === 0) return
+
+    // Verify channel exists and update state
     const channelExists = channels.some(c => c.id === urlChannelId)
     if (channelExists && selectedChannelId !== urlChannelId) {
       setSelectedChannelId(urlChannelId)
@@ -457,20 +458,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       }
     }
   }, [selectedChannelId]) // Run when selected channel changes
-
-  // Create tag handler - opens dialog
-  const handleCreateTag = () => {
-    setIsCreateTagDialogOpen(true)
-  }
-
-  // Hide channel handler (YouTube Channels feature - Step 6.4)
-  const handleHideChannel = (channelId: string) => {
-    updateChannel.mutate({ channelId, data: { is_hidden: true } })
-    // If hiding the currently selected channel, clear selection
-    if (selectedChannelId === channelId) {
-      setSelectedChannelId(null)
-    }
-  }
 
   const handleExportCSV = async () => {
     try {
@@ -802,101 +789,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   }
 
   return (
-    <div className="flex h-screen">
-      {/* Sidebar with TagNavigation */}
-      <CollapsibleSidebar>
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="p-4 border-b">
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/d/dd/YouTube_Premium_logo.svg"
-              alt="Logo"
-              className="h-6"
-            />
-          </div>
-
-          {/* Main Navigation */}
-          <nav className="p-2 space-y-1">
-            <button
-              onClick={() => {
-                setSelectedChannelId(null)
-                clearTags()
-              }}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors"
-            >
-              <Home className="h-4 w-4" />
-              Home
-            </button>
-            <button
-              disabled
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
-            >
-              <History className="h-4 w-4" />
-              History
-            </button>
-            <button
-              disabled
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
-            >
-              <ListVideo className="h-4 w-4" />
-              Playlists
-            </button>
-            <button
-              disabled
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
-            >
-              <Clock className="h-4 w-4" />
-              Watch later
-            </button>
-            <button
-              disabled
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
-            >
-              <Star className="h-4 w-4" />
-              Favorites
-            </button>
-          </nav>
-
-          {/* Categories/Tags */}
-          {tagsLoading ? (
-            <div className="p-4 text-sm text-gray-500">Kategorien werden geladen...</div>
-          ) : tagsError ? (
-            <div className="p-4 text-sm text-red-600">Fehler beim Laden der Kategorien</div>
-          ) : (
-            <TagNavigation
-              tags={tags}
-              selectedTagIds={selectedTagIds}
-              onTagSelect={toggleTag}
-              onTagCreate={handleCreateTag}
-            />
-          )}
-
-          {/* YouTube Channels Navigation */}
-          <ChannelNavigation
-            channels={channels}
-            selectedChannelId={selectedChannelId}
-            onChannelSelect={setSelectedChannelId}
-            onChannelHide={handleHideChannel}
-            isLoading={channelsLoading}
-          />
-
-          {/* Settings Button - Task #8 (moved from controls bar) */}
-          <div className="mt-auto pt-4 border-t border-gray-200">
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-              onClick={() => navigate('/settings/schemas')}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Einstellungen
-            </Button>
-          </div>
-        </div>
-      </CollapsibleSidebar>
-
-      {/* Main content area */}
-      <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
-        <div className="w-full max-w-[2180px] mx-auto p-8">
+    <div className="w-full max-w-[2180px] mx-auto p-8">
         <div className="flex justify-between items-center mb-4">
           <div>
             {selectedChannelId ? (
@@ -904,27 +797,26 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                 <h1 className="text-3xl font-bold text-gray-900">
                   {channels.find(c => c.id === selectedChannelId)?.name || 'Kanal'}
                 </h1>
-                <button
-                  onClick={() => setSelectedChannelId(null)}
-                  className="mt-1 text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Alle Videos anzeigen
-                </button>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {videos.length} {videos.length === 1 ? 'Video' : 'Videos'} in dieser Liste
+                </p>
               </div>
             ) : selectedTags.length > 0 ? (
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">
                   {selectedTags.map(t => t.name).join(', ')}
                 </h1>
-                <button
-                  onClick={clearTags}
-                  className="mt-1 text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Alle Videos anzeigen
-                </button>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {videos.length} {videos.length === 1 ? 'Video' : 'Videos'} in dieser Liste
+                </p>
               </div>
             ) : (
-              <h1 className="text-3xl font-bold text-gray-900">Alle Videos</h1>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Alle Videos</h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {videos.length} {videos.length === 1 ? 'Video' : 'Videos'} in dieser Liste
+                </p>
+              </div>
             )}
           </div>
         {/* Action Buttons - Feature Flag Controlled (Task #24) */}
@@ -980,8 +872,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
         {/* Right side - View controls */}
         <div className="flex gap-1 items-center flex-shrink-0 ml-auto">
-          {/* Add Filter Button - Task #9 (moved from FilterBar) */}
-          <FilterPopover listId={listId} />
+          {/* Filter Settings Modal - Field-based filters */}
+          <FilterSettingsModal listId={listId} selectedTagIds={selectedTagIds} />
           {/* View Mode Toggle - Task #32 */}
           <ViewModeToggle viewMode={viewMode} onToggle={setViewMode} />
           {/* Table Settings Dropdown - Task #35 */}
@@ -1129,7 +1021,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         // Table View (existing implementation)
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="hidden">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
@@ -1196,12 +1088,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         </div>
       )}
 
-      {videos.length > 0 && (
-        <div className="mt-4 text-sm text-gray-600">
-          {videos.length} Video{videos.length !== 1 ? 's' : ''} in dieser Liste
-        </div>
-      )}
-
       {/* Confirm Delete Modal */}
       <ConfirmDeleteModal
         open={deleteModal.open}
@@ -1209,13 +1095,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
         isLoading={deleteVideo.isPending}
-      />
-
-      {/* Create Tag Dialog */}
-      <CreateTagDialog
-        open={isCreateTagDialogOpen}
-        onOpenChange={setIsCreateTagDialogOpen}
-        listId={listId}
       />
 
       {/* Video Details Modal (follows pattern of ConfirmDeleteModal) */}
@@ -1232,8 +1111,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           onFieldChange={handleFieldChange}
         />
       )}
-        </div>
-      </div>
     </div>
   )
 }

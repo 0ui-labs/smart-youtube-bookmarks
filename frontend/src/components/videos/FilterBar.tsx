@@ -8,8 +8,8 @@
  * - Active filter chips with remove button
  * - Clear all filters button
  *
- * Note: Add Filter functionality has been extracted to FilterPopover component
- * for placement in the controls bar (see Task 7).
+ * Note: Add Filter functionality has been extracted to FilterSettingsModal component
+ * for placement in the controls bar.
  *
  * @example
  * ```tsx
