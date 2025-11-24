@@ -16,7 +16,7 @@ import { FieldEditDialog } from '@/components/settings/FieldEditDialog'
 import { ConfirmDeleteFieldModal } from '@/components/settings/ConfirmDeleteFieldModal'
 import { EditTagDialog } from '@/components/EditTagDialog'
 import { ConfirmDeleteTagDialog } from '@/components/ConfirmDeleteTagDialog'
-import { AnalyticsView } from '@/components/analytics/AnalyticsView'
+import { CreateTagDialog } from '@/components/CreateTagDialog'
 import { WorkspaceFieldsCard } from '@/components/settings/WorkspaceFieldsCard'
 import { WorkspaceFieldsEditor } from '@/components/settings/WorkspaceFieldsEditor'
 import { Button } from '@/components/ui/button'
@@ -51,8 +51,8 @@ import type { Tag } from '@/types/tag'
  * <Route path="/settings/schemas" element={<SettingsPage />} />
  */
 export function SettingsPage() {
-  // Category-Fields Feature: Simplified tabs (removed schemas/fields, kept kategorien + analytics)
-  const [activeTab, setActiveTab] = useState<'kategorien' | 'analytics'>('kategorien')
+  // Category-Fields Feature: Simplified to just Kategorien tab
+  const [activeTab, setActiveTab] = useState<'kategorien'>('kategorien')
 
   // ✨ FIX #4: Fetch lists dynamically instead of hardcoded listId
   const { data: lists, isLoading: isListsLoading, isError: isListsError } = useLists()
@@ -84,6 +84,7 @@ export function SettingsPage() {
   // Tag dialog state (Task 6)
   const [editTagDialogOpen, setEditTagDialogOpen] = useState(false)
   const [deleteTagDialogOpen, setDeleteTagDialogOpen] = useState(false)
+  const [createTagDialogOpen, setCreateTagDialogOpen] = useState(false)
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null)
 
   // Workspace fields editor state (Category-Fields Feature)
@@ -178,12 +179,12 @@ export function SettingsPage() {
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Einstellungen</h1>
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">Loading schemas...</p>
+            <p className="text-gray-500 text-lg">Lade Daten...</p>
           </div>
         </main>
       </div>
@@ -203,10 +204,9 @@ export function SettingsPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'kategorien' | 'analytics')}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'kategorien')}>
           <TabsListUI className="mb-6">
             <TabsTrigger value="kategorien">Kategorien</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsListUI>
 
           {/* Schemas Tab */}
@@ -284,11 +284,17 @@ export function SettingsPage() {
           {/* Kategorien Tab - Category-Fields Feature */}
           <TabsContent value="kategorien">
             <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight">Kategorien & Labels</h2>
-                <p className="text-muted-foreground">
-                  Verwalte Kategorien, Labels und deren Felder
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight">Kategorien & Labels</h2>
+                  <p className="text-muted-foreground">
+                    Verwalte Kategorien, Labels und deren Felder
+                  </p>
+                </div>
+                <Button onClick={() => setCreateTagDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Neue Kategorie
+                </Button>
               </div>
 
               {/* Workspace Fields Card - Category-Fields Feature */}
@@ -312,11 +318,6 @@ export function SettingsPage() {
                 />
               )}
             </div>
-          </TabsContent>
-
-          {/* Analytics Tab - Task #142 Step 14 */}
-          <TabsContent value="analytics">
-            <AnalyticsView />
           </TabsContent>
         </Tabs>
       </main>
@@ -388,6 +389,13 @@ export function SettingsPage() {
         defaultSchemaId={lists?.[0]?.default_schema_id ?? null}
         open={workspaceEditorOpen}
         onOpenChange={setWorkspaceEditorOpen}
+      />
+
+      {/* Create Tag Dialog - Category-Fields Feature */}
+      <CreateTagDialog
+        open={createTagDialogOpen}
+        onOpenChange={setCreateTagDialogOpen}
+        listId={listId}
       />
     </div>
   )

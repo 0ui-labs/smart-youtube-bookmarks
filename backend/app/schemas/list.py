@@ -14,6 +14,7 @@ class ListCreate(BaseModel):
 class ListUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
+    default_schema_id: Optional[UUID] = None  # Workspace-wide schema for all videos
 
 
 class ListResponse(BaseModel):
@@ -24,6 +25,7 @@ class ListResponse(BaseModel):
     description: Optional[str]
     user_id: UUID
     schema_id: Optional[UUID]
+    default_schema_id: Optional[UUID] = None  # Workspace-wide schema for all videos
     video_count: int
     created_at: datetime
     updated_at: datetime

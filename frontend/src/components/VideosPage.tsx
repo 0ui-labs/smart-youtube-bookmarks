@@ -20,6 +20,8 @@ import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
 import { CollapsibleSidebar } from '@/components/CollapsibleSidebar'
 import { TagNavigation } from '@/components/TagNavigation'
+import { ChannelNavigation } from '@/components/ChannelNavigation'
+import { useChannels, useUpdateChannel } from '@/hooks/useChannels'
 import { TableSettingsDropdown } from './TableSettingsDropdown'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { CreateTagDialog } from './CreateTagDialog'
@@ -32,7 +34,7 @@ import { useTagStore } from '@/stores/tagStore'
 import { useTableSettingsStore } from '@/stores/tableSettingsStore'
 import { useShallow } from 'zustand/react/shallow'
 import { FEATURE_FLAGS } from '@/config/featureFlags'
-import { Plus, Settings } from 'lucide-react'
+import { Plus, Settings, Home, History, ListVideo, Clock, Star } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -196,6 +198,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   })
   const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
 
+  // Channel filter state (YouTube Channels feature)
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null)
+
   // Video Details Modal state (follows pattern of ConfirmDeleteModal)
   const [videoDetailsModal, setVideoDetailsModal] = useState<{
     open: boolean
@@ -207,6 +212,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // Tag integration
   const { data: tags = [], isLoading: tagsLoading, error: tagsError } = useTags()
+  // Channels query (YouTube Channels feature)
+  const { data: channels = [], isLoading: channelsLoading } = useChannels()
+  const updateChannel = useUpdateChannel()
   // Use useShallow to prevent re-renders when selectedTagIds array has same values
   const selectedTagIds = useTagStore(useShallow((state) => state.selectedTagIds))
   const toggleTag = useTagStore((state) => state.toggleTag)
@@ -307,20 +315,34 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // Get active field-based filters from store
   const activeFilters = useFieldFilterStore((state) => state.activeFilters)
+  const removeFilter = useFieldFilterStore((state) => state.removeFilter)
+
+  // Cleanup: Remove filters with invalid fieldIds (e.g., stale temp IDs from optimistic updates)
+  useEffect(() => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    activeFilters.forEach((filter) => {
+      if (!uuidRegex.test(filter.fieldId)) {
+        console.warn(`Removing filter with invalid fieldId: ${filter.fieldId}`)
+        removeFilter(filter.id)
+      }
+    })
+  }, []) // Run once on mount to clean up stale data
 
   // Fetch videos with both tag filters and field filters
   // Falls back to useVideos if no field filters are active
   const hasFieldFilters = activeFilters.length > 0
   const hasTagFilters = selectedTagNames.length > 0
+  const hasChannelFilter = selectedChannelId !== null
 
-  // Use new filter hook if field filters are active, otherwise fallback to old hook
+  // Use new filter hook if any filters are active, otherwise fallback to old hook
   const { data: filteredVideos = [], isLoading: filterLoading, error: filterError } = useVideosFilter({
     listId,
     tags: hasTagFilters ? selectedTagNames : undefined,
+    channelId: hasChannelFilter ? selectedChannelId : undefined,
     fieldFilters: hasFieldFilters ? activeFilters : undefined,
     sortBy,
     sortOrder,
-    enabled: hasFieldFilters || hasTagFilters,
+    enabled: hasFieldFilters || hasTagFilters || hasChannelFilter,
   })
 
   const { data: allVideos = [], isLoading: allLoading, error: allError } = useVideos(
@@ -333,9 +355,10 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   )
 
   // Use filtered results if filters are active, otherwise show all videos
-  const videos = hasFieldFilters || hasTagFilters ? filteredVideos : allVideos
-  const isLoading = hasFieldFilters || hasTagFilters ? filterLoading : allLoading
-  const error = hasFieldFilters || hasTagFilters ? filterError : allError
+  const hasAnyFilter = hasFieldFilters || hasTagFilters || hasChannelFilter
+  const videos = hasAnyFilter ? filteredVideos : allVideos
+  const isLoading = hasAnyFilter ? filterLoading : allLoading
+  const error = hasAnyFilter ? filterError : allError
   const createVideo = useCreateVideo(listId)
   const assignTags = useAssignTags()
 
@@ -405,9 +428,48 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     }
   }, [selectedTags]) // Run when selected tags change
 
+  // URL Sync: Read channel from URL on mount (YouTube Channels feature)
+  useEffect(() => {
+    const urlChannelId = searchParams.get('channel')
+    if (!urlChannelId || channels.length === 0) return
+
+    // Verify channel exists
+    const channelExists = channels.some(c => c.id === urlChannelId)
+    if (channelExists && selectedChannelId !== urlChannelId) {
+      setSelectedChannelId(urlChannelId)
+    }
+  }, [searchParams, channels]) // Run when URL changes or channels are loaded
+
+  // URL Sync: Update URL when selected channel changes
+  useEffect(() => {
+    if (selectedChannelId === null) {
+      // Remove channel param if no channel selected
+      if (searchParams.has('channel')) {
+        searchParams.delete('channel')
+        setSearchParams(searchParams, { replace: true })
+      }
+    } else {
+      // Set channel param
+      const currentChannelParam = searchParams.get('channel')
+      if (currentChannelParam !== selectedChannelId) {
+        searchParams.set('channel', selectedChannelId)
+        setSearchParams(searchParams, { replace: true })
+      }
+    }
+  }, [selectedChannelId]) // Run when selected channel changes
+
   // Create tag handler - opens dialog
   const handleCreateTag = () => {
     setIsCreateTagDialogOpen(true)
+  }
+
+  // Hide channel handler (YouTube Channels feature - Step 6.4)
+  const handleHideChannel = (channelId: string) => {
+    updateChannel.mutate({ channelId, data: { is_hidden: true } })
+    // If hiding the currently selected channel, clear selection
+    if (selectedChannelId === channelId) {
+      setSelectedChannelId(null)
+    }
   }
 
   const handleExportCSV = async () => {
@@ -744,10 +806,62 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       {/* Sidebar with TagNavigation */}
       <CollapsibleSidebar>
         <div className="flex flex-col h-full">
+          {/* Logo */}
+          <div className="p-4 border-b">
+            <img
+              src="https://upload.wikimedia.org/wikipedia/commons/d/dd/YouTube_Premium_logo.svg"
+              alt="Logo"
+              className="h-6"
+            />
+          </div>
+
+          {/* Main Navigation */}
+          <nav className="p-2 space-y-1">
+            <button
+              onClick={() => {
+                setSelectedChannelId(null)
+                clearTags()
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors"
+            >
+              <Home className="h-4 w-4" />
+              Home
+            </button>
+            <button
+              disabled
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
+            >
+              <History className="h-4 w-4" />
+              History
+            </button>
+            <button
+              disabled
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
+            >
+              <ListVideo className="h-4 w-4" />
+              Playlists
+            </button>
+            <button
+              disabled
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
+            >
+              <Clock className="h-4 w-4" />
+              Watch later
+            </button>
+            <button
+              disabled
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
+            >
+              <Star className="h-4 w-4" />
+              Favorites
+            </button>
+          </nav>
+
+          {/* Categories/Tags */}
           {tagsLoading ? (
-            <div className="p-4 text-sm text-gray-500">Tags werden geladen...</div>
+            <div className="p-4 text-sm text-gray-500">Kategorien werden geladen...</div>
           ) : tagsError ? (
-            <div className="p-4 text-sm text-red-600">Fehler beim Laden der Tags</div>
+            <div className="p-4 text-sm text-red-600">Fehler beim Laden der Kategorien</div>
           ) : (
             <TagNavigation
               tags={tags}
@@ -757,6 +871,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
             />
           )}
 
+          {/* YouTube Channels Navigation */}
+          <ChannelNavigation
+            channels={channels}
+            selectedChannelId={selectedChannelId}
+            onChannelSelect={setSelectedChannelId}
+            onChannelHide={handleHideChannel}
+            isLoading={channelsLoading}
+          />
+
           {/* Settings Button - Task #8 (moved from controls bar) */}
           <div className="mt-auto pt-4 border-t border-gray-200">
             <Button
@@ -765,7 +888,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
               onClick={() => navigate('/settings/schemas')}
             >
               <Settings className="h-4 w-4 mr-2" />
-              Settings
+              Einstellungen
             </Button>
           </div>
         </div>
@@ -773,10 +896,22 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
       {/* Main content area */}
       <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
-        <div className="max-w-7xl mx-auto p-8">
+        <div className="w-full max-w-[2180px] mx-auto p-8">
         <div className="flex justify-between items-center mb-4">
           <div>
-            {selectedTags.length > 0 ? (
+            {selectedChannelId ? (
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {channels.find(c => c.id === selectedChannelId)?.name || 'Kanal'}
+                </h1>
+                <button
+                  onClick={() => setSelectedChannelId(null)}
+                  className="mt-1 text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Alle Videos anzeigen
+                </button>
+              </div>
+            ) : selectedTags.length > 0 ? (
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">
                   {selectedTags.map(t => t.name).join(', ')}
@@ -1013,10 +1148,20 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
             <tbody className="bg-white divide-y divide-gray-200">
               {table.getRowModel().rows.map((row) => {
                 const video = row.original
-                const youtubeUrl = `https://www.youtube.com/watch?v=${video.youtube_id}`
 
+                // Use same logic as Grid View: respect videoDetailsView setting
                 const handleRowClick = () => {
-                  window.open(youtubeUrl, '_blank', 'noopener,noreferrer')
+                  const videoDetailsView = useTableSettingsStore.getState().videoDetailsView
+
+                  if (videoDetailsView === 'modal') {
+                    setVideoDetailsModal({
+                      open: true,
+                      video: video as VideoResponse,
+                    })
+                  } else {
+                    // Page mode - navigate to video details page
+                    navigate(`/videos/${video.id}`)
+                  }
                 }
 
                 const handleKeyDown = (e: React.KeyboardEvent) => {

@@ -43,14 +43,38 @@ def _should_retry(exception: Exception) -> bool:
     return False
 
 
-class VideoMetadata(TypedDict):
+class ChannelInfo(TypedDict, total=False):
+    """Type definition for YouTube channel info"""
+    thumbnail_url: str | None
+    description: str | None
+
+
+class VideoMetadata(TypedDict, total=False):
     """Type definition for YouTube video metadata"""
     video_id: str
     title: str
     channel: str
+    channel_id: str  # YouTube channel ID (e.g., UCX6OQ3DkcsbYNE6H8uQQuVA)
     published_at: str
     thumbnail_url: str
     duration: str
+    # Extended metadata (snippet)
+    description: str
+    youtube_tags: list[str]
+    youtube_category_id: str
+    default_language: str
+    # Content details
+    dimension: str
+    definition: str
+    has_captions: bool
+    region_restriction: dict
+    # Statistics
+    view_count: int
+    like_count: int
+    comment_count: int
+    # Status
+    privacy_status: str
+    is_embeddable: bool
 
 
 class YouTubeClient:
@@ -102,7 +126,7 @@ class YouTubeClient:
                 youtube_v3 = await aiogoogle.discover("youtube", "v3")
 
                 request = youtube_v3.videos.list(
-                    part="snippet,contentDetails",
+                    part="snippet,contentDetails,statistics,status",
                     id=video_id
                 )
 
@@ -115,6 +139,8 @@ class YouTubeClient:
                 item = response["items"][0]
                 snippet = item["snippet"]
                 content_details = item["contentDetails"]
+                statistics = item.get("statistics", {})
+                status = item.get("status", {})
 
                 # Get highest quality thumbnail available
                 # YouTube provides: maxres (1280x720), standard (640x480), high (480x360), medium (320x180), default (120x90)
@@ -131,9 +157,27 @@ class YouTubeClient:
                     "video_id": video_id,
                     "title": snippet["title"],
                     "channel": snippet["channelTitle"],
+                    "channel_id": snippet.get("channelId"),  # YouTube channel ID
                     "published_at": snippet["publishedAt"],
                     "thumbnail_url": thumbnail_url,
-                    "duration": content_details["duration"]
+                    "duration": content_details["duration"],
+                    # Extended snippet
+                    "description": snippet.get("description", ""),
+                    "youtube_tags": snippet.get("tags", []),
+                    "youtube_category_id": snippet.get("categoryId"),
+                    "default_language": snippet.get("defaultLanguage"),
+                    # Content details
+                    "dimension": content_details.get("dimension"),
+                    "definition": content_details.get("definition"),
+                    "has_captions": content_details.get("caption") == "true",
+                    "region_restriction": content_details.get("regionRestriction"),
+                    # Statistics
+                    "view_count": int(statistics.get("viewCount", 0)) if statistics.get("viewCount") else None,
+                    "like_count": int(statistics.get("likeCount", 0)) if statistics.get("likeCount") else None,
+                    "comment_count": int(statistics.get("commentCount", 0)) if statistics.get("commentCount") else None,
+                    # Status
+                    "privacy_status": status.get("privacyStatus"),
+                    "is_embeddable": status.get("embeddable"),
                 }
 
                 # Store in cache with TTL + jitter (7 days)
@@ -160,6 +204,97 @@ class YouTubeClient:
                 # Rate limited - retry handled by tenacity
                 raise
             raise  # Re-raise other HTTP errors
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_should_retry),
+        reraise=True
+    )
+    async def get_channel_info(self, channel_id: str) -> ChannelInfo:
+        """
+        Fetch channel info (thumbnail + description) from YouTube Data API v3 with caching (30-day TTL).
+
+        Uses the Channels API to get the channel's profile picture/thumbnail and description.
+
+        Args:
+            channel_id: YouTube channel ID (e.g., "UCX6OQ3DkcsbYNE6H8uQQuVA")
+
+        Returns:
+            ChannelInfo dict with thumbnail_url and description
+
+        Example:
+            >>> client = YouTubeClient(api_key="...")
+            >>> info = await client.get_channel_info("UCX6OQ3DkcsbYNE6H8uQQuVA")
+            >>> print(info["thumbnail_url"])
+            'https://yt3.ggpht.com/...'
+            >>> print(info["description"])
+            'Tech tutorials and reviews...'
+        """
+        if not channel_id:
+            return {"thumbnail_url": None, "description": None}
+
+        # Try cache first
+        logger.info(f"get_channel_info called for: {channel_id}")
+        if self.redis:
+            cache_key = f"youtube:v3:channel_info:{channel_id}"
+            cached = await self.redis.get(cache_key)
+            if cached:
+                logger.info(f"Cache HIT for channel info: {channel_id}")
+                return json.loads(cached)
+            logger.info(f"Cache MISS for channel info: {channel_id}")
+
+        try:
+            async with Aiogoogle(api_key=self.api_key) as aiogoogle:
+                youtube_v3 = await aiogoogle.discover("youtube", "v3")
+
+                request = youtube_v3.channels.list(
+                    part="snippet",
+                    id=channel_id
+                )
+
+                response = await aiogoogle.as_api_key(request)
+
+                # Check if channel found
+                if not response.get("items"):
+                    logger.warning(f"Channel not found: {channel_id}")
+                    return {"thumbnail_url": None, "description": None}
+
+                item = response["items"][0]
+                snippet = item.get("snippet", {})
+                thumbnails = snippet.get("thumbnails", {})
+
+                # Get highest quality thumbnail available
+                thumbnail_url = (
+                    thumbnails.get("high", {}).get("url") or
+                    thumbnails.get("medium", {}).get("url") or
+                    thumbnails.get("default", {}).get("url")
+                )
+
+                # Get channel description
+                description = snippet.get("description")
+
+                channel_info: ChannelInfo = {
+                    "thumbnail_url": thumbnail_url,
+                    "description": description
+                }
+
+                # Store in cache with TTL (30 days - channel info rarely changes)
+                if self.redis:
+                    ttl = 30 * 24 * 3600
+                    await self.redis.setex(cache_key, ttl, json.dumps(channel_info))
+
+                return channel_info
+
+        except HTTPError as e:
+            logger.warning(f"Failed to fetch channel info for {channel_id}: {e}")
+            return {"thumbnail_url": None, "description": None}
+
+    # Backward compatibility alias
+    async def get_channel_thumbnail(self, channel_id: str) -> Optional[str]:
+        """Backward compatibility wrapper for get_channel_info."""
+        info = await self.get_channel_info(channel_id)
+        return info.get("thumbnail_url")
 
     @retry(
         stop=stop_after_attempt(3),
@@ -293,7 +428,7 @@ class YouTubeClient:
 
                     url = "https://www.googleapis.com/youtube/v3/videos"
                     params = {
-                        "part": "snippet,contentDetails",
+                        "part": "snippet,contentDetails,statistics,status",
                         "id": ids_param,
                         "key": self.api_key,
                     }
@@ -308,6 +443,8 @@ class YouTubeClient:
                         video_id = item["id"]
                         snippet = item.get("snippet", {})
                         content_details = item.get("contentDetails", {})
+                        statistics = item.get("statistics", {})
+                        status = item.get("status", {})
 
                         # Get highest quality thumbnail available (same as get_video_metadata)
                         thumbnails = snippet.get("thumbnails", {})
@@ -323,10 +460,27 @@ class YouTubeClient:
                             "youtube_id": video_id,
                             "title": snippet.get("title", "Unknown Title"),
                             "channel": snippet.get("channelTitle", "Unknown Channel"),
-                            "description": snippet.get("description", ""),
+                            "channel_id": snippet.get("channelId"),  # YouTube channel ID
                             "published_at": snippet.get("publishedAt"),
                             "duration": content_details.get("duration", "PT0S"),
                             "thumbnail_url": thumbnail_url,
+                            # Extended snippet
+                            "description": snippet.get("description", ""),
+                            "youtube_tags": snippet.get("tags", []),
+                            "youtube_category_id": snippet.get("categoryId"),
+                            "default_language": snippet.get("defaultLanguage"),
+                            # Content details
+                            "dimension": content_details.get("dimension"),
+                            "definition": content_details.get("definition"),
+                            "has_captions": content_details.get("caption") == "true",
+                            "region_restriction": content_details.get("regionRestriction"),
+                            # Statistics
+                            "view_count": int(statistics.get("viewCount", 0)) if statistics.get("viewCount") else None,
+                            "like_count": int(statistics.get("likeCount", 0)) if statistics.get("likeCount") else None,
+                            "comment_count": int(statistics.get("commentCount", 0)) if statistics.get("commentCount") else None,
+                            # Status
+                            "privacy_status": status.get("privacyStatus"),
+                            "is_embeddable": status.get("embeddable"),
                         }
 
                         # Cache for 7 days (same as get_video_metadata)

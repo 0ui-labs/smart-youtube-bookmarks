@@ -5,7 +5,7 @@ Includes enhanced URL validation with security checks.
 """
 
 from datetime import datetime
-from typing import Annotated, Optional, Literal
+from typing import Annotated, Any, Optional, Literal
 from uuid import UUID
 from urllib.parse import urlparse
 import re
@@ -108,6 +108,7 @@ class FieldFilter(BaseModel):
 class VideoFilterRequest(BaseModel):
     """Request body for POST /videos/filter endpoint."""
     tags: Optional[list[str]] = Field(None, description="Tag names for OR filtering")
+    channel_id: Optional[str] = Field(None, description="Channel UUID for filtering by YouTube channel")
     field_filters: Optional[list[FieldFilter]] = Field(None, description="Field filters (AND logic)")
     sort_by: Optional[str] = Field(None, description="Sort column: 'title', 'duration', 'created_at', 'channel', or 'field:<field_id>'")
     sort_order: Optional[Literal["asc", "desc"]] = Field("asc", description="Sort direction")
@@ -236,12 +237,33 @@ class VideoResponse(BaseModel):
     list_id: UUID
     youtube_id: str
 
-    # YouTube Metadata (fetched from YouTube Data API v3)
+    # YouTube Metadata - Basic (fetched from YouTube Data API v3)
     title: str | None = None
     channel: str | None = None
     thumbnail_url: str | None = None
     duration: int | None = None  # Duration in seconds
     published_at: datetime | None = None
+
+    # YouTube Metadata - Extended (snippet)
+    description: str | None = None
+    youtube_tags: list[str] | None = None
+    youtube_category_id: str | None = None
+    default_language: str | None = None
+
+    # YouTube Metadata - Content Details
+    dimension: str | None = None  # 2d/3d
+    definition: str | None = None  # hd/sd
+    has_captions: bool | None = None
+    region_restriction: dict[str, Any] | None = None
+
+    # YouTube Metadata - Statistics
+    view_count: int | None = None
+    like_count: int | None = None
+    comment_count: int | None = None
+
+    # YouTube Metadata - Status
+    privacy_status: str | None = None
+    is_embeddable: bool | None = None
 
     # Tags (many-to-many relationship)
     tags: list["TagResponse"] = Field(default_factory=list)

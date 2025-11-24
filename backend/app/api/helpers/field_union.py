@@ -1,13 +1,18 @@
 """
-Field Union Helper Module for Multi-Tag Field Resolution.
+Field Union Helper Module for Two-Layer Field Resolution.
 
 This module provides utilities for computing the union of custom fields
 across multiple schemas, with intelligent conflict resolution when field
 names collide with different types.
 
+Two-Layer Field System:
+1. Workspace Fields: From list.default_schema_id (applies to ALL videos)
+2. Category Fields: From tag.schema_id (applies to videos with that category)
+
 Algorithm Overview:
 - Two-Pass Conflict Detection: First pass detects name conflicts (same name,
   different types), second pass applies schema prefixes only where needed
+- Workspace First: Workspace schema fields are loaded first, then category fields
 - Batch Loading: Single query to load fields for multiple videos
 - Lazy Evaluation: No database queries until explicitly requested
 
@@ -21,6 +26,7 @@ Usage:
 Related:
 - Task #71: Video Field Values CRUD implementation
 - Task #74: Multi-Tag Field Union Query optimization
+- Two-Layer System: Workspace + Category fields
 """
 
 from uuid import UUID
@@ -184,10 +190,19 @@ async def get_available_fields_for_videos(
         - Scales efficiently with number of videos and schemas
     """
     # Step 1: Collect ALL unique schema_ids from ALL videos
+    # Two-Layer System: Workspace schema (list.default_schema_id) + Category schemas (tag.schema_id)
     all_schema_ids: Set[UUID] = set()
     video_schemas: Dict[UUID, List[UUID]] = {}  # video_id → [schema_ids]
 
     for video in videos:
+        schema_ids: List[UUID] = []
+
+        # Layer 1: Workspace schema (applies to ALL videos in this list)
+        # Check if video.list is loaded and has default_schema_id
+        if hasattr(video, 'list') and video.list and video.list.default_schema_id:
+            schema_ids.append(video.list.default_schema_id)
+
+        # Layer 2: Category schemas (from video's tags)
         # Handle case where tags relationship might not be loaded or is None
         # WORKAROUND: SQLAlchemy sometimes has issues with tags relationship
         # Catch TypeError that occurs when tags is a single Tag object instead of a list
@@ -204,7 +219,11 @@ async def get_available_fields_for_videos(
             else:
                 raise
 
-        schema_ids = [tag.schema_id for tag in tags if tag.schema_id is not None]
+        # Add category schemas (avoiding duplicates with workspace schema)
+        for tag in tags:
+            if tag.schema_id is not None and tag.schema_id not in schema_ids:
+                schema_ids.append(tag.schema_id)
+
         if schema_ids:
             video_schemas[video.id] = schema_ids
             all_schema_ids.update(schema_ids)

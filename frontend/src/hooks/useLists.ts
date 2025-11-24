@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { ListResponse, ListCreate } from '@/types/list'
+import type { ListResponse, ListCreate, ListUpdate } from '@/types/list'
 
 /**
  * Query options helper for type-safe reuse
@@ -66,6 +66,30 @@ export const useDeleteList = () => {
       }
     },
     // Refetch to ensure consistency after success or error
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['lists'] })
+    },
+  })
+}
+
+export const useUpdateList = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationKey: ['updateList'],
+    mutationFn: async ({ listId, data }: { listId: string; data: ListUpdate }) => {
+      const { data: response } = await api.put<ListResponse>(`/lists/${listId}`, data)
+      return response
+    },
+    onSuccess: (updatedList) => {
+      // Update the list in cache
+      queryClient.setQueryData(listsOptions().queryKey, (old: ListResponse[] | undefined) =>
+        old?.map((list) => (list.id === updatedList.id ? updatedList : list)) ?? []
+      )
+    },
+    onError: (error) => {
+      console.error('Failed to update list:', error)
+    },
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: ['lists'] })
     },

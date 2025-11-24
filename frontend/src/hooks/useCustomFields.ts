@@ -79,6 +79,8 @@ export function customFieldsOptions(listId: string) {
       // Validate response with Zod schema for runtime safety
       return CustomFieldsSchema.parse(data)
     },
+    // Prevent API calls with empty listId (causes 422 errors)
+    enabled: !!listId,
     // REF MCP: staleTime prevents unnecessary refetches
     // Custom fields change infrequently, so 5 minutes is reasonable
     staleTime: 5 * 60 * 1000, // 5 minutes

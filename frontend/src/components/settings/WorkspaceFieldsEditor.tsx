@@ -19,8 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useSchema, useUpdateSchemaFieldsBatch, schemasKeys } from '@/hooks/useSchemas'
+import { useSchema, useCreateSchema, useUpdateSchemaFieldsBatch, schemasKeys } from '@/hooks/useSchemas'
 import { useCreateCustomField } from '@/hooks/useCustomFields'
+import { useUpdateList, listsOptions } from '@/hooks/useLists'
 import { useQueryClient } from '@tanstack/react-query'
 import { FieldTypeBadge } from './FieldTypeBadge'
 import type { CustomField, FieldType, CustomFieldCreate } from '@/types/customField'
@@ -35,7 +36,7 @@ const FIELD_TYPE_OPTIONS: { value: FieldType; label: string }[] = [
 
 /** Default config for each field type */
 const DEFAULT_CONFIGS: Record<FieldType, object> = {
-  text: { max_length: null },
+  text: {},  // max_length is optional, omit instead of null
   rating: { max_rating: 5 },
   boolean: {},
   select: { options: ['Option 1', 'Option 2'] },
@@ -80,7 +81,9 @@ export function WorkspaceFieldsEditor({
 
   // Mutations
   const createField = useCreateCustomField(listId)
+  const createSchema = useCreateSchema(listId)
   const updateSchemaFields = useUpdateSchemaFieldsBatch(listId, defaultSchemaId ?? '')
+  const updateList = useUpdateList()
 
   // Local state for fields being edited
   const [localFields, setLocalFields] = useState<CustomField[]>([])
@@ -179,10 +182,25 @@ export function WorkspaceFieldsEditor({
           })),
         })
       } else if (!defaultSchemaId && allFieldIds.length > 0) {
-        // Cannot create workspace schema without existing default_schema_id
-        // This would require an API endpoint to update list.default_schema_id
-        setSaveError('Workspace-Schema kann nicht erstellt werden. Bitte kontaktiere den Administrator.')
-        return
+        // Create new workspace schema and update list
+        const newSchema = await createSchema.mutateAsync({
+          name: 'Workspace Felder',
+          description: 'Standard-Felder für alle Videos',
+          fields: allFieldIds.map((fieldId, index) => ({
+            field_id: fieldId,
+            display_order: index,
+            show_on_card: false,
+          })),
+        })
+
+        // Update list with new default_schema_id
+        await updateList.mutateAsync({
+          listId,
+          data: { default_schema_id: newSchema.id },
+        })
+
+        // Invalidate lists query to refresh UI
+        await queryClient.invalidateQueries({ queryKey: listsOptions().queryKey })
       }
 
       // Invalidate queries to refresh data

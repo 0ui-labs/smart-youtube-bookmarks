@@ -10,6 +10,7 @@ from .custom_field import CustomField
 from .field_schema import FieldSchema
 from .schema_field import SchemaField
 from .video_field_value import VideoFieldValue
+from .channel import Channel
 
 __all__ = [
     "Base",
@@ -26,4 +27,5 @@ __all__ = [
     "FieldSchema",
     "SchemaField",
     "VideoFieldValue",
+    "Channel",
 ]

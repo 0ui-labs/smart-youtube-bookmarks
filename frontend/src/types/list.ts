@@ -14,3 +14,9 @@ export interface ListCreate {
   description?: string
   schema_id?: string
 }
+
+export interface ListUpdate {
+  name?: string
+  description?: string
+  default_schema_id?: string | null
+}

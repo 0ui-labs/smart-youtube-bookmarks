@@ -261,38 +261,68 @@ export const useCreateVideo = (listId: string) => {
           )
         }
       })
+
+      // YouTube Channels Feature: Invalidate channels query to show new/updated channels
+      // Creating a video may create a new channel or update video counts
+      queryClient.invalidateQueries({ queryKey: ['channels'] })
     },
   })
 }
 
-export const useDeleteVideo = (listId: string) => {
+export const useDeleteVideo = (_listId: string) => {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (videoId: string) => {
       await api.delete(`/videos/${videoId}`)
     },
-    // Optimistic update: immediately remove from UI
+    // Optimistic update: immediately remove from UI (including filtered views)
     onMutate: async (videoId) => {
-      await queryClient.cancelQueries({ queryKey: videoKeys.list(listId) })
-      const previous = queryClient.getQueryData<VideoResponse[]>(videoKeys.list(listId))
+      // Cancel ALL video queries (including useVideosFilter which uses ['videos', 'filter', ...])
+      await queryClient.cancelQueries({ queryKey: ['videos'] })
 
-      queryClient.setQueryData<VideoResponse[]>(videoKeys.list(listId), (old) =>
-        old?.filter((video) => video.id !== videoId) ?? []
-      )
+      // Snapshot ALL video queries for potential rollback
+      const queryCache = queryClient.getQueryCache()
+      const previousQueries: Array<{ queryKey: readonly unknown[]; data: VideoResponse[] | undefined }> = []
 
-      return { previous }
+      // Find all video queries (both ['videos', 'list', ...] and ['videos', 'filter', ...])
+      queryCache.findAll({ queryKey: ['videos'] }).forEach((query) => {
+        const data = queryClient.getQueryData<VideoResponse[]>(query.queryKey)
+        // Only snapshot if it's an array (video list data)
+        if (Array.isArray(data)) {
+          previousQueries.push({
+            queryKey: query.queryKey,
+            data,
+          })
+        }
+      })
+
+      // Update ALL video queries (optimistically remove the deleted video)
+      previousQueries.forEach(({ queryKey }) => {
+        queryClient.setQueryData<VideoResponse[]>(queryKey, (old) =>
+          old?.filter((video) => video.id !== videoId) ?? []
+        )
+      })
+
+      return { previousQueries }
     },
     // Rollback on error
     onError: (err, _videoId, context) => {
       console.error('Failed to delete video:', err)
-      if (context?.previous) {
-        queryClient.setQueryData(videoKeys.list(listId), context.previous)
+      // Restore ALL queries that were modified
+      if (context?.previousQueries) {
+        context.previousQueries.forEach(({ queryKey, data }) => {
+          queryClient.setQueryData(queryKey, data)
+        })
       }
     },
-    // Refetch to ensure consistency - invalidates ALL queries for this list
+    // Refetch to ensure consistency - invalidates ALL video queries
+    // YouTube Channels feature (Step 6.8): Also invalidate channels for updated counts
+    // and to remove auto-deleted empty channels
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: videoKeys.list(listId) })
+      // Invalidate ALL video queries (both useVideos and useVideosFilter)
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+      queryClient.invalidateQueries({ queryKey: ['channels'] })
     },
   })
 }
@@ -590,7 +620,8 @@ export const useSetVideoCategory = () => {
       queryClient.setQueriesData<VideoResponse[]>(
         { queryKey: videoKeys.all },
         (oldVideos) => {
-          if (!oldVideos) return oldVideos
+          // Guard against non-array data (setQueriesData iterates all matching queries)
+          if (!oldVideos || !Array.isArray(oldVideos)) return oldVideos
 
           return oldVideos.map((video) => {
             if (video.id !== videoId) return video

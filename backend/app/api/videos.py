@@ -53,6 +53,7 @@ from app.schemas.video_field_value import (
 )
 from app.schemas.tag import TagResponse
 from app.schemas.custom_field import CustomFieldResponse
+from app.services.channel_service import get_or_create_channel
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -361,12 +362,31 @@ async def add_video_to_list(
         duration_seconds = parse_youtube_duration(metadata.get("duration"))
         published_at = parse_youtube_timestamp(metadata.get("published_at"))
 
+        # YouTube Channels Feature: Create or get channel for this video
+        channel_db_id = None
+        youtube_channel_id = metadata.get("channel_id")
+        channel_name = metadata.get("channel")
+        if youtube_channel_id and channel_name:
+            # Fetch channel info (thumbnail + description, cached for 30 days)
+            channel_info = await youtube_client.get_channel_info(youtube_channel_id)
+
+            channel = await get_or_create_channel(
+                db=db,
+                user_id=bookmark_list.user_id,
+                youtube_channel_id=youtube_channel_id,
+                channel_name=channel_name,
+                channel_thumbnail=channel_info.get("thumbnail_url"),
+                channel_description=channel_info.get("description")
+            )
+            channel_db_id = channel.id
+
         # Create video with COMPLETE metadata (instant!)
         new_video = Video(
             list_id=list_id,
             youtube_id=youtube_id,
             title=metadata.get("title"),
             channel=metadata.get("channel"),
+            channel_id=channel_db_id,  # Link to Channel record
             thumbnail_url=metadata.get("thumbnail_url"),
             duration=duration_seconds,
             published_at=published_at,
@@ -517,6 +537,16 @@ async def get_videos_in_list(
     for video in videos:
         video.__dict__['tags'] = tags_by_video.get(video.id, [])
 
+    # Load parent list once (for Two-Layer Field System: workspace fields from list.default_schema_id)
+    # All videos in this endpoint share the same list_id
+    parent_list_stmt = select(BookmarkList).where(BookmarkList.id == list_id)
+    parent_list_result = await db.execute(parent_list_stmt)
+    parent_list = parent_list_result.scalar_one_or_none()
+
+    # Assign list to all videos
+    for video in videos:
+        video.__dict__['list'] = parent_list
+
     # === NEW: Batch-load applicable fields for ALL videos ===
     # ✅ REF #1: Single query for all videos
     applicable_fields_by_video = await get_available_fields_for_videos(videos, db)
@@ -656,6 +686,17 @@ async def filter_videos_in_list(
                 .where(func.lower(Tag.name).in_(normalized_tags))
                 .distinct()
             )
+
+    # Step 3.5: Apply channel filtering (YouTube Channels feature)
+    if filter_request.channel_id:
+        try:
+            channel_uuid = UUID(filter_request.channel_id)
+            stmt = stmt.where(Video.channel_id == channel_uuid)
+        except ValueError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid channel_id format: {filter_request.channel_id}"
+            ) from err
 
     # Step 4: Apply field filtering (AND logic)
     if filter_request.field_filters and len(filter_request.field_filters) > 0:
@@ -918,6 +959,12 @@ async def get_video_by_id(
     tags_list = list(tags_result.scalars().all())
     video.__dict__['tags'] = tags_list
 
+    # Step 2C: Load parent list (for Two-Layer Field System: workspace fields from list.default_schema_id)
+    list_stmt = select(BookmarkList).where(BookmarkList.id == video.list_id)
+    list_result = await db.execute(list_stmt)
+    parent_list = list_result.scalar_one_or_none()
+    video.__dict__['list'] = parent_list
+
     # Step 3: Get available fields using helper module
     available_fields_tuples = await get_available_fields_for_video(video, db)
 
@@ -1095,6 +1142,9 @@ async def delete_video(
     """
     Delete a video from a bookmark list.
 
+    Also auto-deletes the channel if this was the last video in that channel
+    (YouTube Channels feature - Step 6.7).
+
     Args:
         video_id: UUID of the video to delete
         db: Database session
@@ -1102,6 +1152,8 @@ async def delete_video(
     Raises:
         HTTPException 404: Video not found
     """
+    from app.models.channel import Channel
+
     # Get video
     result = await db.execute(
         select(Video).where(Video.id == video_id)
@@ -1114,9 +1166,32 @@ async def delete_video(
             detail=f"Video with id {video_id} not found"
         )
 
+    # Store channel_id before deletion for cleanup check
+    channel_id = video.channel_id
+
     # Delete video
     await db.delete(video)
     await db.commit()  # CRITICAL FIX: Commit to persist deletion
+
+    # YouTube Channels feature - Step 6.7: Auto-delete empty channels
+    # If video had a channel, check if it was the last video
+    if channel_id:
+        # Count remaining videos for this channel
+        count_result = await db.execute(
+            select(func.count(Video.id)).where(Video.channel_id == channel_id)
+        )
+        remaining_count = count_result.scalar() or 0
+
+        if remaining_count == 0:
+            # Delete the empty channel
+            channel_result = await db.execute(
+                select(Channel).where(Channel.id == channel_id)
+            )
+            channel = channel_result.scalar_one_or_none()
+            if channel:
+                await db.delete(channel)
+                await db.commit()
+                logger.info(f"Auto-deleted empty channel {channel_id}")
 
     return None
 

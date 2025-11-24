@@ -28,16 +28,15 @@ interface FilterBarProps {
 export function FilterBar({ listId }: FilterBarProps) {
   const { activeFilters, removeFilter, clearFilters } = useFieldFilterStore();
 
+  // Don't render anything if no filters are active
+  if (activeFilters.length === 0) {
+    return null;
+  }
+
   return (
     <div className="flex items-center gap-2 p-4 border-b bg-background">
       {/* Active Filters */}
       <div className="flex items-center gap-2 flex-wrap flex-1">
-        {activeFilters.length === 0 && (
-          <span className="text-sm text-muted-foreground">
-            No filters applied
-          </span>
-        )}
-
         {activeFilters.map((filter) => (
           <Badge key={filter.id} variant="secondary" className="gap-1 pr-1">
             <FieldFilterInput
@@ -50,11 +49,9 @@ export function FilterBar({ listId }: FilterBarProps) {
       </div>
 
       {/* Clear All Button */}
-      {activeFilters.length > 0 && (
-        <Button variant="ghost" size="sm" onClick={clearFilters}>
-          Clear All
-        </Button>
-      )}
+      <Button variant="ghost" size="sm" onClick={clearFilters}>
+        Clear All
+      </Button>
     </div>
   );
 }

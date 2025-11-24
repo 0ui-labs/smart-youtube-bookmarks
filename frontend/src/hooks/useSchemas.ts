@@ -75,6 +75,8 @@ export function schemasOptions(listId: string) {
   return queryOptions({
     queryKey: schemasKeys.list(listId),
     queryFn: async () => schemasApi.getSchemas(listId),
+    // Prevent API calls with empty listId (causes 422 errors)
+    enabled: !!listId,
     // Lower staleTime for lists (user creates/deletes schemas frequently)
     staleTime: 2 * 60 * 1000, // 2 minutes
   })

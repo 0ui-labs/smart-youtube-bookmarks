@@ -387,3 +387,104 @@ async def test_get_batch_metadata_partial_failure():
     # Should only return valid video
     assert len(results) == 1
     assert results[0]["youtube_id"] == "VALID_ID"
+
+
+# ============================================================================
+# Channel ID extraction tests (for YouTube Channels feature)
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_get_video_metadata_includes_channel_id():
+    """Test that get_video_metadata returns channel_id from YouTube API."""
+    client = YouTubeClient(api_key="test-key")
+
+    mock_response = {
+        "items": [{
+            "id": "dQw4w9WgXcQ",
+            "snippet": {
+                "title": "Test Video",
+                "channelTitle": "Test Channel",
+                "channelId": "UCuAXFkgsw1L7xaCfnd5JJOw",  # YouTube channel ID
+                "publishedAt": "2009-10-25T06:57:33Z",
+                "thumbnails": {
+                    "default": {"url": "https://example.com/thumb.jpg"}
+                }
+            },
+            "contentDetails": {
+                "duration": "PT3M33S"
+            }
+        }]
+    }
+
+    with patch('app.clients.youtube.Aiogoogle') as mock_aiogoogle:
+        mock_instance = AsyncMock()
+        mock_aiogoogle.return_value.__aenter__.return_value = mock_instance
+        mock_instance.discover.return_value = AsyncMock()
+        mock_instance.as_api_key.return_value = mock_response
+
+        metadata = await client.get_video_metadata("dQw4w9WgXcQ")
+
+    assert "channel_id" in metadata, "channel_id should be in metadata"
+    assert metadata["channel_id"] == "UCuAXFkgsw1L7xaCfnd5JJOw"
+
+
+@pytest.mark.asyncio
+async def test_get_batch_metadata_includes_channel_id():
+    """Test that get_batch_metadata returns channel_id for each video."""
+    from unittest.mock import AsyncMock
+
+    redis_client = AsyncMock()
+    redis_client.get.return_value = None
+    redis_client.setex = AsyncMock()
+
+    client = YouTubeClient(api_key="test-key", redis_client=redis_client)
+
+    mock_response_data = {
+        "items": [
+            {
+                "id": "VIDEO_ID_1",
+                "snippet": {
+                    "title": "Python Tutorial",
+                    "channelTitle": "Tech Channel",
+                    "channelId": "UCtech123",  # Channel ID
+                    "description": "Learn Python",
+                    "publishedAt": "2024-01-15T10:00:00Z",
+                    "thumbnails": {
+                        "high": {"url": "https://i.ytimg.com/vi/VIDEO_ID_1/hqdefault.jpg"}
+                    }
+                },
+                "contentDetails": {"duration": "PT15M30S"}
+            },
+            {
+                "id": "VIDEO_ID_2",
+                "snippet": {
+                    "title": "FastAPI Guide",
+                    "channelTitle": "Web Dev Channel",
+                    "channelId": "UCwebdev456",  # Different channel
+                    "description": "Build APIs",
+                    "publishedAt": "2024-02-20T14:30:00Z",
+                    "thumbnails": {
+                        "high": {"url": "https://i.ytimg.com/vi/VIDEO_ID_2/hqdefault.jpg"}
+                    }
+                },
+                "contentDetails": {"duration": "PT25M45S"}
+            }
+        ]
+    }
+
+    with patch('httpx.AsyncClient') as mock_client_class:
+        mock_client = AsyncMock()
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value=mock_response_data)
+
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_client_class.return_value.__aexit__.return_value = AsyncMock()
+
+        results = await client.get_batch_metadata(["VIDEO_ID_1", "VIDEO_ID_2"])
+
+    assert len(results) == 2
+    assert "channel_id" in results[0], "channel_id should be in batch metadata"
+    assert results[0]["channel_id"] == "UCtech123"
+    assert results[1]["channel_id"] == "UCwebdev456"

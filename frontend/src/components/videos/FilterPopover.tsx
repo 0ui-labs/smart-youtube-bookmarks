@@ -43,10 +43,13 @@ export function FilterPopover({ listId }: FilterPopoverProps) {
   const { data: customFields, isLoading } = useCustomFields(listId);
   const [open, setOpen] = React.useState(false);
 
-  // Get available fields (exclude already filtered fields)
+  // Get available fields (exclude already filtered fields and temp IDs from optimistic updates)
   const activeFieldIds = new Set(activeFilters.map((f) => f.fieldId));
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const availableFields =
-    customFields?.filter((f) => !activeFieldIds.has(f.id)) || [];
+    customFields?.filter((f) =>
+      !activeFieldIds.has(f.id) && uuidRegex.test(f.id) // Skip temp IDs
+    ) || [];
 
   const handleAddFilter = (fieldId: string) => {
     const field = customFields?.find((f) => f.id === fieldId);

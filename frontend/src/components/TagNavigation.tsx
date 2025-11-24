@@ -45,12 +45,12 @@ export const TagNavigation = ({
     <div className="tag-navigation p-4">
       {/* Header with title and create button */}
       <div className="flex items-center justify-between mb-4 px-3 gap-1">
-        <h2 className="text-lg font-semibold">Tags</h2>
+        <h2 className="text-lg font-semibold">Kategorien</h2>
         <Button
           variant="ghost"
           size="icon"
           onClick={onTagCreate}
-          aria-label="Neuen Tag erstellen"
+          aria-label="Neue Kategorie erstellen"
         >
           <PlusIcon className="h-4 w-4" />
         </Button>
@@ -66,7 +66,7 @@ export const TagNavigation = ({
               key={tag.id}
               onClick={() => onTagSelect(tag.id)}
               aria-pressed={isSelected}
-              aria-label={`Tag ${tag.name} ${isSelected ? 'abwählen' : 'auswählen'}`}
+              aria-label={`Kategorie ${tag.name} ${isSelected ? 'abwählen' : 'auswählen'}`}
               className={cn(
                 'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
                 'hover:bg-accent',

@@ -4,8 +4,10 @@ from arq import Retry
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models import Video, ProcessingJob
+from app.models.list import BookmarkList
 from app.models.job_progress import JobProgressEvent
 from app.clients.youtube import YouTubeClient
+from app.services.channel_service import get_or_create_channel
 from app.core.config import settings
 from app.core.redis import get_redis_client
 from datetime import datetime
@@ -99,6 +101,50 @@ async def process_video(
             video.thumbnail_url = metadata.get("thumbnail_url")
             video.duration = _parse_duration(metadata.get("duration"))
             video.published_at = _parse_timestamp(metadata.get("published_at"))
+
+            # Extended YouTube metadata (snippet)
+            video.description = metadata.get("description")
+            video.youtube_tags = metadata.get("youtube_tags")
+            video.youtube_category_id = metadata.get("youtube_category_id")
+            video.default_language = metadata.get("default_language")
+
+            # Content details
+            video.dimension = metadata.get("dimension")
+            video.definition = metadata.get("definition")
+            video.has_captions = metadata.get("has_captions")
+            video.region_restriction = metadata.get("region_restriction")
+
+            # Statistics
+            video.view_count = metadata.get("view_count")
+            video.like_count = metadata.get("like_count")
+            video.comment_count = metadata.get("comment_count")
+
+            # Status
+            video.privacy_status = metadata.get("privacy_status")
+            video.is_embeddable = metadata.get("is_embeddable")
+
+            # Create or get channel if channel_id is available
+            youtube_channel_id = metadata.get("channel_id")
+            if youtube_channel_id:
+                # Get user_id from the video's list
+                list_result = await db.execute(
+                    select(BookmarkList.user_id).where(BookmarkList.id == video.list_id)
+                )
+                user_id = list_result.scalar_one_or_none()
+
+                if user_id:
+                    # Fetch channel info (thumbnail + description, cached for 30 days)
+                    channel_info = await youtube_client.get_channel_info(youtube_channel_id)
+
+                    channel = await get_or_create_channel(
+                        db=db,
+                        user_id=user_id,
+                        youtube_channel_id=youtube_channel_id,
+                        channel_name=metadata.get("channel", "Unknown Channel"),
+                        channel_thumbnail=channel_info.get("thumbnail_url"),
+                        channel_description=channel_info.get("description")
+                    )
+                    video.channel_id = channel.id
 
             # TODO: Get transcript and extract via Gemini
             # For now, just store YouTube metadata

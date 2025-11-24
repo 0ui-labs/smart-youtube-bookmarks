@@ -1,8 +1,9 @@
 /**
  * CreateTagDialog Component
  *
- * Modal dialog for creating new tags with name, optional color, and optional schema.
- * Uses AlertDialog from Radix UI for accessibility.
+ * Simplified dialog for creating categories and labels.
+ * Schema/field management is hidden from the user - they add fields
+ * after creating the category via the edit dialog.
  *
  * @example
  * ```tsx
@@ -19,17 +20,12 @@ import {
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Label } from '@/components/ui/label'
 import { useCreateTag } from '@/hooks/useTags'
-import { SchemaSelector } from './SchemaSelector'
-import { schemasOptions, useCreateSchema } from '@/hooks/useSchemas'
-import { useQuery } from '@tanstack/react-query'
-import { SchemaEditor, type SchemaFormData } from './schemas/SchemaEditor'
 
 interface CreateTagDialogProps {
   open: boolean
@@ -37,90 +33,45 @@ interface CreateTagDialogProps {
   listId: string
 }
 
-export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogProps) => {
+export const CreateTagDialog = ({ open, onOpenChange, listId: _listId }: CreateTagDialogProps) => {
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3B82F6') // Default blue
   const [error, setError] = useState<string | null>(null)
-  // Task #82: Schema ID state for SchemaSelector
-  // null = "Kein Schema", 'new' = Create new schema, UUID string = Existing schema
-  const [schemaId, setSchemaId] = useState<string | null>(null)
-  // Category-Fields Feature: Tag type selection
-  // true = Kategorie (one per video), false = Label (multiple per video)
-  const [isVideoType, setIsVideoType] = useState(true)
 
   const createTag = useCreateTag()
-  const createSchema = useCreateSchema(listId)
-
-  // Task #82 Batch 3: Fetch schemas with dependent query
-  const { data: schemas = [], isLoading: isSchemasLoading } = useQuery({
-    ...schemasOptions(listId),
-    enabled: !!listId,  // REF MCP Improvement #4: Dependent query pattern
-  })
-
-  // Bug #001 Fix: Handlers for inline schema creation
-  const handleSchemaCreated = async (schemaData: SchemaFormData) => {
-    try {
-      const newSchema = await createSchema.mutateAsync({
-        name: schemaData.name,
-        description: schemaData.description,
-        fields: schemaData.fields,
-      })
-
-      // Set schemaId to newly created schema
-      setSchemaId(newSchema.id)
-    } catch (error) {
-      // Error is handled by SchemaEditor component
-      // Re-throw to let SchemaEditor display the error
-      throw error
-    }
-  }
-
-  const handleSchemaCancelled = () => {
-    // Reset to "no schema" when user cancels
-    setSchemaId(null)
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // Validation
     if (!name.trim()) {
-      setError('Bitte geben Sie einen Tag-Namen ein')
+      setError('Bitte gib einen Namen ein')
       return
     }
 
     if (name.length > 50) {
-      setError('Tag-Name darf maximal 50 Zeichen lang sein')
-      return
-    }
-
-    // Bug #001 Fix: Validate 'new' mode (edge case protection)
-    if (schemaId === 'new') {
-      setError('Bitte erstellen Sie das Schema oder brechen Sie die Erstellung ab')
+      setError('Name darf maximal 50 Zeichen lang sein')
       return
     }
 
     try {
       await createTag.mutateAsync({
         name: name.trim(),
-        color: color || undefined, // Send undefined if empty
-        schema_id: schemaId,  // Task #82 Batch 3: Include schema_id
-        is_video_type: isVideoType, // Category-Fields Feature
+        color: color || undefined,
+        is_video_type: true, // Always category
       })
 
       // Success - reset form and close dialog
       setName('')
       setColor('#3B82F6')
-      setSchemaId(null)
-      setIsVideoType(true)
       setError(null)
       onOpenChange(false)
     } catch (err: any) {
       // Handle errors
       if (err.response?.status === 409) {
-        setError('Ein Tag mit diesem Namen existiert bereits')
+        setError('Eine Kategorie mit diesem Namen existiert bereits')
       } else {
-        setError('Fehler beim Erstellen des Tags. Bitte versuchen Sie es erneut.')
+        setError('Fehler beim Erstellen. Bitte versuche es erneut.')
       }
     }
   }
@@ -128,8 +79,6 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
   const handleCancel = () => {
     setName('')
     setColor('#3B82F6')
-    setSchemaId(null)
-    setIsVideoType(true)
     setError(null)
     onOpenChange(false)
   }
@@ -138,12 +87,15 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Neuen Tag erstellen</AlertDialogTitle>
+          <AlertDialogTitle>Neue Kategorie erstellen</AlertDialogTitle>
+          <AlertDialogDescription>
+            Kategorien helfen dir Videos zu organisieren. Jedes Video kann nur eine Kategorie haben.
+          </AlertDialogDescription>
         </AlertDialogHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
-            {/* Tag Name Input */}
+            {/* Name Input */}
             <div>
               <label
                 htmlFor="tag-name"
@@ -156,7 +108,7 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="z.B. Python, Tutorial, Wichtig"
+                placeholder="z.B. Tutorial, Review, Vlog"
                 className={`w-full px-3 py-2 border ${
                   error ? 'border-red-500' : 'border-gray-300'
                 } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
@@ -168,43 +120,13 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
               )}
             </div>
 
-            {/* Type Selection - Category vs Label */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Typ
-              </label>
-              <RadioGroup
-                value={isVideoType ? 'category' : 'label'}
-                onValueChange={(value) => setIsVideoType(value === 'category')}
-                className="flex gap-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="category" id="type-category" />
-                  <Label htmlFor="type-category" className="font-normal cursor-pointer">
-                    Kategorie
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="label" id="type-label" />
-                  <Label htmlFor="type-label" className="font-normal cursor-pointer">
-                    Label
-                  </Label>
-                </div>
-              </RadioGroup>
-              <p className="mt-1 text-sm text-gray-500">
-                {isVideoType
-                  ? 'Ein Video kann nur eine Kategorie haben'
-                  : 'Ein Video kann mehrere Labels haben'}
-              </p>
-            </div>
-
             {/* Color Picker */}
             <div>
               <label
                 htmlFor="tag-color"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Farbe (optional)
+                Farbe
               </label>
               <div className="flex items-center gap-3">
                 <input
@@ -216,40 +138,13 @@ export const CreateTagDialog = ({ open, onOpenChange, listId }: CreateTagDialogP
                 />
                 <span className="text-sm text-gray-600">{color}</span>
               </div>
-              <p className="mt-1 text-sm text-gray-500">
-                Wählen Sie eine Farbe zur visuellen Unterscheidung
-              </p>
             </div>
 
-            {/* Task #82 Batch 3: Schema Selector */}
-            <div>
-              <label
-                htmlFor="tag-schema"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Schema (optional)
-              </label>
-              <SchemaSelector
-                value={schemaId}
-                schemas={schemas}
-                onChange={setSchemaId}
-                disabled={isSchemasLoading}
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                Verknüpfen Sie benutzerdefinierte Felder mit diesem Tag
-              </p>
-
-              {/* Bug #001 Fix: Show SchemaEditor when schemaId === 'new' */}
-              {schemaId === 'new' && (
-                <div className="mt-4 p-4 border rounded-lg bg-gray-50">
-                  <SchemaEditor
-                    listId={listId}
-                    onSave={handleSchemaCreated}
-                    onCancel={handleSchemaCancelled}
-                  />
-                </div>
-              )}
-            </div>
+            {/* Hint about fields */}
+            <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+              Nach dem Erstellen kannst du über "Bearbeiten" eigene Felder hinzufügen
+              (z.B. Bewertung, Notizen, Kalorien).
+            </p>
           </div>
 
           <AlertDialogFooter>

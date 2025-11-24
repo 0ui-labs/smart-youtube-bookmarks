@@ -1,5 +1,4 @@
 import { TagActionsMenu } from './TagActionsMenu'
-import { Badge } from '@/components/ui/badge'
 import type { Tag } from '@/types/tag'
 
 interface TagsListProps {
@@ -68,9 +67,6 @@ export function TagsList({ tags, onEdit, onDelete, isLoading }: TagsListProps) {
               Farbe
             </th>
             <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-              Typ
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
               Felder
             </th>
             <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">
@@ -96,11 +92,6 @@ export function TagsList({ tags, onEdit, onDelete, isLoading }: TagsListProps) {
                     {tag.color || '#3B82F6'}
                   </span>
                 </div>
-              </td>
-              <td className="p-4 align-middle">
-                <Badge variant={tag.is_video_type ? 'default' : 'secondary'}>
-                  {tag.is_video_type ? 'Kategorie' : 'Label'}
-                </Badge>
               </td>
               <td className="p-4 align-middle">
                 {tag.schema_id ? (

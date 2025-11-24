@@ -4,6 +4,7 @@ import { Dashboard } from './pages/Dashboard'
 import { SettingsPage } from './pages/SettingsPage'
 import { NotFound } from './pages/NotFound'
 import { VideoDetailsPage } from './pages/VideoDetailsPage'
+import { ChannelsPage } from './pages/ChannelsPage'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useLists } from './hooks/useLists'
 
@@ -36,6 +37,7 @@ function App() {
         }
       />
       <Route path="/videos/:videoId" element={<VideoDetailsPage />} />
+      <Route path="/channels" element={<ChannelsPage />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/settings/schemas" element={<SettingsPage />} />
       <Route path="/" element={<Navigate to="/videos" replace />} />

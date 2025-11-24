@@ -26,7 +26,7 @@ class TagResponse(TagBase):
     id: UUID
     user_id: UUID
     schema_id: UUID | None = None  # Schema FK (use this instead of nested object)
-    is_video_type: bool  # True = category (one per video), False = label (multiple)
+    is_video_type: bool = True  # Default True for legacy tags without this field
     # REMOVED: schema: FieldSchemaResponse | None - Causes lazy-loading issues
     # Frontend only needs schema_id - if full schema needed, fetch via GET /api/schemas/{id}
     created_at: datetime

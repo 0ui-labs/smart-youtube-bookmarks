@@ -108,7 +108,7 @@ export function CollapsibleSidebar({
         <aside
           ref={sidebarRef}
           className={cn(
-            'hidden md:flex md:flex-col md:w-64 md:h-screen md:border-r md:bg-background',
+            'hidden md:flex md:flex-col md:w-72 md:h-screen md:border-r md:bg-background',
             className
           )}
         >
@@ -145,7 +145,7 @@ export function CollapsibleSidebar({
                 damping: 30,
               }}
               className={cn(
-                'fixed left-0 top-0 z-40 flex flex-col w-64 h-screen border-r bg-background md:hidden',
+                'fixed left-0 top-0 z-40 flex flex-col w-72 h-screen border-r bg-background md:hidden',
                 className
               )}
             >
