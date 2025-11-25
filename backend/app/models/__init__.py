@@ -11,6 +11,7 @@ from .field_schema import FieldSchema
 from .schema_field import SchemaField
 from .video_field_value import VideoFieldValue
 from .channel import Channel
+from .video_enrichment import VideoEnrichment, EnrichmentStatus
 
 __all__ = [
     "Base",
@@ -28,4 +29,6 @@ __all__ = [
     "SchemaField",
     "VideoFieldValue",
     "Channel",
+    "VideoEnrichment",
+    "EnrichmentStatus",
 ]

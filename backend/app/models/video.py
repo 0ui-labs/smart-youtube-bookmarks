@@ -11,6 +11,7 @@ from .tag import video_tags
 
 if TYPE_CHECKING:
     from .channel import Channel
+    from .video_enrichment import VideoEnrichment
 
 
 class Video(BaseModel):
@@ -94,6 +95,13 @@ class Video(BaseModel):
         cascade="all, delete-orphan",
         passive_deletes=True,  # Trust DB CASCADE (REF MCP, consistent with CustomField)
         uselist=True  # Explicit list relationship (unique constraint may confuse SQLAlchemy)
+    )
+    enrichment: Mapped[Optional["VideoEnrichment"]] = relationship(
+        "VideoEnrichment",
+        back_populates="video",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
 
     __table_args__ = (
