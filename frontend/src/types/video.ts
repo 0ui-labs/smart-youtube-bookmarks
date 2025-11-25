@@ -287,6 +287,9 @@ export const VideoResponseSchema = z.object({
   updated_at: z.string(),
   field_values: z.array(VideoFieldValueSchema).optional().default([]),
   available_fields: z.array(AvailableFieldResponseSchema).nullable().optional(),
+  // Watch progress tracking (video player integration)
+  watch_position: z.number().nullable().optional(),
+  watch_position_updated_at: z.string().nullable().optional(),
 })
 
 /**

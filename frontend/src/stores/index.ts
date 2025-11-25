@@ -21,3 +21,6 @@ export { useTagStore } from './tagStore';
 // Field Filter Store
 export { useFieldFilterStore } from './fieldFilterStore';
 export type { ActiveFilter, FilterOperator } from './fieldFilterStore';
+
+// Player Settings Store
+export { usePlayerSettingsStore } from './playerSettingsStore';

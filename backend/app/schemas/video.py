@@ -279,6 +279,26 @@ class VideoResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Watch progress tracking (for video player integration)
+    watch_position: int | None = None
+    watch_position_updated_at: datetime | None = None
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
+class UpdateWatchProgressRequest(BaseModel):
+    """Request schema for updating video watch progress."""
+    position: int = Field(..., ge=0, description="Watch position in seconds (must be >= 0)")
+
+
+class UpdateWatchProgressResponse(BaseModel):
+    """Response schema for watch progress update."""
+    video_id: UUID
+    watch_position: int
+    updated_at: datetime
+
     model_config = {
         "from_attributes": True
     }

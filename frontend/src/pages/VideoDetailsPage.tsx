@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { VideoResponseSchema } from '@/types/video'
-import { formatDuration } from '@/utils/formatDuration'
 import { CustomFieldsSection } from '@/components/CustomFieldsSection'
 import { CategorySelector } from '@/components/CategorySelector'
 import { useSetVideoCategory } from '@/hooks/useVideos'
@@ -11,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, AlertCircle, X } from 'lucide-react'
+import { VideoPlayer } from '@/components/VideoPlayer'
 
 /**
  * VideoDetailsPage Component
@@ -176,22 +176,15 @@ export const VideoDetailsPage = () => {
 
       {/* Video header */}
       <div className="mb-8">
-        {/* Large thumbnail (16:9) */}
-        {video.thumbnail_url && (
-          <div className="relative w-full aspect-video mb-4 rounded-lg overflow-hidden bg-gray-100">
-            <img
-              src={video.thumbnail_url}
-              alt={video.title || 'Video thumbnail'}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-            {video.duration && (
-              <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
-                {formatDuration(video.duration)}
-              </div>
-            )}
-          </div>
-        )}
+        {/* Video Player (replaces thumbnail) */}
+        <div className="mb-4">
+          <VideoPlayer
+            youtubeId={video.youtube_id}
+            videoId={video.id}
+            initialPosition={video.watch_position}
+            thumbnailUrl={video.thumbnail_url}
+          />
+        </div>
 
         {/* Title */}
         <h1 className="text-3xl font-bold mb-2">{video.title || 'Untitled Video'}</h1>

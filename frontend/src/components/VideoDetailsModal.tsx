@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { formatDuration } from '@/utils/formatDuration'
 import { useVideoDetail } from '@/hooks/useVideoDetail'
+import { VideoPlayer } from '@/components/VideoPlayer'
 
 /**
  * VideoDetailsModal Component
@@ -120,14 +121,13 @@ export const VideoDetailsModal = ({
 
         {/* Video Content */}
         <div className="space-y-4">
-          {/* 16:9 Thumbnail */}
-          <div className="relative w-full aspect-video bg-gray-100 rounded-md overflow-hidden">
-            <img
-              src={displayVideo.thumbnail_url || ''}
-              alt={displayVideo.title || 'Video thumbnail'}
-              className="w-full h-full object-cover"
-            />
-          </div>
+          {/* Video Player (replaces thumbnail) */}
+          <VideoPlayer
+            youtubeId={displayVideo.youtube_id}
+            videoId={displayVideo.id}
+            initialPosition={displayVideo.watch_position}
+            thumbnailUrl={displayVideo.thumbnail_url}
+          />
 
           {/* Metadata: Duration, Channel */}
           <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600">

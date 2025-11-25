@@ -69,6 +69,12 @@ class Video(BaseModel):
     )
     error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
+    # Watch progress tracking (for video player integration)
+    watch_position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    watch_position_updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # Relationships
     list: Mapped["BookmarkList"] = relationship("BookmarkList", back_populates="videos")
     channel_ref: Mapped[Optional["Channel"]] = relationship(
