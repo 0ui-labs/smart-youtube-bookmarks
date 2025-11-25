@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # External APIs
     youtube_api_key: str = ""
     gemini_api_key: str = ""
+    groq_api_key: str = ""
 
     # Authentication (JWT)
     secret_key: str = "your-secret-key-here-change-in-production"
