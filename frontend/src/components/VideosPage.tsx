@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   useReactTable,
@@ -212,8 +212,12 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const selectedTagIds = useTagStore(useShallow((state) => state.selectedTagIds))
   const setSelectedTagIds = useTagStore((state) => state.setSelectedTagIds)
 
-  // Compute selected tags (no useMemo - simple filter is fast enough per React docs)
-  const selectedTags = tags.filter(tag => selectedTagIds.includes(tag.id))
+  // Compute selected tags with useMemo for referential stability
+  // This prevents useEffect dependencies from changing on every render
+  const selectedTags = useMemo(
+    () => tags.filter(tag => selectedTagIds.includes(tag.id)),
+    [tags, selectedTagIds]
+  )
 
   // Query client for cache invalidation
   const queryClient = useQueryClient()
@@ -296,8 +300,11 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     }
   }
 
-  // Extract tag names for API filtering
-  const selectedTagNames = selectedTags.map(tag => tag.name)
+  // Extract tag names for API filtering (memoized to prevent unnecessary query key changes)
+  const selectedTagNames = useMemo(
+    () => selectedTags.map(tag => tag.name),
+    [selectedTags]
+  )
 
   // TASK 4: Parse sort parameters from URL query params
   const sortBy = searchParams.get('sort_by') || undefined
