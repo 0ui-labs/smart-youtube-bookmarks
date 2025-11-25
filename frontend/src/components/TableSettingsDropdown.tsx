@@ -125,39 +125,43 @@ export const TableSettingsDropdown = () => {
           </>
         )}
 
-        {/* Column Visibility Section */}
-        <DropdownMenuLabel>Sichtbare Spalten</DropdownMenuLabel>
+        {/* Column Visibility Section - Only visible in list view */}
+        {viewMode === 'list' && (
+          <>
+            <DropdownMenuLabel>Sichtbare Spalten</DropdownMenuLabel>
 
-        {/* REF MCP Improvement #3: Correct Radix API - checked prop + onCheckedChange */}
-        <DropdownMenuCheckboxItem
-          checked={visibleColumns.thumbnail}
-          onCheckedChange={() => toggleColumn('thumbnail')}
-        >
-          Thumbnail
-        </DropdownMenuCheckboxItem>
+            {/* REF MCP Improvement #3: Correct Radix API - checked prop + onCheckedChange */}
+            <DropdownMenuCheckboxItem
+              checked={visibleColumns.thumbnail}
+              onCheckedChange={() => toggleColumn('thumbnail')}
+            >
+              Thumbnail
+            </DropdownMenuCheckboxItem>
 
-        <DropdownMenuCheckboxItem
-          checked={visibleColumns.title}
-          onCheckedChange={() => toggleColumn('title')}
-        >
-          Titel
-        </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={visibleColumns.title}
+              onCheckedChange={() => toggleColumn('title')}
+            >
+              Titel
+            </DropdownMenuCheckboxItem>
 
-        <DropdownMenuCheckboxItem
-          checked={visibleColumns.duration}
-          onCheckedChange={() => toggleColumn('duration')}
-        >
-          Dauer
-        </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={visibleColumns.duration}
+              onCheckedChange={() => toggleColumn('duration')}
+            >
+              Dauer
+            </DropdownMenuCheckboxItem>
 
-        <DropdownMenuCheckboxItem
-          checked={visibleColumns.actions}
-          onCheckedChange={() => toggleColumn('actions')}
-        >
-          Aktionen
-        </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={visibleColumns.actions}
+              onCheckedChange={() => toggleColumn('actions')}
+            >
+              Aktionen
+            </DropdownMenuCheckboxItem>
 
-        <DropdownMenuSeparator />
+            <DropdownMenuSeparator />
+          </>
+        )}
 
         {/* Video Details Ansicht Section (Task #131 Step 5) */}
         {/* REF MCP #4: RadioGroup for mutually exclusive choice (page OR modal) */}

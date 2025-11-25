@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
 """
-Script to refresh channel descriptions from YouTube API for all existing channels.
+Script to refresh channel descriptions from YouTube API for existing channels.
 
 Usage:
     cd backend
-    python scripts/refresh_channel_descriptions.py
+
+    # Refresh channels for a specific user:
+    python scripts/refresh_channel_descriptions.py --user-id <uuid>
+
+    # Refresh ALL channels (admin-only, requires explicit flag):
+    python scripts/refresh_channel_descriptions.py --all
+
+Note: Either --user-id or --all must be provided. This prevents accidental
+processing of all users' data, which could cause rate-limiting and privacy issues.
 """
+import argparse
 import asyncio
 import os
 import sys
+from uuid import UUID
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,14 +30,62 @@ from app.clients.youtube import YouTubeClient
 from app.core.config import settings
 
 
-async def refresh_channel_descriptions():
-    """Fetch and update descriptions for all channels missing them."""
+def parse_args() -> argparse.Namespace:
+    """Parse and validate command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Refresh channel descriptions from YouTube API.",
+        epilog="Either --user-id or --all must be provided.",
+    )
+    parser.add_argument(
+        "--user-id",
+        type=str,
+        help="UUID of the user whose channels should be refreshed",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="all_users",
+        help="Process ALL channels across all users (admin-only)",
+    )
 
+    args = parser.parse_args()
+
+    # Validate: require either --user-id or --all
+    if not args.user_id and not args.all_users:
+        parser.error(
+            "You must specify either --user-id <uuid> or --all.\n"
+            "Use --all only for admin operations affecting all users."
+        )
+
+    # Validate UUID format if provided
+    if args.user_id:
+        try:
+            args.user_id = UUID(args.user_id)
+        except ValueError:
+            parser.error(f"Invalid UUID format: {args.user_id}")
+
+    return args
+
+
+async def refresh_channel_descriptions(user_id: UUID | None = None):
+    """Fetch and update descriptions for channels.
+
+    Args:
+        user_id: If provided, only refresh channels for this user.
+                 If None, refresh all channels (admin mode).
+    """
     youtube_client = YouTubeClient(api_key=settings.youtube_api_key)
 
     async with AsyncSessionLocal() as db:
-        # Get all channels
-        result = await db.execute(select(Channel))
+        # Build query with optional user filter
+        query = select(Channel)
+        if user_id is not None:
+            query = query.where(Channel.user_id == user_id)
+            print(f"Filtering channels for user: {user_id}")
+        else:
+            print("WARNING: Processing ALL channels across all users (admin mode)")
+
+        result = await db.execute(query)
         channels = result.scalars().all()
 
         print(f"Found {len(channels)} channels to check")
@@ -61,4 +119,5 @@ async def refresh_channel_descriptions():
 
 
 if __name__ == "__main__":
-    asyncio.run(refresh_channel_descriptions())
+    args = parse_args()
+    asyncio.run(refresh_channel_descriptions(user_id=args.user_id))

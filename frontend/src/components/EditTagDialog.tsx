@@ -99,6 +99,7 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
   const [showCreateField, setShowCreateField] = useState(false)
   const [newFieldName, setNewFieldName] = useState('')
   const [newFieldType, setNewFieldType] = useState<'text' | 'rating' | 'boolean' | 'select'>('text')
+  const [createFieldError, setCreateFieldError] = useState<string | null>(null)
 
   const form = useForm<TagFormData>({
     resolver: zodResolver(TagFormSchema),
@@ -153,15 +154,31 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
           const fieldsToRemove = currentFieldIds.filter((id: string) => !selectedFieldIds.includes(id))
 
           // Remove fields that are no longer selected
-          for (const fieldId of fieldsToRemove) {
-            await removeFieldFromSchema.mutateAsync(fieldId)
+          // Execute all removals and verify they all succeeded before proceeding
+          if (fieldsToRemove.length > 0) {
+            const removalResults = await Promise.allSettled(
+              fieldsToRemove.map((fieldId: string) => removeFieldFromSchema.mutateAsync(fieldId))
+            )
+
+            // Check if any removal failed
+            const failedRemovals = removalResults.filter(
+              (result): result is PromiseRejectedResult => result.status === 'rejected'
+            )
+
+            if (failedRemovals.length > 0) {
+              // Abort: don't proceed with additions as display_order would be incorrect
+              const firstFailure = failedRemovals[0]
+              const errorMsg = (firstFailure?.reason as Error)?.message || 'Fehler beim Entfernen von Feldern'
+              throw new Error(`Feld-Synchronisation fehlgeschlagen: ${errorMsg}`)
+            }
           }
 
-          // Add new fields
+          // All removals succeeded - now compute correct display_order and add new fields
+          const remainingFieldCount = currentFieldIds.length - fieldsToRemove.length
           for (const [i, fieldId] of fieldsToAdd.entries()) {
             await addFieldToSchema.mutateAsync({
               field_id: fieldId,
-              display_order: currentFieldIds.length - fieldsToRemove.length + i,
+              display_order: remainingFieldCount + i,
               show_on_card: true,
             })
           }
@@ -230,13 +247,25 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
         field_type: newFieldType,
         config,
       })
-      // Auto-add the new field to selected fields
+      // Success: clear error and reset form
+      setCreateFieldError(null)
       setSelectedFieldIds([...selectedFieldIds, newField.id])
       setNewFieldName('')
       setNewFieldType('text')
       setShowCreateField(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create field:', error)
+      // Surface error to user
+      const detail = error.response?.data?.detail
+      let errorMessage = 'Feld konnte nicht erstellt werden'
+      if (typeof detail === 'string') {
+        errorMessage = detail
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        errorMessage = detail[0]?.msg || 'Validierungsfehler'
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      setCreateFieldError(errorMessage)
     }
   }
 
@@ -246,6 +275,7 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
       setShowCreateField(false)
       setNewFieldName('')
       setNewFieldType('text')
+      setCreateFieldError(null)
       onClose()
     }
   }
@@ -406,11 +436,17 @@ export function EditTagDialog({ tag, open, onClose, listId }: EditTagDialogProps
                           setShowCreateField(false)
                           setNewFieldName('')
                           setNewFieldType('text')
+                          setCreateFieldError(null)
                         }}
                       >
                         Abbrechen
                       </Button>
                     </div>
+                    {createFieldError && (
+                      <p className="text-sm text-red-600 mt-1">
+                        {createFieldError}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
