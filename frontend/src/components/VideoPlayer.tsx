@@ -252,6 +252,9 @@ export const VideoPlayer = ({
   // Show resume indicator if there's a saved position
   const showResumeIndicator = initialPosition && initialPosition > 0
 
+  // Use poster if provided, otherwise fall back to thumbnailUrl
+  const posterSrc = poster || thumbnailUrl
+
   return (
     <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black">
       {/* Loading overlay with resume indicator */}
@@ -276,7 +279,7 @@ export const VideoPlayer = ({
         crossOrigin
         playsInline
         title={title}
-        poster={poster || undefined}
+        poster={posterSrc || undefined}
         volume={volume}
         muted={muted}
         playbackRate={playbackRate}
@@ -292,7 +295,7 @@ export const VideoPlayer = ({
         className="video-player w-full h-full"
       >
         <MediaProvider>
-          {poster && <Poster className="vds-poster" src={poster} alt={title || 'Video poster'} />}
+          {posterSrc && <Poster className="vds-poster" src={posterSrc} alt={title || 'Video poster'} />}
           {textTracks?.map((track) => (
             <Track
               key={track.src}
