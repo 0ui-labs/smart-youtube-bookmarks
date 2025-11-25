@@ -67,46 +67,65 @@
   }
 }
 
-/* Plyr Video Player Theme - integrates with app color scheme */
-:root {
-  /* Main accent color for progress bar, buttons */
-  --plyr-color-main: hsl(var(--primary));
-  /* Control icons color */
-  --plyr-video-control-color: rgba(255, 255, 255, 0.9);
-  --plyr-video-control-color-hover: hsl(var(--primary));
-  /* Typography */
-  --plyr-font-family: ui-sans-serif, system-ui, sans-serif;
-  /* Badge (speed indicator, etc.) */
-  --plyr-badge-background: hsl(var(--secondary));
-  --plyr-badge-text-color: hsl(var(--secondary-foreground));
-  /* Tooltip styling */
-  --plyr-tooltip-background: hsl(var(--popover));
-  --plyr-tooltip-color: hsl(var(--popover-foreground));
-  --plyr-tooltip-radius: calc(var(--radius) - 2px);
-  /* Progress bar */
-  --plyr-range-fill-background: hsl(var(--primary));
-  /* Menu styling */
-  --plyr-menu-background: hsl(var(--popover));
-  --plyr-menu-color: hsl(var(--popover-foreground));
-  --plyr-menu-radius: var(--radius);
+/* Vidstack Video Player Theme - integrates with app color scheme */
+
+/* Video player container styling */
+.video-player[data-view-type="video"] {
+  aspect-ratio: 16 / 9;
+}
+
+/* Default Video Layout customization */
+.vds-video-layout {
+  /* Brand color - used for progress bar, buttons, focus rings */
+  --video-brand: hsl(var(--primary));
+  /* Focus ring color */
+  --video-focus-ring-color: hsl(var(--ring));
+  /* Slider progress fill */
+  --video-slider-track-fill-bg: hsl(var(--primary));
+  /* Font family */
+  --video-font-family: ui-sans-serif, system-ui, sans-serif;
+  /* Border radius to match app */
+  --video-border-radius: var(--radius);
+}
+
+/* Menu styling */
+.vds-menu {
+  --menu-bg: hsl(var(--popover));
+  --menu-border: hsl(var(--border));
+  --menu-item-hover-bg: hsl(var(--accent));
+}
+
+/* Tooltip styling */
+.vds-tooltip {
+  --tooltip-bg: hsl(var(--popover));
+  --tooltip-color: hsl(var(--popover-foreground));
+}
+
+/* Chapter markers on timeline */
+.vds-time-slider .vds-slider-chapter {
+  --chapter-title-color: hsl(var(--foreground));
+}
+
+/* Captions/Subtitles styling */
+.vds-captions {
+  --cue-bg: hsl(0 0% 0% / 0.8);
+  --cue-color: hsl(0 0% 100%);
+  --cue-font-size: clamp(14px, 2.5vw, 20px);
 }
 
 /* Focus styles for accessibility */
-.plyr__control:focus-visible {
+.vds-button:focus-visible,
+.vds-slider:focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
 }
 
-/* Ensure player respects container width */
-.plyr {
-  --plyr-video-background: hsl(var(--background));
+/* Ensure poster image covers container */
+.vds-poster {
+  object-fit: cover;
 }
 
-/* Loading spinner color */
-.plyr__control--overlaid {
-  background: hsl(var(--primary) / 0.9);
-}
-
-.plyr__control--overlaid:hover {
-  background: hsl(var(--primary));
+/* Buffering indicator */
+.vds-buffering-indicator {
+  --buffering-color: hsl(var(--primary));
 }

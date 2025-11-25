@@ -54,16 +54,55 @@ export interface UpdateWatchProgressRequest {
 export const PLAYBACK_SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const
 
 /**
- * Plyr player controls configuration.
+ * Text track kind for Vidstack player.
+ * - subtitles: Transcription or translation of dialogue
+ * - captions: Transcription with sound effects for deaf/hard of hearing
+ * - chapters: Chapter titles for navigation
+ * - descriptions: Audio descriptions for blind users
+ * - metadata: Machine-readable data
  */
-export const PLAYER_CONTROLS = [
-  'play-large',
-  'play',
-  'progress',
-  'current-time',
-  'mute',
-  'volume',
-  'settings',
-  'pip',
-  'fullscreen',
-] as const
+export type TextTrackKind = 'subtitles' | 'captions' | 'chapters' | 'descriptions' | 'metadata'
+
+/**
+ * Text track format type.
+ */
+export type TextTrackType = 'vtt' | 'srt' | 'ssa' | 'ass'
+
+/**
+ * Text track definition for video player.
+ * Used for subtitles, captions, and chapters.
+ *
+ * @example
+ * ```ts
+ * const englishSubtitles: TextTrack = {
+ *   src: 'https://example.com/subs/english.vtt',
+ *   label: 'English',
+ *   language: 'en-US',
+ *   kind: 'subtitles',
+ *   type: 'vtt',
+ *   default: true,
+ * }
+ *
+ * const chapters: TextTrack = {
+ *   src: 'https://example.com/chapters.vtt',
+ *   language: 'en-US',
+ *   kind: 'chapters',
+ *   type: 'vtt',
+ *   default: true,
+ * }
+ * ```
+ */
+export interface TextTrack {
+  /** URL to the text track file (VTT, SRT, SSA) */
+  src: string
+  /** Human-readable label (e.g., "English", "Deutsch") */
+  label?: string
+  /** BCP 47 language code (e.g., "en-US", "de-DE") */
+  language: string
+  /** Type of text track */
+  kind: TextTrackKind
+  /** File format */
+  type?: TextTrackType
+  /** Whether this track should be active by default */
+  default?: boolean
+}

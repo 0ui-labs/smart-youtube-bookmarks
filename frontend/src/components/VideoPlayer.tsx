@@ -1,11 +1,24 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
-import Plyr from 'plyr'
-import 'plyr/dist/plyr.css'
+import { useRef, useState, useCallback } from 'react'
+import {
+  MediaPlayer,
+  MediaProvider,
+  Poster,
+  Track,
+  type MediaPlayerInstance,
+} from '@vidstack/react'
+import {
+  DefaultVideoLayout,
+  defaultLayoutIcons,
+} from '@vidstack/react/player/layouts/default'
 import { useDebouncedCallback } from 'use-debounce'
 import { usePlayerSettingsStore } from '@/stores/playerSettingsStore'
 import { useUpdateWatchProgress } from '@/hooks/useWatchProgress'
-import { PLAYER_CONTROLS, PLAYBACK_SPEED_OPTIONS } from '@/types/player'
 import { AlertCircle, Loader2, Play } from 'lucide-react'
+import type { TextTrack as TextTrackType } from '@/types/player'
+
+// Vidstack styles
+import '@vidstack/react/player/styles/default/theme.css'
+import '@vidstack/react/player/styles/default/layouts/video.css'
 
 /**
  * Format seconds to MM:SS or HH:MM:SS
@@ -26,10 +39,18 @@ interface VideoPlayerProps {
   youtubeId: string
   /** Internal video UUID for progress tracking */
   videoId: string
+  /** Video title for accessibility */
+  title?: string
   /** Initial playback position in seconds */
   initialPosition?: number | null
+  /** Poster image URL (shown before playback) */
+  poster?: string | null
   /** Thumbnail URL for error fallback */
   thumbnailUrl?: string | null
+  /** Text tracks for subtitles, captions, and chapters */
+  textTracks?: TextTrackType[]
+  /** Thumbnails VTT file URL for scrubbing preview */
+  thumbnailsVtt?: string | null
   /** Callback when player is ready */
   onReady?: () => void
   /** Callback when video ends */
@@ -39,15 +60,19 @@ interface VideoPlayerProps {
 }
 
 /**
- * VideoPlayer component using Plyr for YouTube playback
+ * VideoPlayer component using Vidstack for YouTube playback
  *
  * Features:
- * - YouTube video playback via Plyr
+ * - YouTube video playback via Vidstack
  * - Persisted settings (volume, speed) via Zustand store
  * - Watch progress tracking with debounced saves
  * - Resume playback from last position
  * - Error handling with fallback UI
  * - Loading state
+ * - GDPR-compliant (no cookies by default)
+ * - Performance optimized (preconnections, lazy loading)
+ * - Text tracks support (subtitles, captions, chapters)
+ * - Thumbnail scrubbing preview
  *
  * Keyboard Shortcuts (when player is focused):
  * - Space/K: Play/Pause
@@ -64,24 +89,33 @@ interface VideoPlayerProps {
  * <VideoPlayer
  *   youtubeId="dQw4w9WgXcQ"
  *   videoId="uuid-here"
+ *   title="Never Gonna Give You Up"
  *   initialPosition={120}
+ *   textTracks={[
+ *     { src: '/subs/en.vtt', label: 'English', language: 'en', kind: 'subtitles', default: true },
+ *     { src: '/chapters.vtt', language: 'en', kind: 'chapters', default: true },
+ *   ]}
+ *   thumbnailsVtt="/thumbnails.vtt"
  * />
  * ```
  */
 export const VideoPlayer = ({
   youtubeId,
   videoId,
+  title,
   initialPosition,
+  poster,
   thumbnailUrl,
+  textTracks,
+  thumbnailsVtt,
   onReady,
   onEnded,
   onError,
 }: VideoPlayerProps) => {
-  const playerRef = useRef<Plyr | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const playerRef = useRef<MediaPlayerInstance>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
-  const hasInitializedRef = useRef(false)
+  const hasSeenPositionRef = useRef(false)
 
   // Store - player settings
   const { volume, muted, playbackRate, setVolume, setMuted, setPlaybackRate } =
@@ -103,108 +137,98 @@ export const VideoPlayer = ({
     [updateProgress, videoId]
   )
 
-  // Initialize Plyr
-  useEffect(() => {
-    if (!containerRef.current || hasInitializedRef.current) return
+  // Event: Player can play (ready)
+  const handleCanPlay = useCallback(() => {
+    setIsLoading(false)
 
-    hasInitializedRef.current = true
-
-    try {
-      const player = new Plyr(containerRef.current, {
-        controls: [...PLAYER_CONTROLS],
-        settings: ['speed'],
-        speed: {
-          selected: playbackRate,
-          options: [...PLAYBACK_SPEED_OPTIONS],
-        },
-        keyboard: { focused: true, global: false },
-        youtube: {
-          noCookie: true, // Privacy-enhanced mode
-          rel: 0, // Don't show related videos
-          showinfo: 0,
-          modestbranding: 1,
-        },
-      })
-
-      // Apply stored settings
-      player.volume = volume
-      player.muted = muted
-      player.speed = playbackRate
-
-      // Event: Player ready
-      player.on('ready', () => {
-        setIsLoading(false)
-
-        // Seek to initial position if provided
-        if (initialPosition && initialPosition > 0) {
-          player.currentTime = initialPosition
-        }
-
-        onReady?.()
-      })
-
-      // Event: Video ended
-      player.on('ended', () => {
-        // Save final position
-        saveProgressImmediate(player.duration)
-        onEnded?.()
-      })
-
-      // Event: Error
-      player.on('error', () => {
-        const err = new Error('Video playback error')
-        setError(err)
-        setIsLoading(false)
-        onError?.(err)
-      })
-
-      // Event: Time update - debounced progress save
-      player.on('timeupdate', () => {
-        if (player.playing) {
-          saveProgress(player.currentTime)
-        }
-      })
-
-      // Event: Pause - immediate progress save
-      player.on('pause', () => {
-        saveProgressImmediate(player.currentTime)
-      })
-
-      // Event: Volume change - persist to store
-      player.on('volumechange', () => {
-        setVolume(player.volume)
-        setMuted(player.muted)
-      })
-
-      // Event: Rate change - persist to store
-      player.on('ratechange', () => {
-        setPlaybackRate(player.speed)
-      })
-
-      playerRef.current = player
-
-      // Cleanup
-      return () => {
-        saveProgress.cancel()
-        player.destroy()
-        playerRef.current = null
-        hasInitializedRef.current = false
+    // Seek to initial position if provided and not already seeked
+    if (initialPosition && initialPosition > 0 && !hasSeenPositionRef.current) {
+      const player = playerRef.current
+      if (player) {
+        player.currentTime = initialPosition
+        hasSeenPositionRef.current = true
       }
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to initialize player')
-      setError(error)
-      setIsLoading(false)
-      onError?.(error)
     }
-  }, [youtubeId]) // Only re-init when youtubeId changes
+
+    onReady?.()
+  }, [initialPosition, onReady])
+
+  // Event: Video ended
+  const handleEnd = useCallback(() => {
+    const player = playerRef.current
+    if (player) {
+      saveProgressImmediate(player.duration)
+    }
+    onEnded?.()
+  }, [saveProgressImmediate, onEnded])
+
+  // Event: Error
+  const handleError = useCallback(() => {
+    const err = new Error('Video playback error')
+    setError(err)
+    setIsLoading(false)
+    onError?.(err)
+  }, [onError])
+
+  // Event: Time update - debounced progress save
+  const handleTimeUpdate = useCallback(() => {
+    const player = playerRef.current
+    if (player && !player.paused) {
+      saveProgress(player.currentTime)
+    }
+  }, [saveProgress])
+
+  // Event: Pause - immediate progress save
+  const handlePause = useCallback(() => {
+    const player = playerRef.current
+    if (player) {
+      saveProgressImmediate(player.currentTime)
+    }
+  }, [saveProgressImmediate])
+
+  // Event: Seeked - save after user seeks with scrubber
+  const handleSeeked = useCallback(() => {
+    const player = playerRef.current
+    if (player) {
+      saveProgressImmediate(player.currentTime)
+    }
+  }, [saveProgressImmediate])
+
+  // Event: Playing - seek to initial position (YouTube may require video to start first)
+  const handlePlay = useCallback(() => {
+    if (initialPosition && initialPosition > 0 && !hasSeenPositionRef.current) {
+      const player = playerRef.current
+      if (player) {
+        player.currentTime = initialPosition
+        hasSeenPositionRef.current = true
+      }
+    }
+  }, [initialPosition])
+
+  // Event: Volume change - persist to store
+  const handleVolumeChange = useCallback(() => {
+    const player = playerRef.current
+    if (player) {
+      setVolume(player.volume)
+      setMuted(player.muted)
+    }
+  }, [setVolume, setMuted])
+
+  // Event: Rate change - persist to store
+  const handleRateChange = useCallback(() => {
+    const player = playerRef.current
+    if (player) {
+      setPlaybackRate(player.playbackRate)
+    }
+  }, [setPlaybackRate])
 
   // Error fallback UI
   if (error) {
     return (
       <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted">
-        {thumbnailUrl && (
+        {(thumbnailUrl || poster) && (
           <img
-            src={thumbnailUrl}
+            src={thumbnailUrl || poster || ''}
             alt="Video thumbnail"
             className="absolute inset-0 w-full h-full object-cover blur-sm opacity-50"
           />
@@ -243,13 +267,49 @@ export const VideoPlayer = ({
         </div>
       )}
 
-      {/* Plyr container */}
-      <div
-        ref={containerRef}
-        data-plyr-provider="youtube"
-        data-plyr-embed-id={youtubeId}
-        className="w-full h-full"
-      />
+      {/* Vidstack Player */}
+      <MediaPlayer
+        ref={playerRef}
+        src={`youtube/${youtubeId}`}
+        viewType="video"
+        streamType="on-demand"
+        crossOrigin
+        playsInline
+        title={title}
+        poster={poster || undefined}
+        volume={volume}
+        muted={muted}
+        playbackRate={playbackRate}
+        onCanPlay={handleCanPlay}
+        onEnd={handleEnd}
+        onError={handleError}
+        onTimeUpdate={handleTimeUpdate}
+        onPause={handlePause}
+        onSeeked={handleSeeked}
+        onPlay={handlePlay}
+        onVolumeChange={handleVolumeChange}
+        onRateChange={handleRateChange}
+        className="video-player w-full h-full"
+      >
+        <MediaProvider>
+          {poster && <Poster className="vds-poster" src={poster} alt={title || 'Video poster'} />}
+          {textTracks?.map((track) => (
+            <Track
+              key={track.src}
+              src={track.src}
+              label={track.label}
+              language={track.language}
+              kind={track.kind}
+              type={track.type}
+              default={track.default}
+            />
+          ))}
+        </MediaProvider>
+        <DefaultVideoLayout
+          icons={defaultLayoutIcons}
+          thumbnails={thumbnailsVtt || undefined}
+        />
+      </MediaPlayer>
     </div>
   )
 }

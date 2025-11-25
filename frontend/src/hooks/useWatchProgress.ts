@@ -47,7 +47,8 @@ export const useUpdateWatchProgress = () => {
     },
     onSuccess: (_, { videoId }) => {
       // Invalidate video detail query to refresh watch_position
-      queryClient.invalidateQueries({ queryKey: ['video-detail', videoId] })
+      // Note: VideoDetailsPage uses ['videos', videoId] as query key
+      queryClient.invalidateQueries({ queryKey: ['videos', videoId] })
       // Also invalidate videos list queries that might include this video
       queryClient.invalidateQueries({ queryKey: ['videos'] })
     },

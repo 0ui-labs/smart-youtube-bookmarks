@@ -2,21 +2,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-// Mock Plyr before importing VideoPlayer
-vi.mock('plyr', () => {
-  return {
-    default: vi.fn().mockImplementation(() => ({
-      on: vi.fn(),
-      destroy: vi.fn(),
-      volume: 1,
-      muted: false,
-      speed: 1,
-      currentTime: 0,
-      duration: 300,
-      playing: false,
-    })),
-  }
-})
+// Mock Vidstack before importing VideoPlayer
+vi.mock('@vidstack/react', () => ({
+  MediaPlayer: vi.fn(({ children, src, className, title }) => (
+    <div data-testid="media-player" data-src={src} data-title={title} className={className}>
+      {children}
+    </div>
+  )),
+  MediaProvider: vi.fn(({ children }) => <div data-testid="media-provider">{children}</div>),
+  Poster: vi.fn(({ src, alt }) => <img data-testid="poster" src={src} alt={alt} />),
+  Track: vi.fn(({ src, kind, label }) => (
+    <div data-testid={`track-${kind}`} data-src={src} data-label={label} />
+  )),
+}))
+
+vi.mock('@vidstack/react/player/layouts/default', () => ({
+  DefaultVideoLayout: vi.fn(() => <div data-testid="default-video-layout" />),
+  defaultLayoutIcons: {},
+}))
 
 // Mock the stores and hooks
 vi.mock('@/stores/playerSettingsStore', () => ({
@@ -35,6 +38,10 @@ vi.mock('@/hooks/useWatchProgress', () => ({
     mutate: vi.fn(),
   })),
 }))
+
+// Mock Vidstack CSS imports
+vi.mock('@vidstack/react/player/styles/default/theme.css', () => ({}))
+vi.mock('@vidstack/react/player/styles/default/layouts/video.css', () => ({}))
 
 import { VideoPlayer } from '../VideoPlayer'
 
@@ -69,7 +76,7 @@ describe('VideoPlayer', () => {
     expect(document.querySelector('.animate-spin')).toBeInTheDocument()
   })
 
-  it('renders with youtube id in data attribute', () => {
+  it('renders MediaPlayer with youtube source', () => {
     render(
       <VideoPlayer
         youtubeId="dQw4w9WgXcQ"
@@ -78,8 +85,22 @@ describe('VideoPlayer', () => {
       { wrapper: createWrapper() }
     )
 
-    const container = document.querySelector('[data-plyr-embed-id="dQw4w9WgXcQ"]')
-    expect(container).toBeInTheDocument()
+    const mediaPlayer = screen.getByTestId('media-player')
+    expect(mediaPlayer).toBeInTheDocument()
+    expect(mediaPlayer).toHaveAttribute('data-src', 'youtube/dQw4w9WgXcQ')
+  })
+
+  it('renders MediaProvider and DefaultVideoLayout', () => {
+    render(
+      <VideoPlayer
+        youtubeId="dQw4w9WgXcQ"
+        videoId="test-uuid"
+      />,
+      { wrapper: createWrapper() }
+    )
+
+    expect(screen.getByTestId('media-provider')).toBeInTheDocument()
+    expect(screen.getByTestId('default-video-layout')).toBeInTheDocument()
   })
 
   it('shows resume indicator when initialPosition is provided', () => {
@@ -132,5 +153,55 @@ describe('VideoPlayer', () => {
     )
 
     expect(screen.getByText('Fortsetzen bei 1:01:01')).toBeInTheDocument()
+  })
+
+  it('renders with title prop', () => {
+    render(
+      <VideoPlayer
+        youtubeId="dQw4w9WgXcQ"
+        videoId="test-uuid"
+        title="Test Video Title"
+      />,
+      { wrapper: createWrapper() }
+    )
+
+    const mediaPlayer = screen.getByTestId('media-player')
+    expect(mediaPlayer).toHaveAttribute('data-title', 'Test Video Title')
+  })
+
+  it('renders poster when provided', () => {
+    render(
+      <VideoPlayer
+        youtubeId="dQw4w9WgXcQ"
+        videoId="test-uuid"
+        poster="https://example.com/poster.jpg"
+        title="Test Video"
+      />,
+      { wrapper: createWrapper() }
+    )
+
+    const poster = screen.getByTestId('poster')
+    expect(poster).toBeInTheDocument()
+    expect(poster).toHaveAttribute('src', 'https://example.com/poster.jpg')
+  })
+
+  it('renders text tracks when provided', () => {
+    const textTracks = [
+      { src: '/subs/en.vtt', label: 'English', language: 'en', kind: 'subtitles' as const, default: true },
+      { src: '/chapters.vtt', language: 'en', kind: 'chapters' as const, default: true },
+    ]
+
+    render(
+      <VideoPlayer
+        youtubeId="dQw4w9WgXcQ"
+        videoId="test-uuid"
+        textTracks={textTracks}
+      />,
+      { wrapper: createWrapper() }
+    )
+
+    expect(screen.getByTestId('track-subtitles')).toBeInTheDocument()
+    expect(screen.getByTestId('track-subtitles')).toHaveAttribute('data-label', 'English')
+    expect(screen.getByTestId('track-chapters')).toBeInTheDocument()
   })
 })
