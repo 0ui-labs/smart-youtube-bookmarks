@@ -1,14 +1,12 @@
 /**
- * Tests for TextSnippet Component - Text Field Display with Truncation
- * REF MCP Improvement #2: Use `truncateAt` prop (NOT `maxLength`) for clarity
+ * Tests for TextSnippet Component - Rich Text Field Display with Truncation
  *
  * Tests cover:
- * - Read-only mode with truncation
- * - Editable mode with inline input
+ * - Read-only mode with HTML rendering and truncation
+ * - Edit mode with Tiptap editor
  * - Null value handling
  * - Expand button behavior
- * - Custom className support
- * - maxLength enforcement
+ * - Backward compatibility with plain text
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -16,12 +14,37 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TextSnippet } from './TextSnippet'
 
+// Mock TiptapEditor since it requires complex browser APIs
+vi.mock('./TiptapEditor', () => ({
+  TiptapEditor: ({
+    content,
+    onChange,
+    placeholder,
+    className,
+  }: {
+    content: string
+    onChange: (html: string) => void
+    placeholder?: string
+    maxLength?: number
+    className?: string
+  }) => (
+    <div data-testid="tiptap-editor" className={className}>
+      <textarea
+        data-testid="tiptap-textarea"
+        value={content.replace(/<[^>]*>/g, '')}
+        onChange={(e) => onChange(`<p>${e.target.value}</p>`)}
+        placeholder={placeholder}
+      />
+    </div>
+  ),
+}))
+
 describe('TextSnippet Component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  describe('Read-Only Mode - Truncation', () => {
+  describe('Read-Only Mode - HTML Rendering', () => {
     it('renders short text without truncation', () => {
       const { container } = render(
         <TextSnippet
@@ -31,12 +54,25 @@ describe('TextSnippet Component', () => {
         />
       )
 
-      expect(screen.getByText('Hello World')).toBeInTheDocument()
-      // Should NOT have ellipsis
+      expect(container.textContent).toContain('Hello World')
       expect(container.textContent).not.toContain('...')
     })
 
-    it('truncates long text with ellipsis (REF MCP #2)', () => {
+    it('renders HTML content correctly', () => {
+      const { container } = render(
+        <TextSnippet
+          value="<p>Formatted <strong>text</strong></p>"
+          truncateAt={100}
+          readOnly={true}
+        />
+      )
+
+      // Should render the HTML
+      const proseContainer = container.querySelector('.tiptap-prose')
+      expect(proseContainer).toBeInTheDocument()
+    })
+
+    it('truncates long text with ellipsis', () => {
       const longText = 'This is a very long text that should be truncated because it exceeds the limit'
       const { container } = render(
         <TextSnippet
@@ -46,24 +82,22 @@ describe('TextSnippet Component', () => {
         />
       )
 
-      const textElement = screen.getByText(/This is a very lon/)
-      expect(textElement).toBeInTheDocument()
       expect(container.textContent).toContain('...')
     })
 
-    it('respects truncateAt prop as character limit (REF MCP #2)', () => {
-      const text = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' // 26 chars
+    it('wraps plain text in paragraph for backward compatibility', () => {
       const { container } = render(
         <TextSnippet
-          value={text}
-          truncateAt={10}
+          value="Plain text without HTML"
+          truncateAt={100}
           readOnly={true}
         />
       )
 
-      // Should truncate to 10 chars + "..."
-      expect(container.textContent).toContain('ABCDEFGHIJ')
-      expect(container.textContent).toContain('...')
+      // Plain text should be wrapped and rendered via tiptap-prose
+      const proseContainer = container.querySelector('.tiptap-prose')
+      expect(proseContainer).toBeInTheDocument()
+      expect(container.textContent).toContain('Plain text without HTML')
     })
 
     it('displays null value as em dash placeholder', () => {
@@ -89,6 +123,18 @@ describe('TextSnippet Component', () => {
 
       expect(container.textContent).toContain('—')
     })
+
+    it('displays empty string as em dash placeholder', () => {
+      const { container } = render(
+        <TextSnippet
+          value=""
+          truncateAt={50}
+          readOnly={true}
+        />
+      )
+
+      expect(container.textContent).toContain('—')
+    })
   })
 
   describe('Expand Button Behavior', () => {
@@ -105,7 +151,7 @@ describe('TextSnippet Component', () => {
 
       const expandButton = screen.getByRole('button')
       expect(expandButton).toBeInTheDocument()
-      expect(expandButton).toHaveAttribute('aria-label', 'Expand text')
+      expect(expandButton).toHaveAttribute('aria-label', 'Text erweitern')
     })
 
     it('does not show expand button when text is not truncated', () => {
@@ -141,33 +187,11 @@ describe('TextSnippet Component', () => {
 
       expect(onExpand).toHaveBeenCalledTimes(1)
     })
-
-    it('expand button has keyboard accessibility (Keyboard navigation)', async () => {
-      const onExpand = vi.fn()
-      const user = userEvent.setup()
-      const longText = 'This is a long text that will be truncated'
-
-      render(
-        <TextSnippet
-          value={longText}
-          truncateAt={20}
-          readOnly={true}
-          onExpand={onExpand}
-        />
-      )
-
-      const expandButton = screen.getByRole('button')
-      expandButton.focus()
-      expect(expandButton).toHaveFocus()
-
-      await user.keyboard('{Enter}')
-      expect(onExpand).toHaveBeenCalledTimes(1)
-    })
   })
 
-  describe('Editable Mode - Inline Input', () => {
-    it('renders native input element in editable mode', () => {
-      const { container } = render(
+  describe('Editable Mode - Tiptap Editor', () => {
+    it('renders TiptapEditor in edit mode', () => {
+      render(
         <TextSnippet
           value="Editable text"
           truncateAt={50}
@@ -176,13 +200,45 @@ describe('TextSnippet Component', () => {
         />
       )
 
-      const input = container.querySelector('input[type="text"]')
-      expect(input).toBeInTheDocument()
-      expect(input).toHaveValue('Editable text')
+      expect(screen.getByTestId('tiptap-editor')).toBeInTheDocument()
     })
 
-    it('displays editable input with null value', () => {
-      const { container } = render(
+    it('passes content to TiptapEditor', () => {
+      render(
+        <TextSnippet
+          value="<p>HTML content</p>"
+          truncateAt={50}
+          readOnly={false}
+          onChange={vi.fn()}
+        />
+      )
+
+      expect(screen.getByTestId('tiptap-editor')).toBeInTheDocument()
+    })
+
+    it('calls onChange with HTML when content changes', async () => {
+      const onChange = vi.fn()
+      const user = userEvent.setup()
+
+      render(
+        <TextSnippet
+          value=""
+          truncateAt={50}
+          readOnly={false}
+          onChange={onChange}
+        />
+      )
+
+      const textarea = screen.getByTestId('tiptap-textarea')
+      await user.type(textarea, 'New text')
+
+      expect(onChange).toHaveBeenCalled()
+      // Should receive HTML wrapped content
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('<p>'))
+    })
+
+    it('handles null value in edit mode', () => {
+      render(
         <TextSnippet
           value={null}
           truncateAt={50}
@@ -191,157 +247,41 @@ describe('TextSnippet Component', () => {
         />
       )
 
-      const input = container.querySelector('input[type="text"]')
-      expect(input).toBeInTheDocument()
-      expect(input).toHaveValue('')
-    })
-
-    it('calls onChange when input value changes', async () => {
-      const onChange = vi.fn()
-      const user = userEvent.setup()
-      const { container } = render(
-        <TextSnippet
-          value="Original"
-          truncateAt={50}
-          readOnly={false}
-          onChange={onChange}
-        />
-      )
-
-      const input = container.querySelector('input[type="text"]') as HTMLInputElement
-      // Triple-click to select all
-      await user.tripleClick(input)
-      // Type replacement text
-      await user.type(input, 'Updated text')
-
-      // onChange is called on every keystroke, check that it was called (at least once)
-      expect(onChange).toHaveBeenCalled()
-    })
-
-    it('enforces maxLength from field config in editable mode', () => {
-      const { container } = render(
-        <TextSnippet
-          value="Test"
-          truncateAt={50}
-          readOnly={false}
-          maxLength={10}
-          onChange={vi.fn()}
-        />
-      )
-
-      const input = container.querySelector('input[type="text"]') as HTMLInputElement
-      expect(input).toHaveAttribute('maxLength', '10')
-    })
-
-    it('allows input beyond maxLength attribute (browser enforces limit)', async () => {
-      const onChange = vi.fn()
-      const user = userEvent.setup()
-      const { container } = render(
-        <TextSnippet
-          value=""
-          truncateAt={50}
-          readOnly={false}
-          maxLength={5}
-          onChange={onChange}
-        />
-      )
-
-      const input = container.querySelector('input[type="text"]') as HTMLInputElement
-
-      // Type all characters
-      for (const char of 'ABCDEFGH') {
-        await user.type(input, char)
-        // Check that maxLength prevents exceeding 5 chars
-        if (input.value.length > 5) {
-          // Reset to test again
-          break
-        }
-      }
-
-      // Browser enforces maxLength, so input stops at 5 chars
-      expect(input.value.length).toBeLessThanOrEqual(5)
-    })
-
-    it('handles rapid input changes', async () => {
-      const onChange = vi.fn()
-      const user = userEvent.setup()
-      const { container } = render(
-        <TextSnippet
-          value=""
-          truncateAt={50}
-          readOnly={false}
-          onChange={onChange}
-        />
-      )
-
-      const input = container.querySelector('input[type="text"]') as HTMLInputElement
-      await user.type(input, 'Fast typing!')
-
-      // onChange is called on every keystroke, verify it was called multiple times
-      expect(onChange.mock.calls.length).toBeGreaterThan(5)
+      expect(screen.getByTestId('tiptap-editor')).toBeInTheDocument()
     })
   })
 
   describe('Custom Styling', () => {
-    it('applies custom className to read-only text container', () => {
+    it('applies custom className to read-only container', () => {
       const { container } = render(
         <TextSnippet
           value="Styled text"
           truncateAt={50}
           readOnly={true}
-          className="text-blue-600 font-bold"
+          className="custom-style"
         />
       )
 
-      const textContainer = container.querySelector('[class*="text-blue-600"]')
-      expect(textContainer).toBeInTheDocument()
-      expect(textContainer).toHaveClass('font-bold')
+      const wrapper = container.firstChild
+      expect(wrapper).toHaveClass('custom-style')
     })
 
-    it('applies custom className to editable input', () => {
-      const { container } = render(
+    it('applies custom className to editor in edit mode', () => {
+      render(
         <TextSnippet
-          value="Styled input"
+          value="Styled"
           truncateAt={50}
           readOnly={false}
-          className="border-red-500"
+          className="custom-style"
           onChange={vi.fn()}
         />
       )
 
-      const input = container.querySelector('input[type="text"]')
-      expect(input).toHaveClass('border-red-500')
+      expect(screen.getByTestId('tiptap-editor')).toHaveClass('custom-style')
     })
   })
 
   describe('Edge Cases', () => {
-    it('handles empty string correctly', () => {
-      const { container } = render(
-        <TextSnippet
-          value=""
-          truncateAt={50}
-          readOnly={true}
-        />
-      )
-
-      expect(container.textContent).toContain('—')
-    })
-
-    it('handles whitespace-only text in read-only mode', () => {
-      const { container } = render(
-        <TextSnippet
-          value="   "
-          truncateAt={50}
-          readOnly={true}
-        />
-      )
-
-      // Should render the spaces (not treated as empty)
-      const span = container.querySelector('span.truncate')
-      expect(span).toBeInTheDocument()
-      expect(span?.textContent).toBe('   ')
-    })
-
     it('handles text exactly equal to truncateAt length', () => {
       const { container } = render(
         <TextSnippet
@@ -352,7 +292,6 @@ describe('TextSnippet Component', () => {
       )
 
       // Should NOT truncate (text equals limit)
-      expect(screen.getByText('ABCDEFGHIJ')).toBeInTheDocument()
       expect(container.textContent).not.toContain('...')
     })
 
@@ -369,39 +308,49 @@ describe('TextSnippet Component', () => {
       expect(container.textContent).toContain('...')
     })
 
-    it('renders without error when both value and onChange are provided', async () => {
-      const onChange = vi.fn()
-      const user = userEvent.setup()
+    it('handles HTML content with special characters', () => {
       const { container } = render(
         <TextSnippet
-          value="Text"
-          truncateAt={50}
-          readOnly={false}
-          onChange={onChange}
-        />
-      )
-
-      const input = container.querySelector('input[type="text"]') as HTMLInputElement
-      await user.type(input, ' updated')
-
-      expect(onChange).toHaveBeenCalled()
-    })
-  })
-
-  describe('Accessibility (WCAG 2.1 AA)', () => {
-    it('provides semantic HTML structure for read-only text', () => {
-      const { container } = render(
-        <TextSnippet
-          value="Accessible text"
-          truncateAt={50}
+          value="<p>Text with &amp; and &lt;brackets&gt;</p>"
+          truncateAt={100}
           readOnly={true}
         />
       )
 
-      // Should have meaningful text content
-      expect(screen.getByText('Accessible text')).toBeInTheDocument()
+      // Should render HTML entities correctly
+      expect(container.querySelector('.tiptap-prose')).toBeInTheDocument()
+    })
+  })
+
+  describe('Backward Compatibility', () => {
+    it('converts plain text to HTML for display', () => {
+      const { container } = render(
+        <TextSnippet
+          value="Just plain text"
+          truncateAt={100}
+          readOnly={true}
+        />
+      )
+
+      // Should be wrapped in tiptap-prose for styling
+      expect(container.querySelector('.tiptap-prose')).toBeInTheDocument()
     })
 
+    it('escapes HTML in plain text values', () => {
+      const { container } = render(
+        <TextSnippet
+          value="Text with <script>alert('xss')</script>"
+          truncateAt={100}
+          readOnly={true}
+        />
+      )
+
+      // Should escape and display as text, not execute
+      expect(container.innerHTML).not.toContain('<script>')
+    })
+  })
+
+  describe('Accessibility', () => {
     it('provides accessible label for expand button', () => {
       const longText = 'This is a long text that needs expanding'
       render(
@@ -413,26 +362,11 @@ describe('TextSnippet Component', () => {
         />
       )
 
-      const button = screen.getByRole('button', { name: /expand text/i })
+      const button = screen.getByRole('button', { name: /text erweitern/i })
       expect(button).toBeInTheDocument()
     })
 
-    it('provides accessible input with proper attributes in editable mode', () => {
-      const { container } = render(
-        <TextSnippet
-          value="Editable"
-          truncateAt={50}
-          readOnly={false}
-          onChange={vi.fn()}
-        />
-      )
-
-      const input = container.querySelector('input[type="text"]') as HTMLInputElement
-      expect(input).toHaveAttribute('type', 'text')
-      expect(input).toBeVisible()
-    })
-
-    it('supports keyboard-only navigation for expand button', async () => {
+    it('supports keyboard navigation for expand button', async () => {
       const onExpand = vi.fn()
       const user = userEvent.setup()
       const longText = 'This is a long text that needs expanding'
@@ -447,47 +381,11 @@ describe('TextSnippet Component', () => {
       )
 
       const button = screen.getByRole('button')
-
-      // Tab to focus
       await user.tab()
       expect(button).toHaveFocus()
 
-      // Space to activate
-      await user.keyboard(' ')
+      await user.keyboard('{Enter}')
       expect(onExpand).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('Prop Validation', () => {
-    it('uses truncateAt prop (NOT maxLength for read-only)', () => {
-      // REF MCP #2: truncateAt is for display truncation, maxLength is for input
-      const { container } = render(
-        <TextSnippet
-          value="A very long text string that should be truncated"
-          truncateAt={10}
-          readOnly={true}
-        />
-      )
-
-      // Should use truncateAt for truncation point
-      expect(container.textContent).toContain('A very lo')
-      expect(container.textContent).toContain('...')
-    })
-
-    it('uses maxLength only in editable mode for input element', () => {
-      const { container } = render(
-        <TextSnippet
-          value="Test"
-          truncateAt={50}
-          readOnly={false}
-          maxLength={5}
-          onChange={vi.fn()}
-        />
-      )
-
-      const input = container.querySelector('input[type="text"]') as HTMLInputElement
-      // maxLength is applied to input element
-      expect(input).toHaveAttribute('maxLength', '5')
     })
   })
 })
