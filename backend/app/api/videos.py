@@ -54,9 +54,81 @@ from app.schemas.video_field_value import (
 from app.schemas.tag import TagResponse
 from app.schemas.custom_field import CustomFieldResponse
 from app.services.channel_service import get_or_create_channel
+from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
+from app.models.channel import Channel
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+async def _load_channel_thumbnails(videos: Sequence[Video], db: AsyncSession) -> None:
+    """
+    Load channel thumbnails for all videos and assign to channel_thumbnail_url.
+
+    This fetches all channels for the videos in a single query and assigns
+    the thumbnail_url to each video's __dict__ for serialization.
+
+    Falls back to matching by channel name if channel_id is not set.
+    """
+    if not videos:
+        return
+
+    # Get all unique channel_ids from videos
+    channel_ids = list(set(v.channel_id for v in videos if v.channel_id))
+
+    # Get all unique channel names for videos without channel_id
+    channel_names = list(set(v.channel for v in videos if not v.channel_id and v.channel))
+
+    channels_by_id: dict = {}
+    channels_by_name: dict = {}
+
+    # Fetch channels by ID
+    if channel_ids:
+        channels_stmt = select(Channel).where(Channel.id.in_(channel_ids))
+        channels_result = await db.execute(channels_stmt)
+        channels_by_id = {c.id: c for c in channels_result.scalars().all()}
+
+    # Fetch channels by name (fallback for videos without channel_id)
+    if channel_names:
+        channels_name_stmt = select(Channel).where(Channel.name.in_(channel_names))
+        channels_name_result = await db.execute(channels_name_stmt)
+        channels_by_name = {c.name: c for c in channels_name_result.scalars().all()}
+
+    # Assign thumbnail_url to each video
+    for video in videos:
+        if video.channel_id and video.channel_id in channels_by_id:
+            video.__dict__['channel_thumbnail_url'] = channels_by_id[video.channel_id].thumbnail_url
+        elif video.channel and video.channel in channels_by_name:
+            video.__dict__['channel_thumbnail_url'] = channels_by_name[video.channel].thumbnail_url
+        else:
+            video.__dict__['channel_thumbnail_url'] = None
+
+
+async def _enqueue_enrichment(video_id: UUID, db: AsyncSession) -> None:
+    """
+    Enqueue enrichment job for a video if auto-trigger is enabled.
+
+    Creates pending VideoEnrichment record and enqueues ARQ job.
+    Silently skips if enrichment is disabled or Redis unavailable.
+    """
+    if not settings.enrichment_enabled or not settings.enrichment_auto_trigger:
+        return
+
+    try:
+        # Create pending enrichment record
+        enrichment = VideoEnrichment(
+            video_id=video_id,
+            status=EnrichmentStatus.pending.value
+        )
+        db.add(enrichment)
+        await db.flush()
+
+        # Enqueue ARQ job
+        arq_pool = await get_arq_pool()
+        await arq_pool.enqueue_job("enrich_video", str(video_id))
+        logger.info(f"Enqueued enrichment job for video {video_id}")
+    except Exception as e:
+        logger.warning(f"Failed to enqueue enrichment job for video {video_id}: {e}")
 
 
 def parse_youtube_duration(iso_duration: str | None) -> int | None:
@@ -421,6 +493,11 @@ async def add_video_to_list(
             detail="Video already exists in this list"
         )
 
+    # Trigger enrichment if video was successfully created with metadata
+    if new_video.processing_status == "completed":
+        await _enqueue_enrichment(new_video.id, db)
+        await db.commit()  # Commit enrichment record
+
     # Set tags to empty list to avoid async relationship loading issues
     # (newly created video has no tags assigned yet)
     new_video.__dict__['tags'] = []
@@ -619,6 +696,9 @@ async def get_videos_in_list(
         # No videos → no field values needed
         for video in videos:
             video.__dict__['field_values'] = []
+
+    # Load channel thumbnails for all videos
+    await _load_channel_thumbnails(videos, db)
 
     return list(videos)
 
@@ -903,6 +983,9 @@ async def filter_videos_in_list(
         for video in videos:
             video.__dict__['field_values'] = []
 
+    # Load channel thumbnails for all videos
+    await _load_channel_thumbnails(videos, db)
+
     return list(videos)
 
 
@@ -1033,12 +1116,29 @@ async def get_video_by_id(
         for tag in tags_list
     ]
 
+    # Load channel thumbnail for this video
+    channel_thumbnail_url = None
+    if video.channel_id:
+        channel_stmt = select(Channel).where(Channel.id == video.channel_id)
+        channel_result = await db.execute(channel_stmt)
+        channel = channel_result.scalar_one_or_none()
+        if channel:
+            channel_thumbnail_url = channel.thumbnail_url
+    elif video.channel:
+        # Fallback: try to find channel by name
+        channel_stmt = select(Channel).where(Channel.name == video.channel)
+        channel_result = await db.execute(channel_stmt)
+        channel = channel_result.scalar_one_or_none()
+        if channel:
+            channel_thumbnail_url = channel.thumbnail_url
+
     return {
         'id': video.id,
         'list_id': video.list_id,
         'youtube_id': video.youtube_id,
         'title': video.title,
         'channel': video.channel,
+        'channel_thumbnail_url': channel_thumbnail_url,
         'duration': video.duration,
         'published_at': video.published_at,
         'thumbnail_url': video.thumbnail_url,
@@ -1181,6 +1281,9 @@ async def list_all_videos(
     # This prevents MissingGreenlet error when VideoResponse tries to access field_values
     for video in videos:
         video.__dict__['field_values'] = []
+
+    # Load channel thumbnails for all videos
+    await _load_channel_thumbnails(videos, db)
 
     return list(videos)
 

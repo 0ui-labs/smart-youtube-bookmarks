@@ -3,7 +3,7 @@
  *
  * Features:
  * - Read-only mode: Displays truncated text with expand button
- * - Editable mode: Native input with maxLength enforcement
+ * - Editable mode: Auto-resizing textarea with maxLength enforcement
  * - Null/undefined handling: Displays em dash (—)
  * - REF MCP #2: Uses truncateAt prop (NOT maxLength) for clarity
  *
@@ -17,10 +17,10 @@
  * - className?: string - Custom Tailwind classes
  */
 
-import React from 'react'
+import React, { useEffect, useRef, useCallback } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 
 export interface TextSnippetProps {
@@ -41,7 +41,7 @@ export interface TextSnippetProps {
 }
 
 export const TextSnippet = React.forwardRef<
-  HTMLDivElement | HTMLInputElement,
+  HTMLDivElement | HTMLTextAreaElement,
   TextSnippetProps
 >(
   (
@@ -56,6 +56,22 @@ export const TextSnippet = React.forwardRef<
     },
     ref
   ) => {
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+    // Auto-resize textarea to fit content
+    const adjustHeight = useCallback(() => {
+      const textarea = textareaRef.current
+      if (textarea) {
+        textarea.style.height = 'auto'
+        textarea.style.height = `${textarea.scrollHeight}px`
+      }
+    }, [])
+
+    // Adjust height on value change and initial mount
+    useEffect(() => {
+      adjustHeight()
+    }, [value, adjustHeight])
+
     // Determine if text needs truncation
     const isTruncated = value && value.length > truncateAt
     const displayText = isTruncated ? value.slice(0, truncateAt) : value
@@ -89,15 +105,22 @@ export const TextSnippet = React.forwardRef<
       )
     }
 
-    // Editable mode: native input element
+    // Editable mode: auto-resizing textarea
     return (
-      <Input
-        ref={ref as React.Ref<HTMLInputElement>}
-        type="text"
+      <Textarea
+        ref={textareaRef}
         value={value ?? ''}
-        onChange={(e) => onChange?.(e.target.value)}
+        onChange={(e) => {
+          onChange?.(e.target.value)
+        }}
+        onInput={adjustHeight}
         maxLength={maxLength}
-        className={className}
+        placeholder="Notizen eingeben..."
+        rows={3}
+        className={cn(
+          'resize-none overflow-hidden min-h-[80px]',
+          className
+        )}
       />
     )
   }

@@ -240,6 +240,7 @@ class VideoResponse(BaseModel):
     # YouTube Metadata - Basic (fetched from YouTube Data API v3)
     title: str | None = None
     channel: str | None = None
+    channel_thumbnail_url: str | None = None  # Channel avatar from Channel table
     thumbnail_url: str | None = None
     duration: int | None = None  # Duration in seconds
     published_at: datetime | None = None

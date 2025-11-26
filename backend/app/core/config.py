@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     groq_api_key: str = ""
 
+    # Enrichment settings
+    enrichment_enabled: bool = True
+    enrichment_auto_trigger: bool = True  # Auto-enrich on video import
+    enrichment_max_retries: int = 3
+    enrichment_chunk_duration_minutes: int = 10  # Audio chunk duration
+
     # Authentication (JWT)
     secret_key: str = "your-secret-key-here-change-in-production"
     algorithm: str = "HS256"

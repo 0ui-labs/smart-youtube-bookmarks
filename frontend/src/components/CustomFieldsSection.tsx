@@ -1,13 +1,5 @@
-import { useState, useEffect } from 'react'
 import { AvailableFieldResponse, VideoFieldValue } from '@/types/video'
 import { FieldDisplay } from '@/components/fields'
-import { Button } from '@/components/ui/button'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import { ChevronDown, ChevronUp } from 'lucide-react'
 
 /**
  * CustomFieldsSection Component
@@ -70,30 +62,6 @@ export const CustomFieldsSection = ({
   onFieldChange,
   onExpand,
 }: CustomFieldsSectionProps) => {
-  // Track which schemas are expanded (default: all expanded)
-  const [openSchemas, setOpenSchemas] = useState<Record<string, boolean>>({})
-
-  // Group available_fields by schema_name
-  const groupedFields = availableFields.reduce((acc, field) => {
-    const schemaName = field.schema_name || 'Allgemeine Felder'
-    if (!acc[schemaName]) {
-      acc[schemaName] = []
-    }
-    acc[schemaName].push(field)
-    return acc
-  }, {} as Record<string, AvailableFieldResponse[]>)
-
-  // Initialize all schemas as expanded on first render
-  useEffect(() => {
-    if (availableFields.length > 0 && Object.keys(openSchemas).length === 0) {
-      const initialOpenState = Object.keys(groupedFields).reduce((acc, schemaName) => {
-        acc[schemaName] = true
-        return acc
-      }, {} as Record<string, boolean>)
-      setOpenSchemas(initialOpenState)
-    }
-  }, [availableFields.length, openSchemas, groupedFields])
-
   // No fields message
   if (availableFields.length === 0) {
     return (
@@ -105,136 +73,98 @@ export const CustomFieldsSection = ({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-semibold mb-4">Benutzerdefinierte Felder</h2>
+      {availableFields
+        .sort((a, b) => a.display_order - b.display_order)
+        .map((field) => {
+          // Find existing value from field_values
+          const existingValue = fieldValues.find(
+            (fv) => fv.field_id === field.field_id
+          )
 
-      {Object.entries(groupedFields)
-        .sort(([nameA], [nameB]) => nameA.localeCompare(nameB))
-        .map(([schemaName, fields]) => {
-          const fieldCount = fields.length
-          const isOpen = openSchemas[schemaName] ?? true
+          // Create type-specific VideoFieldValue for FieldDisplay
+          // TypeScript requires exact discriminated union types
+          let fieldValue: VideoFieldValue
+
+          if (existingValue) {
+            fieldValue = existingValue
+          } else {
+            // Create type-specific placeholder based on field_type
+            const baseField = {
+              id: crypto.randomUUID(),
+              video_id: videoId,
+              field_id: field.field_id,
+              field_name: field.field_name,
+              show_on_card: field.show_on_card,
+              updated_at: new Date().toISOString(),
+            }
+
+            const fieldMeta = {
+              id: field.field_id,
+              list_id: listId,
+              name: field.field_name,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+
+            if (field.field_type === 'rating') {
+              fieldValue = {
+                ...baseField,
+                field: {
+                  ...fieldMeta,
+                  field_type: 'rating' as const,
+                  config: field.config as { max_rating: number },
+                },
+                value: null,
+              }
+            } else if (field.field_type === 'select') {
+              fieldValue = {
+                ...baseField,
+                field: {
+                  ...fieldMeta,
+                  field_type: 'select' as const,
+                  config: field.config as { options: string[] },
+                },
+                value: null,
+              }
+            } else if (field.field_type === 'text') {
+              const textConfig = field.config as { max_length?: number | null }
+              fieldValue = {
+                ...baseField,
+                field: {
+                  ...fieldMeta,
+                  field_type: 'text' as const,
+                  config: {
+                    max_length: textConfig.max_length ?? undefined,
+                  },
+                },
+                value: null,
+              }
+            } else {
+              // boolean
+              fieldValue = {
+                ...baseField,
+                field: {
+                  ...fieldMeta,
+                  field_type: 'boolean' as const,
+                  config: {},
+                },
+                value: null,
+              }
+            }
+          }
 
           return (
-            <Collapsible
-              key={schemaName}
-              open={isOpen}
-              onOpenChange={(open) =>
-                setOpenSchemas((prev) => ({ ...prev, [schemaName]: open }))
-              }
-              className="border rounded-lg p-4"
-            >
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="w-full flex justify-between items-center p-0 h-auto hover:bg-transparent"
-                >
-                  <span className="text-lg font-semibold">
-                    {schemaName} ({fieldCount} {fieldCount === 1 ? 'Feld' : 'Felder'})
-                  </span>
-                  {isOpen ? (
-                    <ChevronUp className="h-5 w-5" aria-hidden="true" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" aria-hidden="true" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-
-              <CollapsibleContent className="mt-4 space-y-4">
-                {fields
-                  .sort((a, b) => a.display_order - b.display_order)
-                  .map((field) => {
-                    // Find existing value from field_values
-                    const existingValue = fieldValues.find(
-                      (fv) => fv.field_id === field.field_id
-                    )
-
-                    // Create type-specific VideoFieldValue for FieldDisplay
-                    // TypeScript requires exact discriminated union types
-                    let fieldValue: VideoFieldValue
-
-                    if (existingValue) {
-                      fieldValue = existingValue
-                    } else {
-                      // Create type-specific placeholder based on field_type
-                      const baseField = {
-                        id: crypto.randomUUID(),
-                        video_id: videoId,
-                        field_id: field.field_id,
-                        field_name: field.field_name,
-                        show_on_card: field.show_on_card,
-                        updated_at: new Date().toISOString(),
-                      }
-
-                      const fieldMeta = {
-                        id: field.field_id,
-                        list_id: listId,
-                        name: field.field_name,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                      }
-
-                      if (field.field_type === 'rating') {
-                        fieldValue = {
-                          ...baseField,
-                          field: {
-                            ...fieldMeta,
-                            field_type: 'rating' as const,
-                            config: field.config as { max_rating: number },
-                          },
-                          value: null,
-                        }
-                      } else if (field.field_type === 'select') {
-                        fieldValue = {
-                          ...baseField,
-                          field: {
-                            ...fieldMeta,
-                            field_type: 'select' as const,
-                            config: field.config as { options: string[] },
-                          },
-                          value: null,
-                        }
-                      } else if (field.field_type === 'text') {
-                        const textConfig = field.config as { max_length?: number | null }
-                        fieldValue = {
-                          ...baseField,
-                          field: {
-                            ...fieldMeta,
-                            field_type: 'text' as const,
-                            config: {
-                              max_length: textConfig.max_length ?? undefined,
-                            },
-                          },
-                          value: null,
-                        }
-                      } else {
-                        // boolean
-                        fieldValue = {
-                          ...baseField,
-                          field: {
-                            ...fieldMeta,
-                            field_type: 'boolean' as const,
-                            config: {},
-                          },
-                          value: null,
-                        }
-                      }
-                    }
-
-                    return (
-                      <div key={field.field_id} className="flex items-start gap-2">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium mb-1">{field.field_name}</p>
-                          <FieldDisplay
-                            fieldValue={fieldValue}
-                            readonly={false}
-                            onChange={(value) => onFieldChange(field.field_id, value)}
-                            onExpand={onExpand}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-              </CollapsibleContent>
-            </Collapsible>
+            <div key={field.field_id} className="flex items-start gap-2">
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">{field.field_name}</p>
+                <FieldDisplay
+                  fieldValue={fieldValue}
+                  readonly={false}
+                  onChange={(value) => onFieldChange(field.field_id, value)}
+                  onExpand={onExpand}
+                />
+              </div>
+            </div>
           )
         })}
     </div>

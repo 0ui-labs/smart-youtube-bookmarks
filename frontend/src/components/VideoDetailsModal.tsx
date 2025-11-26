@@ -1,14 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { VideoResponse } from '@/types/video'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CustomFieldsSection } from '@/components/CustomFieldsSection'
-import { CategorySelector } from '@/components/CategorySelector'
+import { ChannelInfo } from '@/components/ChannelInfo'
 import { useSetVideoCategory } from '@/hooks/useVideos'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { formatDuration } from '@/utils/formatDuration'
 import { useVideoDetail } from '@/hooks/useVideoDetail'
 import { VideoPlayer } from '@/components/VideoPlayer'
+import { useVideoEnrichment, useRetryEnrichment } from '@/hooks/useVideoEnrichment'
+import { EnrichmentStatus } from '@/components/EnrichmentStatus'
+import type { TextTrack } from '@/types/player'
+import { getLanguageLabel } from '@/lib/enrichmentUtils'
 
 /**
  * VideoDetailsModal Component
@@ -81,6 +85,65 @@ export const VideoDetailsModal = ({
   // Use videoDetail if loaded, fallback to prop video for basic info
   const displayVideo = videoDetail || video
 
+  // Enrichment data (captions, chapters)
+  const {
+    data: enrichment,
+    isLoading: isEnrichmentLoading,
+  } = useVideoEnrichment(video?.id, { enabled: open })
+
+  const retryEnrichment = useRetryEnrichment()
+
+  // Generate text tracks from enrichment data with proper cleanup
+  const [textTracks, setTextTracks] = useState<TextTrack[]>([])
+  const blobUrlsRef = useRef<string[]>([])
+
+  useEffect(() => {
+    // Cleanup previous blob URLs
+    blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+    blobUrlsRef.current = []
+
+    const tracks: TextTrack[] = []
+
+    if (enrichment?.captions_vtt) {
+      // Create a blob URL from VTT content
+      const blob = new Blob([enrichment.captions_vtt], { type: 'text/vtt' })
+      const src = URL.createObjectURL(blob)
+      blobUrlsRef.current.push(src)
+
+      tracks.push({
+        src,
+        label: getLanguageLabel(enrichment.captions_language, enrichment.captions_source),
+        language: enrichment.captions_language || 'en',
+        kind: 'captions',
+        type: 'vtt',
+        default: true,
+      })
+    }
+
+    if (enrichment?.chapters_vtt) {
+      const blob = new Blob([enrichment.chapters_vtt], { type: 'text/vtt' })
+      const src = URL.createObjectURL(blob)
+      blobUrlsRef.current.push(src)
+
+      tracks.push({
+        src,
+        label: 'Chapters',
+        language: 'en',
+        kind: 'chapters',
+        type: 'vtt',
+        default: true,
+      })
+    }
+
+    setTextTracks(tracks)
+
+    // Cleanup on unmount
+    return () => {
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+      blobUrlsRef.current = []
+    }
+  }, [enrichment?.captions_vtt, enrichment?.captions_language, enrichment?.captions_source, enrichment?.chapters_vtt])
+
   // Category change mutation (Step 5.12)
   const setVideoCategory = useSetVideoCategory()
   const [categoryError, setCategoryError] = useState<string | null>(null)
@@ -122,23 +185,39 @@ export const VideoDetailsModal = ({
         {/* Video Content */}
         <div className="space-y-4">
           {/* Video Player (replaces thumbnail) */}
+          {/* key forces remount on video change to prevent "provider destroyed" errors */}
           <VideoPlayer
+            key={displayVideo.youtube_id}
             youtubeId={displayVideo.youtube_id}
             videoId={displayVideo.id}
             initialPosition={displayVideo.watch_position}
             thumbnailUrl={displayVideo.thumbnail_url}
+            textTracks={textTracks}
+            thumbnailsVtt={enrichment?.thumbnails_vtt_url}
           />
 
-          {/* Metadata: Duration, Channel */}
-          <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600">
-            {displayVideo.duration && <span>{formatDuration(displayVideo.duration)}</span>}
-            {displayVideo.channel && (
-              <>
-                {displayVideo.duration && <span>•</span>}
-                <span>{displayVideo.channel}</span>
-              </>
-            )}
-          </div>
+          {/* Duration */}
+          {displayVideo.duration && (
+            <div className="text-sm text-gray-600">
+              {formatDuration(displayVideo.duration)}
+            </div>
+          )}
+
+          {/* Channel Info with Category (YouTube-style) */}
+          <ChannelInfo
+            channelName={displayVideo.channel}
+            channelAvatarUrl={displayVideo.channel_thumbnail_url}
+            currentCategory={currentCategory}
+            onCategoryChange={handleCategoryChange}
+            isCategoryMutating={setVideoCategory.isPending}
+          />
+
+          {/* Category Error */}
+          {categoryError && (
+            <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+              {categoryError}
+            </div>
+          )}
 
           {/* Labels (only is_video_type=false tags) - Step 5.12 */}
           {labels.length > 0 && (
@@ -151,20 +230,13 @@ export const VideoDetailsModal = ({
             </div>
           )}
 
-          {/* Category Selector (Step 5.12) */}
-          <CategorySelector
-            videoId={displayVideo.id}
-            currentCategoryId={currentCategory?.id ?? null}
-            onCategoryChange={handleCategoryChange}
-            isMutating={setVideoCategory.isPending}
+          {/* Enrichment Status */}
+          <EnrichmentStatus
+            enrichment={enrichment}
+            isLoading={isEnrichmentLoading}
+            onRetry={() => retryEnrichment.mutate(displayVideo.id)}
+            isRetrying={retryEnrichment.isPending}
           />
-
-          {/* Category Error */}
-          {categoryError && (
-            <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
-              {categoryError}
-            </div>
-          )}
 
           <Separator />
 

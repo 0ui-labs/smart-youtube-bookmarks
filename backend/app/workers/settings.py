@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.workers.db_manager import sessionmanager, db_session_context
 from app.workers.video_processor import process_video, process_video_list
+from app.workers.enrichment_worker import enrich_video
 import logging
 
 logger = logging.getLogger(__name__)
@@ -97,10 +98,11 @@ class WorkerSettings:
     )
 
     # Worker functions
-    functions = [process_video, process_video_list]
+    functions = [process_video, process_video_list, enrich_video]
 
     # Worker configuration
-    max_jobs = 10
+    # NOTE: Keep max_jobs=1 for enrichment to avoid YouTube rate limiting (429)
+    max_jobs = 1
     job_timeout = 300  # 5 minutes
     keep_result = 3600  # 1 hour
 
