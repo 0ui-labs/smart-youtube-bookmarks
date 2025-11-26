@@ -131,7 +131,7 @@ class GroqTranscriber:
         except Exception as e:
             # Check for rate limit
             if hasattr(e, 'status_code') and e.status_code == 429:
-                raise RateLimitError(f"Groq rate limit exceeded: {e}")
+                raise RateLimitError(f"Groq rate limit exceeded: {e}") from e
             raise TranscriptionError(f"Transcription failed: {e}") from e
 
     async def _call_groq_api(self, audio_path: Path):
@@ -143,7 +143,7 @@ class GroqTranscriber:
         Returns:
             Groq API response
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def _sync_call():
             with open(audio_path, "rb") as audio_file:

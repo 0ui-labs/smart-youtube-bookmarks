@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { CategoryModal } from './CategoryModal'
+import { UI_STRINGS } from '@/constants/ui'
 
 interface CategoryTag {
   id: string
@@ -97,7 +98,7 @@ export function ChannelInfo({
                 <span>{currentCategory.name}</span>
               </>
             ) : (
-              <span className="italic">Kategorie wählen</span>
+              <span className="italic">{UI_STRINGS.channel.chooseCategory}</span>
             )}
           </button>
         </div>

@@ -20,6 +20,6 @@ isodate==0.6.1
 google-genai[aiohttp]==0.3.0
 rapidfuzz==3.10.0  # High-performance Levenshtein distance
 numpy==1.26.4  # For embedding operations
-yt-dlp>=2024.1.0  # Video/audio downloading for enrichment
+yt-dlp>=2024.07.01  # Video/audio downloading for enrichment (CVE fixes)
 groq>=0.4.0  # Whisper transcription API
 pydub>=0.25.0  # Audio processing for chunking

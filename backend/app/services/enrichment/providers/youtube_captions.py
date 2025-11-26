@@ -21,7 +21,9 @@ class YoutubeCaptionProvider(CaptionProvider):
     Prefers manual captions over auto-generated, and English over other languages.
     """
 
-    name = "youtube"
+    @property
+    def name(self) -> str:
+        return "youtube"
 
     async def fetch(self, youtube_id: str, duration: int) -> Optional[CaptionResult]:
         """Fetch captions from YouTube using yt-dlp.
@@ -132,13 +134,7 @@ class YoutubeCaptionProvider(CaptionProvider):
         Returns:
             VTT content or None if file not found
         """
-        # yt-dlp creates files like: video_id.lang.vtt
-        possible_patterns = [
-            f"{youtube_id}.{language}.vtt",
-            f"{youtube_id}.{language}.vtt",
-        ]
-
-        # List all files and find the VTT
+        # Scan directory for any VTT file created by yt-dlp
         for filename in os.listdir(tmpdir):
             if filename.endswith(".vtt"):
                 filepath = os.path.join(tmpdir, filename)

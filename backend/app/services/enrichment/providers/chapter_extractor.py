@@ -185,7 +185,7 @@ def chapters_to_vtt(chapters: List[Chapter]) -> str:
 
     lines = ["WEBVTT", ""]
 
-    for i, chapter in enumerate(chapters):
+    for chapter in chapters:
         start_time = _format_vtt_time(chapter.start)
         end_time = _format_vtt_time(chapter.end)
 

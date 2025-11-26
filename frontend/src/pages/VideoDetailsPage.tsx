@@ -169,9 +169,8 @@ export const VideoDetailsPage = () => {
     )
   }
 
-  // Handle channel link click with stopPropagation
-  const handleChannelClick = (e: React.MouseEvent, channelName: string) => {
-    e.stopPropagation()
+  // Handle channel link click
+  const handleChannelClick = (channelName: string) => {
     // TODO: Navigate to channel filter or search
     console.log('Channel clicked:', channelName)
   }
@@ -262,7 +261,7 @@ export const VideoDetailsPage = () => {
           currentCategory={currentCategory}
           onCategoryChange={handleCategoryChange}
           isCategoryMutating={setVideoCategory.isPending}
-          onChannelClick={() => handleChannelClick({} as React.MouseEvent, video.channel!)}
+          onChannelClick={() => handleChannelClick(video.channel!)}
         />
 
         {/* Labels (only is_video_type=false tags) - Step 5.9 */}

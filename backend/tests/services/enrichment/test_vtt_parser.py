@@ -1,6 +1,5 @@
 """Tests for VTT parsing utilities."""
 import pytest
-from dataclasses import dataclass
 
 from app.services.enrichment.utils.vtt_parser import (
     parse_vtt,

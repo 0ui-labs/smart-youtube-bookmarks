@@ -53,7 +53,7 @@ async def enrich_video(ctx: dict, video_id: str) -> dict:
         }
 
     except Exception as e:
-        logger.exception(f"Error enriching video {video_id}: {e}")
+        logger.exception(f"Error enriching video {video_id}")
         return {
             "status": "error",
             "message": str(e),

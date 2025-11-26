@@ -4,6 +4,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from dataclasses import dataclass
 
+import groq
+
 from app.services.enrichment.providers.groq_transcriber import (
     GroqTranscriber,
     TranscriptionSegment,
@@ -147,12 +149,17 @@ class TestGroqTranscriberSingle:
             chunk_index=0
         )
 
-        # Simulate rate limit error
-        rate_limit_error = Exception("Rate limit exceeded")
-        rate_limit_error.status_code = 429
+        # Create mock response for RateLimitError
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.headers = {}
 
         with patch.object(transcriber, '_call_groq_api', new_callable=AsyncMock) as mock_api:
-            mock_api.side_effect = rate_limit_error
+            mock_api.side_effect = groq.RateLimitError(
+                "Rate limit exceeded",
+                response=mock_response,
+                body=None
+            )
 
             with pytest.raises(RateLimitError):
                 await transcriber._transcribe_single(chunk)

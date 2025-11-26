@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import DOMPurify from 'dompurify'
 import { Search, X, Loader2, Play } from 'lucide-react'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useTranscriptSearch } from '@/hooks/useTranscriptSearch'
@@ -154,9 +155,12 @@ function SearchResultItem({ result, onClick }: SearchResultItemProps) {
         <p
           className="text-xs text-gray-600 mt-1 line-clamp-2"
           dangerouslySetInnerHTML={{
-            __html: result.snippet
-              .replace(/<b>/g, '<mark class="bg-yellow-200">')
-              .replace(/<\/b>/g, '</mark>'),
+            __html: DOMPurify.sanitize(
+              result.snippet
+                .replace(/<b>/g, '<mark class="bg-yellow-200">')
+                .replace(/<\/b>/g, '</mark>'),
+              { ALLOWED_TAGS: ['mark'], ALLOWED_ATTR: ['class'] }
+            ),
           }}
         />
       </div>

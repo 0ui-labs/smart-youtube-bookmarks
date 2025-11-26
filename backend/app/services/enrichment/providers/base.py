@@ -25,7 +25,11 @@ class CaptionProvider(ABC):
     Providers are tried in order until one succeeds.
     """
 
-    name: str  # Provider identifier
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Provider identifier. Subclasses must implement this."""
+        ...
 
     @abstractmethod
     async def fetch(self, youtube_id: str, duration: int) -> Optional[CaptionResult]:

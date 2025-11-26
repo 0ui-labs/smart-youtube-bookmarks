@@ -130,7 +130,6 @@ class AudioChunker:
         """
         audio = AudioSegment.from_mp3(str(audio_path))
         total_duration_ms = len(audio)
-        total_duration_s = total_duration_ms / 1000
 
         chunks: List[AudioChunk] = []
         chunk_index = 0

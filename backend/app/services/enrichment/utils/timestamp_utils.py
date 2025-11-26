@@ -55,21 +55,25 @@ def offset_timestamps(vtt_content: str, offset_seconds: float) -> str:
         offset_seconds: Seconds to add to all timestamps
 
     Returns:
-        VTT content with offset timestamps
+        VTT content with offset timestamps. Timestamps are clamped to >= 0.0,
+        and segments where end <= start after clamping are dropped.
     """
     if offset_seconds == 0.0:
         return vtt_content
 
     segments = parse_vtt(vtt_content)
 
-    offset_segments = [
-        VTTSegment(
-            start=seg.start + offset_seconds,
-            end=seg.end + offset_seconds,
-            text=seg.text
-        )
-        for seg in segments
-    ]
+    offset_segments = []
+    for seg in segments:
+        # Apply offset and clamp to non-negative
+        start = max(0.0, seg.start + offset_seconds)
+        end = max(0.0, seg.end + offset_seconds)
+
+        # Drop segments where end is not after start (invalid after clamping)
+        if end <= start:
+            continue
+
+        offset_segments.append(VTTSegment(start=start, end=end, text=seg.text))
 
     return generate_vtt(offset_segments)
 

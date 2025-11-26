@@ -17,7 +17,7 @@
  * - className?: string - Custom Tailwind classes
  */
 
-import React, { useEffect, useRef, useCallback } from 'react'
+import React, { useEffect, useRef, useCallback, useMemo } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
@@ -57,6 +57,19 @@ export const TextSnippet = React.forwardRef<
     ref
   ) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+    // Combine internal ref with forwarded ref so parents receive the element
+    const combinedTextareaRef = useMemo(() => {
+      return (element: HTMLTextAreaElement | null) => {
+        textareaRef.current = element
+        if (typeof ref === 'function') {
+          ref(element)
+        } else if (ref) {
+          ;(ref as React.MutableRefObject<HTMLTextAreaElement | null>).current =
+            element
+        }
+      }
+    }, [ref])
 
     // Auto-resize textarea to fit content
     const adjustHeight = useCallback(() => {
@@ -108,7 +121,7 @@ export const TextSnippet = React.forwardRef<
     // Editable mode: auto-resizing textarea
     return (
       <Textarea
-        ref={textareaRef}
+        ref={combinedTextareaRef}
         value={value ?? ''}
         onChange={(e) => {
           onChange?.(e.target.value)

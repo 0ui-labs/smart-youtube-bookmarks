@@ -169,7 +169,7 @@ class TestYoutubeCaptionProviderLanguageSelection:
         result = provider._select_best_caption_language(subtitles, auto_captions)
 
         assert result is not None
-        lang, is_auto = result
+        _, is_auto = result
         assert is_auto is True
 
     def test_select_best_caption_language_returns_none_when_empty(self):

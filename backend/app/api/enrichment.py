@@ -9,6 +9,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -116,7 +117,8 @@ async def get_enrichment(
     response_model=EnrichmentRetryResponse,
     responses={
         404: {"description": "Video not found"},
-        409: {"description": "Enrichment already processing"}
+        409: {"description": "Enrichment already processing"},
+        503: {"description": "Failed to enqueue job (Redis unavailable)"}
     }
 )
 async def retry_enrichment(
@@ -174,16 +176,23 @@ async def retry_enrichment(
         )
         db.add(enrichment)
 
-    await db.commit()
-    await db.refresh(enrichment)
-
-    # Enqueue job
+    # Enqueue job BEFORE committing DB to ensure atomicity
+    # If enqueue fails, the DB transaction will be rolled back
     try:
         arq_pool = await get_arq_pool()
         await arq_pool.enqueue_job("enrich_video", str(video_id))
         logger.info(f"Enqueued enrichment job for video {video_id}")
-    except Exception as e:
-        logger.warning(f"Failed to enqueue enrichment job: {e}")
+    except (RedisError, RedisConnectionError, OSError) as e:
+        logger.exception(f"Failed to enqueue enrichment job for video {video_id}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to enqueue enrichment job: {type(e).__name__}"
+        )
+
+    # Only commit after successful enqueue
+    await db.commit()
+    await db.refresh(enrichment)
 
     return EnrichmentRetryResponse(
         message="Enrichment retry started",

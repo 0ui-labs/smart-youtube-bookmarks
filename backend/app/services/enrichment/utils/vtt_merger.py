@@ -28,7 +28,7 @@ def merge_vtt_files(vtt_contents: List[str], offsets: List[float]) -> str:
 
     all_segments: List[VTTSegment] = []
 
-    for vtt_content, offset in zip(vtt_contents, offsets):
+    for vtt_content, offset in zip(vtt_contents, offsets, strict=True):
         segments = parse_vtt(vtt_content)
 
         for segment in segments:
