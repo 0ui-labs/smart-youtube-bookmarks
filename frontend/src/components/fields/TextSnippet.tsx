@@ -1,37 +1,37 @@
 /**
- * TextSnippet Component - Text Field Display with Truncation
+ * TextSnippet Component - Rich Text Field Display with Truncation
  *
  * Features:
- * - Read-only mode: Displays truncated text with expand button
- * - Editable mode: Auto-resizing textarea with maxLength enforcement
+ * - Read-only mode: Displays formatted HTML with truncation and expand button
+ * - Editable mode: Tiptap rich text editor with bubble menu
+ * - Backward compatibility: Plain text is wrapped in paragraph tags
  * - Null/undefined handling: Displays em dash (—)
- * - REF MCP #2: Uses truncateAt prop (NOT maxLength) for clarity
  *
  * Props:
- * - value: string | null | undefined - Text content to display
+ * - value: string | null | undefined - Text or HTML content to display
  * - truncateAt: number - Character limit for display truncation (read-only)
  * - readOnly?: boolean - Toggle between read-only and editable modes
- * - onChange?: (value: string) => void - Callback on input change (editable mode)
+ * - onChange?: (value: string) => void - Callback on input change (returns HTML)
  * - onExpand?: () => void - Callback when expand button clicked
  * - maxLength?: number - Max characters for input field (editable mode)
- * - placeholder?: string - Placeholder text for editable mode (default: 'Enter notes...')
+ * - placeholder?: string - Placeholder text for editable mode
  * - className?: string - Custom Tailwind classes
  */
 
-import React, { useEffect, useRef, useCallback, useMemo } from 'react'
+import React from 'react'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { TiptapEditor } from './TiptapEditor'
 
 export interface TextSnippetProps {
-  /** Text content to display */
+  /** Text or HTML content to display */
   value: string | null | undefined
-  /** Character limit for display truncation (read-only mode) - REF MCP #2 */
+  /** Character limit for display truncation (read-only mode) */
   truncateAt: number
   /** Toggle between read-only and editable modes (default: true) */
   readOnly?: boolean
-  /** Callback when input value changes (editable mode) */
+  /** Callback when input value changes (editable mode) - returns HTML */
   onChange?: (value: string) => void
   /** Callback when expand button clicked */
   onExpand?: () => void
@@ -43,10 +43,32 @@ export interface TextSnippetProps {
   className?: string
 }
 
-export const TextSnippet = React.forwardRef<
-  HTMLDivElement | HTMLTextAreaElement,
-  TextSnippetProps
->(
+/**
+ * Normalize content: wrap plain text in paragraph tags.
+ * HTML content (starting with <) is returned as-is.
+ */
+function normalizeContent(value: string | null | undefined): string {
+  if (!value) return ''
+  // Already HTML? Return as-is
+  if (value.trim().startsWith('<')) return value
+  // Plain text → wrap in paragraph, escape HTML entities
+  return `<p>${value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
+}
+
+/**
+ * Strip HTML tags to get plain text content for truncation check.
+ */
+function getTextContent(html: string): string {
+  // Use DOMParser for accurate text extraction
+  if (typeof DOMParser !== 'undefined') {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    return doc.body.textContent || ''
+  }
+  // Fallback: simple regex strip
+  return html.replace(/<[^>]*>/g, '')
+}
+
+export const TextSnippet = React.forwardRef<HTMLDivElement, TextSnippetProps>(
   (
     {
       value,
@@ -55,65 +77,41 @@ export const TextSnippet = React.forwardRef<
       onChange,
       onExpand,
       maxLength,
-      placeholder = 'Enter notes...',
+      placeholder = 'Notizen eingeben...',
       className,
     },
     ref
   ) => {
-    const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-    // Combine internal ref with forwarded ref so parents receive the element
-    const combinedTextareaRef = useMemo(() => {
-      return (element: HTMLTextAreaElement | null) => {
-        textareaRef.current = element
-        if (typeof ref === 'function') {
-          ref(element)
-        } else if (ref) {
-          ;(ref as React.MutableRefObject<HTMLTextAreaElement | null>).current =
-            element
-        }
-      }
-    }, [ref])
-
-    // Auto-resize textarea to fit content
-    const adjustHeight = useCallback(() => {
-      const textarea = textareaRef.current
-      if (textarea) {
-        textarea.style.height = 'auto'
-        textarea.style.height = `${textarea.scrollHeight}px`
-      }
-    }, [])
-
-    // Adjust height on value change and initial mount
-    useEffect(() => {
-      adjustHeight()
-    }, [value, adjustHeight])
-
-    // Determine if text needs truncation
-    const isTruncated = value && value.length > truncateAt
-    const displayText = isTruncated ? value.slice(0, truncateAt) : value
+    const normalizedValue = normalizeContent(value)
+    const textContent = getTextContent(normalizedValue)
+    const isTruncated = textContent.length > truncateAt
 
     if (readOnly) {
-      // Read-only mode: display text with optional expand button
+      // Read-only mode: Render formatted HTML
       return (
         <div
-          ref={ref as React.Ref<HTMLDivElement>}
-          className={cn(
-            'inline-flex items-center gap-2 text-sm',
-            className
-          )}
+          ref={ref}
+          className={cn('inline-flex items-start gap-2 text-sm', className)}
         >
-          <span className="truncate">
-            {!displayText ? '—' : displayText}
-            {isTruncated && '...'}
-          </span>
+          {!textContent ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <div
+              className="tiptap-prose"
+              dangerouslySetInnerHTML={{
+                __html: isTruncated
+                  ? getTextContent(normalizedValue).slice(0, truncateAt) + '...'
+                  : normalizedValue,
+              }}
+            />
+          )}
           {isTruncated && onExpand && (
             <Button
               variant="ghost"
               size="icon"
               className="h-5 w-5 shrink-0 p-0"
               onClick={onExpand}
-              aria-label="Expand text"
+              aria-label="Text erweitern"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -122,22 +120,14 @@ export const TextSnippet = React.forwardRef<
       )
     }
 
-    // Editable mode: auto-resizing textarea
+    // Edit mode: Tiptap Editor
     return (
-      <Textarea
-        ref={combinedTextareaRef}
-        value={value ?? ''}
-        onChange={(e) => {
-          onChange?.(e.target.value)
-        }}
-        onInput={adjustHeight}
-        maxLength={maxLength}
+      <TiptapEditor
+        content={normalizedValue}
+        onChange={(html) => onChange?.(html)}
         placeholder={placeholder}
-        rows={3}
-        className={cn(
-          'resize-none overflow-hidden min-h-[80px]',
-          className
-        )}
+        maxLength={maxLength}
+        className={className}
       />
     )
   }
