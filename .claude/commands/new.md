@@ -1,0 +1,2 @@
+Ich möchte in einem neuen Thread starten Bitte schreibe mir einen Prompt. Wir verwenden für die Umsetzung die entsprechenden Skills executing-plans, test-driven-development und 
+verification-before-completion am Ende zum validieren ob alles vollständig und korrekt nach Plan umgesetzt worden ist. 
