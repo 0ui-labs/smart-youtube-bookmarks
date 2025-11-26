@@ -11,7 +11,12 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
+import Link from '@tiptap/extension-link'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { common, createLowlight } from 'lowlight'
 import { cn } from '@/lib/utils'
+
+const lowlight = createLowlight(common)
 
 interface TiptapEditorProps {
   content: string
@@ -31,9 +36,20 @@ export const TiptapEditor = ({
 }: TiptapEditorProps) => {
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        codeBlock: false,
+      }),
       Placeholder.configure({
         placeholder,
+      }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          class: 'text-primary underline',
+        },
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
       }),
     ],
     content,
