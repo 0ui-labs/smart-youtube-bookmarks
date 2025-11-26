@@ -278,6 +278,7 @@ export const VideoResponseSchema = z.object({
   youtube_id: z.string(),
   title: z.string().nullable(),
   channel: z.string().nullable(),
+  channel_thumbnail_url: z.string().nullable().optional(),
   thumbnail_url: z.string().nullable(),
   duration: z.number().nullable(),
   published_at: z.string().nullable(),

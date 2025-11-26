@@ -3,7 +3,7 @@
  *
  * Features:
  * - Read-only mode: Displays truncated text with expand button
- * - Editable mode: Native input with maxLength enforcement
+ * - Editable mode: Auto-resizing textarea with maxLength enforcement
  * - Null/undefined handling: Displays em dash (—)
  * - REF MCP #2: Uses truncateAt prop (NOT maxLength) for clarity
  *
@@ -14,13 +14,14 @@
  * - onChange?: (value: string) => void - Callback on input change (editable mode)
  * - onExpand?: () => void - Callback when expand button clicked
  * - maxLength?: number - Max characters for input field (editable mode)
+ * - placeholder?: string - Placeholder text for editable mode (default: 'Enter notes...')
  * - className?: string - Custom Tailwind classes
  */
 
-import React from 'react'
+import React, { useEffect, useRef, useCallback, useMemo } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 
 export interface TextSnippetProps {
@@ -36,12 +37,14 @@ export interface TextSnippetProps {
   onExpand?: () => void
   /** Max characters for input field (editable mode) */
   maxLength?: number
+  /** Placeholder text for editable mode */
+  placeholder?: string
   /** Custom Tailwind classes */
   className?: string
 }
 
 export const TextSnippet = React.forwardRef<
-  HTMLDivElement | HTMLInputElement,
+  HTMLDivElement | HTMLTextAreaElement,
   TextSnippetProps
 >(
   (
@@ -52,10 +55,40 @@ export const TextSnippet = React.forwardRef<
       onChange,
       onExpand,
       maxLength,
+      placeholder = 'Enter notes...',
       className,
     },
     ref
   ) => {
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+    // Combine internal ref with forwarded ref so parents receive the element
+    const combinedTextareaRef = useMemo(() => {
+      return (element: HTMLTextAreaElement | null) => {
+        textareaRef.current = element
+        if (typeof ref === 'function') {
+          ref(element)
+        } else if (ref) {
+          ;(ref as React.MutableRefObject<HTMLTextAreaElement | null>).current =
+            element
+        }
+      }
+    }, [ref])
+
+    // Auto-resize textarea to fit content
+    const adjustHeight = useCallback(() => {
+      const textarea = textareaRef.current
+      if (textarea) {
+        textarea.style.height = 'auto'
+        textarea.style.height = `${textarea.scrollHeight}px`
+      }
+    }, [])
+
+    // Adjust height on value change and initial mount
+    useEffect(() => {
+      adjustHeight()
+    }, [value, adjustHeight])
+
     // Determine if text needs truncation
     const isTruncated = value && value.length > truncateAt
     const displayText = isTruncated ? value.slice(0, truncateAt) : value
@@ -89,15 +122,22 @@ export const TextSnippet = React.forwardRef<
       )
     }
 
-    // Editable mode: native input element
+    // Editable mode: auto-resizing textarea
     return (
-      <Input
-        ref={ref as React.Ref<HTMLInputElement>}
-        type="text"
+      <Textarea
+        ref={combinedTextareaRef}
         value={value ?? ''}
-        onChange={(e) => onChange?.(e.target.value)}
+        onChange={(e) => {
+          onChange?.(e.target.value)
+        }}
+        onInput={adjustHeight}
         maxLength={maxLength}
-        className={className}
+        placeholder={placeholder}
+        rows={3}
+        className={cn(
+          'resize-none overflow-hidden min-h-[80px]',
+          className
+        )}
       />
     )
   }

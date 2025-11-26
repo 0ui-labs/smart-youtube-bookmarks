@@ -108,9 +108,18 @@
 
 /* Captions/Subtitles styling */
 .vds-captions {
-  --cue-bg: hsl(0 0% 0% / 0.8);
+  --cue-bg: hsl(0 0% 0% / 0.85);
   --cue-color: hsl(0 0% 100%);
-  --cue-font-size: clamp(14px, 2.5vw, 20px);
+  --cue-font-size: clamp(20px, 4vw, 32px);
+  /* Fix position to bottom - prevent jumping when controls show/hide */
+  bottom: 12px !important;
+  transition: none !important;
+}
+
+/* Ensure captions don't move when controls appear */
+.vds-video-layout[data-controls] .vds-captions,
+.vds-video-layout:not([data-controls]) .vds-captions {
+  bottom: 12px !important;
 }
 
 /* Focus styles for accessibility */

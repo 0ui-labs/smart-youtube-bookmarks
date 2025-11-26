@@ -9,7 +9,8 @@ from app.models.job_progress import JobProgressEvent
 from app.clients.youtube import YouTubeClient
 from app.services.channel_service import get_or_create_channel
 from app.core.config import settings
-from app.core.redis import get_redis_client
+from app.core.redis import get_redis_client, get_arq_pool
+from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
 from datetime import datetime
 from isodate import parse_duration
 import logging
@@ -152,6 +153,22 @@ async def process_video(
             video.processing_status = "completed"
             video.error_message = None  # Clear error from previous failed attempts
             await db.flush()
+
+            # Trigger enrichment if enabled
+            if settings.enrichment_enabled and settings.enrichment_auto_trigger:
+                try:
+                    enrichment = VideoEnrichment(
+                        video_id=video.id,
+                        status=EnrichmentStatus.pending.value
+                    )
+                    db.add(enrichment)
+                    await db.flush()
+
+                    arq_pool = await get_arq_pool()
+                    await arq_pool.enqueue_job("enrich_video", str(video.id))
+                    logger.info(f"Enqueued enrichment job for video {video_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to enqueue enrichment for video {video_id}: {e}")
 
             # Publish WebSocket update for instant UI refresh
             # Skip for large batches to avoid overwhelming Redis (rely on progress updates instead)
