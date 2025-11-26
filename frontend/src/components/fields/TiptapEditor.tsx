@@ -15,6 +15,7 @@ import Link from '@tiptap/extension-link'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
 import { cn } from '@/lib/utils'
+import { TiptapBubbleMenu } from './TiptapBubbleMenu'
 
 const lowlight = createLowlight(common)
 
@@ -65,6 +66,7 @@ export const TiptapEditor = ({
 
   return (
     <div className={cn('tiptap-editor', className)}>
+      <TiptapBubbleMenu editor={editor} />
       <EditorContent editor={editor} />
     </div>
   )
