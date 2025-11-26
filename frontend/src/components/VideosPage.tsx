@@ -193,7 +193,10 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   })
 
   // Channel filter state (YouTube Channels feature)
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null)
+  // Initialize from URL immediately to prevent fetching all videos first
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(() => {
+    return searchParams.get('channel')
+  })
 
   // Video Details Modal state (follows pattern of ConfirmDeleteModal)
   const [videoDetailsModal, setVideoDetailsModal] = useState<{
@@ -450,21 +453,27 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // URL Sync: Update URL when selected channel changes
   useEffect(() => {
+    // Wait for channels to load before syncing state → URL
+    // This prevents removing channel param before we can validate it
+    if (channels.length === 0) return
+
     if (selectedChannelId === null) {
       // Remove channel param if no channel selected
       if (searchParams.has('channel')) {
-        searchParams.delete('channel')
-        setSearchParams(searchParams, { replace: true })
+        const params = new URLSearchParams(searchParams)
+        params.delete('channel')
+        setSearchParams(params, { replace: true })
       }
     } else {
       // Set channel param
       const currentChannelParam = searchParams.get('channel')
       if (currentChannelParam !== selectedChannelId) {
-        searchParams.set('channel', selectedChannelId)
-        setSearchParams(searchParams, { replace: true })
+        const params = new URLSearchParams(searchParams)
+        params.set('channel', selectedChannelId)
+        setSearchParams(params, { replace: true })
       }
     }
-  }, [selectedChannelId]) // Run when selected channel changes
+  }, [selectedChannelId, channels.length]) // Run when selected channel changes or channels load
 
   const handleExportCSV = async () => {
     try {
