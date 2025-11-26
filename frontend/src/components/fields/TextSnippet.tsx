@@ -14,6 +14,7 @@
  * - onChange?: (value: string) => void - Callback on input change (editable mode)
  * - onExpand?: () => void - Callback when expand button clicked
  * - maxLength?: number - Max characters for input field (editable mode)
+ * - placeholder?: string - Placeholder text for editable mode (default: 'Enter notes...')
  * - className?: string - Custom Tailwind classes
  */
 
@@ -36,6 +37,8 @@ export interface TextSnippetProps {
   onExpand?: () => void
   /** Max characters for input field (editable mode) */
   maxLength?: number
+  /** Placeholder text for editable mode */
+  placeholder?: string
   /** Custom Tailwind classes */
   className?: string
 }
@@ -52,6 +55,7 @@ export const TextSnippet = React.forwardRef<
       onChange,
       onExpand,
       maxLength,
+      placeholder = 'Enter notes...',
       className,
     },
     ref
@@ -128,7 +132,7 @@ export const TextSnippet = React.forwardRef<
         }}
         onInput={adjustHeight}
         maxLength={maxLength}
-        placeholder="Notizen eingeben..."
+        placeholder={placeholder}
         rows={3}
         className={cn(
           'resize-none overflow-hidden min-h-[80px]',

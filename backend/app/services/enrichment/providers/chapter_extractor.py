@@ -1,10 +1,14 @@
 """Chapter extraction from YouTube videos."""
 import asyncio
+import logging
 import re
 from dataclasses import dataclass
 from typing import List, Optional
 
 import yt_dlp
+from yt_dlp.utils import DownloadError, ExtractorError
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -66,7 +70,27 @@ class ChapterExtractor:
 
             return chapters if chapters else None
 
-        except Exception:
+        except (KeyboardInterrupt, SystemExit):
+            # Re-raise critical exceptions - don't swallow these
+            raise
+        except (DownloadError, ExtractorError) as e:
+            # yt-dlp specific errors (video unavailable, geo-blocked, etc.)
+            logger.warning(
+                f"fetch_youtube_chapters: yt-dlp error for youtube_id={youtube_id}: {e}"
+            )
+            return None
+        except (KeyError, TypeError, ValueError) as e:
+            # Parsing/data structure errors from chapter extraction
+            logger.warning(
+                f"fetch_youtube_chapters: parsing error for youtube_id={youtube_id}: {e}",
+                exc_info=True
+            )
+            return None
+        except Exception as e:
+            # Unexpected errors - log full stacktrace for debugging
+            logger.exception(
+                f"fetch_youtube_chapters: unexpected error for youtube_id={youtube_id}: {e}"
+            )
             return None
 
     async def _extract_info(self, youtube_id: str) -> Optional[dict]:
@@ -79,13 +103,13 @@ class ChapterExtractor:
             Video info dict or None on error
         """
         url = f"https://www.youtube.com/watch?v={youtube_id}"
-        loop = asyncio.get_event_loop()
 
         def _sync_extract():
             with yt_dlp.YoutubeDL(self._ydl_opts) as ydl:
                 return ydl.extract_info(url, download=False)
 
-        return await loop.run_in_executor(None, _sync_extract)
+        # Run in thread pool to avoid blocking (Python 3.9+)
+        return await asyncio.to_thread(_sync_extract)
 
     def parse_description_chapters(
         self,
@@ -108,7 +132,8 @@ class ChapterExtractor:
             List of Chapter objects, or None if not enough timestamps found
         """
         # Pattern matches timestamps like 0:00, 00:00, 0:00:00, 00:00:00
-        timestamp_pattern = r'^(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–]?\s*(.+)$'
+        # Dash character class includes: hyphen-minus (-), en dash (–), em dash (—)
+        timestamp_pattern = r'^(\d{1,2}:\d{2}(?::\d{2})?)\s*[\-\u2013\u2014]?\s*(.+)$'
 
         chapters: List[tuple] = []
 

@@ -101,8 +101,9 @@ class WorkerSettings:
     functions = [process_video, process_video_list, enrich_video]
 
     # Worker configuration
-    # NOTE: Keep max_jobs=1 for enrichment to avoid YouTube rate limiting (429)
-    max_jobs = 1
+    # Allows concurrent processing for video imports while enrichment uses
+    # internal rate limiting (see EnrichmentService._youtube_semaphore)
+    max_jobs = 10
     job_timeout = 300  # 5 minutes
     keep_result = 3600  # 1 hour
 

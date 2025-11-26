@@ -98,12 +98,8 @@ class AudioChunker:
             "no_warnings": True,
         }
 
-        # Run in thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: self._download_sync(url, ydl_opts)
-        )
+        # Run in thread pool to avoid blocking (Python 3.9+)
+        await asyncio.to_thread(self._download_sync, url, ydl_opts)
 
         # Find the downloaded file
         audio_path = Path(self._temp_dir) / "audio.mp3"

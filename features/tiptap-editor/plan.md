@@ -25,6 +25,7 @@ cd frontend
 npm install @tiptap/react @tiptap/pm @tiptap/starter-kit
 npm install @tiptap/extension-link @tiptap/extension-placeholder
 npm install @tiptap/extension-code-block-lowlight lowlight
+npm install @tiptap/extension-character-count
 ```
 
 ### Verifikation
@@ -52,6 +53,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import CharacterCount from '@tiptap/extension-character-count'
 import { common, createLowlight } from 'lowlight'
 import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
@@ -92,6 +94,9 @@ export const TiptapEditor = ({
       }),
       CodeBlockLowlight.configure({
         lowlight,
+      }),
+      CharacterCount.configure({
+        limit: maxLength,
       }),
     ],
     content,

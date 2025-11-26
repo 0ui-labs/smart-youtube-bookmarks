@@ -33,6 +33,7 @@ from sqlalchemy.orm import selectinload, joinedload, aliased
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from isodate import parse_duration
 from httpx import HTTPError, TimeoutException
+from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
 
 from app.core.database import get_db
 from app.core.redis import get_arq_pool, get_redis_client
@@ -114,20 +115,24 @@ async def _enqueue_enrichment(video_id: UUID, db: AsyncSession) -> None:
     if not settings.enrichment_enabled or not settings.enrichment_auto_trigger:
         return
 
-    try:
-        # Create pending enrichment record
-        enrichment = VideoEnrichment(
-            video_id=video_id,
-            status=EnrichmentStatus.pending.value
-        )
-        db.add(enrichment)
-        await db.flush()
+    # Create pending enrichment record (not yet flushed)
+    enrichment = VideoEnrichment(
+        video_id=video_id,
+        status=EnrichmentStatus.pending.value
+    )
+    db.add(enrichment)
 
-        # Enqueue ARQ job
+    try:
+        # Enqueue ARQ job first - if this fails, we don't want the DB record
         arq_pool = await get_arq_pool()
         await arq_pool.enqueue_job("enrich_video", str(video_id))
+
+        # Only flush after job is successfully enqueued
+        await db.flush()
         logger.info(f"Enqueued enrichment job for video {video_id}")
-    except Exception as e:
+    except (RedisError, RedisConnectionError, OSError) as e:
+        # Redis/connection errors - expunge the unpersisted enrichment record
+        db.expunge(enrichment)
         logger.warning(f"Failed to enqueue enrichment job for video {video_id}: {e}")
 
 

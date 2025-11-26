@@ -1,4 +1,29 @@
-"""Video enrichment service for captions and chapters."""
+"""Video enrichment service for captions and chapters.
+
+Rate Limiting Strategy:
+-----------------------
+YouTube API has strict rate limits that return 429 errors when exceeded.
+To avoid throttling ALL worker jobs (video imports, list processing), we use
+a module-level asyncio.Semaphore to limit concurrent YouTube API calls to 1.
+
+This allows:
+- Multiple video imports to run concurrently (max_jobs=10 in worker settings)
+- Enrichment jobs to queue and process sequentially for YouTube API calls
+- Better overall throughput vs global max_jobs=1
+
+The semaphore is combined with a 2-second delay between YouTube API calls
+to stay well under rate limits.
+
+Monitoring:
+- Check ARQ queue depth: `arq info` or Redis LLEN on arq:queue:default
+- Watch for 429 errors in logs: grep "429" or "rate limit"
+- Consider adding metrics for enrichment_queue_depth, enrichment_wait_time
+
+Future improvements:
+- Exponential backoff retry on 429 responses
+- Separate ARQ worker instance for enrichment with max_jobs=1
+- Redis-based distributed rate limiter for multi-worker deployments
+"""
 import asyncio
 import os
 from typing import List, Optional
@@ -18,6 +43,11 @@ from .providers.groq_transcriber import GroqTranscriber
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Module-level semaphore to limit concurrent YouTube API calls across all
+# EnrichmentService instances. This prevents 429 rate limit errors while
+# allowing other worker jobs (video imports) to run concurrently.
+_youtube_api_semaphore = asyncio.Semaphore(1)
 
 
 class EnrichmentService:
@@ -299,21 +329,28 @@ class EnrichmentService:
         await self._db.flush()
 
         try:
-            # Fetch captions - try YouTube first, then Groq Whisper fallback
-            await self._update_progress(enrichment, "Fetching captions from YouTube...")
-            has_captions = await self._fetch_captions(enrichment, video)
+            # Use semaphore to limit concurrent YouTube API calls across all workers
+            # This prevents 429 rate limit errors while allowing other jobs to proceed
+            async with _youtube_api_semaphore:
+                logger.debug(f"Acquired YouTube API semaphore for video {video_id}")
 
-            # If YouTube failed, try Groq Whisper as fallback
-            if not has_captions:
-                await self._update_progress(enrichment, "YouTube unavailable, trying Groq Whisper...")
-                has_captions = await self._fetch_captions_groq(enrichment, video)
+                # Fetch captions - try YouTube first, then Groq Whisper fallback
+                await self._update_progress(enrichment, "Fetching captions from YouTube...")
+                has_captions = await self._fetch_captions(enrichment, video)
 
-            # Rate limit delay to avoid YouTube 429 errors
-            await asyncio.sleep(2)
+                # If YouTube failed, try Groq Whisper as fallback (outside rate limit)
+                if not has_captions:
+                    await self._update_progress(enrichment, "YouTube unavailable, trying Groq Whisper...")
+                    has_captions = await self._fetch_captions_groq(enrichment, video)
 
-            # Fetch chapters
-            await self._update_progress(enrichment, "Extracting chapters...")
-            has_chapters = await self._fetch_chapters(enrichment, video)
+                # Rate limit delay to avoid YouTube 429 errors
+                await asyncio.sleep(2)
+
+                # Fetch chapters
+                await self._update_progress(enrichment, "Extracting chapters...")
+                has_chapters = await self._fetch_chapters(enrichment, video)
+
+                logger.debug(f"Released YouTube API semaphore for video {video_id}")
 
             # Generate chapters VTT if we have chapters
             if has_chapters and enrichment.chapters_json:

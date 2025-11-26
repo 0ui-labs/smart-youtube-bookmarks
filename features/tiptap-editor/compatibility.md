@@ -172,10 +172,31 @@ return <TiptapEditor ... />  // Neues Verhalten
 ### Daten-Recovery
 
 ```typescript
-// HTML zu Plain Text konvertieren (Notfall)
+/**
+ * Cross-platform HTML stripper.
+ * Works in both browser (DOMParser) and Node/SSR (regex fallback).
+ */
 function stripHtml(html: string): string {
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  return doc.body.textContent || ''
+  if (!html) return ''
+
+  // Browser environment: use DOMParser for accurate parsing
+  if (typeof window !== 'undefined' && typeof DOMParser !== 'undefined') {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    return doc.body.textContent || ''
+  }
+
+  // Node/SSR environment: regex-based fallback
+  // For production SSR, consider using 'string-strip-html' package
+  return html
+    .replace(/<[^>]*>/g, '')           // Remove HTML tags
+    .replace(/&nbsp;/g, ' ')           // Convert non-breaking spaces
+    .replace(/&amp;/g, '&')            // Decode ampersands
+    .replace(/&lt;/g, '<')             // Decode less-than
+    .replace(/&gt;/g, '>')             // Decode greater-than
+    .replace(/&quot;/g, '"')           // Decode quotes
+    .replace(/&#39;/g, "'")            // Decode apostrophes
+    .replace(/\s+/g, ' ')              // Normalize whitespace
+    .trim()
 }
 ```
 

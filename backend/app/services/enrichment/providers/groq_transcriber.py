@@ -62,6 +62,8 @@ class GroqTranscriber:
     async def transcribe_chunks(self, chunks: List[AudioChunk]) -> List[TranscriptionResult]:
         """Transcribe multiple audio chunks with rate limiting.
 
+        Processes up to MAX_CONCURRENT chunks concurrently using a semaphore.
+
         Args:
             chunks: List of AudioChunk objects to transcribe
 
@@ -71,21 +73,20 @@ class GroqTranscriber:
         if not chunks:
             return []
 
-        results: List[TranscriptionResult] = []
-
-        # Process in batches with rate limiting
-        for i, chunk in enumerate(chunks):
+        async def _process_chunk(chunk: AudioChunk) -> TranscriptionResult:
+            """Process a single chunk with semaphore-based rate limiting."""
             async with self._semaphore:
                 result = await self._transcribe_single(chunk)
-                results.append(result)
+                # Add delay after each request to respect rate limits
+                await asyncio.sleep(DELAY_BETWEEN_REQUESTS)
+                return result
 
-                # Add delay between requests (except for the last one)
-                if i < len(chunks) - 1:
-                    await asyncio.sleep(DELAY_BETWEEN_REQUESTS)
+        # Process chunks concurrently with semaphore limiting concurrency
+        results = await asyncio.gather(*[_process_chunk(chunk) for chunk in chunks])
 
         # Sort by chunk index
         results.sort(key=lambda r: r.chunk_index)
-        return results
+        return list(results)
 
     async def _transcribe_single(self, chunk: AudioChunk) -> TranscriptionResult:
         """Transcribe a single audio chunk.
