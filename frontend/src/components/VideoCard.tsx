@@ -10,6 +10,7 @@ import {
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
 import { useTagStore } from '@/stores/tagStore'
+import { useImportProgressStore } from '@/stores/importProgressStore'
 
 // Import VideoThumbnail from VideosPage (reuse existing component)
 // REF MCP Improvement #2: Use existing VideoThumbnail API (url, title props)
@@ -17,6 +18,9 @@ import { VideoThumbnail } from './VideosPage'
 
 // Import CustomFieldsPreview for field value display (Task #89)
 import { CustomFieldsPreview } from './fields'
+
+// Import ProgressOverlay for import progress display
+import { ProgressOverlay } from './ProgressOverlay'
 
 interface VideoCardProps {
   video: VideoResponse
@@ -56,12 +60,22 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
   const cardRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const { tags, toggleTag } = useTagStore()
+  const { isImporting, getProgress } = useImportProgressStore()
+
+  // Check if video is currently importing
+  const importing = isImporting(video.id)
+  const importProgress = getProgress(video.id)
 
   // Modal state removed - now handled at VideosPage level
 
   // Task #6: Navigate to video details page on card click
   // Updated: Use parent callback if provided (Grid view with modal/page logic)
   const handleCardClick = () => {
+    // Disable card click while importing
+    if (importing) {
+      return
+    }
+
     // Use parent callback if provided (VideosPage handles modal/page decision)
     if (onCardClick) {
       onCardClick()
@@ -117,11 +131,18 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
       <div className="relative">
         {/* REF MCP #2: Reuse VideoThumbnail with correct API (url, title) */}
         {/* Task #35 Fix: Use useFullWidth={true} for Grid mode (container-adapted sizing) */}
-        <VideoThumbnail url={video.thumbnail_url} title={video.title || 'Untitled'} useFullWidth={true} />
+        <div className={importing ? 'grayscale' : ''}>
+          <VideoThumbnail url={video.thumbnail_url} title={video.title || 'Untitled'} useFullWidth={true} />
+        </div>
 
-        {/* Duration Overlay (bottom-right corner) */}
+        {/* Import Progress Overlay */}
+        {importing && importProgress && (
+          <ProgressOverlay progress={importProgress.progress} stage={importProgress.stage} />
+        )}
+
+        {/* Duration Overlay (bottom-right corner) - hide while importing */}
         {/* REF MCP #4: Enhanced readability with shadow-lg and border */}
-        {video.duration && (
+        {video.duration && !importing && (
           <div className="absolute bottom-2 right-2 rounded bg-black/80 px-1.5 py-0.5 text-xs font-semibold text-white shadow-lg border border-white/20">
             {formatDuration(video.duration)}
           </div>

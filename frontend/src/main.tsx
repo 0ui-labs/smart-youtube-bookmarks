@@ -4,6 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import { getQueryClient } from './lib/queryClient'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { WebSocketProvider } from './components/WebSocketProvider'
 import App from './App'
 import './index.css'
 
@@ -18,7 +19,9 @@ ReactDOM.createRoot(rootElement).render(
     <ErrorBoundary>
       <QueryClientProvider client={getQueryClient()}>
         <BrowserRouter>
-          <App />
+          <WebSocketProvider>
+            <App />
+          </WebSocketProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>

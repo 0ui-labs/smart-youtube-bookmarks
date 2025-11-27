@@ -468,6 +468,125 @@ describe('useWebSocket', () => {
     });
   });
 
+  describe('Import Progress Updates', () => {
+    it('updates importProgressStore on import_progress message', async () => {
+      // Dynamic import to get fresh store state
+      const { useImportProgressStore } = await import('@/stores/importProgressStore');
+
+      const { result, rerender } = renderHook(() => useWebSocket());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // Clear any previous state
+      act(() => {
+        useImportProgressStore.getState().clearAllProgress();
+      });
+
+      // Simulate import_progress message from backend
+      await act(async () => {
+        mockLastJsonMessage = {
+          type: 'import_progress',
+          video_id: 'video-123',
+          progress: 60,
+          stage: 'captions'
+        };
+        rerender();
+      });
+
+      // Check that importProgressStore was updated
+      const storeProgress = useImportProgressStore.getState().getProgress('video-123');
+      expect(storeProgress).toBeDefined();
+      expect(storeProgress?.progress).toBe(60);
+      expect(storeProgress?.stage).toBe('captions');
+    });
+
+    it('handles multiple import_progress updates for different videos', async () => {
+      const { useImportProgressStore } = await import('@/stores/importProgressStore');
+
+      const { result, rerender } = renderHook(() => useWebSocket());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // Clear any previous state
+      act(() => {
+        useImportProgressStore.getState().clearAllProgress();
+      });
+
+      // Simulate import_progress for video 1
+      await act(async () => {
+        mockLastJsonMessage = {
+          type: 'import_progress',
+          video_id: 'video-1',
+          progress: 25,
+          stage: 'metadata'
+        };
+        rerender();
+      });
+
+      // Simulate import_progress for video 2
+      await act(async () => {
+        mockLastJsonMessage = {
+          type: 'import_progress',
+          video_id: 'video-2',
+          progress: 90,
+          stage: 'chapters'
+        };
+        rerender();
+      });
+
+      // Both videos should be tracked
+      const store = useImportProgressStore.getState();
+      expect(store.getProgress('video-1')?.progress).toBe(25);
+      expect(store.getProgress('video-2')?.progress).toBe(90);
+    });
+
+    it('clears import progress when stage is complete', async () => {
+      const { useImportProgressStore } = await import('@/stores/importProgressStore');
+
+      const { result, rerender } = renderHook(() => useWebSocket());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // Clear any previous state
+      act(() => {
+        useImportProgressStore.getState().clearAllProgress();
+      });
+
+      // First set progress to importing
+      await act(async () => {
+        mockLastJsonMessage = {
+          type: 'import_progress',
+          video_id: 'video-123',
+          progress: 60,
+          stage: 'captions'
+        };
+        rerender();
+      });
+
+      expect(useImportProgressStore.getState().isImporting('video-123')).toBe(true);
+
+      // Then complete the import
+      await act(async () => {
+        mockLastJsonMessage = {
+          type: 'import_progress',
+          video_id: 'video-123',
+          progress: 100,
+          stage: 'complete'
+        };
+        rerender();
+      });
+
+      // Video should no longer be "importing" (stage is terminal)
+      expect(useImportProgressStore.getState().isImporting('video-123')).toBe(false);
+    });
+  });
+
   describe('Error Handling', () => {
     it.skip('handles malformed JSON messages gracefully', async () => {
       // react-use-websocket handles JSON parsing and filtering
