@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import useWebSocketLib, { ReadyState } from 'react-use-websocket';
+import { useImportProgressStore } from '@/stores/importProgressStore';
 
 /**
  * Progress update data structure received from WebSocket
@@ -172,7 +173,14 @@ export function useWebSocket(): UseWebSocketReturn {
       return;
     }
 
-    // Handle progress updates
+    // Handle video-level import progress updates
+    if (data.type === 'import_progress') {
+      const { video_id, progress, stage } = data;
+      useImportProgressStore.getState().setProgress(video_id, progress, stage);
+      return;
+    }
+
+    // Handle job-level progress updates
     const update: ProgressUpdate = data;
 
     // Add timestamp for cleanup logic
