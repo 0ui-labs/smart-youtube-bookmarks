@@ -3,10 +3,119 @@ Tests for staged enrichment worker functions.
 """
 import pytest
 from uuid import uuid4
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.video import Video
+from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
+
+
+@pytest.mark.asyncio
+async def test_enrich_video_staged_updates_progress(test_db: AsyncSession, test_list, arq_context):
+    """Test that enrich_video_staged updates progress through stages."""
+    from app.workers.video_processor import enrich_video_staged
+
+    # Create a video with metadata already fetched
+    video = Video(
+        list_id=test_list.id,
+        youtube_id="staged_enrich_123",
+        title="Test Video",
+        import_stage="metadata",
+        import_progress=25
+    )
+    test_db.add(video)
+    await test_db.flush()
+
+    # Mock the EnrichmentService to avoid actual API calls
+    mock_enrichment = VideoEnrichment(
+        video_id=video.id,
+        status=EnrichmentStatus.completed,
+        captions_vtt="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nHello"
+    )
+
+    with patch('app.services.enrichment.enrichment_service.EnrichmentService') as mock_service_class:
+        mock_service = AsyncMock()
+        mock_service.enrich_video.return_value = mock_enrichment
+        mock_service_class.return_value = mock_service
+
+        # Run staged enrichment
+        result = await enrich_video_staged(arq_context, str(video.id))
+
+    # Verify result
+    assert result["status"] == "completed"
+    assert result["video_id"] == str(video.id)
+
+    # Verify video was updated to complete
+    await test_db.refresh(video)
+    assert video.import_stage == "complete"
+    assert video.import_progress == 100
+
+
+@pytest.mark.asyncio
+async def test_enrich_video_staged_publishes_progress(test_db: AsyncSession, test_list, arq_context):
+    """Test that enrich_video_staged publishes progress updates via Redis."""
+    from app.workers.video_processor import enrich_video_staged
+
+    video = Video(
+        list_id=test_list.id,
+        youtube_id="publish_test_123",
+        title="Test Video",
+        import_stage="metadata",
+        import_progress=25
+    )
+    test_db.add(video)
+    await test_db.flush()
+
+    mock_enrichment = VideoEnrichment(
+        video_id=video.id,
+        status=EnrichmentStatus.completed
+    )
+
+    with patch('app.services.enrichment.enrichment_service.EnrichmentService') as mock_service_class:
+        mock_service = AsyncMock()
+        mock_service.enrich_video.return_value = mock_enrichment
+        mock_service_class.return_value = mock_service
+
+        await enrich_video_staged(arq_context, str(video.id))
+
+    # Verify Redis publish was called (progress updates)
+    redis_mock = arq_context['redis']
+    assert redis_mock.publish.called
+
+
+@pytest.mark.asyncio
+async def test_enrich_video_staged_handles_partial_enrichment(test_db: AsyncSession, test_list, arq_context):
+    """Test that partial enrichment (no captions but has chapters) sets correct stage."""
+    from app.workers.video_processor import enrich_video_staged
+
+    video = Video(
+        list_id=test_list.id,
+        youtube_id="partial_test_123",
+        title="Test Video",
+        import_stage="metadata",
+        import_progress=25
+    )
+    test_db.add(video)
+    await test_db.flush()
+
+    # Partial enrichment - no captions but maybe chapters
+    mock_enrichment = VideoEnrichment(
+        video_id=video.id,
+        status=EnrichmentStatus.partial
+    )
+
+    with patch('app.services.enrichment.enrichment_service.EnrichmentService') as mock_service_class:
+        mock_service = AsyncMock()
+        mock_service.enrich_video.return_value = mock_enrichment
+        mock_service_class.return_value = mock_service
+
+        result = await enrich_video_staged(arq_context, str(video.id))
+
+    assert result["status"] == "partial"
+    await test_db.refresh(video)
+    # Partial still means complete for import purposes
+    assert video.import_stage == "complete"
+    assert video.import_progress == 100
 
 
 @pytest.mark.asyncio

@@ -81,6 +81,94 @@ async def publish_progress(redis, user_id: str, video_id: str, progress: int, st
     logger.debug(f"Published progress update for video {video_id}: {progress}% ({stage})")
 
 
+async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
+    """
+    Enrich a video with captions and chapters, updating progress through stages.
+
+    This is the staged version of enrichment that:
+    1. Updates import_stage/import_progress at each phase
+    2. Publishes progress updates via Redis for real-time UI
+
+    Stages:
+    - captions (60%): Fetching captions from YouTube or Groq Whisper
+    - chapters (90%): Extracting chapters
+    - complete (100%): All done
+
+    Args:
+        ctx: ARQ job context (contains db session and redis)
+        video_id: UUID of video to enrich
+
+    Returns:
+        dict: Processing result with status and video_id
+    """
+    from app.services.enrichment.enrichment_service import EnrichmentService
+
+    db: AsyncSession = ctx['db']
+    redis = ctx.get('redis')
+
+    try:
+        # Fetch video
+        video = await db.get(Video, UUID(video_id))
+        if not video:
+            logger.error(f"Video {video_id} not found for staged enrichment")
+            return {"status": "error", "message": "Video not found", "video_id": video_id}
+
+        # Get user_id for progress publishing
+        list_result = await db.execute(
+            select(BookmarkList.user_id).where(BookmarkList.id == video.list_id)
+        )
+        user_id = list_result.scalar_one_or_none()
+
+        # Stage: Captions (60%)
+        await update_stage(db, video, "captions", 60)
+        if redis and user_id:
+            await publish_progress(redis, str(user_id), video_id, 60, "captions")
+
+        # Run enrichment service
+        service = EnrichmentService(db)
+        enrichment = await service.enrich_video(UUID(video_id))
+
+        # Stage: Chapters (90%) - enrichment service handles this internally
+        await update_stage(db, video, "chapters", 90)
+        if redis and user_id:
+            await publish_progress(redis, str(user_id), video_id, 90, "chapters")
+
+        # Stage: Complete (100%)
+        await update_stage(db, video, "complete", 100)
+        if redis and user_id:
+            await publish_progress(redis, str(user_id), video_id, 100, "complete")
+
+        await db.commit()
+
+        logger.info(
+            f"Staged enrichment completed for video {video_id} with status {enrichment.status}"
+        )
+
+        return {
+            "status": enrichment.status.value if hasattr(enrichment.status, 'value') else str(enrichment.status),
+            "video_id": video_id,
+            "enrichment_id": str(enrichment.id) if enrichment.id else None
+        }
+
+    except Exception as e:
+        logger.exception(f"Error in staged enrichment for video {video_id}")
+
+        # Try to set error state
+        try:
+            video = await db.get(Video, UUID(video_id))
+            if video:
+                await update_stage(db, video, "error", video.import_progress)
+                await db.commit()
+        except Exception:
+            pass
+
+        return {
+            "status": "error",
+            "message": str(e),
+            "video_id": video_id
+        }
+
+
 async def process_video(
     ctx: dict,
     video_id: str,
