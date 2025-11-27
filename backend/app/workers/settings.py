@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, update
 from app.core.config import settings
 from app.workers.db_manager import sessionmanager, db_session_context
-from app.workers.video_processor import process_video, process_video_list
+from app.workers.video_processor import process_video, process_video_list, enrich_video_staged
 from app.workers.enrichment_worker import enrich_video
 from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
 from app.models.video import Video
@@ -242,7 +242,7 @@ class WorkerSettings:
     )
 
     # Worker functions
-    functions = [process_video, process_video_list, enrich_video, recover_failed_enrichments]
+    functions = [process_video, process_video_list, enrich_video, enrich_video_staged, recover_failed_enrichments]
 
     # Cron jobs - periodic tasks
     # Retry failed enrichments every 5 minutes
