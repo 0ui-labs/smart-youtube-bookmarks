@@ -41,7 +41,30 @@ export const useVideoDropZone = (
 
   const onDrop = useCallback(
     async (acceptedFiles: File[], _rejectedFiles: unknown, event?: DropEvent) => {
-      // 1. Check for text/URL data (browser URL drag)
+      // 1. Handle .webloc files (prioritize files over text data)
+      // When dragging webloc files, macOS includes text/plain which would cause early return
+      const weblocFiles = acceptedFiles.filter((f) => f.name.endsWith('.webloc'))
+      if (weblocFiles.length > 0) {
+        const urls = await Promise.all(weblocFiles.map(parseWeblocFile))
+        const validUrls = urls.filter((url): url is string => url !== null)
+        if (validUrls.length > 0) {
+          onVideosDetected({ type: 'webloc-files', urls: validUrls })
+        }
+        return
+      }
+
+      // 2. Handle .csv files
+      const csvFiles = acceptedFiles.filter((f) => f.name.endsWith('.csv'))
+      const csvFile = csvFiles[0]
+      if (csvFile) {
+        const urls = await parseUrlsFromCSV(csvFile)
+        if (urls.length > 0) {
+          onVideosDetected({ type: 'csv-file', urls, file: csvFile })
+        }
+        return
+      }
+
+      // 3. Check for text/URL data (browser URL drag - only if no files)
       if (event && 'dataTransfer' in event && event.dataTransfer) {
         const text =
           event.dataTransfer.getData('text/plain') ||
@@ -53,27 +76,6 @@ export const useVideoDropZone = (
             onVideosDetected({ type: 'youtube-urls', urls })
             return
           }
-        }
-      }
-
-      // 2. Handle .webloc files
-      const weblocFiles = acceptedFiles.filter((f) => f.name.endsWith('.webloc'))
-      if (weblocFiles.length > 0) {
-        const urls = await Promise.all(weblocFiles.map(parseWeblocFile))
-        const validUrls = urls.filter((url): url is string => url !== null)
-        if (validUrls.length > 0) {
-          onVideosDetected({ type: 'webloc-files', urls: validUrls })
-        }
-        return
-      }
-
-      // 3. Handle .csv files
-      const csvFiles = acceptedFiles.filter((f) => f.name.endsWith('.csv'))
-      const csvFile = csvFiles[0]
-      if (csvFile) {
-        const urls = await parseUrlsFromCSV(csvFile)
-        if (urls.length > 0) {
-          onVideosDetected({ type: 'csv-file', urls, file: csvFile })
         }
       }
     },
