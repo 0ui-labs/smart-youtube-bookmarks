@@ -76,7 +76,13 @@ export const TagNavigation = ({
     if (!FEATURE_FLAGS.DRAG_DROP_IMPORT || !onVideosDropped || isTouchDevice) return
     e.preventDefault()
     e.stopPropagation()
-    setDragOverTagId(null)
+
+    // Only clear if we're actually leaving the button (not entering a child element)
+    const relatedTarget = e.relatedTarget as Node | null
+    const currentTarget = e.currentTarget as Node
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      setDragOverTagId(null)
+    }
   }, [onVideosDropped, isTouchDevice])
 
   // Handle drop on a tag

@@ -13,7 +13,7 @@ import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV, useAssignTa
 import { useVideoDropZone, type ParsedDropData } from '@/hooks/useVideoDropZone'
 import { DropZoneOverlay } from '@/components/DropZoneOverlay'
 import { ImportPreviewModal } from '@/components/ImportPreviewModal'
-import { createCSVFromUrls } from '@/utils/urlParser'
+import { createCSVFromUrls, parseUrlsFromText } from '@/utils/urlParser'
 import { useImportDropStore } from '@/stores/importDropStore'
 import { useVideosFilter } from '@/hooks/useVideosFilter'
 import { useFieldFilterStore } from '@/stores/fieldFilterStore'
@@ -386,7 +386,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // Drag & Drop handler: called when videos are detected
   const handleVideosDetected = useCallback((data: ParsedDropData) => {
-    if (data.urls.length === 0) return
+    if (data.urls.length === 0) {
+      return
+    }
 
     // Open import preview modal with detected URLs
     setImportPreviewModal({
@@ -397,32 +399,36 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // Drag & Drop handler: called when import is confirmed
   const handleImportConfirm = useCallback(
-    async (urls: string[], _categoryId?: string) => {
-      // Close modal first
-      setImportPreviewModal({ open: false, urls: [] })
-
-      if (urls.length === 0) return
-
+    async (urls: string[], categoryId?: string) => {
       try {
+        // Close modal first
+        setImportPreviewModal({ open: false, urls: [] })
+
+        if (urls.length === 0) {
+          return
+        }
+
         // Create CSV blob from URLs
         const csvBlob = createCSVFromUrls(urls)
         const csvFile = new File([csvBlob], 'import.csv', { type: 'text/csv' })
 
         // Upload via bulk upload API
-        await bulkUpload.mutateAsync(csvFile)
+        const result = await bulkUpload.mutateAsync(csvFile)
 
         // If category was selected, assign it to all imported videos
-        // Note: This would require the API to return the imported video IDs
-        // For now, we just trigger the import - category assignment can be added later
-        // if (categoryId && importedVideoIds.length > 0) {
-        //   await Promise.all(importedVideoIds.map(id => assignCategory(id, categoryId)))
-        // }
+        if (categoryId && result.created_video_ids.length > 0) {
+          await Promise.all(
+            result.created_video_ids.map((videoId) =>
+              assignTags.mutateAsync({ videoId, tagIds: [categoryId] })
+            )
+          )
+        }
       } catch (error) {
         console.error('Failed to import videos:', error)
         // TODO: Add toast notification for error
       }
     },
-    [bulkUpload]
+    [bulkUpload, assignTags, listId]
   )
 
   // Mobile detection: Disable drag-drop on touch devices (Step 29)
@@ -432,25 +438,32 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   }, [])
 
   // Initialize useVideoDropZone hook
+  const dropZoneDisabled = !FEATURE_FLAGS.DRAG_DROP_IMPORT || isTouchDevice
   const { isDragging, getRootProps, getInputProps } = useVideoDropZone({
     onVideosDetected: handleVideosDetected,
-    disabled: !FEATURE_FLAGS.DRAG_DROP_IMPORT || isTouchDevice,
+    disabled: dropZoneDisabled,
   })
 
   // Listen for pending imports from TagNavigation drops
   const pendingImport = useImportDropStore((state) => state.pendingImport)
   const clearPendingImport = useImportDropStore((state) => state.clearPendingImport)
 
-  // Open modal when there's a pending import from sidebar
+  // Handle pending imports from TagNavigation drops
   useEffect(() => {
     if (pendingImport) {
-      setImportPreviewModal({
-        open: true,
-        urls: pendingImport.urls,
-      })
-      // Note: We use the preselectedCategoryId in the modal's prop below
+      // If category was preselected (dropped on a tag), auto-import without modal
+      if (pendingImport.preselectedCategoryId) {
+        handleImportConfirm(pendingImport.urls, pendingImport.preselectedCategoryId)
+        clearPendingImport()
+      } else {
+        // No category preselected - show modal for selection
+        setImportPreviewModal({
+          open: true,
+          urls: pendingImport.urls,
+        })
+      }
     }
-  }, [pendingImport])
+  }, [pendingImport, handleImportConfirm, clearPendingImport])
 
   // WebSocket for bulk upload progress (optional - bulk uploads now work without it too)
   // Disabled for now to prevent unnecessary re-renders
@@ -875,6 +888,24 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     setIsAdding(true)
   }
 
+  // Handle URL drops directly (react-dropzone only handles file drops)
+  // MUST be defined before early returns to satisfy React hooks rules
+  const handleNativeDrop = useCallback((e: React.DragEvent) => {
+    // Check for text/URL data first (browser URL drag)
+    const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list')
+    if (text) {
+      const urls = parseUrlsFromText(text)
+      if (urls.length > 0) {
+        e.preventDefault()
+        e.stopPropagation()
+        handleVideosDetected({ type: 'youtube-urls', urls })
+        return
+      }
+    }
+    // Let react-dropzone handle file drops
+    getRootProps().onDrop?.(e as React.DragEvent<HTMLElement>)
+  }, [handleVideosDetected, getRootProps])
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -896,6 +927,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   return (
     <div
       {...getRootProps()}
+      onDrop={handleNativeDrop}
       className="w-full max-w-[2180px] mx-auto p-8 relative"
     >
       {/* Hidden file input for react-dropzone */}

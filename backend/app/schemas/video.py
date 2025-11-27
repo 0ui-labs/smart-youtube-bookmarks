@@ -317,6 +317,7 @@ class BulkUploadResponse(BaseModel):
     created_count: int
     failed_count: int
     failures: list[BulkUploadFailure] = Field(default_factory=list)
+    created_video_ids: list[str] = Field(default_factory=list, description="UUIDs of successfully created videos")
 
 
 # Resolve forward references after all schemas are defined

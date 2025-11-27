@@ -121,6 +121,8 @@ export interface BulkUploadResponse {
   failed_count: number
   /** Array of detailed failure information for each failed upload */
   failures: BulkUploadFailure[]
+  /** UUIDs of successfully created videos */
+  created_video_ids: string[]
 }
 
 /**

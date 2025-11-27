@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import {
   Dialog,
@@ -48,6 +48,13 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
     preselectedCategoryId
   )
   const { data: categories = [] } = useCategories()
+
+  // Sync selectedCategoryId when preselectedCategoryId changes
+  useEffect(() => {
+    if (preselectedCategoryId) {
+      setSelectedCategoryId(preselectedCategoryId)
+    }
+  }, [preselectedCategoryId])
 
   // Validate all URLs
   const validatedUrls = useMemo<UrlValidation[]>(() => {

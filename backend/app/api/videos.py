@@ -1764,7 +1764,8 @@ async def bulk_upload_videos(
         return BulkUploadResponse(
             created_count=len(created_videos),
             failed_count=len(failures),
-            failures=failures
+            failures=failures,
+            created_video_ids=[str(v.id) for v in created_videos]
         )
 
     except UnicodeDecodeError:
