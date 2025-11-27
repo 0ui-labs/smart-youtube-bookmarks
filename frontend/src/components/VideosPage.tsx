@@ -891,7 +891,20 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   // Handle URL drops directly (react-dropzone only handles file drops)
   // MUST be defined before early returns to satisfy React hooks rules
   const handleNativeDrop = useCallback((e: React.DragEvent) => {
-    // Check for text/URL data first (browser URL drag)
+    // Check for files FIRST - macOS includes text/plain when dragging webloc files
+    // which would cause us to only detect 1 URL instead of all files
+    const hasFiles = e.dataTransfer.files && e.dataTransfer.files.length > 0
+    const hasWeblocOrCsv = hasFiles && Array.from(e.dataTransfer.files).some(
+      f => f.name.endsWith('.webloc') || f.name.endsWith('.csv')
+    )
+
+    if (hasWeblocOrCsv) {
+      // Let react-dropzone handle file drops
+      getRootProps().onDrop?.(e as React.DragEvent<HTMLElement>)
+      return
+    }
+
+    // Check for text/URL data (browser URL drag - only if no supported files)
     const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list')
     if (text) {
       const urls = parseUrlsFromText(text)
@@ -902,7 +915,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         return
       }
     }
-    // Let react-dropzone handle file drops
+
+    // Let react-dropzone handle other file drops
     getRootProps().onDrop?.(e as React.DragEvent<HTMLElement>)
   }, [handleVideosDetected, getRootProps])
 
