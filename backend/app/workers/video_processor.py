@@ -158,22 +158,33 @@ async def process_video(
             if settings.enrichment_enabled and settings.enrichment_auto_trigger:
                 try:
                     # Check if enrichment already exists (avoid IntegrityError on duplicate)
-                    existing_enrichment = await db.execute(
+                    existing_result = await db.execute(
                         select(VideoEnrichment).where(VideoEnrichment.video_id == video.id)
                     )
-                    if existing_enrichment.scalar_one_or_none() is None:
+                    existing_enrichment = existing_result.scalar_one_or_none()
+
+                    if existing_enrichment is None:
+                        # Create new enrichment record
                         enrichment = VideoEnrichment(
                             video_id=video.id,
                             status=EnrichmentStatus.pending.value
                         )
                         db.add(enrichment)
                         await db.flush()
+                        should_enqueue = True
+                    elif existing_enrichment.status == EnrichmentStatus.pending.value:
+                        # Enrichment exists but job may not have been enqueued - enqueue it
+                        should_enqueue = True
+                        logger.info(f"Re-enqueuing pending enrichment for video {video_id}")
+                    else:
+                        # Enrichment already completed or processing
+                        should_enqueue = False
+                        logger.info(f"Enrichment already {existing_enrichment.status} for video {video_id}, skipping")
 
+                    if should_enqueue:
                         arq_pool = await get_arq_pool()
                         await arq_pool.enqueue_job("enrich_video", str(video.id))
                         logger.info(f"Enqueued enrichment job for video {video_id}")
-                    else:
-                        logger.info(f"Enrichment already exists for video {video_id}, skipping")
                 except Exception as e:
                     logger.warning(f"Failed to enqueue enrichment for video {video_id}: {e}")
 
