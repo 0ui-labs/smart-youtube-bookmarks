@@ -70,6 +70,10 @@ class Video(BaseModel):
     )
     error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
+    # Import progress tracking (for two-phase import)
+    import_progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    import_stage: Mapped[str] = mapped_column(String(20), nullable=False, default="created")
+
     # Watch progress tracking (for video player integration)
     watch_position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     watch_position_updated_at: Mapped[Optional[datetime]] = mapped_column(

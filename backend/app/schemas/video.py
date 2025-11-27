@@ -284,6 +284,10 @@ class VideoResponse(BaseModel):
     watch_position: int | None = None
     watch_position_updated_at: datetime | None = None
 
+    # Import progress tracking (for two-phase import)
+    import_progress: int = 0
+    import_stage: str = "created"
+
     model_config = {
         "from_attributes": True
     }
