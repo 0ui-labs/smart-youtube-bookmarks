@@ -9,6 +9,7 @@ from app.models.list import BookmarkList
 from app.models.job_progress import JobProgressEvent
 from app.clients.youtube import YouTubeClient
 from app.services.channel_service import get_or_create_channel
+from app.services.rate_limiter import AdaptiveRateLimiter
 from app.core.config import settings
 from app.core.redis import get_redis_client
 from datetime import datetime
@@ -16,6 +17,15 @@ from isodate import parse_duration
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Module-level rate limiter for enrichment requests
+# Limits concurrent YouTube API calls to prevent 429 errors
+_enrichment_rate_limiter = AdaptiveRateLimiter(
+    max_concurrent=3,
+    base_delay=2.0,
+    max_delay=60.0,
+    failure_threshold=5
+)
 
 
 def _parse_duration(iso_duration: str | None) -> int | None:
@@ -39,6 +49,52 @@ def _parse_timestamp(timestamp: str | None) -> datetime | None:
     except (ValueError, AttributeError) as e:
         logger.debug(f"Invalid timestamp format '{timestamp}': {e}")
         return None
+
+
+async def fetch_with_retry(
+    func,
+    *args,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    **kwargs
+):
+    """
+    Execute async function with exponential backoff retry.
+
+    Args:
+        func: Async function to call
+        *args: Positional arguments for func
+        max_retries: Maximum number of retry attempts
+        base_delay: Base delay between retries (doubles each time)
+        **kwargs: Keyword arguments for func
+
+    Returns:
+        Result from func
+
+    Raises:
+        Exception: The last exception if all retries fail
+    """
+    last_exception = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            last_exception = e
+
+            if attempt == max_retries:
+                # No more retries
+                raise
+
+            # Exponential backoff
+            delay = base_delay * (2 ** attempt)
+            logger.warning(
+                f"Retry {attempt + 1}/{max_retries} after {delay:.2f}s: {e}"
+            )
+            await asyncio.sleep(delay)
+
+    # Should not reach here, but just in case
+    raise last_exception
 
 
 async def update_stage(db: AsyncSession, video: Video, stage: str, progress: int) -> None:
@@ -124,9 +180,17 @@ async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
         if redis and user_id:
             await publish_progress(redis, str(user_id), video_id, 60, "captions")
 
-        # Run enrichment service
-        service = EnrichmentService(db)
-        enrichment = await service.enrich_video(UUID(video_id))
+        # Run enrichment service with rate limiting
+        async with _enrichment_rate_limiter.acquire():
+            service = EnrichmentService(db)
+            try:
+                enrichment = await service.enrich_video(UUID(video_id))
+                _enrichment_rate_limiter.on_success()
+            except Exception as e:
+                # Check if it's a rate limit error (429)
+                is_rate_limit = "429" in str(e) or "rate limit" in str(e).lower()
+                _enrichment_rate_limiter.on_failure(is_rate_limit=is_rate_limit)
+                raise
 
         # Stage: Chapters (90%) - enrichment service handles this internally
         await update_stage(db, video, "chapters", 90)
