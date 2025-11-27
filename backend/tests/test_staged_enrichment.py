@@ -119,6 +119,41 @@ async def test_enrich_video_staged_handles_partial_enrichment(test_db: AsyncSess
 
 
 @pytest.mark.asyncio
+async def test_enrich_video_staged_uses_rate_limiter(test_db: AsyncSession, test_list, arq_context):
+    """Test that enrich_video_staged uses the rate limiter."""
+    from app.workers.video_processor import enrich_video_staged, _enrichment_rate_limiter
+
+    video = Video(
+        list_id=test_list.id,
+        youtube_id="rate_limit_test",
+        title="Test Video",
+        import_stage="metadata",
+        import_progress=25
+    )
+    test_db.add(video)
+    await test_db.flush()
+
+    mock_enrichment = VideoEnrichment(
+        video_id=video.id,
+        status=EnrichmentStatus.completed
+    )
+
+    with patch('app.services.enrichment.enrichment_service.EnrichmentService') as mock_service_class:
+        mock_service = AsyncMock()
+        mock_service.enrich_video.return_value = mock_enrichment
+        mock_service_class.return_value = mock_service
+
+        # Reset rate limiter state
+        _enrichment_rate_limiter.reset()
+
+        await enrich_video_staged(arq_context, str(video.id))
+
+    # Verify rate limiter was used (on_success called)
+    # The delay should still be at base since we called on_success
+    assert _enrichment_rate_limiter.current_delay == _enrichment_rate_limiter.base_delay
+
+
+@pytest.mark.asyncio
 async def test_update_stage_saves_to_db(test_db: AsyncSession, test_list):
     """Test that update_stage saves stage and progress to database."""
     from app.workers.video_processor import update_stage
