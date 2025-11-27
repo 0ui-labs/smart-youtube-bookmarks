@@ -221,6 +221,12 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     urls: [],
   })
 
+  // Polling state for real-time updates after import
+  // When true, refetch videos frequently until all are processed
+  const [isPolling, setIsPolling] = useState(false)
+  const [pendingVideoIds, setPendingVideoIds] = useState<string[]>([])
+  const POLLING_INTERVAL = 500 // 500ms for snappy updates
+
   // Tag integration
   const { data: tags = [] } = useTags()
   // Channels query (YouTube Channels feature)
@@ -358,6 +364,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     sortBy,
     sortOrder,
     enabled: hasFieldFilters || hasTagFilters || hasChannelFilter,
+    refetchInterval: isPolling ? POLLING_INTERVAL : undefined,
   })
 
   const { data: allVideos = [], isLoading: allLoading, error: allError } = useVideos(
@@ -366,6 +373,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       tags: undefined,
       sortBy,
       sortOrder,
+      refetchInterval: isPolling ? POLLING_INTERVAL : undefined,
     }
   )
 
@@ -383,6 +391,28 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     () => videos.map((v) => v.youtube_id).filter((id): id is string => id !== null),
     [videos]
   )
+
+  // Stop polling when all PENDING videos have been processed (have a title)
+  // This provides real-time UI updates after import without manual refresh
+  useEffect(() => {
+    console.log('[Polling] isPolling:', isPolling, 'pendingVideoIds:', pendingVideoIds.length, 'videos.length:', videos.length)
+    if (!isPolling || pendingVideoIds.length === 0) return
+
+    // Find the pending videos in the current videos list
+    const pendingVideos = videos.filter((video) => pendingVideoIds.includes(video.id))
+    console.log('[Polling] Found pending videos:', pendingVideos.length, 'of', pendingVideoIds.length)
+
+    // Check if all pending videos have been processed (title is filled in by worker)
+    const unprocessed = pendingVideos.filter((video) => video.title === null || video.title === undefined)
+    console.log('[Polling] Unprocessed pending videos:', unprocessed.length, unprocessed.map(v => v.youtube_id))
+
+    // Only stop polling when we found all pending videos AND they all have titles
+    if (pendingVideos.length === pendingVideoIds.length && unprocessed.length === 0) {
+      console.log('[Polling] All pending videos processed, stopping polling')
+      setIsPolling(false)
+      setPendingVideoIds([])
+    }
+  }, [isPolling, pendingVideoIds, videos])
 
   // Drag & Drop handler: called when videos are detected
   const handleVideosDetected = useCallback((data: ParsedDropData) => {
@@ -414,6 +444,13 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
         // Upload via bulk upload API
         const result = await bulkUpload.mutateAsync(csvFile)
+
+        // Start polling for real-time updates after successful import
+        if (result.created_video_ids.length > 0) {
+          console.log('[Import] Starting polling for', result.created_video_ids.length, 'videos:', result.created_video_ids)
+          setPendingVideoIds(result.created_video_ids)
+          setIsPolling(true)
+        }
 
         // If category was selected, assign it to all imported videos
         if (categoryId && result.created_video_ids.length > 0) {

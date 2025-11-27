@@ -92,17 +92,9 @@ export const TagNavigation = ({
     e.stopPropagation()
     setDragOverTagId(null)
 
-    // 1. Check for text/URL data (browser URL drag)
-    const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list')
-    if (text) {
-      const urls = parseUrlsFromText(text)
-      if (urls.length > 0) {
-        onVideosDropped(tagId, urls)
-        return
-      }
-    }
-
-    // 2. Handle dropped files
+    // 1. Handle dropped files FIRST (prioritize over text/plain)
+    // When dragging webloc files, macOS includes text/plain with only ONE URL
+    // which would cause early return and skip remaining files
     const files = Array.from(e.dataTransfer.files)
 
     // Handle .webloc files
@@ -121,6 +113,16 @@ export const TagNavigation = ({
     const csvFile = csvFiles[0]
     if (csvFile) {
       const urls = await parseUrlsFromCSV(csvFile)
+      if (urls.length > 0) {
+        onVideosDropped(tagId, urls)
+      }
+      return
+    }
+
+    // 2. Check for text/URL data (browser URL drag - only if no supported files)
+    const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list')
+    if (text) {
+      const urls = parseUrlsFromText(text)
       if (urls.length > 0) {
         onVideosDropped(tagId, urls)
       }

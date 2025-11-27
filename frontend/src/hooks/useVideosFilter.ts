@@ -11,6 +11,7 @@ interface UseVideosFilterOptions {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   enabled?: boolean;  // Allow disabling the query
+  refetchInterval?: number;  // Polling interval in ms (for real-time updates after import)
 }
 
 /**
@@ -168,6 +169,7 @@ export function useVideosFilter({
   sortBy,
   sortOrder = 'asc',
   enabled = true,
+  refetchInterval,
 }: UseVideosFilterOptions) {
   const isQueryEnabled = enabled && !!listId;
 
@@ -222,5 +224,6 @@ export function useVideosFilter({
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     refetchOnReconnect: false,
+    refetchInterval,  // Polling for real-time updates (undefined = disabled)
   });
 }
