@@ -41,6 +41,46 @@ def _parse_timestamp(timestamp: str | None) -> datetime | None:
         return None
 
 
+async def update_stage(db: AsyncSession, video: Video, stage: str, progress: int) -> None:
+    """
+    Update video import stage and progress.
+
+    Args:
+        db: Database session
+        video: Video model instance
+        stage: New import stage (created, metadata, captions, chapters, complete, error)
+        progress: Progress percentage (0-100)
+    """
+    video.import_stage = stage
+    video.import_progress = progress
+    await db.flush()
+
+
+async def publish_progress(redis, user_id: str, video_id: str, progress: int, stage: str) -> None:
+    """
+    Publish import progress update via Redis Pub/Sub.
+
+    Args:
+        redis: Redis client instance
+        user_id: UUID of user (for channel routing)
+        video_id: UUID of video
+        progress: Progress percentage (0-100)
+        stage: Current import stage
+    """
+    import json
+
+    message = {
+        "type": "import_progress",
+        "video_id": video_id,
+        "progress": progress,
+        "stage": stage
+    }
+
+    channel = f"progress:user:{user_id}"
+    await redis.publish(channel, json.dumps(message))
+    logger.debug(f"Published progress update for video {video_id}: {progress}% ({stage})")
+
+
 async def process_video(
     ctx: dict,
     video_id: str,
