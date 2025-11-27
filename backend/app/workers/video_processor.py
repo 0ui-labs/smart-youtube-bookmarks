@@ -157,16 +157,23 @@ async def process_video(
             # Trigger enrichment if enabled
             if settings.enrichment_enabled and settings.enrichment_auto_trigger:
                 try:
-                    enrichment = VideoEnrichment(
-                        video_id=video.id,
-                        status=EnrichmentStatus.pending.value
+                    # Check if enrichment already exists (avoid IntegrityError on duplicate)
+                    existing_enrichment = await db.execute(
+                        select(VideoEnrichment).where(VideoEnrichment.video_id == video.id)
                     )
-                    db.add(enrichment)
-                    await db.flush()
+                    if existing_enrichment.scalar_one_or_none() is None:
+                        enrichment = VideoEnrichment(
+                            video_id=video.id,
+                            status=EnrichmentStatus.pending.value
+                        )
+                        db.add(enrichment)
+                        await db.flush()
 
-                    arq_pool = await get_arq_pool()
-                    await arq_pool.enqueue_job("enrich_video", str(video.id))
-                    logger.info(f"Enqueued enrichment job for video {video_id}")
+                        arq_pool = await get_arq_pool()
+                        await arq_pool.enqueue_job("enrich_video", str(video.id))
+                        logger.info(f"Enqueued enrichment job for video {video_id}")
+                    else:
+                        logger.info(f"Enrichment already exists for video {video_id}, skipping")
                 except Exception as e:
                     logger.warning(f"Failed to enqueue enrichment for video {video_id}: {e}")
 
