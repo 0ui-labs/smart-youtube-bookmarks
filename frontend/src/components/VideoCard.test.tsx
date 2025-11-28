@@ -345,4 +345,50 @@ describe('VideoCard', () => {
       expect(mockNavigateFn).not.toHaveBeenCalled()
     })
   })
+
+  // Error state tests (Phase 5.2)
+  describe('Error state', () => {
+    const errorVideo: VideoResponse = {
+      ...mockVideo,
+      id: 'error-video-123',
+      import_stage: 'error',
+      import_progress: 0,
+    }
+
+    it('shows error indicator when import_stage is error', () => {
+      const { container } = renderWithRouter(<VideoCard video={errorVideo} />)
+
+      // Should have error styling (red border or indicator)
+      const errorIndicator = container.querySelector('[data-error="true"]') ||
+        container.querySelector('.border-red-500') ||
+        container.querySelector('.text-red-500')
+      expect(errorIndicator).toBeInTheDocument()
+    })
+
+    it('shows error icon on thumbnail when import failed', () => {
+      renderWithRouter(<VideoCard video={errorVideo} />)
+
+      // Should show some error indicator (icon, badge, etc.)
+      const errorIcon = screen.getByLabelText(/fehler|error/i)
+      expect(errorIcon).toBeInTheDocument()
+    })
+
+    it('allows clicking error video to see details', async () => {
+      const user = userEvent.setup()
+      renderWithRouter(<VideoCard video={errorVideo} />)
+
+      const card = screen.getByRole('button', { name: /Test Video/i })
+      await user.click(card)
+
+      // Error videos should be clickable (unlike importing)
+      expect(mockNavigateFn).toHaveBeenCalled()
+    })
+
+    it('does not show progress overlay for error state', () => {
+      renderWithRouter(<VideoCard video={errorVideo} />)
+
+      // Should NOT show progress overlay
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    })
+  })
 })

@@ -291,6 +291,9 @@ export const VideoResponseSchema = z.object({
   // Watch progress tracking (video player integration)
   watch_position: z.number().nullable().optional(),
   watch_position_updated_at: z.string().nullable().optional(),
+  // Import progress tracking (Phase 1 - Robust Video Import)
+  import_progress: z.number().optional().default(0),
+  import_stage: z.string().optional().default('created'),
 })
 
 /**
