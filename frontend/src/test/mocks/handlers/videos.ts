@@ -92,6 +92,8 @@ export const videosHandlers = [
         created_at: '2025-11-06T10:00:00Z',
         updated_at: '2025-11-06T10:00:00Z',
         field_values: [],
+        import_progress: 100,
+        import_stage: 'complete',
       }
       return HttpResponse.json(emptyVideo)
     }
@@ -114,6 +116,8 @@ export const videosHandlers = [
         ...fv,
         video_id: videoId as string,
       })),
+      import_progress: 100,
+      import_stage: 'complete',
     }
 
     return HttpResponse.json(mockVideo)

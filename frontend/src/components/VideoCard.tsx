@@ -60,11 +60,32 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
   const cardRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const { tags, toggleTag } = useTagStore()
-  const { isImporting, getProgress } = useImportProgressStore()
+  const { getProgress } = useImportProgressStore()
 
-  // Check if video is currently importing
-  const importing = isImporting(video.id)
-  const importProgress = getProgress(video.id)
+  // Two-phase import: Check BOTH WebSocket store AND DB fields for import state
+  // WebSocket store provides real-time updates with smooth animation, DB fields provide fallback
+  const storeProgress = getProgress(video.id)
+
+  // Determine if video is importing: WebSocket store takes priority, DB fields as fallback
+  // Simple logic: Only import_stage matters (data migration fixed legacy videos)
+  // - 'complete' or 'error' = done
+  // - 'created', 'metadata', 'captions', 'chapters' = still importing
+  // - null/undefined = old video before feature (treat as done)
+  const importing = storeProgress
+    ? storeProgress.stage !== 'complete' && storeProgress.stage !== 'error'
+    : video.import_stage != null &&
+      video.import_stage !== 'complete' &&
+      video.import_stage !== 'error'
+
+  // Merge progress from store (real-time animated) or DB (fallback)
+  // Use displayProgress for smooth animation, fallback to DB import_progress
+  const importProgress = storeProgress ? {
+    progress: storeProgress.displayProgress,  // Animated value for smooth UI
+    stage: storeProgress.stage
+  } : (video.import_stage ? {
+    progress: video.import_progress ?? 0,
+    stage: video.import_stage as 'created' | 'metadata' | 'captions' | 'chapters' | 'complete' | 'error'
+  } : undefined)
 
   // Check if video import failed
   const hasError = video.import_stage === 'error'

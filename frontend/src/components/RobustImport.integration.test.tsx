@@ -127,7 +127,7 @@ describe('Robust Import Integration Flow', () => {
       await waitFor(() => {
         expect(screen.getByText('25%')).toBeInTheDocument()
       })
-      expect(screen.getByText('Metadata')).toBeInTheDocument()
+      expect(screen.getByText('Lade Metadaten...')).toBeInTheDocument()
 
       // Act: Progress to captions stage
       act(() => {
@@ -137,7 +137,7 @@ describe('Robust Import Integration Flow', () => {
       // Assert: Progress updated
       await waitFor(() => {
         expect(screen.getByText('50%')).toBeInTheDocument()
-        expect(screen.getByText('Untertitel')).toBeInTheDocument()
+        expect(screen.getByText('Lade Untertitel...')).toBeInTheDocument()
       })
 
       // Act: Progress to chapters stage
@@ -148,7 +148,7 @@ describe('Robust Import Integration Flow', () => {
       // Assert: Progress updated
       await waitFor(() => {
         expect(screen.getByText('75%')).toBeInTheDocument()
-        expect(screen.getByText('Kapitel')).toBeInTheDocument()
+        expect(screen.getByText('Lade Kapitel...')).toBeInTheDocument()
       })
     })
 
@@ -269,10 +269,10 @@ describe('Robust Import Integration Flow', () => {
 
     it('displays correct stage labels', () => {
       const stages = [
-        { stage: 'created', label: 'Erstellt' },
-        { stage: 'metadata', label: 'Metadata' },
-        { stage: 'captions', label: 'Untertitel' },
-        { stage: 'chapters', label: 'Kapitel' },
+        { stage: 'created', label: 'Vorbereiten...' },
+        { stage: 'metadata', label: 'Lade Metadaten...' },
+        { stage: 'captions', label: 'Lade Untertitel...' },
+        { stage: 'chapters', label: 'Lade Kapitel...' },
         { stage: 'complete', label: 'Fertig' },
         { stage: 'error', label: 'Fehler' },
       ]

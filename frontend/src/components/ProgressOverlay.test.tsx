@@ -17,7 +17,7 @@ describe('ProgressOverlay', () => {
     render(<ProgressOverlay progress={25} stage="metadata" />);
 
     // Use getAllByText since label appears in visible span + sr-only span
-    expect(screen.getAllByText(/metadata/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Lade Metadaten/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it('has correct ARIA attributes for progressbar', () => {
@@ -40,16 +40,15 @@ describe('ProgressOverlay', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
   });
 
-  it('renders SVG circular progress indicator', () => {
+  it('renders iOS-style solid pie chart progress indicator', () => {
     const { container } = render(<ProgressOverlay progress={50} stage="captions" />);
 
-    // Should have an SVG element
-    const svg = container.querySelector('svg');
-    expect(svg).toBeInTheDocument();
+    // Should have a pie chart element with conic-gradient
+    const pieChart = container.querySelector('[data-testid="pie-chart"]');
+    expect(pieChart).toBeInTheDocument();
 
-    // Should have circle elements for track and progress
-    const circles = container.querySelectorAll('circle');
-    expect(circles.length).toBeGreaterThanOrEqual(2); // track + progress
+    // Should have correct dimensions (iOS-style compact)
+    expect(pieChart).toHaveStyle({ width: '48px', height: '48px' });
   });
 
   it('applies overlay styling classes', () => {
@@ -63,10 +62,10 @@ describe('ProgressOverlay', () => {
 
   it('shows different labels for each stage', () => {
     const stages: Array<{ stage: string; expectedText: RegExp }> = [
-      { stage: 'created', expectedText: /erstellt|created/i },
-      { stage: 'metadata', expectedText: /metadata/i },
-      { stage: 'captions', expectedText: /untertitel|captions/i },
-      { stage: 'chapters', expectedText: /kapitel|chapters/i },
+      { stage: 'created', expectedText: /Vorbereiten/i },
+      { stage: 'metadata', expectedText: /Lade Metadaten/i },
+      { stage: 'captions', expectedText: /Lade Untertitel/i },
+      { stage: 'chapters', expectedText: /Lade Kapitel/i },
     ];
 
     stages.forEach(({ stage, expectedText }) => {
@@ -77,12 +76,10 @@ describe('ProgressOverlay', () => {
     });
   });
 
-  it('respects reduced motion preferences', () => {
-    const { container } = render(<ProgressOverlay progress={50} stage="captions" />);
+  it('displays percentage below the pie chart', () => {
+    render(<ProgressOverlay progress={50} stage="captions" />);
 
-    // Should have motion-safe/motion-reduce classes
-    const progressElement = container.querySelector('.motion-safe\\:animate-spin, .motion-reduce\\:animate-none, circle');
-    // At least the component should exist
-    expect(container.querySelector('svg')).toBeInTheDocument();
+    // Percentage should be displayed (iOS-style: below the pie)
+    expect(screen.getByText('50%')).toBeInTheDocument();
   });
 });

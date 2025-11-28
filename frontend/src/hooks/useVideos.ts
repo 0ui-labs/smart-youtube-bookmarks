@@ -23,6 +23,13 @@ const VideoResponseSchema = z.object({
   error_message: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
+
+  // Import progress tracking (Phase 1 - Robust Video Import)
+  // These fields enable the progress overlay on VideoCard during import
+  // IMPORTANT: Use nullable() NOT default() - old videos won't have these fields
+  // and we need to distinguish "no value" from "created" stage
+  import_progress: z.number().nullable().optional(),
+  import_stage: z.string().nullable().optional(),
 })
 
 /**
