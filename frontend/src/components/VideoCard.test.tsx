@@ -43,10 +43,16 @@ vi.mock('@/stores/tagStore', () => ({
 
 vi.mock('@/stores/tableSettingsStore', () => ({
   useTableSettingsStore: (selector: any) => {
-    if (typeof selector === 'function') {
-      return selector({ videoDetailsView: 'page' })
+    const state = {
+      videoDetailsView: 'page',
+      viewMode: 'list',
+      gridColumns: 3,
+      thumbnailSize: 'small',
     }
-    return { videoDetailsView: 'page' }
+    if (typeof selector === 'function') {
+      return selector(state)
+    }
+    return state
   },
 }))
 
