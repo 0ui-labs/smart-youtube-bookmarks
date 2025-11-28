@@ -1756,12 +1756,19 @@ async def bulk_upload_videos(
                     video_objects.append(video)
             else:
                 # ASYNC PATH: Create with pending status, ARQ worker fetches metadata
+                # Two-phase import: Set thumbnail immediately from YouTube ID pattern
+                # This ensures instant visual feedback while enrichment runs in background
                 logger.info(f"Large batch ({len(videos_to_create)} videos) - queueing for background processing")
                 for video_data in videos_to_create:
                     youtube_id = video_data["youtube_id"]
                     video = Video(
                         list_id=list_id,
                         youtube_id=youtube_id,
+                        # Two-phase import: Thumbnail URL derived from YouTube ID (instant)
+                        thumbnail_url=f"https://img.youtube.com/vi/{youtube_id}/mqdefault.jpg",
+                        # Initial import state for progress tracking
+                        import_stage="created",
+                        import_progress=0,
                         processing_status="pending"
                     )
                     video_objects.append(video)

@@ -47,7 +47,8 @@ logger = logging.getLogger(__name__)
 # Module-level semaphore to limit concurrent YouTube API calls across all
 # EnrichmentService instances. This prevents 429 rate limit errors while
 # allowing other worker jobs (video imports) to run concurrently.
-_youtube_api_semaphore = asyncio.Semaphore(1)
+# Set to 3 to allow parallel enrichment (matches rate limiter max_concurrent)
+_youtube_api_semaphore = asyncio.Semaphore(3)
 
 
 class EnrichmentService:
@@ -336,6 +337,9 @@ class EnrichmentService:
 
                 # Fetch captions - try YouTube first, then Groq Whisper fallback
                 await self._update_progress(enrichment, "Fetching captions from YouTube...")
+                # NOTE: import_stage/import_progress updates moved to enrich_video worker
+                # to avoid duplicate updates and enable WebSocket broadcasting
+
                 has_captions = await self._fetch_captions(enrichment, video)
 
                 # If YouTube failed, try Groq Whisper as fallback (outside rate limit)
@@ -343,11 +347,13 @@ class EnrichmentService:
                     await self._update_progress(enrichment, "YouTube unavailable, trying Groq Whisper...")
                     has_captions = await self._fetch_captions_groq(enrichment, video)
 
-                # Rate limit delay to avoid YouTube 429 errors
-                await asyncio.sleep(2)
+                # Short delay between API calls (yt-dlp has its own rate limiting)
+                await asyncio.sleep(0.5)
 
                 # Fetch chapters
                 await self._update_progress(enrichment, "Extracting chapters...")
+                # NOTE: import_stage/import_progress updates moved to enrich_video worker
+
                 has_chapters = await self._fetch_chapters(enrichment, video)
 
                 logger.debug(f"Released YouTube API semaphore for video {video_id}")
@@ -366,6 +372,7 @@ class EnrichmentService:
                 enrichment.chapters_vtt = chapters_to_vtt(chapters)
 
             # Determine final status
+            # NOTE: import_stage/import_progress updates moved to enrich_video worker
             if has_captions:
                 enrichment.status = EnrichmentStatus.completed
                 enrichment.progress_message = None  # Clear progress on completion
@@ -383,6 +390,7 @@ class EnrichmentService:
             logger.error(f"Enrichment failed for video {video_id}: {e}")
             enrichment.status = EnrichmentStatus.failed
             enrichment.error_message = str(e)
+            # NOTE: import_stage/import_progress error handling moved to enrich_video worker
             await self._db.commit()
 
         return enrichment

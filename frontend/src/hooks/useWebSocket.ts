@@ -65,9 +65,10 @@ export function useWebSocket(): UseWebSocketReturn {
   const lastConnectedTimeRef = useRef<Map<string, number>>(new Map());
   const isReconnectingRef = useRef(false);
 
-  // Get auth token from localStorage
+  // Get auth token from localStorage (optional in dev mode)
   const token = localStorage.getItem('token');
-  const wsUrl = token ? `${WS_URL}?token=${token}` : null;
+  // In dev mode, connect without token (backend will use default user)
+  const wsUrl = token ? `${WS_URL}?token=${token}` : WS_URL;
 
   // ===== react-use-websocket Integration =====
   const {
@@ -151,8 +152,8 @@ export function useWebSocket(): UseWebSocketReturn {
         }
       },
     },
-    // Only connect if token exists
-    !!token
+    // Always connect (backend handles auth in dev mode)
+    true
   );
 
   // ===== Handle Incoming Messages =====

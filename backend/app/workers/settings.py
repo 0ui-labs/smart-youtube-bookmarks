@@ -2,12 +2,13 @@
 from arq.connections import RedisSettings, ArqRedis
 from arq.jobs import Job
 from arq.cron import cron
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, parse_qs
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, update
 from app.core.config import settings
 from app.workers.db_manager import sessionmanager, db_session_context
-from app.workers.video_processor import process_video, process_video_list, enrich_video_staged
+from app.workers.video_processor import process_video, process_video_list
 from app.workers.enrichment_worker import enrich_video
 from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
 from app.models.video import Video
@@ -17,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 # Maximum retry attempts for failed enrichments
 MAX_ENRICHMENT_RETRIES = 3
+
+# Threshold for considering a pending video as "stuck" (in minutes)
+STUCK_VIDEO_THRESHOLD_MINUTES = 5
 
 # Parse Redis DSN (same logic as redis.py for consistency)
 redis_dsn = urlparse(settings.redis_url)
@@ -86,6 +90,45 @@ async def startup(ctx: dict) -> None:
                 db_session_context.set(None)
         except Exception as e:
             logger.warning(f"Failed to recover enrichments: {e}")
+
+    # Recovery: Find videos stuck in 'pending' processing status
+    # These are videos whose processing jobs were lost due to worker crash/restart
+    try:
+        db_session_context.set("startup_stuck_videos")
+        db = sessionmanager.get_session()
+        arq_redis: ArqRedis = ctx['redis']
+
+        try:
+            # Find videos stuck in pending for more than threshold
+            threshold_time = datetime.now(timezone.utc) - timedelta(minutes=STUCK_VIDEO_THRESHOLD_MINUTES)
+
+            result = await db.execute(
+                select(Video)
+                .where(Video.processing_status == "pending")
+                .where(Video.updated_at < threshold_time)
+            )
+            stuck_videos = result.scalars().all()
+
+            if stuck_videos:
+                logger.info(f"Found {len(stuck_videos)} stuck videos to recover on startup")
+                for video in stuck_videos:
+                    try:
+                        await arq_redis.enqueue_job(
+                            "process_video",
+                            str(video.id),
+                            str(video.list_id),
+                            None,
+                            None
+                        )
+                        logger.info(f"Recovered stuck video {video.id} (youtube_id={video.youtube_id})")
+                    except Exception as e:
+                        logger.warning(f"Failed to enqueue stuck video {video.id}: {e}")
+
+        finally:
+            await sessionmanager.scoped_session.remove()
+            db_session_context.set(None)
+    except Exception as e:
+        logger.warning(f"Failed to recover stuck videos on startup: {e}")
 
     logger.info("ARQ worker startup complete")
 
@@ -166,6 +209,79 @@ async def recover_failed_enrichments(ctx: dict) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+async def recover_stuck_videos(ctx: dict) -> dict:
+    """
+    Periodic job to recover videos stuck in 'pending' processing status.
+
+    Finds videos that have processing_status='pending' but haven't been updated
+    in STUCK_VIDEO_THRESHOLD_MINUTES, indicating their processing job was lost
+    (e.g., worker crash/restart).
+
+    Re-enqueues them as process_video jobs for retry.
+
+    Runs every 5 minutes via cron.
+    """
+    try:
+        db_session_context.set("recover_stuck_videos")
+        db = sessionmanager.get_session()
+        arq_redis: ArqRedis = ctx['redis']
+
+        try:
+            # Find videos stuck in pending status older than threshold
+            threshold_time = datetime.now(timezone.utc) - timedelta(minutes=STUCK_VIDEO_THRESHOLD_MINUTES)
+
+            result = await db.execute(
+                select(Video)
+                .where(Video.processing_status == "pending")
+                .where(Video.updated_at < threshold_time)
+            )
+            stuck_videos = result.scalars().all()
+
+            if not stuck_videos:
+                logger.debug("No stuck videos to recover")
+                return {"status": "ok", "recovered": 0}
+
+            logger.info(f"Found {len(stuck_videos)} stuck videos to recover")
+
+            recovered = 0
+            for video in stuck_videos:
+                try:
+                    # Re-enqueue as process_video job
+                    # Pass None for schema and job_id since recovery doesn't need parent job
+                    job = await arq_redis.enqueue_job(
+                        "process_video",
+                        str(video.id),
+                        str(video.list_id),
+                        None,  # schema - not needed for basic processing
+                        None   # job_id - no parent processing job
+                    )
+
+                    if job:
+                        logger.info(
+                            f"Recovered stuck video {video.id} "
+                            f"(youtube_id={video.youtube_id}, stuck since {video.updated_at})"
+                        )
+                        recovered += 1
+                    else:
+                        logger.warning(
+                            f"Failed to enqueue recovery for video {video.id} - "
+                            f"job may already exist"
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to recover video {video.id}: {e}")
+
+            logger.info(f"Recovered {recovered} stuck videos")
+            return {"status": "ok", "recovered": recovered}
+
+        finally:
+            await sessionmanager.scoped_session.remove()
+            db_session_context.set(None)
+
+    except Exception as e:
+        logger.error(f"Failed to recover stuck videos: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 async def shutdown(ctx: dict | None) -> None:
     """Cleanup worker resources on shutdown."""
     logger.info("ARQ worker shutting down")
@@ -242,12 +358,14 @@ class WorkerSettings:
     )
 
     # Worker functions
-    functions = [process_video, process_video_list, enrich_video, enrich_video_staged, recover_failed_enrichments]
+    functions = [process_video, process_video_list, enrich_video, recover_failed_enrichments, recover_stuck_videos]
 
     # Cron jobs - periodic tasks
     # Retry failed enrichments every 5 minutes
+    # Recover stuck videos every 5 minutes (offset by 2 min to avoid collision)
     cron_jobs = [
-        cron(recover_failed_enrichments, minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55})
+        cron(recover_failed_enrichments, minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55}),
+        cron(recover_stuck_videos, minute={2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57})
     ]
 
     # Worker configuration

@@ -344,6 +344,17 @@ async def process_video(
 
             video.processing_status = "completed"
             video.error_message = None  # Clear error from previous failed attempts
+
+            # Two-phase import: Update import stage based on enrichment config
+            # If enrichment is enabled, stay at 'metadata' stage (25%) - enrichment will complete it
+            # If enrichment is disabled, mark as 'complete' (100%) - metadata is all we need
+            if settings.enrichment_enabled and settings.enrichment_auto_trigger:
+                video.import_stage = "metadata"
+                video.import_progress = 25
+            else:
+                video.import_stage = "complete"
+                video.import_progress = 100
+
             await db.flush()
 
             # Trigger enrichment if enabled
