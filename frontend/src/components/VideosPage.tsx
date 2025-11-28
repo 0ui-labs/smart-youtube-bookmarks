@@ -689,7 +689,13 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
             const row = info.row.original
             const title = row.title || `Video ${row.youtube_id}`
 
-            return <VideoThumbnail url={thumbnailUrl} title={title} />
+            return (
+              <VideoThumbnail
+                youtubeId={row.youtube_id}
+                fallbackUrl={thumbnailUrl}
+                title={title}
+              />
+            )
           },
         }),
 
