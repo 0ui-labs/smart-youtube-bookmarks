@@ -13,7 +13,7 @@ import { useTagStore } from '@/stores/tagStore'
 import { useImportProgressStore } from '@/stores/importProgressStore'
 
 // Import VideoThumbnail from VideosPage (reuse existing component)
-// REF MCP Improvement #2: Use existing VideoThumbnail API (url, title props)
+// REF MCP Improvement #2: Use VideoThumbnail with responsive loading (youtubeId, fallbackUrl props)
 import { VideoThumbnail } from './VideosPage'
 
 // Import CustomFieldsPreview for field value display (Task #89)
@@ -153,10 +153,15 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
     >
       {/* Thumbnail Container with Duration Overlay */}
       <div className="relative">
-        {/* REF MCP #2: Reuse VideoThumbnail with correct API (url, title) */}
+        {/* REF MCP #2: Reuse VideoThumbnail with responsive thumbnail loading */}
         {/* Task #35 Fix: Use useFullWidth={true} for Grid mode (container-adapted sizing) */}
         <div className={importing ? 'grayscale' : ''}>
-          <VideoThumbnail url={video.thumbnail_url} title={video.title || 'Untitled'} useFullWidth={true} />
+          <VideoThumbnail
+            youtubeId={video.youtube_id}
+            fallbackUrl={video.thumbnail_url}
+            title={video.title || 'Untitled'}
+            useFullWidth={true}
+          />
         </div>
 
         {/* Import Progress Overlay */}
