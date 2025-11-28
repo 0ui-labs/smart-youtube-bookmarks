@@ -1,4 +1,5 @@
 """ARQ worker for processing YouTube videos."""
+import asyncio
 from uuid import UUID
 from arq import Retry
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,8 +10,7 @@ from app.models.job_progress import JobProgressEvent
 from app.clients.youtube import YouTubeClient
 from app.services.channel_service import get_or_create_channel
 from app.core.config import settings
-from app.core.redis import get_redis_client, get_arq_pool
-from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
+from app.core.redis import get_redis_client
 from datetime import datetime
 from isodate import parse_duration
 import logging
@@ -155,18 +155,28 @@ async def process_video(
             await db.flush()
 
             # Trigger enrichment if enabled
+            # NOTE: Don't pre-create enrichment record here to avoid race condition.
+            # The EnrichmentService._get_or_create_enrichment handles record creation
+            # atomically in the enrich_video job's own transaction.
             if settings.enrichment_enabled and settings.enrichment_auto_trigger:
                 try:
-                    enrichment = VideoEnrichment(
-                        video_id=video.id,
-                        status=EnrichmentStatus.pending.value
-                    )
-                    db.add(enrichment)
-                    await db.flush()
+                    # Use the worker's existing Redis connection from ctx
+                    arq_redis = ctx['redis']
+                    job = await arq_redis.enqueue_job("enrich_video", str(video.id))
 
-                    arq_pool = await get_arq_pool()
-                    await arq_pool.enqueue_job("enrich_video", str(video.id))
-                    logger.info(f"Enqueued enrichment job for video {video_id}")
+                    # Retry once if enqueue failed (handles transient Redis issues)
+                    if not job:
+                        await asyncio.sleep(0.1)
+                        job = await arq_redis.enqueue_job("enrich_video", str(video.id))
+
+                    if job:
+                        logger.info(f"Enqueued enrichment job for video {video_id}")
+                    else:
+                        # enqueue_job returns None if job with same ID already exists
+                        logger.warning(
+                            f"enqueue_job returned None for video {video_id} - "
+                            f"job may already exist in queue"
+                        )
                 except Exception as e:
                     logger.warning(f"Failed to enqueue enrichment for video {video_id}: {e}")
 

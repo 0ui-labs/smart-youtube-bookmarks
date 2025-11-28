@@ -229,8 +229,15 @@ async def user_factory(test_db: AsyncSession):
 async def arq_context(test_db: AsyncSession):
     """Create ARQ worker context for testing."""
     from datetime import datetime, timezone
+    from unittest.mock import AsyncMock
+
+    # Create mock Redis client that mimics ArqRedis
+    mock_redis = AsyncMock()
+    mock_redis.enqueue_job = AsyncMock(return_value=None)
+
     return {
         "db": test_db,
+        "redis": mock_redis,  # Required for job enqueuing in workers
         "job_id": "test-job-123",
         "job_try": 1,
         "enqueue_time": datetime.now(timezone.utc),

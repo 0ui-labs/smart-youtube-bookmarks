@@ -49,6 +49,11 @@ vi.mock('@/hooks/useTags', () => ({
     isLoading: false,
     error: null,
   })),
+  useCategories: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
   useCreateTag: vi.fn(() => ({
     mutate: vi.fn(),
     mutateAsync: vi.fn(),

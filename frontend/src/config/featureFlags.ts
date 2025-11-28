@@ -62,6 +62,15 @@ export const FEATURE_FLAGS = {
     import.meta.env.VITE_FEATURE_SHOW_ADD_PLUS_ICON_BUTTON,
     true
   ),
+
+  /**
+   * Aktiviert Drag & Drop Import von Videos
+   * Ermöglicht das Importieren von YouTube URLs, .webloc und .csv Dateien per Drag & Drop
+   */
+  DRAG_DROP_IMPORT: envToBool(
+    import.meta.env.VITE_FEATURE_DRAG_DROP_IMPORT,
+    true
+  ),
 } as const
 
 export type FeatureFlags = typeof FEATURE_FLAGS

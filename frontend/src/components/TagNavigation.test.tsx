@@ -47,7 +47,7 @@ describe('TagNavigation', () => {
       />
     )
 
-    expect(screen.getByText('Tags')).toBeInTheDocument()
+    expect(screen.getByText('Kategorien')).toBeInTheDocument()
   })
 
   it('renders plus icon button with aria-label', () => {
@@ -60,7 +60,7 @@ describe('TagNavigation', () => {
       />
     )
 
-    const button = screen.getByRole('button', { name: /neuen tag erstellen/i })
+    const button = screen.getByRole('button', { name: /neue kategorie erstellen/i })
     expect(button).toBeInTheDocument()
   })
 
@@ -110,7 +110,7 @@ describe('TagNavigation', () => {
       />
     )
 
-    const createButton = screen.getByRole('button', { name: /neuen tag erstellen/i })
+    const createButton = screen.getByRole('button', { name: /neue kategorie erstellen/i })
     fireEvent.click(createButton)
 
     expect(onTagCreate).toHaveBeenCalledTimes(1)
@@ -194,7 +194,7 @@ describe('TagNavigation', () => {
       />
     )
 
-    expect(screen.getByText('Tags')).toBeInTheDocument()
+    expect(screen.getByText('Kategorien')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /auswählen/i })).not.toBeInTheDocument()
   })
 
@@ -214,7 +214,7 @@ describe('TagNavigation', () => {
   })
 
   it('buttons have proper accessibility attributes', () => {
-    const { container } = render(
+    render(
       <TagNavigation
         tags={[mockTags[0]]}
         selectedTagIds={[]}
@@ -226,6 +226,6 @@ describe('TagNavigation', () => {
     // Verify button has proper aria-label
     const tagButton = screen.getByRole('button', { name: /python auswählen/i })
     expect(tagButton).toHaveAttribute('aria-pressed', 'false')
-    expect(tagButton).toHaveAttribute('aria-label', 'Tag Python auswählen')
+    expect(tagButton).toHaveAttribute('aria-label', 'Kategorie Python auswählen')
   })
 })

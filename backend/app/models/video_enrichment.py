@@ -49,7 +49,7 @@ class VideoEnrichment(BaseModel):
 
     # Captions (VTT format)
     captions_vtt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    captions_language: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    captions_language: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     captions_source: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)  # Match existing DB
 
     # Transcript (plain text for search)

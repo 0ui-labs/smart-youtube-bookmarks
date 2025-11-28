@@ -1681,21 +1681,82 @@ async def bulk_upload_videos(
                     error=str(e)
                 ))
 
-        # Create videos with pending status and queue ARQ background tasks (Option B)
-        if videos_to_create:
-            # Create video objects with PENDING status
-            # Metadata will be fetched by ARQ worker in background
-            video_objects = []
-            for video_data in videos_to_create:
-                youtube_id = video_data["youtube_id"]
+        # Create videos - HYBRID APPROACH:
+        # - Small batches (≤5): Fetch metadata synchronously for instant UI feedback
+        # - Large batches (>5): Use ARQ workers to avoid timeout
+        SYNC_BATCH_THRESHOLD = 5
+        use_sync_fetch = len(videos_to_create) <= SYNC_BATCH_THRESHOLD
 
-                # Create video with pending status
-                video = Video(
-                    list_id=list_id,
-                    youtube_id=youtube_id,
-                    processing_status="pending"  # Option B: Queue background task
+        if videos_to_create:
+            video_objects = []
+
+            if use_sync_fetch:
+                # SYNC PATH: Fetch metadata immediately for small batches
+                logger.info(f"Small batch ({len(videos_to_create)} videos) - fetching metadata synchronously")
+                redis = await get_redis_client()
+                youtube_client = YouTubeClient(
+                    api_key=settings.youtube_api_key,
+                    redis_client=redis
                 )
-                video_objects.append(video)
+
+                for video_data in videos_to_create:
+                    youtube_id = video_data["youtube_id"]
+                    try:
+                        # Fetch YouTube metadata immediately (200-500ms per video)
+                        metadata = await youtube_client.get_video_metadata(youtube_id)
+
+                        # Parse duration and timestamp
+                        duration_seconds = parse_youtube_duration(metadata.get("duration"))
+                        published_at = parse_youtube_timestamp(metadata.get("published_at"))
+
+                        # YouTube Channels: Create or get channel
+                        channel_db_id = None
+                        youtube_channel_id = metadata.get("channel_id")
+                        channel_name = metadata.get("channel")
+                        if youtube_channel_id and channel_name:
+                            channel_info = await youtube_client.get_channel_info(youtube_channel_id)
+                            channel = await get_or_create_channel(
+                                db=db,
+                                user_id=bookmark_list.user_id,
+                                youtube_channel_id=youtube_channel_id,
+                                channel_name=channel_name,
+                                channel_thumbnail=channel_info.get("thumbnail_url"),
+                                channel_description=channel_info.get("description")
+                            )
+                            channel_db_id = channel.id
+
+                        # Create video with COMPLETE metadata
+                        video = Video(
+                            list_id=list_id,
+                            youtube_id=youtube_id,
+                            title=metadata.get("title"),
+                            channel=metadata.get("channel"),
+                            channel_id=channel_db_id,
+                            thumbnail_url=metadata.get("thumbnail_url"),
+                            duration=duration_seconds,
+                            published_at=published_at,
+                            processing_status="completed"
+                        )
+                    except (HTTPError, TimeoutException, ValueError, KeyError, OSError) as e:
+                        logger.warning(f"Failed to fetch metadata for {youtube_id}: {e}, falling back to pending")
+                        video = Video(
+                            list_id=list_id,
+                            youtube_id=youtube_id,
+                            processing_status="pending",
+                            error_message=f"Could not fetch video metadata: {str(e)}"
+                        )
+                    video_objects.append(video)
+            else:
+                # ASYNC PATH: Create with pending status, ARQ worker fetches metadata
+                logger.info(f"Large batch ({len(videos_to_create)} videos) - queueing for background processing")
+                for video_data in videos_to_create:
+                    youtube_id = video_data["youtube_id"]
+                    video = Video(
+                        list_id=list_id,
+                        youtube_id=youtube_id,
+                        processing_status="pending"
+                    )
+                    video_objects.append(video)
 
             # Update videos_to_create to actual Video objects
             videos_to_create = video_objects
@@ -1742,9 +1803,9 @@ async def bulk_upload_videos(
                     for video in existing_videos:
                         await db.refresh(video)
 
-            # Capture created video count before processing field values
-            # (defensive programming - ensures job count reflects actual created videos)
-            created_count = len(created_videos)
+            # Separate videos by status for different handling
+            pending_videos = [v for v in created_videos if v.processing_status == "pending"]
+            completed_videos = [v for v in created_videos if v.processing_status == "completed"]
 
             # === Apply field values to ALL videos (new + existing) (SINGLE LOCATION) ===
             all_videos = created_videos + (existing_videos if 'existing_videos' in locals() else [])
@@ -1758,13 +1819,21 @@ async def bulk_upload_videos(
                 )
                 await db.commit()
 
-            # Create processing job if videos were created
-            await _enqueue_video_processing(db, list_id, created_count)
+            # Create processing job only for pending videos
+            if pending_videos:
+                await _enqueue_video_processing(db, list_id, len(pending_videos))
+
+            # Trigger enrichment for videos that were processed synchronously
+            if completed_videos:
+                for video in completed_videos:
+                    await _enqueue_enrichment(video.id, db)
+                await db.commit()
 
         return BulkUploadResponse(
             created_count=len(created_videos),
             failed_count=len(failures),
-            failures=failures
+            failures=failures,
+            created_video_ids=[str(v.id) for v in created_videos]
         )
 
     except UnicodeDecodeError:

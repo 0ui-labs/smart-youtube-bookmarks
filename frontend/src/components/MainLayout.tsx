@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button'
 import { useTags } from '@/hooks/useTags'
 import { useChannels, useUpdateChannel } from '@/hooks/useChannels'
 import { useTagStore } from '@/stores/tagStore'
+import { useImportDropStore } from '@/stores/importDropStore'
 import { useShallow } from 'zustand/react/shallow'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { CreateTagDialog } from './CreateTagDialog'
 import { useLists } from '@/hooks/useLists'
 
@@ -32,9 +33,20 @@ export function MainLayout() {
   const updateChannel = useUpdateChannel()
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null)
 
+  // Store for drag & drop imports
+  const setPendingImport = useImportDropStore((state) => state.setPendingImport)
+
   const handleCreateTag = () => {
     setIsCreateTagDialogOpen(true)
   }
+
+  // Handle videos dropped on a tag
+  const handleVideosDropped = useCallback((tagId: string, urls: string[]) => {
+    // Store the pending import with preselected category
+    setPendingImport(urls, tagId)
+    // Navigate to videos page (the modal will open there)
+    navigate('/videos')
+  }, [setPendingImport, navigate])
 
   const handleHideChannel = (channelId: string) => {
     updateChannel.mutate({ channelId, data: { is_hidden: true } })
@@ -127,6 +139,7 @@ export function MainLayout() {
               selectedTagIds={selectedTagIds}
               onTagSelect={handleTagSelect}
               onTagCreate={handleCreateTag}
+              onVideosDropped={handleVideosDropped}
             />
           )}
 

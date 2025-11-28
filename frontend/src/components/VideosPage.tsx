@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   useReactTable,
@@ -9,7 +9,12 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { api } from '@/lib/api'
-import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV, useAssignTags } from '@/hooks/useVideos'
+import { useVideos, useCreateVideo, useDeleteVideo, exportVideosCSV, useAssignTags, useBulkUploadVideos } from '@/hooks/useVideos'
+import { useVideoDropZone, type ParsedDropData } from '@/hooks/useVideoDropZone'
+import { DropZoneOverlay } from '@/components/DropZoneOverlay'
+import { ImportPreviewModal } from '@/components/ImportPreviewModal'
+import { createCSVFromUrls, parseUrlsFromText } from '@/utils/urlParser'
+import { useImportDropStore } from '@/stores/importDropStore'
 import { useVideosFilter } from '@/hooks/useVideosFilter'
 import { useFieldFilterStore } from '@/stores/fieldFilterStore'
 import { FilterBar } from '@/components/videos/FilterBar'
@@ -207,6 +212,21 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     video: null,
   })
 
+  // Drag & Drop Import state (Steps 19-23)
+  const [importPreviewModal, setImportPreviewModal] = useState<{
+    open: boolean
+    urls: string[]
+  }>({
+    open: false,
+    urls: [],
+  })
+
+  // Polling state for real-time updates after import
+  // When true, refetch videos frequently until all are processed
+  const [isPolling, setIsPolling] = useState(false)
+  const [pendingVideoIds, setPendingVideoIds] = useState<string[]>([])
+  const POLLING_INTERVAL = 500 // 500ms for snappy updates
+
   // Tag integration
   const { data: tags = [] } = useTags()
   // Channels query (YouTube Channels feature)
@@ -344,6 +364,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     sortBy,
     sortOrder,
     enabled: hasFieldFilters || hasTagFilters || hasChannelFilter,
+    refetchInterval: isPolling ? POLLING_INTERVAL : undefined,
   })
 
   const { data: allVideos = [], isLoading: allLoading, error: allError } = useVideos(
@@ -352,6 +373,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       tags: undefined,
       sortBy,
       sortOrder,
+      refetchInterval: isPolling ? POLLING_INTERVAL : undefined,
     }
   )
 
@@ -362,6 +384,123 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const error = hasAnyFilter ? filterError : allError
   const createVideo = useCreateVideo(listId)
   const assignTags = useAssignTags()
+  const bulkUpload = useBulkUploadVideos(listId)
+
+  // Get existing video IDs for duplicate detection in import preview
+  const existingVideoIds = useMemo(
+    () => videos.map((v) => v.youtube_id).filter((id): id is string => id !== null),
+    [videos]
+  )
+
+  // Stop polling when all PENDING videos have been processed (have a title)
+  // This provides real-time UI updates after import without manual refresh
+  useEffect(() => {
+    console.log('[Polling] isPolling:', isPolling, 'pendingVideoIds:', pendingVideoIds.length, 'videos.length:', videos.length)
+    if (!isPolling || pendingVideoIds.length === 0) return
+
+    // Find the pending videos in the current videos list
+    const pendingVideos = videos.filter((video) => pendingVideoIds.includes(video.id))
+    console.log('[Polling] Found pending videos:', pendingVideos.length, 'of', pendingVideoIds.length)
+
+    // Check if all pending videos have been processed (title is filled in by worker)
+    const unprocessed = pendingVideos.filter((video) => video.title === null || video.title === undefined)
+    console.log('[Polling] Unprocessed pending videos:', unprocessed.length, unprocessed.map(v => v.youtube_id))
+
+    // Only stop polling when we found all pending videos AND they all have titles
+    if (pendingVideos.length === pendingVideoIds.length && unprocessed.length === 0) {
+      console.log('[Polling] All pending videos processed, stopping polling')
+      setIsPolling(false)
+      setPendingVideoIds([])
+    }
+  }, [isPolling, pendingVideoIds, videos])
+
+  // Drag & Drop handler: called when videos are detected
+  const handleVideosDetected = useCallback((data: ParsedDropData) => {
+    if (data.urls.length === 0) {
+      return
+    }
+
+    // Open import preview modal with detected URLs
+    setImportPreviewModal({
+      open: true,
+      urls: data.urls,
+    })
+  }, [])
+
+  // Drag & Drop handler: called when import is confirmed
+  const handleImportConfirm = useCallback(
+    async (urls: string[], categoryId?: string) => {
+      try {
+        // Close modal first
+        setImportPreviewModal({ open: false, urls: [] })
+
+        if (urls.length === 0) {
+          return
+        }
+
+        // Create CSV blob from URLs
+        const csvBlob = createCSVFromUrls(urls)
+        const csvFile = new File([csvBlob], 'import.csv', { type: 'text/csv' })
+
+        // Upload via bulk upload API
+        const result = await bulkUpload.mutateAsync(csvFile)
+
+        // Start polling for real-time updates after successful import
+        if (result.created_video_ids.length > 0) {
+          console.log('[Import] Starting polling for', result.created_video_ids.length, 'videos:', result.created_video_ids)
+          setPendingVideoIds(result.created_video_ids)
+          setIsPolling(true)
+        }
+
+        // If category was selected, assign it to all imported videos
+        if (categoryId && result.created_video_ids.length > 0) {
+          await Promise.all(
+            result.created_video_ids.map((videoId) =>
+              assignTags.mutateAsync({ videoId, tagIds: [categoryId] })
+            )
+          )
+        }
+      } catch (error) {
+        console.error('Failed to import videos:', error)
+        // TODO: Add toast notification for error
+      }
+    },
+    [bulkUpload, assignTags, listId]
+  )
+
+  // Mobile detection: Disable drag-drop on touch devices (Step 29)
+  const isTouchDevice = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0
+  }, [])
+
+  // Initialize useVideoDropZone hook
+  const dropZoneDisabled = !FEATURE_FLAGS.DRAG_DROP_IMPORT || isTouchDevice
+  const { isDragging, getRootProps, getInputProps } = useVideoDropZone({
+    onVideosDetected: handleVideosDetected,
+    disabled: dropZoneDisabled,
+  })
+
+  // Listen for pending imports from TagNavigation drops
+  const pendingImport = useImportDropStore((state) => state.pendingImport)
+  const clearPendingImport = useImportDropStore((state) => state.clearPendingImport)
+
+  // Handle pending imports from TagNavigation drops
+  useEffect(() => {
+    if (pendingImport) {
+      // If category was preselected (dropped on a tag), auto-import without modal
+      if (pendingImport.preselectedCategoryId) {
+        handleImportConfirm(pendingImport.urls, pendingImport.preselectedCategoryId)
+        clearPendingImport()
+      } else {
+        // No category preselected - show modal for selection
+        setImportPreviewModal({
+          open: true,
+          urls: pendingImport.urls,
+        })
+      }
+    }
+  }, [pendingImport, handleImportConfirm, clearPendingImport])
 
   // WebSocket for bulk upload progress (optional - bulk uploads now work without it too)
   // Disabled for now to prevent unnecessary re-renders
@@ -786,6 +925,38 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     setIsAdding(true)
   }
 
+  // Handle URL drops directly (react-dropzone only handles file drops)
+  // MUST be defined before early returns to satisfy React hooks rules
+  const handleNativeDrop = useCallback((e: React.DragEvent) => {
+    // Check for files FIRST - macOS includes text/plain when dragging webloc files
+    // which would cause us to only detect 1 URL instead of all files
+    const hasFiles = e.dataTransfer.files && e.dataTransfer.files.length > 0
+    const hasWeblocOrCsv = hasFiles && Array.from(e.dataTransfer.files).some(
+      f => f.name.endsWith('.webloc') || f.name.endsWith('.csv')
+    )
+
+    if (hasWeblocOrCsv) {
+      // Let react-dropzone handle file drops
+      getRootProps().onDrop?.(e as React.DragEvent<HTMLElement>)
+      return
+    }
+
+    // Check for text/URL data (browser URL drag - only if no supported files)
+    const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list')
+    if (text) {
+      const urls = parseUrlsFromText(text)
+      if (urls.length > 0) {
+        e.preventDefault()
+        e.stopPropagation()
+        handleVideosDetected({ type: 'youtube-urls', urls })
+        return
+      }
+    }
+
+    // Let react-dropzone handle other file drops
+    getRootProps().onDrop?.(e as React.DragEvent<HTMLElement>)
+  }, [handleVideosDetected, getRootProps])
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -805,7 +976,19 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   }
 
   return (
-    <div className="w-full max-w-[2180px] mx-auto p-8">
+    <div
+      {...getRootProps()}
+      onDrop={handleNativeDrop}
+      className="w-full max-w-[2180px] mx-auto p-8 relative"
+    >
+      {/* Hidden file input for react-dropzone */}
+      <input {...getInputProps()} />
+
+      {/* Drop Zone Overlay - shown during drag (not on touch devices) */}
+      {isDragging && FEATURE_FLAGS.DRAG_DROP_IMPORT && !isTouchDevice && (
+        <DropZoneOverlay message="YouTube-URLs hier ablegen" />
+      )}
+
         <div className="flex justify-between items-center mb-4">
           <div>
             {selectedChannelId ? (
@@ -1127,6 +1310,21 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           onFieldChange={handleFieldChange}
         />
       )}
+
+      {/* Import Preview Modal (Drag & Drop Import feature) */}
+      <ImportPreviewModal
+        open={importPreviewModal.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setImportPreviewModal({ open: false, urls: [] })
+            clearPendingImport() // Clear pending import from TagNavigation
+          }
+        }}
+        urls={importPreviewModal.urls}
+        existingVideoIds={existingVideoIds}
+        preselectedCategoryId={pendingImport?.preselectedCategoryId}
+        onImport={handleImportConfirm}
+      />
     </div>
   )
 }
