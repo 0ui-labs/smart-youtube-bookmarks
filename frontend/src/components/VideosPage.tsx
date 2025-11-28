@@ -21,6 +21,7 @@ import { FilterBar } from '@/components/videos/FilterBar'
 import { FilterSettingsModal } from '@/components/videos/FilterSettingsModal'
 import { CSVUpload } from './CSVUpload'
 import { formatDuration } from '@/utils/formatDuration'
+import { getThumbnailUrls, calculateThumbnailWidth } from '@/utils/thumbnailUrl'
 import type { VideoResponse } from '@/types/video'
 import { useChannels } from '@/hooks/useChannels'
 import { TableSettingsDropdown } from './TableSettingsDropdown'
@@ -140,6 +141,8 @@ const VideoThumbnail = ({
 }) => {
   const [loadError, setLoadError] = useState(false)
   const thumbnailSize = useTableSettingsStore((state) => state.thumbnailSize)
+  const viewMode = useTableSettingsStore((state) => state.viewMode)
+  const gridColumns = useTableSettingsStore((state) => state.gridColumns)
 
   // REF MCP Improvement #3: Full class strings for Tailwind PurgeCSS
   // Object mapping ensures all classes are detected at build time (no dynamic concatenation)
@@ -172,8 +175,18 @@ const VideoThumbnail = ({
     </div>
   )
 
-  // No youtubeId or error occurred - try fallback or show placeholder
-  if (!youtubeId || loadError) {
+  // Calculate target width based on view settings
+  const targetWidth = calculateThumbnailWidth(
+    useFullWidth ? 'grid' : viewMode,
+    thumbnailSize,
+    gridColumns as 2 | 3 | 4 | 5
+  )
+
+  // Generate responsive URLs
+  const urls = youtubeId ? getThumbnailUrls(youtubeId, targetWidth) : null
+
+  // No youtubeId or all loads failed - use fallback chain
+  if (!urls || loadError) {
     if (fallbackUrl) {
       return (
         <img
@@ -188,9 +201,19 @@ const VideoThumbnail = ({
     return <Placeholder />
   }
 
-  // TODO: Step 6 will implement picture element with WebP/JPEG
-  // Temporary: just show placeholder until Step 6
-  return <Placeholder />
+  // Primary: picture element with WebP + JPEG fallback
+  return (
+    <picture>
+      <source srcSet={urls.webp} type="image/webp" />
+      <img
+        src={urls.jpeg}
+        alt={title}
+        loading="lazy"
+        className={useFullWidth ? fullWidthClasses : sizeClasses[thumbnailSize]}
+        onError={() => setLoadError(true)}
+      />
+    </picture>
+  )
 }
 
 export const VideosPage = ({ listId }: VideosPageProps) => {
