@@ -57,6 +57,11 @@ vi.mock('@/hooks/useTags', () => ({
   })),
   useCreateTag: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
   useBulkApplySchema: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false })),
+  useCategories: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
   tagsOptions: vi.fn(() => ({
     queryKey: ['tags'],
     queryFn: vi.fn(),
