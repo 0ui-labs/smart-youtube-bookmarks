@@ -127,8 +127,18 @@ interface VideosPageProps {
 // REF MCP Improvement #5: w-48 for large (not w-64) for smoother progression
 // REF MCP Improvement #6: Placeholder also scales dynamically
 // Task #35 Fix: Add useFullWidth prop for Grid mode (container-adapted sizing)
-const VideoThumbnail = ({ url, title, useFullWidth = false }: { url: string | null; title: string; useFullWidth?: boolean }) => {
-  const [hasError, setHasError] = useState(false)
+const VideoThumbnail = ({
+  youtubeId,
+  fallbackUrl,
+  title,
+  useFullWidth = false
+}: {
+  youtubeId: string
+  fallbackUrl?: string | null
+  title: string
+  useFullWidth?: boolean
+}) => {
+  const [loadError, setLoadError] = useState(false)
   const thumbnailSize = useTableSettingsStore((state) => state.thumbnailSize)
 
   // REF MCP Improvement #3: Full class strings for Tailwind PurgeCSS
@@ -162,22 +172,25 @@ const VideoThumbnail = ({ url, title, useFullWidth = false }: { url: string | nu
     </div>
   )
 
-  // No URL or error occurred - show placeholder
-  if (!url || hasError) {
+  // No youtubeId or error occurred - try fallback or show placeholder
+  if (!youtubeId || loadError) {
+    if (fallbackUrl) {
+      return (
+        <img
+          src={fallbackUrl}
+          alt={title}
+          loading="lazy"
+          className={useFullWidth ? fullWidthClasses : sizeClasses[thumbnailSize]}
+          onError={() => setLoadError(true)}
+        />
+      )
+    }
     return <Placeholder />
   }
 
-  // Show image with error handling
-  // Task #35 Fix: Use fullWidthClasses in Grid mode, sizeClasses in List mode
-  return (
-    <img
-      src={url}
-      alt={title}
-      loading="lazy"
-      className={useFullWidth ? fullWidthClasses : sizeClasses[thumbnailSize]}
-      onError={() => setHasError(true)}
-    />
-  )
+  // TODO: Step 6 will implement picture element with WebP/JPEG
+  // Temporary: just show placeholder until Step 6
+  return <Placeholder />
 }
 
 export const VideosPage = ({ listId }: VideosPageProps) => {
