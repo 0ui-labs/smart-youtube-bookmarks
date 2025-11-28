@@ -52,3 +52,31 @@ export function getThumbnailUrls(
     jpeg: `https://i.ytimg.com/vi/${youtubeId}/${quality}default.jpg`,
   }
 }
+
+/**
+ * Calculate target thumbnail width based on view settings
+ */
+export function calculateThumbnailWidth(
+  viewMode: 'list' | 'grid',
+  thumbnailSize: 'small' | 'medium' | 'large' | 'xlarge',
+  gridColumns: 2 | 3 | 4 | 5
+): number {
+  if (viewMode === 'list') {
+    const listSizeMap = {
+      small: 128,
+      medium: 160,
+      large: 192,
+      xlarge: 500,
+    } as const
+    return listSizeMap[thumbnailSize]
+  }
+
+  // Grid view: estimate card width based on columns
+  const gridWidthMap = {
+    5: 200,
+    4: 280,
+    3: 380,
+    2: 580,
+  } as const
+  return gridWidthMap[gridColumns]
+}
