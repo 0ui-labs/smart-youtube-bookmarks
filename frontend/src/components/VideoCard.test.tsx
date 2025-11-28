@@ -18,6 +18,18 @@ vi.mock('react-router-dom', async () => {
 // Mock stores and hooks
 const mockToggleTagFn = vi.fn()
 const mockMutateFn = vi.fn()
+let mockImportProgress: Map<string, { progress: number; stage: string }> = new Map()
+
+vi.mock('@/stores/importProgressStore', () => ({
+  useImportProgressStore: () => ({
+    isImporting: (videoId: string) => {
+      const progress = mockImportProgress.get(videoId)
+      if (!progress) return false
+      return progress.stage !== 'complete' && progress.stage !== 'error'
+    },
+    getProgress: (videoId: string) => mockImportProgress.get(videoId),
+  }),
+}))
 
 vi.mock('@/stores/tagStore', () => ({
   useTagStore: () => ({
@@ -66,6 +78,7 @@ const mockVideo: VideoResponse = {
 describe('VideoCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockImportProgress = new Map() // Reset import progress state
   })
 
   it('renders video thumbnail with VideoThumbnail component', () => {
@@ -266,6 +279,116 @@ describe('VideoCard', () => {
 
       // Verify the mutation function is defined (setup in VideoCard)
       expect(mockMutateFn).toBeDefined()
+    })
+  })
+
+  // Import progress tests (Phase 4.5)
+  describe('Importing state', () => {
+    it('shows grayscale filter when video is importing', () => {
+      // Set video as importing
+      mockImportProgress.set('video-123', { progress: 50, stage: 'captions' })
+
+      const { container } = renderWithRouter(<VideoCard video={mockVideo} />)
+
+      // Thumbnail should have grayscale class
+      const thumbnail = container.querySelector('.grayscale')
+      expect(thumbnail).toBeInTheDocument()
+    })
+
+    it('shows ProgressOverlay when video is importing', () => {
+      mockImportProgress.set('video-123', { progress: 60, stage: 'captions' })
+
+      renderWithRouter(<VideoCard video={mockVideo} />)
+
+      // Should show progress overlay
+      expect(screen.getByRole('progressbar')).toBeInTheDocument()
+      expect(screen.getByText('60%')).toBeInTheDocument()
+    })
+
+    it('does not show grayscale or overlay when video is complete', () => {
+      // Video is complete (not importing)
+      mockImportProgress.set('video-123', { progress: 100, stage: 'complete' })
+
+      const { container } = renderWithRouter(<VideoCard video={mockVideo} />)
+
+      // Should NOT have grayscale
+      const grayscaleElement = container.querySelector('.grayscale')
+      expect(grayscaleElement).not.toBeInTheDocument()
+
+      // Should NOT show progress overlay
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    })
+
+    it('does not show importing state when no progress in store', () => {
+      // No progress set in mock (empty map)
+
+      const { container } = renderWithRouter(<VideoCard video={mockVideo} />)
+
+      // Should NOT have grayscale
+      const grayscaleElement = container.querySelector('.grayscale')
+      expect(grayscaleElement).not.toBeInTheDocument()
+
+      // Should NOT show progress overlay
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    })
+
+    it('disables card click while importing', async () => {
+      mockImportProgress.set('video-123', { progress: 50, stage: 'captions' })
+
+      const user = userEvent.setup()
+      renderWithRouter(<VideoCard video={mockVideo} />)
+
+      const card = screen.getByRole('button', { name: /Test Video/i })
+      await user.click(card)
+
+      // Should NOT navigate while importing
+      expect(mockNavigateFn).not.toHaveBeenCalled()
+    })
+  })
+
+  // Error state tests (Phase 5.2)
+  describe('Error state', () => {
+    const errorVideo: VideoResponse = {
+      ...mockVideo,
+      id: 'error-video-123',
+      import_stage: 'error',
+      import_progress: 0,
+    }
+
+    it('shows error indicator when import_stage is error', () => {
+      const { container } = renderWithRouter(<VideoCard video={errorVideo} />)
+
+      // Should have error styling (red border or indicator)
+      const errorIndicator = container.querySelector('[data-error="true"]') ||
+        container.querySelector('.border-red-500') ||
+        container.querySelector('.text-red-500')
+      expect(errorIndicator).toBeInTheDocument()
+    })
+
+    it('shows error icon on thumbnail when import failed', () => {
+      renderWithRouter(<VideoCard video={errorVideo} />)
+
+      // Should show some error indicator (icon, badge, etc.)
+      const errorIcon = screen.getByLabelText(/fehler|error/i)
+      expect(errorIcon).toBeInTheDocument()
+    })
+
+    it('allows clicking error video to see details', async () => {
+      const user = userEvent.setup()
+      renderWithRouter(<VideoCard video={errorVideo} />)
+
+      const card = screen.getByRole('button', { name: /Test Video/i })
+      await user.click(card)
+
+      // Error videos should be clickable (unlike importing)
+      expect(mockNavigateFn).toHaveBeenCalled()
+    })
+
+    it('does not show progress overlay for error state', () => {
+      renderWithRouter(<VideoCard video={errorVideo} />)
+
+      // Should NOT show progress overlay
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
     })
   })
 })

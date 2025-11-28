@@ -467,7 +467,10 @@ async def add_video_to_list(
             thumbnail_url=metadata.get("thumbnail_url"),
             duration=duration_seconds,
             published_at=published_at,
-            processing_status="completed"  # Already have all data!
+            processing_status="completed",  # Already have all data!
+            # Two-phase import: metadata stage complete, ready for enrichment
+            import_stage="metadata",
+            import_progress=25
         )
 
     except (HTTPError, TimeoutException, ValueError, KeyError, OSError) as e:
@@ -481,8 +484,13 @@ async def add_video_to_list(
         new_video = Video(
             list_id=list_id,
             youtube_id=youtube_id,
+            # Two-phase import: Set thumbnail immediately from YouTube ID pattern
+            thumbnail_url=f"https://img.youtube.com/vi/{youtube_id}/mqdefault.jpg",
             processing_status="pending",
-            error_message=f"Could not fetch video metadata: {str(e)}"
+            error_message=f"Could not fetch video metadata: {str(e)}",
+            # Initial import state
+            import_stage="created",
+            import_progress=0
         )
 
     # Save to database
@@ -1748,12 +1756,19 @@ async def bulk_upload_videos(
                     video_objects.append(video)
             else:
                 # ASYNC PATH: Create with pending status, ARQ worker fetches metadata
+                # Two-phase import: Set thumbnail immediately from YouTube ID pattern
+                # This ensures instant visual feedback while enrichment runs in background
                 logger.info(f"Large batch ({len(videos_to_create)} videos) - queueing for background processing")
                 for video_data in videos_to_create:
                     youtube_id = video_data["youtube_id"]
                     video = Video(
                         list_id=list_id,
                         youtube_id=youtube_id,
+                        # Two-phase import: Thumbnail URL derived from YouTube ID (instant)
+                        thumbnail_url=f"https://img.youtube.com/vi/{youtube_id}/mqdefault.jpg",
+                        # Initial import state for progress tracking
+                        import_stage="created",
+                        import_progress=0,
                         processing_status="pending"
                     )
                     video_objects.append(video)

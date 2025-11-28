@@ -10,6 +10,7 @@ import {
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
 import { useTagStore } from '@/stores/tagStore'
+import { useImportProgressStore } from '@/stores/importProgressStore'
 
 // Import VideoThumbnail from VideosPage (reuse existing component)
 // REF MCP Improvement #2: Use existing VideoThumbnail API (url, title props)
@@ -17,6 +18,9 @@ import { VideoThumbnail } from './VideosPage'
 
 // Import CustomFieldsPreview for field value display (Task #89)
 import { CustomFieldsPreview } from './fields'
+
+// Import ProgressOverlay for import progress display
+import { ProgressOverlay } from './ProgressOverlay'
 
 interface VideoCardProps {
   video: VideoResponse
@@ -56,12 +60,46 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
   const cardRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const { tags, toggleTag } = useTagStore()
+  const { getProgress } = useImportProgressStore()
+
+  // Two-phase import: Check BOTH WebSocket store AND DB fields for import state
+  // WebSocket store provides real-time updates with smooth animation, DB fields provide fallback
+  const storeProgress = getProgress(video.id)
+
+  // Determine if video is importing: WebSocket store takes priority, DB fields as fallback
+  // Simple logic: Only import_stage matters (data migration fixed legacy videos)
+  // - 'complete' or 'error' = done
+  // - 'created', 'metadata', 'captions', 'chapters' = still importing
+  // - null/undefined = old video before feature (treat as done)
+  const importing = storeProgress
+    ? storeProgress.stage !== 'complete' && storeProgress.stage !== 'error'
+    : video.import_stage != null &&
+      video.import_stage !== 'complete' &&
+      video.import_stage !== 'error'
+
+  // Merge progress from store (real-time animated) or DB (fallback)
+  // Use displayProgress for smooth animation, fallback to DB import_progress
+  const importProgress = storeProgress ? {
+    progress: storeProgress.displayProgress,  // Animated value for smooth UI
+    stage: storeProgress.stage
+  } : (video.import_stage ? {
+    progress: video.import_progress ?? 0,
+    stage: video.import_stage as 'created' | 'metadata' | 'captions' | 'chapters' | 'complete' | 'error'
+  } : undefined)
+
+  // Check if video import failed
+  const hasError = video.import_stage === 'error'
 
   // Modal state removed - now handled at VideosPage level
 
   // Task #6: Navigate to video details page on card click
   // Updated: Use parent callback if provided (Grid view with modal/page logic)
   const handleCardClick = () => {
+    // Disable card click while importing
+    if (importing) {
+      return
+    }
+
     // Use parent callback if provided (VideosPage handles modal/page decision)
     if (onCardClick) {
       onCardClick()
@@ -117,11 +155,31 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
       <div className="relative">
         {/* REF MCP #2: Reuse VideoThumbnail with correct API (url, title) */}
         {/* Task #35 Fix: Use useFullWidth={true} for Grid mode (container-adapted sizing) */}
-        <VideoThumbnail url={video.thumbnail_url} title={video.title || 'Untitled'} useFullWidth={true} />
+        <div className={importing ? 'grayscale' : ''}>
+          <VideoThumbnail url={video.thumbnail_url} title={video.title || 'Untitled'} useFullWidth={true} />
+        </div>
 
-        {/* Duration Overlay (bottom-right corner) */}
+        {/* Import Progress Overlay */}
+        {importing && importProgress && (
+          <ProgressOverlay progress={importProgress.progress} stage={importProgress.stage} />
+        )}
+
+        {/* Error Indicator (top-right corner) */}
+        {hasError && (
+          <div
+            className="absolute top-2 right-2 flex items-center justify-center w-8 h-8 rounded-full bg-red-500 text-white shadow-lg"
+            aria-label="Import-Fehler"
+            data-error="true"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+        )}
+
+        {/* Duration Overlay (bottom-right corner) - hide while importing */}
         {/* REF MCP #4: Enhanced readability with shadow-lg and border */}
-        {video.duration && (
+        {video.duration && !importing && (
           <div className="absolute bottom-2 right-2 rounded bg-black/80 px-1.5 py-0.5 text-xs font-semibold text-white shadow-lg border border-white/20">
             {formatDuration(video.duration)}
           </div>

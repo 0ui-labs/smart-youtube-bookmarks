@@ -9,6 +9,7 @@ from app.models.list import BookmarkList
 from app.models.job_progress import JobProgressEvent
 from app.clients.youtube import YouTubeClient
 from app.services.channel_service import get_or_create_channel
+from app.services.rate_limiter import AdaptiveRateLimiter
 from app.core.config import settings
 from app.core.redis import get_redis_client
 from datetime import datetime
@@ -16,6 +17,15 @@ from isodate import parse_duration
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Module-level rate limiter for enrichment requests
+# Limits concurrent YouTube API calls to prevent 429 errors
+_enrichment_rate_limiter = AdaptiveRateLimiter(
+    max_concurrent=3,
+    base_delay=2.0,
+    max_delay=60.0,
+    failure_threshold=5
+)
 
 
 def _parse_duration(iso_duration: str | None) -> int | None:
@@ -39,6 +49,188 @@ def _parse_timestamp(timestamp: str | None) -> datetime | None:
     except (ValueError, AttributeError) as e:
         logger.debug(f"Invalid timestamp format '{timestamp}': {e}")
         return None
+
+
+async def fetch_with_retry(
+    func,
+    *args,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    **kwargs
+):
+    """
+    Execute async function with exponential backoff retry.
+
+    Args:
+        func: Async function to call
+        *args: Positional arguments for func
+        max_retries: Maximum number of retry attempts
+        base_delay: Base delay between retries (doubles each time)
+        **kwargs: Keyword arguments for func
+
+    Returns:
+        Result from func
+
+    Raises:
+        Exception: The last exception if all retries fail
+    """
+    last_exception = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            last_exception = e
+
+            if attempt == max_retries:
+                # No more retries
+                raise
+
+            # Exponential backoff
+            delay = base_delay * (2 ** attempt)
+            logger.warning(
+                f"Retry {attempt + 1}/{max_retries} after {delay:.2f}s: {e}"
+            )
+            await asyncio.sleep(delay)
+
+    # Should not reach here, but just in case
+    raise last_exception
+
+
+async def update_stage(db: AsyncSession, video: Video, stage: str, progress: int) -> None:
+    """
+    Update video import stage and progress.
+
+    Args:
+        db: Database session
+        video: Video model instance
+        stage: New import stage (created, metadata, captions, chapters, complete, error)
+        progress: Progress percentage (0-100)
+    """
+    video.import_stage = stage
+    video.import_progress = progress
+    await db.flush()
+
+
+async def publish_progress(redis, user_id: str, video_id: str, progress: int, stage: str) -> None:
+    """
+    Publish import progress update via Redis Pub/Sub.
+
+    Args:
+        redis: Redis client instance
+        user_id: UUID of user (for channel routing)
+        video_id: UUID of video
+        progress: Progress percentage (0-100)
+        stage: Current import stage
+    """
+    import json
+
+    message = {
+        "type": "import_progress",
+        "video_id": video_id,
+        "progress": progress,
+        "stage": stage
+    }
+
+    channel = f"progress:user:{user_id}"
+    await redis.publish(channel, json.dumps(message))
+    logger.debug(f"Published progress update for video {video_id}: {progress}% ({stage})")
+
+
+async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
+    """
+    Enrich a video with captions and chapters, updating progress through stages.
+
+    This is the staged version of enrichment that:
+    1. Updates import_stage/import_progress at each phase
+    2. Publishes progress updates via Redis for real-time UI
+
+    Stages:
+    - captions (60%): Fetching captions from YouTube or Groq Whisper
+    - chapters (90%): Extracting chapters
+    - complete (100%): All done
+
+    Args:
+        ctx: ARQ job context (contains db session and redis)
+        video_id: UUID of video to enrich
+
+    Returns:
+        dict: Processing result with status and video_id
+    """
+    from app.services.enrichment.enrichment_service import EnrichmentService
+
+    db: AsyncSession = ctx['db']
+    redis = ctx.get('redis')
+
+    try:
+        # Fetch video
+        video = await db.get(Video, UUID(video_id))
+        if not video:
+            logger.error(f"Video {video_id} not found for staged enrichment")
+            return {"status": "error", "message": "Video not found", "video_id": video_id}
+
+        # Get user_id for progress publishing
+        list_result = await db.execute(
+            select(BookmarkList.user_id).where(BookmarkList.id == video.list_id)
+        )
+        user_id = list_result.scalar_one_or_none()
+
+        # Stage: Captions (60%)
+        await update_stage(db, video, "captions", 60)
+        if redis and user_id:
+            await publish_progress(redis, str(user_id), video_id, 60, "captions")
+
+        # Run enrichment service with rate limiting
+        async with _enrichment_rate_limiter.acquire():
+            service = EnrichmentService(db)
+            try:
+                enrichment = await service.enrich_video(UUID(video_id))
+                _enrichment_rate_limiter.on_success()
+            except Exception as e:
+                # Check if it's a rate limit error (429)
+                is_rate_limit = "429" in str(e) or "rate limit" in str(e).lower()
+                _enrichment_rate_limiter.on_failure(is_rate_limit=is_rate_limit)
+                raise
+
+        # Stage: Chapters (90%) - enrichment service handles this internally
+        await update_stage(db, video, "chapters", 90)
+        if redis and user_id:
+            await publish_progress(redis, str(user_id), video_id, 90, "chapters")
+
+        # Stage: Complete (100%)
+        await update_stage(db, video, "complete", 100)
+        if redis and user_id:
+            await publish_progress(redis, str(user_id), video_id, 100, "complete")
+
+        await db.commit()
+
+        logger.info(
+            f"Staged enrichment completed for video {video_id} with status {enrichment.status}"
+        )
+
+        return {
+            "status": enrichment.status.value if hasattr(enrichment.status, 'value') else str(enrichment.status),
+            "video_id": video_id,
+            "enrichment_id": str(enrichment.id) if enrichment.id else None
+        }
+
+    except Exception as e:
+        logger.exception(f"Error in staged enrichment for video {video_id}")
+
+        # Try to set error state
+        try:
+            video = await db.get(Video, UUID(video_id))
+            if video:
+                await update_stage(db, video, "error", video.import_progress)
+                await db.commit()
+        except Exception:
+            pass
+
+        return {
+            "status": "error",
+            "message": str(e),
+            "video_id": video_id
+        }
 
 
 async def process_video(
@@ -152,6 +344,17 @@ async def process_video(
 
             video.processing_status = "completed"
             video.error_message = None  # Clear error from previous failed attempts
+
+            # Two-phase import: Update import stage based on enrichment config
+            # If enrichment is enabled, stay at 'metadata' stage (25%) - enrichment will complete it
+            # If enrichment is disabled, mark as 'complete' (100%) - metadata is all we need
+            if settings.enrichment_enabled and settings.enrichment_auto_trigger:
+                video.import_stage = "metadata"
+                video.import_progress = 25
+            else:
+                video.import_stage = "complete"
+                video.import_progress = 100
+
             await db.flush()
 
             # Trigger enrichment if enabled

@@ -20,7 +20,6 @@ import { useFieldFilterStore } from '@/stores/fieldFilterStore'
 import { FilterBar } from '@/components/videos/FilterBar'
 import { FilterSettingsModal } from '@/components/videos/FilterSettingsModal'
 import { CSVUpload } from './CSVUpload'
-import { ProgressBar } from './ProgressBar'
 import { formatDuration } from '@/utils/formatDuration'
 import type { VideoResponse } from '@/types/video'
 import { useChannels } from '@/hooks/useChannels'
@@ -34,6 +33,7 @@ import { useTagStore } from '@/stores/tagStore'
 import { useTableSettingsStore } from '@/stores/tableSettingsStore'
 import { useShallow } from 'zustand/react/shallow'
 import { FEATURE_FLAGS } from '@/config/featureFlags'
+import { useWebSocket } from '@/hooks/useWebSocket'
 import { Plus } from 'lucide-react'
 import {
   DropdownMenu,
@@ -392,7 +392,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     [videos]
   )
 
-  // Stop polling when all PENDING videos have been processed (have a title)
+  // Stop polling when all PENDING videos have been fully processed (import_stage = complete/error)
   // This provides real-time UI updates after import without manual refresh
   useEffect(() => {
     console.log('[Polling] isPolling:', isPolling, 'pendingVideoIds:', pendingVideoIds.length, 'videos.length:', videos.length)
@@ -402,12 +402,17 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     const pendingVideos = videos.filter((video) => pendingVideoIds.includes(video.id))
     console.log('[Polling] Found pending videos:', pendingVideos.length, 'of', pendingVideoIds.length)
 
-    // Check if all pending videos have been processed (title is filled in by worker)
-    const unprocessed = pendingVideos.filter((video) => video.title === null || video.title === undefined)
-    console.log('[Polling] Unprocessed pending videos:', unprocessed.length, unprocessed.map(v => v.youtube_id))
+    // Check if all pending videos have finished import (complete or error)
+    // Videos are "still processing" if import_stage is NOT 'complete' or 'error'
+    // Note: Type assertion needed because import_stage may not be in all response types
+    const stillProcessing = pendingVideos.filter((video) => {
+      const stage = (video as VideoResponse).import_stage || 'created'
+      return stage !== 'complete' && stage !== 'error'
+    })
+    console.log('[Polling] Still processing:', stillProcessing.length, stillProcessing.map(v => `${v.youtube_id}:${(v as VideoResponse).import_stage}`))
 
-    // Only stop polling when we found all pending videos AND they all have titles
-    if (pendingVideos.length === pendingVideoIds.length && unprocessed.length === 0) {
+    // Only stop polling when we found all pending videos AND they're all done
+    if (pendingVideos.length === pendingVideoIds.length && stillProcessing.length === 0) {
       console.log('[Polling] All pending videos processed, stopping polling')
       setIsPolling(false)
       setPendingVideoIds([])
@@ -502,12 +507,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     }
   }, [pendingImport, handleImportConfirm, clearPendingImport])
 
-  // WebSocket for bulk upload progress (optional - bulk uploads now work without it too)
-  // Disabled for now to prevent unnecessary re-renders
-  // const { jobProgress, reconnecting, historyError } = useWebSocket()
-  const jobProgress = new Map()
-  const reconnecting = false
-  const historyError = null
+  // WebSocket for bulk upload progress and import progress tracking
+  // Provides real-time updates for video enrichment stages (created → metadata → captions → chapters → complete)
+  const { jobProgress, reconnecting, historyError } = useWebSocket()
 
   const deleteVideo = useDeleteVideo(listId)
 
@@ -1123,19 +1125,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         </div>
       )}
 
-      {/* Progress Dashboard */}
-      {jobProgress.size > 0 && (
-        <div className="mb-8 p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">
-            Active Jobs ({jobProgress.size})
-          </h2>
-          <div className="space-y-4">
-            {Array.from(jobProgress.values()).map((progress) => (
-              <ProgressBar key={progress.job_id} progress={progress} />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Job-level progress removed - individual video progress is shown on thumbnails */}
 
       {isUploadingCSV && (
         <CSVUpload
