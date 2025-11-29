@@ -91,3 +91,9 @@ alembic/versions/*.py
 
 # Code analysis results
 semgrep.json
+
+# Local documentation (planning, bugs, features)
+docs/
+
+# Bracket
+.br/

@@ -41,7 +41,29 @@ async def lifespan(app: FastAPI):
     await close_arq_pool()
 
 
-app = FastAPI(title="Smart YouTube Bookmarks", lifespan=lifespan)
+app = FastAPI(
+    title="Smart YouTube Bookmarks API",
+    description="""
+API for managing YouTube video collections with custom fields, real-time processing, and video enrichment.
+
+## Features
+
+- **Lists** – Create and manage video collections
+- **Videos** – Add, import (CSV), export, and manage videos
+- **Custom Fields** – Define rating, select, text, and boolean fields
+- **Field Schemas** – Create reusable field templates
+- **Channels** – Auto-created from video metadata
+- **Tags** – Organize videos with custom tags
+- **Enrichment** – Transcripts and AI-powered metadata
+- **Real-Time Progress** – WebSocket-based import tracking
+
+## Authentication
+
+Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+    """,
+    version="0.1.0",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
