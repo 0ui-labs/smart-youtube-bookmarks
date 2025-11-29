@@ -1,62 +1,62 @@
-import { useRef, useState, useCallback } from 'react'
 import {
   MediaPlayer,
+  type MediaPlayerInstance,
   MediaProvider,
   Poster,
   Track,
-  type MediaPlayerInstance,
-} from '@vidstack/react'
+} from "@vidstack/react";
 import {
   DefaultVideoLayout,
   defaultLayoutIcons,
-} from '@vidstack/react/player/layouts/default'
-import { useDebouncedCallback } from 'use-debounce'
-import { usePlayerSettingsStore } from '@/stores/playerSettingsStore'
-import { useUpdateWatchProgress } from '@/hooks/useWatchProgress'
-import { AlertCircle, Loader2, Play } from 'lucide-react'
-import type { TextTrack as TextTrackType } from '@/types/player'
+} from "@vidstack/react/player/layouts/default";
+import { AlertCircle, Loader2, Play } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { useDebouncedCallback } from "use-debounce";
+import { useUpdateWatchProgress } from "@/hooks/useWatchProgress";
+import { usePlayerSettingsStore } from "@/stores/playerSettingsStore";
+import type { TextTrack as TextTrackType } from "@/types/player";
 
 // Vidstack styles
-import '@vidstack/react/player/styles/default/theme.css'
-import '@vidstack/react/player/styles/default/layouts/video.css'
+import "@vidstack/react/player/styles/default/theme.css";
+import "@vidstack/react/player/styles/default/layouts/video.css";
 
 /**
  * Format seconds to MM:SS or HH:MM:SS
  */
 const formatTime = (seconds: number): string => {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = Math.floor(seconds % 60)
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
 
   if (h > 0) {
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   }
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
 
 interface VideoPlayerProps {
   /** YouTube video ID (11 characters) */
-  youtubeId: string
+  youtubeId: string;
   /** Internal video UUID for progress tracking */
-  videoId: string
+  videoId: string;
   /** Video title for accessibility */
-  title?: string
+  title?: string;
   /** Initial playback position in seconds */
-  initialPosition?: number | null
+  initialPosition?: number | null;
   /** Poster image URL (shown before playback) */
-  poster?: string | null
+  poster?: string | null;
   /** Thumbnail URL for error fallback */
-  thumbnailUrl?: string | null
+  thumbnailUrl?: string | null;
   /** Text tracks for subtitles, captions, and chapters */
-  textTracks?: TextTrackType[]
+  textTracks?: TextTrackType[];
   /** Thumbnails VTT file URL for scrubbing preview */
-  thumbnailsVtt?: string | null
+  thumbnailsVtt?: string | null;
   /** Callback when player is ready */
-  onReady?: () => void
+  onReady?: () => void;
   /** Callback when video ends */
-  onEnded?: () => void
+  onEnded?: () => void;
   /** Callback on player error */
-  onError?: (error: Error) => void
+  onError?: (error: Error) => void;
 }
 
 /**
@@ -112,157 +112,159 @@ export const VideoPlayer = ({
   onEnded,
   onError,
 }: VideoPlayerProps) => {
-  const playerRef = useRef<MediaPlayerInstance>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-  const hasSeenPositionRef = useRef(false)
+  const playerRef = useRef<MediaPlayerInstance>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const hasSeenPositionRef = useRef(false);
 
   // Store - player settings
   const { volume, muted, playbackRate, setVolume, setMuted, setPlaybackRate } =
-    usePlayerSettingsStore()
+    usePlayerSettingsStore();
 
   // Progress mutation
-  const updateProgress = useUpdateWatchProgress()
+  const updateProgress = useUpdateWatchProgress();
 
   // Debounced progress save (every 10 seconds during playback)
   const saveProgress = useDebouncedCallback((position: number) => {
-    updateProgress.mutate({ videoId, position: Math.floor(position) })
-  }, 10000)
+    updateProgress.mutate({ videoId, position: Math.floor(position) });
+  }, 10_000);
 
   // Immediate progress save (on pause)
   const saveProgressImmediate = useCallback(
     (position: number) => {
-      updateProgress.mutate({ videoId, position: Math.floor(position) })
+      updateProgress.mutate({ videoId, position: Math.floor(position) });
     },
     [updateProgress, videoId]
-  )
+  );
 
   // Event: Player can play (ready)
   const handleCanPlay = useCallback(() => {
-    setIsLoading(false)
+    setIsLoading(false);
 
     // Seek to initial position if provided and not already seeked
     if (initialPosition && initialPosition > 0 && !hasSeenPositionRef.current) {
-      const player = playerRef.current
+      const player = playerRef.current;
       if (player) {
-        player.currentTime = initialPosition
-        hasSeenPositionRef.current = true
+        player.currentTime = initialPosition;
+        hasSeenPositionRef.current = true;
       }
     }
 
-    onReady?.()
-  }, [initialPosition, onReady])
+    onReady?.();
+  }, [initialPosition, onReady]);
 
   // Event: Video ended
   const handleEnd = useCallback(() => {
-    const player = playerRef.current
+    const player = playerRef.current;
     if (player) {
-      saveProgressImmediate(player.duration)
+      saveProgressImmediate(player.duration);
     }
-    onEnded?.()
-  }, [saveProgressImmediate, onEnded])
+    onEnded?.();
+  }, [saveProgressImmediate, onEnded]);
 
   // Event: Error
   const handleError = useCallback(() => {
-    const err = new Error('Video playback error')
-    setError(err)
-    setIsLoading(false)
-    onError?.(err)
-  }, [onError])
+    const err = new Error("Video playback error");
+    setError(err);
+    setIsLoading(false);
+    onError?.(err);
+  }, [onError]);
 
   // Event: Time update - debounced progress save
   const handleTimeUpdate = useCallback(() => {
-    const player = playerRef.current
+    const player = playerRef.current;
     if (player && !player.paused) {
-      saveProgress(player.currentTime)
+      saveProgress(player.currentTime);
     }
-  }, [saveProgress])
+  }, [saveProgress]);
 
   // Event: Pause - immediate progress save
   const handlePause = useCallback(() => {
-    const player = playerRef.current
+    const player = playerRef.current;
     if (player) {
-      saveProgressImmediate(player.currentTime)
+      saveProgressImmediate(player.currentTime);
     }
-  }, [saveProgressImmediate])
+  }, [saveProgressImmediate]);
 
   // Event: Seeked - save after user seeks with scrubber
   const handleSeeked = useCallback(() => {
-    const player = playerRef.current
+    const player = playerRef.current;
     if (player) {
-      saveProgressImmediate(player.currentTime)
+      saveProgressImmediate(player.currentTime);
     }
-  }, [saveProgressImmediate])
+  }, [saveProgressImmediate]);
 
   // Event: Playing - seek to initial position (YouTube may require video to start first)
   const handlePlay = useCallback(() => {
     if (initialPosition && initialPosition > 0 && !hasSeenPositionRef.current) {
-      const player = playerRef.current
+      const player = playerRef.current;
       if (player) {
-        player.currentTime = initialPosition
-        hasSeenPositionRef.current = true
+        player.currentTime = initialPosition;
+        hasSeenPositionRef.current = true;
       }
     }
-  }, [initialPosition])
+  }, [initialPosition]);
 
   // Event: Volume change - persist to store
   const handleVolumeChange = useCallback(() => {
-    const player = playerRef.current
+    const player = playerRef.current;
     if (player) {
-      setVolume(player.volume)
-      setMuted(player.muted)
+      setVolume(player.volume);
+      setMuted(player.muted);
     }
-  }, [setVolume, setMuted])
+  }, [setVolume, setMuted]);
 
   // Event: Rate change - persist to store
   const handleRateChange = useCallback(() => {
-    const player = playerRef.current
+    const player = playerRef.current;
     if (player) {
-      setPlaybackRate(player.playbackRate)
+      setPlaybackRate(player.playbackRate);
     }
-  }, [setPlaybackRate])
+  }, [setPlaybackRate]);
 
   // Error fallback UI
   if (error) {
     return (
-      <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted">
+      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
         {(thumbnailUrl || poster) && (
           <img
-            src={thumbnailUrl || poster || ''}
             alt="Video thumbnail"
-            className="absolute inset-0 w-full h-full object-cover blur-sm opacity-50"
+            className="absolute inset-0 h-full w-full object-cover opacity-50 blur-sm"
+            src={thumbnailUrl || poster || ""}
           />
         )}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/40">
           <AlertCircle className="h-10 w-10 text-destructive" />
-          <p className="text-sm text-white font-medium">Video nicht verfügbar</p>
+          <p className="font-medium text-sm text-white">
+            Video nicht verfügbar
+          </p>
           <a
+            className="text-primary-foreground text-sm underline hover:no-underline"
             href={`https://www.youtube.com/watch?v=${youtubeId}`}
-            target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-primary-foreground underline hover:no-underline"
+            target="_blank"
           >
             Auf YouTube ansehen →
           </a>
         </div>
       </div>
-    )
+    );
   }
 
   // Show resume indicator if there's a saved position
-  const showResumeIndicator = initialPosition && initialPosition > 0
+  const showResumeIndicator = initialPosition && initialPosition > 0;
 
   // Use poster if provided, otherwise fall back to thumbnailUrl
-  const posterSrc = poster || thumbnailUrl
+  const posterSrc = poster || thumbnailUrl;
 
   return (
-    <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black">
+    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
       {/* Loading overlay with resume indicator */}
       {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-10 gap-3">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/60">
           <Loader2 className="h-10 w-10 animate-spin text-white" />
           {showResumeIndicator && (
-            <div className="flex items-center gap-2 text-white/90 text-sm bg-black/40 px-3 py-1.5 rounded-full">
+            <div className="flex items-center gap-2 rounded-full bg-black/40 px-3 py-1.5 text-sm text-white/90">
               <Play className="h-3.5 w-3.5" />
               <span>Fortsetzen bei {formatTime(initialPosition)}</span>
             </div>
@@ -272,39 +274,45 @@ export const VideoPlayer = ({
 
       {/* Vidstack Player */}
       <MediaPlayer
-        ref={playerRef}
-        src={`youtube/${youtubeId}`}
-        viewType="video"
-        streamType="on-demand"
+        className="video-player h-full w-full"
         crossOrigin
-        playsInline
-        title={title}
-        poster={posterSrc || undefined}
-        volume={volume}
         muted={muted}
-        playbackRate={playbackRate}
         onCanPlay={handleCanPlay}
         onEnd={handleEnd}
         onError={handleError}
-        onTimeUpdate={handleTimeUpdate}
         onPause={handlePause}
-        onSeeked={handleSeeked}
         onPlay={handlePlay}
-        onVolumeChange={handleVolumeChange}
         onRateChange={handleRateChange}
-        className="video-player w-full h-full"
+        onSeeked={handleSeeked}
+        onTimeUpdate={handleTimeUpdate}
+        onVolumeChange={handleVolumeChange}
+        playbackRate={playbackRate}
+        playsInline
+        poster={posterSrc || undefined}
+        ref={playerRef}
+        src={`youtube/${youtubeId}`}
+        streamType="on-demand"
+        title={title}
+        viewType="video"
+        volume={volume}
       >
         <MediaProvider>
-          {posterSrc && <Poster className="vds-poster" src={posterSrc} alt={title || 'Video poster'} />}
+          {posterSrc && (
+            <Poster
+              alt={title || "Video poster"}
+              className="vds-poster"
+              src={posterSrc}
+            />
+          )}
           {textTracks?.map((track) => (
             <Track
+              default={track.default}
               key={track.src}
-              src={track.src}
+              kind={track.kind}
               label={track.label}
               language={track.language}
-              kind={track.kind}
+              src={track.src}
               type={track.type}
-              default={track.default}
             />
           ))}
         </MediaProvider>
@@ -314,5 +322,5 @@ export const VideoPlayer = ({
         />
       </MediaPlayer>
     </div>
-  )
-}
+  );
+};

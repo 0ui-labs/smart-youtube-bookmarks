@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { VideoResponse } from '@/types/video'
+import { useQuery } from "@tanstack/react-query";
+import type { VideoResponse } from "@/types/video";
 
 /**
  * Hook to fetch a single video's details with available_fields.
@@ -22,21 +22,21 @@ import { VideoResponse } from '@/types/video'
  */
 export const useVideoDetail = (videoId: string | null, enabled = true) => {
   return useQuery<VideoResponse>({
-    queryKey: ['video-detail', videoId],
+    queryKey: ["video-detail", videoId],
     queryFn: async () => {
-      if (!videoId) throw new Error('Video ID is required')
+      if (!videoId) throw new Error("Video ID is required");
 
-      const response = await fetch(`/api/videos/${videoId}`)
+      const response = await fetch(`/api/videos/${videoId}`);
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to fetch video details')
+        const error = await response.json();
+        throw new Error(error.detail || "Failed to fetch video details");
       }
 
-      return response.json()
+      return response.json();
     },
     enabled: enabled && !!videoId,
     // Cache for 5 minutes
     staleTime: 5 * 60 * 1000,
-  })
-}
+  });
+};

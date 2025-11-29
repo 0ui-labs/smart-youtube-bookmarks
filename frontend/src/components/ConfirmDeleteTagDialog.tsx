@@ -1,5 +1,4 @@
-import { AlertTriangle } from 'lucide-react'
-import { useDeleteTag } from '@/hooks/useTags'
+import { AlertTriangle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,15 +8,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
-import type { Tag } from '@/types/tag'
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { useDeleteTag } from "@/hooks/useTags";
+import type { Tag } from "@/types/tag";
 
 interface ConfirmDeleteTagDialogProps {
-  tag: Tag
-  open: boolean
-  onConfirm: () => void
-  onCancel: () => void
+  tag: Tag;
+  open: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
 }
 
 /**
@@ -52,19 +52,19 @@ export function ConfirmDeleteTagDialog({
   onConfirm,
   onCancel,
 }: ConfirmDeleteTagDialogProps) {
-  const deleteTag = useDeleteTag()
+  const deleteTag = useDeleteTag();
 
   const handleConfirm = async () => {
     try {
-      await deleteTag.mutateAsync(tag.id)
-      onConfirm()
+      await deleteTag.mutateAsync(tag.id);
+      onConfirm();
     } catch (error) {
-      console.error('Failed to delete tag:', error)
+      console.error("Failed to delete tag:", error);
     }
-  }
+  };
 
   return (
-    <AlertDialog open={open} onOpenChange={(open) => !open && onCancel()}>
+    <AlertDialog onOpenChange={(open) => !open && onCancel()} open={open}>
       <AlertDialogContent className="sm:max-w-[425px]">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
@@ -74,32 +74,37 @@ export function ConfirmDeleteTagDialog({
           <AlertDialogDescription asChild>
             <div className="space-y-3">
               <p>
-                Are you sure you want to delete the tag{' '}
-                <strong className="font-semibold text-foreground">"{tag.name}"</strong>?
+                Are you sure you want to delete the tag{" "}
+                <strong className="font-semibold text-foreground">
+                  "{tag.name}"
+                </strong>
+                ?
               </p>
               <p>This will remove the tag from all videos.</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 This action cannot be undone.
               </p>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleteTag.isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={deleteTag.isPending}>
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction asChild>
             <Button
-              variant="destructive"
-              onClick={(e) => {
-                e.preventDefault() // Prevents auto-close during mutation
-                handleConfirm()
-              }}
               disabled={deleteTag.isPending}
+              onClick={(e) => {
+                e.preventDefault(); // Prevents auto-close during mutation
+                handleConfirm();
+              }}
+              variant="destructive"
             >
-              {deleteTag.isPending ? 'Deleting...' : 'Delete'}
+              {deleteTag.isPending ? "Deleting..." : "Delete"}
             </Button>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }

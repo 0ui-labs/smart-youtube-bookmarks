@@ -1,5 +1,5 @@
-import { ProgressBar } from './ProgressBar';
-import type { ProgressUpdate } from '../hooks/useWebSocket';
+import type { ProgressUpdate } from "../hooks/useWebSocket";
+import { ProgressBar } from "./ProgressBar";
 
 export interface JobProgressCardProps {
   job: ProgressUpdate;
@@ -13,17 +13,17 @@ export interface JobProgressCardProps {
 export function JobProgressCard({ job }: JobProgressCardProps) {
   return (
     <div
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200"
+      className="rounded-lg bg-white shadow-md transition-shadow duration-200 hover:shadow-lg"
       data-testid={`job-card-${job.job_id}`}
     >
       {/* Card Header */}
-      <div className="px-4 pt-4 pb-2 border-b border-gray-200">
-        <div className="flex justify-between items-center">
-          <h3 className="text-sm font-semibold text-gray-900">
+      <div className="border-gray-200 border-b px-4 pt-4 pb-2">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900 text-sm">
             Job {job.job_id.slice(0, 8)}
           </h3>
           {job.video_id && (
-            <span className="text-xs text-gray-500">
+            <span className="text-gray-500 text-xs">
               Video: {job.video_id.slice(0, 8)}
             </span>
           )}

@@ -1,6 +1,6 @@
-import type { CustomField } from '@/types/customFields'
-import type { CategoryFilters } from '@/types/filterSettings'
-import { useFieldFilterStore } from '@/stores/fieldFilterStore'
+import { Plus, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -8,13 +8,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Plus, X } from 'lucide-react'
+} from "@/components/ui/table";
+import { useFieldFilterStore } from "@/stores/fieldFilterStore";
+import type { CustomField } from "@/types/customFields";
+import type { CategoryFilters } from "@/types/filterSettings";
 
 interface FilterTableProps {
-  categoryFilter: CategoryFilters
+  categoryFilter: CategoryFilters;
 }
 
 /**
@@ -26,88 +26,84 @@ interface FilterTableProps {
  * @param categoryFilter - Category with fields to display
  */
 export function FilterTable({ categoryFilter }: FilterTableProps) {
-  const { activeFilters, addFilter, removeFilter } = useFieldFilterStore()
+  const { activeFilters, addFilter, removeFilter } = useFieldFilterStore();
 
   // Get active filter for a specific field
-  const getActiveFilter = (fieldId: string) => {
-    return activeFilters.find((f) => f.fieldId === fieldId)
-  }
+  const getActiveFilter = (fieldId: string) =>
+    activeFilters.find((f) => f.fieldId === fieldId);
 
   // Check if field has active filter
-  const hasActiveFilter = (fieldId: string) => {
-    return activeFilters.some((f) => f.fieldId === fieldId)
-  }
+  const hasActiveFilter = (fieldId: string) =>
+    activeFilters.some((f) => f.fieldId === fieldId);
 
   // Handle adding a filter (default operator and value)
   const handleAddFilter = (field: CustomField) => {
     // Default operator and value based on field type
-    if (field.field_type === 'rating') {
+    if (field.field_type === "rating") {
       addFilter({
         fieldId: field.id,
         fieldName: field.name,
-        fieldType: 'rating',
-        operator: 'gte',
+        fieldType: "rating",
+        operator: "gte",
         value: 1,
-      })
-    } else if (field.field_type === 'select') {
-      const config = field.config as { options: string[] }
+      });
+    } else if (field.field_type === "select") {
+      const config = field.config as { options: string[] };
       addFilter({
         fieldId: field.id,
         fieldName: field.name,
-        fieldType: 'select',
-        operator: 'in',
+        fieldType: "select",
+        operator: "in",
         value: config.options[0],
-      })
-    } else if (field.field_type === 'text') {
+      });
+    } else if (field.field_type === "text") {
       addFilter({
         fieldId: field.id,
         fieldName: field.name,
-        fieldType: 'text',
-        operator: 'contains',
-        value: '',
-      })
-    } else if (field.field_type === 'boolean') {
+        fieldType: "text",
+        operator: "contains",
+        value: "",
+      });
+    } else if (field.field_type === "boolean") {
       addFilter({
         fieldId: field.id,
         fieldName: field.name,
-        fieldType: 'boolean',
-        operator: 'is',
+        fieldType: "boolean",
+        operator: "is",
         value: true,
-      })
+      });
     }
-  }
+  };
 
   // Handle removing a filter
   const handleRemoveFilter = (fieldId: string) => {
-    const filter = getActiveFilter(fieldId)
+    const filter = getActiveFilter(fieldId);
     if (filter) {
-      removeFilter(filter.id)
+      removeFilter(filter.id);
     }
-  }
+  };
 
   // Get field type display label
-  const getFieldTypeLabel = (fieldType: CustomField['field_type']): string => {
-    const labels: Record<CustomField['field_type'], string> = {
-      rating: 'Bewertung',
-      select: 'Auswahl',
-      text: 'Text',
-      boolean: 'Ja/Nein',
-    }
-    return labels[fieldType]
-  }
+  const getFieldTypeLabel = (fieldType: CustomField["field_type"]): string => {
+    const labels: Record<CustomField["field_type"], string> = {
+      rating: "Bewertung",
+      select: "Auswahl",
+      text: "Text",
+      boolean: "Ja/Nein",
+    };
+    return labels[fieldType];
+  };
 
   // No fields available
   if (categoryFilter.fields.length === 0) {
     return (
-      <div className="py-8 text-center text-sm text-muted-foreground">
+      <div className="py-8 text-center text-muted-foreground text-sm">
         <p>Keine Felder verfügbar für diese Kategorie.</p>
         {categoryFilter.schemaId === null && (
-          <p className="mt-2">
-            Diese Kategorie hat kein Schema zugewiesen.
-          </p>
+          <p className="mt-2">Diese Kategorie hat kein Schema zugewiesen.</p>
         )}
       </div>
-    )
+    );
   }
 
   return (
@@ -123,7 +119,7 @@ export function FilterTable({ categoryFilter }: FilterTableProps) {
         </TableHeader>
         <TableBody>
           {categoryFilter.fields.map((field) => {
-            const isActive = hasActiveFilter(field.id)
+            const isActive = hasActiveFilter(field.id);
 
             return (
               <TableRow key={field.id}>
@@ -143,29 +139,29 @@ export function FilterTable({ categoryFilter }: FilterTableProps) {
                 <TableCell className="text-right">
                   {isActive ? (
                     <Button
-                      variant="ghost"
-                      size="sm"
                       onClick={() => handleRemoveFilter(field.id)}
+                      size="sm"
+                      variant="ghost"
                     >
-                      <X className="h-4 w-4 mr-1" />
+                      <X className="mr-1 h-4 w-4" />
                       Entfernen
                     </Button>
                   ) : (
                     <Button
-                      variant="ghost"
-                      size="sm"
                       onClick={() => handleAddFilter(field)}
+                      size="sm"
+                      variant="ghost"
                     >
-                      <Plus className="h-4 w-4 mr-1" />
+                      <Plus className="mr-1 h-4 w-4" />
                       Hinzufügen
                     </Button>
                   )}
                 </TableCell>
               </TableRow>
-            )
+            );
           })}
         </TableBody>
       </Table>
     </div>
-  )
+  );
 }

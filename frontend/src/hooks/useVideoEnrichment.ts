@@ -1,18 +1,18 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import type {
   EnrichmentResponse,
   EnrichmentRetryResponse,
-} from '@/types/enrichment'
+} from "@/types/enrichment";
 
 /**
  * Query key factory for enrichment queries.
  * Used for cache invalidation and query identification.
  */
 export const enrichmentKeys = {
-  all: ['enrichment'] as const,
-  detail: (videoId: string) => ['enrichment', videoId] as const,
-}
+  all: ["enrichment"] as const,
+  detail: (videoId: string) => ["enrichment", videoId] as const,
+};
 
 /**
  * React Query hook to fetch video enrichment data.
@@ -36,49 +36,49 @@ export const enrichmentKeys = {
 export const useVideoEnrichment = (
   videoId: string | undefined,
   options?: {
-    enabled?: boolean
-    refetchInterval?: number | false
+    enabled?: boolean;
+    refetchInterval?: number | false;
   }
 ) => {
   return useQuery({
-    queryKey: enrichmentKeys.detail(videoId ?? ''),
+    queryKey: enrichmentKeys.detail(videoId ?? ""),
     queryFn: async (): Promise<EnrichmentResponse | null> => {
-      if (!videoId) return null
+      if (!videoId) return null;
 
       try {
         const { data } = await api.get<EnrichmentResponse>(
           `/videos/${videoId}/enrichment`
-        )
-        return data
+        );
+        return data;
       } catch (error: unknown) {
         // Return null for 404 (enrichment not found)
         if (
           error &&
-          typeof error === 'object' &&
-          'response' in error &&
+          typeof error === "object" &&
+          "response" in error &&
           (error as { response?: { status?: number } }).response?.status === 404
         ) {
-          return null
+          return null;
         }
-        throw error
+        throw error;
       }
     },
     enabled: !!videoId && (options?.enabled ?? true),
     // Poll while processing
     refetchInterval: (query) => {
       if (options?.refetchInterval !== undefined) {
-        return options.refetchInterval
+        return options.refetchInterval;
       }
       // Auto-poll every 2s while processing
-      if (query.state.data?.status === 'processing') {
-        return 2000
+      if (query.state.data?.status === "processing") {
+        return 2000;
       }
-      return false
+      return false;
     },
     // Keep data fresh
     staleTime: 30 * 1000, // 30 seconds
-  })
-}
+  });
+};
 
 /**
  * React Query mutation hook to retry video enrichment.
@@ -102,31 +102,28 @@ export const useVideoEnrichment = (
  * ```
  */
 export const useRetryEnrichment = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (videoId: string): Promise<EnrichmentRetryResponse> => {
       const { data } = await api.post<EnrichmentRetryResponse>(
         `/videos/${videoId}/enrichment/retry`
-      )
-      return data
+      );
+      return data;
     },
     onSuccess: (data, videoId) => {
       // Update the enrichment cache with new data
-      queryClient.setQueryData(
-        enrichmentKeys.detail(videoId),
-        data.enrichment
-      )
+      queryClient.setQueryData(enrichmentKeys.detail(videoId), data.enrichment);
       // Also invalidate to trigger refetch
       queryClient.invalidateQueries({
         queryKey: enrichmentKeys.detail(videoId),
-      })
+      });
     },
     onError: (error) => {
-      console.error('Failed to retry enrichment:', error)
+      console.error("Failed to retry enrichment:", error);
     },
-  })
-}
+  });
+};
 
 /**
  * Prefetch enrichment data for a video.
@@ -146,12 +143,12 @@ export const prefetchEnrichment = async (
       try {
         const { data } = await api.get<EnrichmentResponse>(
           `/videos/${videoId}/enrichment`
-        )
-        return data
+        );
+        return data;
       } catch {
-        return null
+        return null;
       }
     },
     staleTime: 30 * 1000,
-  })
-}
+  });
+};

@@ -1,5 +1,5 @@
-import axios from 'axios'
-import type { AnalyticsResponse } from '@/types/analytics'
+import axios from "axios";
+import type { AnalyticsResponse } from "@/types/analytics";
 
 /**
  * Axios instance configured for the backend API.
@@ -13,8 +13,8 @@ import type { AnalyticsResponse } from '@/types/analytics'
  * - URLSearchParams: application/x-www-form-urlencoded
  */
 export const api = axios.create({
-  baseURL: '/api',
-})
+  baseURL: "/api",
+});
 
 /**
  * Response interceptor for comprehensive error handling.
@@ -34,58 +34,58 @@ api.interceptors.response.use(
   (error) => {
     if (error.response) {
       // Server responded with error status (4xx, 5xx)
-      const status = error.response.status
-      const url = error.config?.url
+      const status = error.response.status;
+      const url = error.config?.url;
 
-      console.error('API Error:', {
+      console.error("API Error:", {
         status,
         data: error.response.data,
         url,
-      })
+      });
 
       // Handle specific error codes
       switch (status) {
         case 401:
           // Unauthorized - redirect to login page (when auth is implemented)
-          console.warn('Unauthorized access - authentication required')
+          console.warn("Unauthorized access - authentication required");
           // TODO: Implement authentication and redirect
           // window.location.href = '/login'
-          break
+          break;
 
         case 403:
           // Forbidden - user doesn't have permission
-          console.error('Forbidden - insufficient permissions for:', url)
-          break
+          console.error("Forbidden - insufficient permissions for:", url);
+          break;
 
         case 404:
           // Not Found - resource doesn't exist
-          console.warn('Resource not found:', url)
-          break
+          console.warn("Resource not found:", url);
+          break;
 
         case 500:
         case 502:
         case 503:
           // Server errors
-          console.error('Server error:', status, '-', url)
+          console.error("Server error:", status, "-", url);
           // TODO: Show global error toast/notification
-          break
+          break;
 
         default:
           // Other client/server errors
-          console.error('Unexpected error status:', status)
+          console.error("Unexpected error status:", status);
       }
     } else if (error.request) {
       // Request was made but no response received (network error)
-      console.error('Network Error:', error.message)
+      console.error("Network Error:", error.message);
       // TODO: Show "No internet connection" notification
     } else {
       // Error in request setup
-      console.error('Request Setup Error:', error.message)
+      console.error("Request Setup Error:", error.message);
     }
 
-    return Promise.reject(error)
+    return Promise.reject(error);
   }
-)
+);
 
 /**
  * Get analytics for custom fields usage in a list.
@@ -93,7 +93,11 @@ api.interceptors.response.use(
  * @param listId - UUID of the bookmark list
  * @returns Analytics data with all metrics
  */
-export const getAnalytics = async (listId: string): Promise<AnalyticsResponse> => {
-  const { data } = await api.get<AnalyticsResponse>(`/lists/${listId}/analytics`)
-  return data
-}
+export const getAnalytics = async (
+  listId: string
+): Promise<AnalyticsResponse> => {
+  const { data } = await api.get<AnalyticsResponse>(
+    `/lists/${listId}/analytics`
+  );
+  return data;
+};

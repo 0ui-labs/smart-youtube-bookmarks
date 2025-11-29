@@ -5,9 +5,9 @@
 import {
   CAPTION_SOURCE_LABELS,
   CHAPTER_SOURCE_LABELS,
-  LANGUAGE_LABELS,
   type EnrichmentStatus,
-} from '@/types/enrichment'
+  LANGUAGE_LABELS,
+} from "@/types/enrichment";
 
 /**
  * Get human-readable language label.
@@ -25,20 +25,20 @@ export function getLanguageLabel(
   languageCode: string | null | undefined,
   source?: string | null
 ): string {
-  if (!languageCode) return 'Unknown'
+  if (!languageCode) return "Unknown";
 
   // Get base language name
-  const baseName = LANGUAGE_LABELS[languageCode] || languageCode.toUpperCase()
+  const baseName = LANGUAGE_LABELS[languageCode] || languageCode.toUpperCase();
 
   // Add source suffix if auto-generated
-  if (source === 'youtube_auto') {
-    return `${baseName} (Auto)`
+  if (source === "youtube_auto") {
+    return `${baseName} (Auto)`;
   }
-  if (source === 'groq_whisper') {
-    return `${baseName} (Whisper)`
+  if (source === "groq_whisper") {
+    return `${baseName} (Whisper)`;
   }
 
-  return baseName
+  return baseName;
 }
 
 /**
@@ -51,9 +51,11 @@ export function getLanguageLabel(
  * getCaptionSourceLabel('youtube_manual') // "YouTube (Manual)"
  * getCaptionSourceLabel('groq_whisper') // "Groq Whisper"
  */
-export function getCaptionSourceLabel(source: string | null | undefined): string {
-  if (!source) return 'Unknown'
-  return CAPTION_SOURCE_LABELS[source] || source
+export function getCaptionSourceLabel(
+  source: string | null | undefined
+): string {
+  if (!source) return "Unknown";
+  return CAPTION_SOURCE_LABELS[source] || source;
 }
 
 /**
@@ -66,9 +68,11 @@ export function getCaptionSourceLabel(source: string | null | undefined): string
  * getChapterSourceLabel('youtube') // "YouTube"
  * getChapterSourceLabel('description') // "Description"
  */
-export function getChapterSourceLabel(source: string | null | undefined): string {
-  if (!source) return 'Unknown'
-  return CHAPTER_SOURCE_LABELS[source] || source
+export function getChapterSourceLabel(
+  source: string | null | undefined
+): string {
+  if (!source) return "Unknown";
+  return CHAPTER_SOURCE_LABELS[source] || source;
 }
 
 /**
@@ -83,14 +87,14 @@ export function getChapterSourceLabel(source: string | null | undefined): string
  * formatChapterTime(0) // "0:00"
  */
 export function formatChapterTime(seconds: number): string {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = Math.floor(seconds % 60)
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
 
   if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -105,7 +109,7 @@ export function formatChapterTime(seconds: number): string {
  * formatChapterTimeRange(3600, 3720) // "1:00:00 - 1:02:00"
  */
 export function formatChapterTimeRange(start: number, end: number): string {
-  return `${formatChapterTime(start)} - ${formatChapterTime(end)}`
+  return `${formatChapterTime(start)} - ${formatChapterTime(end)}`;
 }
 
 /**
@@ -115,23 +119,23 @@ export function formatChapterTimeRange(start: number, end: number): string {
  * @returns Object with label, color, and icon info
  */
 export function getStatusDisplay(status: EnrichmentStatus): {
-  label: string
-  color: 'gray' | 'blue' | 'green' | 'yellow' | 'red'
-  isLoading: boolean
+  label: string;
+  color: "gray" | "blue" | "green" | "yellow" | "red";
+  isLoading: boolean;
 } {
   switch (status) {
-    case 'pending':
-      return { label: 'Pending', color: 'gray', isLoading: false }
-    case 'processing':
-      return { label: 'Processing', color: 'blue', isLoading: true }
-    case 'completed':
-      return { label: 'Completed', color: 'green', isLoading: false }
-    case 'partial':
-      return { label: 'Partial', color: 'yellow', isLoading: false }
-    case 'failed':
-      return { label: 'Failed', color: 'red', isLoading: false }
+    case "pending":
+      return { label: "Pending", color: "gray", isLoading: false };
+    case "processing":
+      return { label: "Processing", color: "blue", isLoading: true };
+    case "completed":
+      return { label: "Completed", color: "green", isLoading: false };
+    case "partial":
+      return { label: "Partial", color: "yellow", isLoading: false };
+    case "failed":
+      return { label: "Failed", color: "red", isLoading: false };
     default:
-      return { label: 'Unknown', color: 'gray', isLoading: false }
+      return { label: "Unknown", color: "gray", isLoading: false };
   }
 }
 
@@ -141,7 +145,7 @@ export function getStatusDisplay(status: EnrichmentStatus): {
 export function hasCaptions(
   enrichment: { captions_vtt?: string | null } | null | undefined
 ): boolean {
-  return !!enrichment?.captions_vtt
+  return !!enrichment?.captions_vtt;
 }
 
 /**
@@ -150,7 +154,7 @@ export function hasCaptions(
 export function hasChapters(
   enrichment: { chapters?: unknown[] | null } | null | undefined
 ): boolean {
-  return Array.isArray(enrichment?.chapters) && enrichment.chapters.length > 0
+  return Array.isArray(enrichment?.chapters) && enrichment.chapters.length > 0;
 }
 
 /**
@@ -164,11 +168,11 @@ export function findActiveChapter<T extends { start: number; end: number }>(
   chapters: T[] | null | undefined,
   currentTime: number
 ): T | null {
-  if (!chapters || chapters.length === 0) return null
+  if (!chapters || chapters.length === 0) return null;
 
   return (
     chapters.find(
       (chapter) => currentTime >= chapter.start && currentTime < chapter.end
     ) || null
-  )
+  );
 }

@@ -1,6 +1,6 @@
-import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { CustomFieldsSection } from '@/components/CustomFieldsSection'
-import { AvailableFieldResponse, VideoFieldValue } from '@/types/video'
+import { CustomFieldsSection } from "@/components/CustomFieldsSection";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import type { AvailableFieldResponse, VideoFieldValue } from "@/types/video";
 
 /**
  * CustomFieldsModal Component
@@ -16,25 +16,25 @@ import { AvailableFieldResponse, VideoFieldValue } from '@/types/video'
  */
 interface CustomFieldsModalProps {
   /** Modal open state */
-  open: boolean
+  open: boolean;
 
   /** Handler for modal state changes */
-  onOpenChange: (open: boolean) => void
+  onOpenChange: (open: boolean) => void;
 
   /** All available fields for this video */
-  availableFields: AvailableFieldResponse[]
+  availableFields: AvailableFieldResponse[];
 
   /** Current field values with metadata */
-  fieldValues: VideoFieldValue[]
+  fieldValues: VideoFieldValue[];
 
   /** Video ID for mutation context */
-  videoId: string
+  videoId: string;
 
   /** List ID for API calls */
-  listId: string
+  listId: string;
 
   /** Callback when field value changes */
-  onFieldChange: (fieldId: string, value: string | number | boolean) => void
+  onFieldChange: (fieldId: string, value: string | number | boolean) => void;
 }
 
 export const CustomFieldsModal = ({
@@ -45,20 +45,18 @@ export const CustomFieldsModal = ({
   videoId,
   listId,
   onFieldChange,
-}: CustomFieldsModalProps) => {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <div className="mt-2">
-          <CustomFieldsSection
-            availableFields={availableFields}
-            fieldValues={fieldValues}
-            videoId={videoId}
-            listId={listId}
-            onFieldChange={onFieldChange}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
+}: CustomFieldsModalProps) => (
+  <Dialog onOpenChange={onOpenChange} open={open}>
+    <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+      <div className="mt-2">
+        <CustomFieldsSection
+          availableFields={availableFields}
+          fieldValues={fieldValues}
+          listId={listId}
+          onFieldChange={onFieldChange}
+          videoId={videoId}
+        />
+      </div>
+    </DialogContent>
+  </Dialog>
+);

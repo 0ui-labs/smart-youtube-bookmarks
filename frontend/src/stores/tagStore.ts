@@ -5,9 +5,9 @@
  * Users can select multiple tags to filter videos.
  * Selected tags are persisted in localStorage.
  */
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Tag } from '@/types/tag';
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import type { Tag } from "@/types/tag";
 
 /**
  * Tag store state and actions
@@ -63,7 +63,7 @@ export const useTagStore = create<TagStore>()(
       clearTags: () => set({ selectedTagIds: [] }),
     }),
     {
-      name: 'tag-filter-selection', // localStorage key
+      name: "tag-filter-selection", // localStorage key
       storage: createJSONStorage(() => localStorage),
       // Only persist selectedTagIds, not the full tags array
       partialize: (state) => ({ selectedTagIds: state.selectedTagIds }),

@@ -1,10 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import type { UpdateWatchProgressResponse } from '@/types/player'
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import type { UpdateWatchProgressResponse } from "@/types/player";
 
 interface UpdateWatchProgressParams {
-  videoId: string
-  position: number
+  videoId: string;
+  position: number;
 }
 
 /**
@@ -32,7 +32,7 @@ interface UpdateWatchProgressParams {
  * ```
  */
 export const useUpdateWatchProgress = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
@@ -42,20 +42,20 @@ export const useUpdateWatchProgress = () => {
       const { data } = await api.patch<UpdateWatchProgressResponse>(
         `/videos/${videoId}/progress`,
         { position }
-      )
-      return data
+      );
+      return data;
     },
     onSuccess: (_, { videoId }) => {
       // Invalidate video detail query to refresh watch_position
       // Note: VideoDetailsPage uses ['videos', videoId] as query key
-      queryClient.invalidateQueries({ queryKey: ['videos', videoId] })
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
       // Also invalidate videos list queries that might include this video
-      queryClient.invalidateQueries({ queryKey: ['videos'] })
+      queryClient.invalidateQueries({ queryKey: ["videos"] });
     },
     // Silent failure - don't show errors for progress updates
     // (network issues during playback shouldn't interrupt the user)
     onError: (error) => {
-      console.warn('Failed to save watch progress:', error)
+      console.warn("Failed to save watch progress:", error);
     },
-  })
-}
+  });
+};

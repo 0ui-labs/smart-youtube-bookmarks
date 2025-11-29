@@ -21,31 +21,34 @@
  * #6 - Field component pattern (2025 shadcn/ui, NOT deprecated Form)
  */
 
-import { useEffect, useState } from 'react'
-import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { useDebouncedCallback } from 'use-debounce'
-
-import { Button } from '@/components/ui/button'
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { useDebouncedCallback } from "use-debounce";
+import { z } from "zod";
+import { checkFieldNameDuplicate } from "@/api/customFields";
+import { Button } from "@/components/ui/button";
 import {
   Field,
-  FieldLabel,
-  FieldError,
   FieldDescription,
-} from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
+import {
+  type CustomFieldCreate,
+  CustomFieldCreateSchema,
+  type FieldType,
+} from "@/types/customField";
 
-import { FieldType, CustomFieldCreate, CustomFieldCreateSchema } from '@/types/customField'
-import { checkFieldNameDuplicate } from '@/api/customFields'
 // TODO: Import from Task #124 when available
 // import { FieldConfigEditor } from './FieldConfigEditor'
 // TODO: Import from Task #125 when available
@@ -57,74 +60,79 @@ import { checkFieldNameDuplicate } from '@/api/customFields'
  * REF MCP #3: Dynamic config validation based on field_type
  */
 const newFieldFormSchema = CustomFieldCreateSchema.superRefine((data, ctx) => {
-  const { field_type, config } = data
+  const { field_type, config } = data;
 
   // Type-specific config validation
   switch (field_type) {
-    case 'select':
-      if (!config.options || !Array.isArray(config.options)) {
+    case "select":
+      if (!(config.options && Array.isArray(config.options))) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Select fields require at least one option',
-          path: ['config', 'options'],
-        })
+          message: "Select fields require at least one option",
+          path: ["config", "options"],
+        });
       } else if (config.options.length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'At least one option is required',
-          path: ['config', 'options'],
-        })
-      } else if (!config.options.every((opt: any) => typeof opt === 'string' && opt.trim())) {
+          message: "At least one option is required",
+          path: ["config", "options"],
+        });
+      } else if (
+        !config.options.every(
+          (opt: any) => typeof opt === "string" && opt.trim()
+        )
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'All options must be non-empty strings',
-          path: ['config', 'options'],
-        })
+          message: "All options must be non-empty strings",
+          path: ["config", "options"],
+        });
       }
-      break
+      break;
 
-    case 'rating':
-      if (typeof config.max_rating !== 'number') {
+    case "rating":
+      if (typeof config.max_rating !== "number") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Max rating is required',
-          path: ['config', 'max_rating'],
-        })
+          message: "Max rating is required",
+          path: ["config", "max_rating"],
+        });
       } else if (config.max_rating < 1 || config.max_rating > 10) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Max rating must be between 1 and 10',
-          path: ['config', 'max_rating'],
-        })
+          message: "Max rating must be between 1 and 10",
+          path: ["config", "max_rating"],
+        });
       }
-      break
+      break;
 
-    case 'text':
+    case "text":
       // max_length is optional, but if present must be >=1
-      if (config.max_length !== undefined) {
-        if (typeof config.max_length !== 'number' || config.max_length < 1) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Max length must be at least 1',
-            path: ['config', 'max_length'],
-          })
-        }
+      if (
+        config.max_length !== undefined &&
+        (typeof config.max_length !== "number" || config.max_length < 1)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Max length must be at least 1",
+          path: ["config", "max_length"],
+        });
       }
-      break
+      break;
 
-    case 'boolean':
+    case "boolean":
       // No config validation needed
-      break
+      break;
   }
-})
+});
 
-type NewFieldFormValues = z.infer<typeof newFieldFormSchema>
+type NewFieldFormValues = z.infer<typeof newFieldFormSchema>;
 
 interface NewFieldFormProps {
-  listId: string
-  onSubmit: (fieldData: CustomFieldCreate) => void | Promise<void>
-  onCancel: () => void
-  isSubmitting?: boolean
+  listId: string;
+  onSubmit: (fieldData: CustomFieldCreate) => void | Promise<void>;
+  onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
 export const NewFieldForm = ({
@@ -134,94 +142,105 @@ export const NewFieldForm = ({
   isSubmitting = false,
 }: NewFieldFormProps) => {
   const [duplicateCheck, setDuplicateCheck] = useState<{
-    checking: boolean
-    exists: boolean
-    existingField: any | null
+    checking: boolean;
+    exists: boolean;
+    existingField: any | null;
   }>({
     checking: false,
     exists: false,
     existingField: null,
-  })
+  });
 
   // REF MCP #1: React Hook Form with Zod resolver
   const form = useForm<NewFieldFormValues>({
     resolver: zodResolver(newFieldFormSchema),
     defaultValues: {
-      name: '',
-      field_type: 'text', // Default to simplest type
+      name: "",
+      field_type: "text", // Default to simplest type
       config: {},
     },
-  })
+  });
 
-  const selectedType = form.watch('field_type')
+  const selectedType = form.watch("field_type");
 
   // REF MCP #2: Debounced duplicate check (500ms delay)
   const checkDuplicate = useDebouncedCallback(async (name: string) => {
     if (!name.trim()) {
-      setDuplicateCheck({ checking: false, exists: false, existingField: null })
-      return
+      setDuplicateCheck({
+        checking: false,
+        exists: false,
+        existingField: null,
+      });
+      return;
     }
 
-    setDuplicateCheck(prev => ({ ...prev, checking: true }))
+    setDuplicateCheck((prev) => ({ ...prev, checking: true }));
 
     try {
-      const result = await checkFieldNameDuplicate(listId, name)
+      const result = await checkFieldNameDuplicate(listId, name);
       setDuplicateCheck({
         checking: false,
         exists: result.exists,
         existingField: result.field,
-      })
+      });
     } catch (error) {
-      console.error('Duplicate check failed:', error)
-      setDuplicateCheck({ checking: false, exists: false, existingField: null })
+      console.error("Duplicate check failed:", error);
+      setDuplicateCheck({
+        checking: false,
+        exists: false,
+        existingField: null,
+      });
     }
-  }, 500)
+  }, 500);
 
   // Watch name field and trigger duplicate check
-  const nameValue = form.watch('name')
+  const nameValue = form.watch("name");
   useEffect(() => {
-    checkDuplicate(nameValue)
-  }, [nameValue, checkDuplicate])
+    checkDuplicate(nameValue);
+  }, [nameValue, checkDuplicate]);
 
   // Reset config when field type changes
   useEffect(() => {
     const defaultConfigs: Record<FieldType, any> = {
-      select: { options: ['Option 1', 'Option 2'] },
+      select: { options: ["Option 1", "Option 2"] },
       rating: { max_rating: 5 },
       text: {},
       boolean: {},
-    }
+    };
 
-    form.setValue('config', defaultConfigs[selectedType])
-  }, [selectedType, form])
+    form.setValue("config", defaultConfigs[selectedType]);
+  }, [selectedType, form]);
 
   const handleSubmit = form.handleSubmit(async (data) => {
     // Prevent submission if duplicate exists
     if (duplicateCheck.exists) {
-      form.setError('name', {
-        type: 'manual',
-        message: 'A field with this name already exists',
-      })
-      return
+      form.setError("name", {
+        type: "manual",
+        message: "A field with this name already exists",
+      });
+      return;
     }
 
-    await onSubmit(data)
-  })
+    await onSubmit(data);
+  });
 
   // REF MCP #5: Keyboard navigation (Escape to cancel)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCancel()
+      if (e.key === "Escape") {
+        onCancel();
       }
-    }
+    };
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onCancel])
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 border rounded-lg p-4 bg-muted/50">
+    <form
+      className="space-y-4 rounded-lg border bg-muted/50 p-4"
+      onSubmit={handleSubmit}
+    >
       {/* Field Name Input */}
       <Controller
         control={form.control}
@@ -231,11 +250,13 @@ export const NewFieldForm = ({
             <FieldLabel htmlFor="field-name">Field Name *</FieldLabel>
             <Input
               {...field}
+              aria-describedby={
+                duplicateCheck.exists ? "duplicate-warning" : undefined
+              }
+              aria-invalid={fieldState.invalid}
+              autoFocus
               id="field-name"
               placeholder="e.g., Presentation Quality"
-              autoFocus
-              aria-invalid={fieldState.invalid}
-              aria-describedby={duplicateCheck.exists ? 'duplicate-warning' : undefined}
             />
             <FieldDescription>
               The name must be unique within this list (case-insensitive)
@@ -244,16 +265,19 @@ export const NewFieldForm = ({
 
             {/* TODO: Replace with DuplicateWarning component (Task #125) */}
             {duplicateCheck.checking && (
-              <p className="text-sm text-muted-foreground">Checking for duplicates...</p>
+              <p className="text-muted-foreground text-sm">
+                Checking for duplicates...
+              </p>
             )}
             {duplicateCheck.exists && (
               <div
+                className="mt-2 rounded-md border border-yellow-200 bg-yellow-50 p-3"
                 id="duplicate-warning"
-                className="rounded-md bg-yellow-50 border border-yellow-200 p-3 mt-2"
                 role="alert"
               >
                 <p className="text-sm text-yellow-800">
-                  ⚠️ A field named "{duplicateCheck.existingField?.name}" already exists.
+                  ⚠️ A field named "{duplicateCheck.existingField?.name}" already
+                  exists.
                   {duplicateCheck.existingField?.field_type && (
                     <> Type: {duplicateCheck.existingField.field_type}</>
                   )}
@@ -271,8 +295,8 @@ export const NewFieldForm = ({
         render={({ field, fieldState }) => (
           <Field data-invalid={fieldState.invalid}>
             <FieldLabel htmlFor="field-type">Field Type *</FieldLabel>
-            <Select onValueChange={field.onChange} defaultValue={field.value}>
-              <SelectTrigger id="field-type" aria-label="Select field type">
+            <Select defaultValue={field.value} onValueChange={field.onChange}>
+              <SelectTrigger aria-label="Select field type" id="field-type">
                 <SelectValue placeholder="Select a field type" />
               </SelectTrigger>
               <SelectContent>
@@ -304,96 +328,114 @@ export const NewFieldForm = ({
 
         {/* TODO: Replace with FieldConfigEditor component (Task #124) */}
         {/* Placeholder config editors */}
-        {selectedType === 'select' && (
-          <div className="space-y-2 border rounded-md p-3 bg-background">
+        {selectedType === "select" && (
+          <div className="space-y-2 rounded-md border bg-background p-3">
             <Controller
               control={form.control}
               name="config.options"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="select-options">Options (comma-separated)</FieldLabel>
+                  <FieldLabel htmlFor="select-options">
+                    Options (comma-separated)
+                  </FieldLabel>
                   <Input
+                    aria-invalid={fieldState.invalid}
                     id="select-options"
-                    placeholder="Option 1, Option 2, Option 3"
-                    value={Array.isArray(field.value) ? field.value.join(', ') : ''}
                     onChange={(e) => {
                       const options = e.target.value
-                        .split(',')
-                        .map(opt => opt.trim())
-                        .filter(opt => opt)
-                      field.onChange(options)
+                        .split(",")
+                        .map((opt) => opt.trim())
+                        .filter((opt) => opt);
+                      field.onChange(options);
                     }}
-                    aria-invalid={fieldState.invalid}
+                    placeholder="Option 1, Option 2, Option 3"
+                    value={
+                      Array.isArray(field.value) ? field.value.join(", ") : ""
+                    }
                   />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
           </div>
         )}
 
-        {selectedType === 'rating' && (
-          <div className="space-y-2 border rounded-md p-3 bg-background">
+        {selectedType === "rating" && (
+          <div className="space-y-2 rounded-md border bg-background p-3">
             <Controller
               control={form.control}
               name="config.max_rating"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="max-rating">Max Rating (1-10)</FieldLabel>
+                  <FieldLabel htmlFor="max-rating">
+                    Max Rating (1-10)
+                  </FieldLabel>
                   <Input
                     id="max-rating"
-                    type="number"
-                    min={1}
                     max={10}
+                    min={1}
+                    type="number"
                     {...field}
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
                     aria-invalid={fieldState.invalid}
+                    onChange={(e) =>
+                      field.onChange(Number.parseInt(e.target.value, 10))
+                    }
+                    value={field.value ?? ""}
                   />
                   <FieldDescription>
                     Maximum value for the rating scale
                   </FieldDescription>
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
           </div>
         )}
 
-        {selectedType === 'text' && (
-          <div className="space-y-2 border rounded-md p-3 bg-background">
+        {selectedType === "text" && (
+          <div className="space-y-2 rounded-md border bg-background p-3">
             <Controller
               control={form.control}
               name="config.max_length"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="max-length">Max Length (optional)</FieldLabel>
+                  <FieldLabel htmlFor="max-length">
+                    Max Length (optional)
+                  </FieldLabel>
                   <Input
                     id="max-length"
-                    type="number"
                     min={1}
                     placeholder="No limit"
+                    type="number"
                     {...field}
-                    value={field.value ?? ''}
-                    onChange={(e) => {
-                      const val = e.target.value ? parseInt(e.target.value, 10) : undefined
-                      field.onChange(val)
-                    }}
                     aria-invalid={fieldState.invalid}
+                    onChange={(e) => {
+                      const val = e.target.value
+                        ? Number.parseInt(e.target.value, 10)
+                        : undefined;
+                      field.onChange(val);
+                    }}
+                    value={field.value ?? ""}
                   />
                   <FieldDescription>
                     Optional character limit for text input
                   </FieldDescription>
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
           </div>
         )}
 
-        {selectedType === 'boolean' && (
-          <div className="border rounded-md p-3 bg-background">
-            <p className="text-sm text-muted-foreground">
+        {selectedType === "boolean" && (
+          <div className="rounded-md border bg-background p-3">
+            <p className="text-muted-foreground text-sm">
               Boolean fields don't require configuration
             </p>
           </div>
@@ -403,21 +445,21 @@ export const NewFieldForm = ({
       {/* Action Buttons */}
       <div className="flex items-center gap-2 pt-2">
         <Button
-          type="submit"
-          disabled={isSubmitting || duplicateCheck.exists}
           className="flex-1"
+          disabled={isSubmitting || duplicateCheck.exists}
+          type="submit"
         >
-          {isSubmitting ? 'Creating...' : 'Add Field'}
+          {isSubmitting ? "Creating..." : "Add Field"}
         </Button>
         <Button
+          disabled={isSubmitting}
+          onClick={onCancel}
           type="button"
           variant="outline"
-          onClick={onCancel}
-          disabled={isSubmitting}
         >
           Cancel
         </Button>
       </div>
     </form>
-  )
-}
+  );
+};

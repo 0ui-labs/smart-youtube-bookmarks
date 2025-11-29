@@ -1,241 +1,247 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { ConfirmDeleteFieldModal } from './ConfirmDeleteFieldModal'
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ConfirmDeleteFieldModal } from "./ConfirmDeleteFieldModal";
 
-describe('ConfirmDeleteFieldModal', () => {
+describe("ConfirmDeleteFieldModal", () => {
   afterEach(() => {
-    vi.clearAllMocks()
-  })
+    vi.clearAllMocks();
+  });
 
-  it('renders with field name', () => {
+  it("renders with field name", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
-        usageCount={0}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
         isLoading={false}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        open={true}
+        usageCount={0}
       />
-    )
+    );
 
-    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     // Use more specific query within alertdialog to avoid matching multiple elements
-    const alertDialog = screen.getByRole('alertdialog')
-    expect(alertDialog).toHaveTextContent(/"Test Field"/i)
-  })
+    const alertDialog = screen.getByRole("alertdialog");
+    expect(alertDialog).toHaveTextContent(/"Test Field"/i);
+  });
 
-  it('shows usage count warning when field in use', () => {
+  it("shows usage count warning when field in use", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
-        usageCount={3}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
         isLoading={false}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        open={true}
+        usageCount={3}
       />
-    )
+    );
 
-    expect(screen.getByText(/used by 3 schema\(s\)/i)).toBeInTheDocument()
-    expect(screen.getByText(/Cannot delete/i)).toBeInTheDocument()
-  })
+    expect(screen.getByText(/used by 3 schema\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cannot delete/i)).toBeInTheDocument();
+  });
 
-  it('shows singular usage count correctly', () => {
+  it("shows singular usage count correctly", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
+        isLoading={false}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        open={true}
         usageCount={1}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-        isLoading={false}
       />
-    )
+    );
 
-    expect(screen.getByText(/used by 1 schema\(s\)/i)).toBeInTheDocument()
-  })
+    expect(screen.getByText(/used by 1 schema\(s\)/i)).toBeInTheDocument();
+  });
 
-  it('disables delete button when field in use', () => {
+  it("disables delete button when field in use", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
+        isLoading={false}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        open={true}
         usageCount={2}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-        isLoading={false}
       />
-    )
+    );
 
-    const deleteButton = screen.getByText('Delete Field')
-    expect(deleteButton).toBeDisabled()
-  })
+    const deleteButton = screen.getByText("Delete Field");
+    expect(deleteButton).toBeDisabled();
+  });
 
-  it('enables delete button when field not in use', () => {
+  it("enables delete button when field not in use", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
+        isLoading={false}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        open={true}
         usageCount={0}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-        isLoading={false}
       />
-    )
+    );
 
-    const deleteButton = screen.getByText('Delete Field')
-    expect(deleteButton).not.toBeDisabled()
-  })
+    const deleteButton = screen.getByText("Delete Field");
+    expect(deleteButton).not.toBeDisabled();
+  });
 
-  it('shows cascade warning when field not in use', () => {
+  it("shows cascade warning when field not in use", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
+        isLoading={false}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        open={true}
         usageCount={0}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-        isLoading={false}
       />
-    )
+    );
 
-    expect(screen.getByText(/All video values for this field/i)).toBeInTheDocument()
-    expect(screen.getByText(/This action cannot be undone/i)).toBeInTheDocument()
-  })
+    expect(
+      screen.getByText(/All video values for this field/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/This action cannot be undone/i)
+    ).toBeInTheDocument();
+  });
 
-  it('shows remove from schemas message when field in use', () => {
+  it("shows remove from schemas message when field in use", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
+        isLoading={false}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        open={true}
         usageCount={5}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-        isLoading={false}
       />
-    )
+    );
 
-    expect(screen.getByText(/Remove this field from all schemas before deleting/i)).toBeInTheDocument()
-  })
+    expect(
+      screen.getByText(/Remove this field from all schemas before deleting/i)
+    ).toBeInTheDocument();
+  });
 
-  it('calls onConfirm when delete clicked', async () => {
-    const user = userEvent.setup({ delay: null })
-    const onConfirm = vi.fn()
+  it("calls onConfirm when delete clicked", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onConfirm = vi.fn();
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
-        usageCount={0}
+        isLoading={false}
+        onCancel={vi.fn()}
         onConfirm={onConfirm}
-        onCancel={vi.fn()}
-        isLoading={false}
+        open={true}
+        usageCount={0}
       />
-    )
+    );
 
-    await user.click(screen.getByText('Delete Field'))
-    expect(onConfirm).toHaveBeenCalledTimes(1)
-  })
+    await user.click(screen.getByText("Delete Field"));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
 
-  it('calls onCancel when cancel clicked', async () => {
-    const user = userEvent.setup({ delay: null })
-    const onCancel = vi.fn()
+  it("calls onCancel when cancel clicked", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onCancel = vi.fn();
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
-        usageCount={0}
-        onConfirm={vi.fn()}
+        isLoading={false}
         onCancel={onCancel}
-        isLoading={false}
+        onConfirm={vi.fn()}
+        open={true}
+        usageCount={0}
       />
-    )
+    );
 
-    await user.click(screen.getByText('Cancel'))
-    expect(onCancel).toHaveBeenCalledTimes(1)
-  })
+    await user.click(screen.getByText("Cancel"));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
 
-  it('shows loading state during deletion', () => {
+  it("shows loading state during deletion", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
-        usageCount={0}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
         isLoading={true}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        open={true}
+        usageCount={0}
       />
-    )
+    );
 
-    expect(screen.getByText('Deleting...')).toBeInTheDocument()
-    expect(screen.getByText('Deleting...')).toBeDisabled()
-  })
+    expect(screen.getByText("Deleting...")).toBeInTheDocument();
+    expect(screen.getByText("Deleting...")).toBeDisabled();
+  });
 
-  it('disables cancel button during loading', () => {
+  it("disables cancel button during loading", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
-        usageCount={0}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
         isLoading={true}
-      />
-    )
-
-    expect(screen.getByText('Cancel')).toBeDisabled()
-  })
-
-  it('uses destructive styling for delete button', () => {
-    render(
-      <ConfirmDeleteFieldModal
-        open={true}
-        fieldName="Test Field"
-        usageCount={0}
-        onConfirm={vi.fn()}
         onCancel={vi.fn()}
-        isLoading={false}
+        onConfirm={vi.fn()}
+        open={true}
+        usageCount={0}
       />
-    )
+    );
 
-    const deleteButton = screen.getByText('Delete Field')
-    expect(deleteButton).toHaveClass('bg-red-600')
-  })
+    expect(screen.getByText("Cancel")).toBeDisabled();
+  });
 
-  it('does not call onConfirm when disabled and clicked', async () => {
-    const user = userEvent.setup({ delay: null })
-    const onConfirm = vi.fn()
+  it("uses destructive styling for delete button", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName="Test Field"
-        usageCount={3}
+        isLoading={false}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        open={true}
+        usageCount={0}
+      />
+    );
+
+    const deleteButton = screen.getByText("Delete Field");
+    expect(deleteButton).toHaveClass("bg-red-600");
+  });
+
+  it("does not call onConfirm when disabled and clicked", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmDeleteFieldModal
+        fieldName="Test Field"
+        isLoading={false}
+        onCancel={vi.fn()}
         onConfirm={onConfirm}
-        onCancel={vi.fn()}
-        isLoading={false}
+        open={true}
+        usageCount={3}
       />
-    )
+    );
 
-    const deleteButton = screen.getByText('Delete Field')
-    await user.click(deleteButton)
+    const deleteButton = screen.getByText("Delete Field");
+    await user.click(deleteButton);
 
     // Button is disabled, so click should not trigger onConfirm
-    expect(onConfirm).not.toHaveBeenCalled()
-  })
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
 
-  it('handles null fieldName gracefully', () => {
+  it("handles null fieldName gracefully", () => {
     render(
       <ConfirmDeleteFieldModal
-        open={true}
         fieldName={null}
-        usageCount={0}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
         isLoading={false}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        open={true}
+        usageCount={0}
       />
-    )
+    );
 
-    expect(screen.getByText('Delete Field?')).toBeInTheDocument()
-  })
-})
+    expect(screen.getByText("Delete Field?")).toBeInTheDocument();
+  });
+});

@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
-import { renderWithRouter } from '@/test/renderWithRouter'
-import { SettingsPage } from './SettingsPage'
-import type { FieldSchemaResponse } from '@/types/schema'
+import { screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter } from "@/test/renderWithRouter";
+import type { FieldSchemaResponse } from "@/types/schema";
+import { SettingsPage } from "./SettingsPage";
 
 // Mock useSchemas and useLists hooks
-vi.mock('@/hooks/useSchemas', () => ({
+vi.mock("@/hooks/useSchemas", () => ({
   useSchemas: vi.fn(),
   useSchema: vi.fn(),
   usePrefetchSchema: vi.fn(() => vi.fn()),
@@ -58,19 +58,19 @@ vi.mock('@/hooks/useSchemas', () => ({
   schemasOptions: vi.fn(),
   schemaOptions: vi.fn(),
   schemasKeys: {
-    all: () => ['schemas'],
-    lists: () => ['schemas', 'list'],
-    list: (listId: string) => ['schemas', 'list', listId],
-    details: () => ['schemas', 'detail'],
-    detail: (schemaId: string) => ['schemas', 'detail', schemaId],
+    all: () => ["schemas"],
+    lists: () => ["schemas", "list"],
+    list: (listId: string) => ["schemas", "list", listId],
+    details: () => ["schemas", "detail"],
+    detail: (schemaId: string) => ["schemas", "detail", schemaId],
   },
-}))
+}));
 
-vi.mock('@/hooks/useLists', () => ({
+vi.mock("@/hooks/useLists", () => ({
   useLists: vi.fn(),
-}))
+}));
 
-vi.mock('@/hooks/useCustomFields', () => ({
+vi.mock("@/hooks/useCustomFields", () => ({
   useCustomFields: vi.fn(() => ({
     data: [],
     isLoading: false,
@@ -79,48 +79,53 @@ vi.mock('@/hooks/useCustomFields', () => ({
   useUpdateCustomField: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useDeleteCustomField: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useFieldUsageCounts: vi.fn(() => new Map()),
-}))
+}));
 
-import { useSchemas } from '@/hooks/useSchemas'
-import { useLists } from '@/hooks/useLists'
+import { useLists } from "@/hooks/useLists";
+import { useSchemas } from "@/hooks/useSchemas";
 
 const mockLists = [
-  { id: 'list-1', name: 'My List', created_at: '2025-01-01', updated_at: '2025-01-01' }
-]
+  {
+    id: "list-1",
+    name: "My List",
+    created_at: "2025-01-01",
+    updated_at: "2025-01-01",
+  },
+];
 
 const mockSchemas: FieldSchemaResponse[] = [
   {
-    id: 'schema-1',
-    list_id: 'list-1',
-    name: 'Makeup Tutorial Criteria',
-    description: 'Fields for rating makeup tutorials',
-    created_at: '2025-11-08T10:00:00Z',
-    updated_at: '2025-11-08T10:00:00Z',
+    id: "schema-1",
+    list_id: "list-1",
+    name: "Makeup Tutorial Criteria",
+    description: "Fields for rating makeup tutorials",
+    created_at: "2025-11-08T10:00:00Z",
+    updated_at: "2025-11-08T10:00:00Z",
     schema_fields: [
       {
-        field_id: 'field-1',
-        schema_id: 'schema-1',
+        field_id: "field-1",
+        schema_id: "schema-1",
         display_order: 1,
         show_on_card: true,
         field: {
-          id: 'field-1',
-          list_id: 'list-1',
-          name: 'Presentation Quality',
-          field_type: 'rating',
+          id: "field-1",
+          list_id: "list-1",
+          name: "Presentation Quality",
+          field_type: "rating",
           config: { max_rating: 5 },
-          created_at: '2025-11-08T09:00:00Z',
-          updated_at: '2025-11-08T09:00:00Z',
+          created_at: "2025-11-08T09:00:00Z",
+          updated_at: "2025-11-08T09:00:00Z",
         },
       },
     ],
   },
-]
+];
 
-describe('SettingsPage', () => {
+describe("SettingsPage", () => {
   // ✨ FIX #2: Added afterEach cleanup
   afterEach(() => {
-    vi.clearAllMocks()
-  })
+    vi.clearAllMocks();
+  });
 
   beforeEach(() => {
     // Default mock setup
@@ -128,124 +133,126 @@ describe('SettingsPage', () => {
       data: mockLists,
       isLoading: false,
       isError: false,
-    } as any)
-  })
+    } as any);
+  });
 
-  it('renders page header', () => {
+  it("renders page header", () => {
     vi.mocked(useSchemas).mockReturnValue({
       data: [],
       isLoading: false,
       isError: false,
-    } as any)
+    } as any);
 
-    renderWithRouter(<SettingsPage />)
+    renderWithRouter(<SettingsPage />);
 
-    expect(screen.getByText('Settings')).toBeInTheDocument()
-  })
+    expect(screen.getByText("Settings")).toBeInTheDocument();
+  });
 
-  it('renders tabs navigation', () => {
+  it("renders tabs navigation", () => {
     vi.mocked(useSchemas).mockReturnValue({
       data: [],
       isLoading: false,
       isError: false,
-    } as any)
+    } as any);
 
-    renderWithRouter(<SettingsPage />)
+    renderWithRouter(<SettingsPage />);
 
-    expect(screen.getByRole('tab', { name: /schemas/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /fields/i })).toBeInTheDocument()
-  })
+    expect(screen.getByRole("tab", { name: /schemas/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /fields/i })).toBeInTheDocument();
+  });
 
-  it('renders schemas tab by default', () => {
+  it("renders schemas tab by default", () => {
     vi.mocked(useSchemas).mockReturnValue({
       data: [],
       isLoading: false,
       isError: false,
-    } as any)
+    } as any);
 
-    renderWithRouter(<SettingsPage />)
+    renderWithRouter(<SettingsPage />);
 
-    expect(screen.getByRole('tabpanel')).toBeInTheDocument()
-  })
+    expect(screen.getByRole("tabpanel")).toBeInTheDocument();
+  });
 
-  it('renders create schema button', () => {
+  it("renders create schema button", () => {
     vi.mocked(useSchemas).mockReturnValue({
       data: [],
       isLoading: false,
       isError: false,
-    } as any)
+    } as any);
 
-    renderWithRouter(<SettingsPage />)
+    renderWithRouter(<SettingsPage />);
 
-    expect(screen.getByRole('button', { name: /create schema/i })).toBeInTheDocument()
-  })
+    expect(
+      screen.getByRole("button", { name: /create schema/i })
+    ).toBeInTheDocument();
+  });
 
   // ✨ FIX #4: Test useLists loading state
-  it('displays loading state when lists are loading', () => {
+  it("displays loading state when lists are loading", () => {
     vi.mocked(useLists).mockReturnValue({
       data: undefined,
       isLoading: true,
       isError: false,
-    } as any)
+    } as any);
 
     vi.mocked(useSchemas).mockReturnValue({
       data: undefined,
       isLoading: false,
       isError: false,
-    } as any)
+    } as any);
 
-    renderWithRouter(<SettingsPage />)
+    renderWithRouter(<SettingsPage />);
 
-    expect(screen.getByText(/loading/i)).toBeInTheDocument()
-  })
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+  });
 
-  it('displays loading state when schemas are loading', () => {
+  it("displays loading state when schemas are loading", () => {
     vi.mocked(useSchemas).mockReturnValue({
       data: undefined,
       isLoading: true,
       isError: false,
-    } as any)
+    } as any);
 
-    renderWithRouter(<SettingsPage />)
+    renderWithRouter(<SettingsPage />);
 
-    expect(screen.getByText(/loading schemas/i)).toBeInTheDocument()
-  })
+    expect(screen.getByText(/loading schemas/i)).toBeInTheDocument();
+  });
 
-  it('displays error state', () => {
+  it("displays error state", () => {
     vi.mocked(useSchemas).mockReturnValue({
       data: undefined,
       isLoading: false,
       isError: true,
-    } as any)
+    } as any);
 
-    renderWithRouter(<SettingsPage />)
+    renderWithRouter(<SettingsPage />);
 
-    expect(screen.getByText(/error loading schemas/i)).toBeInTheDocument()
-  })
+    expect(screen.getByText(/error loading schemas/i)).toBeInTheDocument();
+  });
 
-  it('displays empty state when no schemas exist', () => {
+  it("displays empty state when no schemas exist", () => {
     vi.mocked(useSchemas).mockReturnValue({
       data: [],
       isLoading: false,
       isError: false,
-    } as any)
+    } as any);
 
-    renderWithRouter(<SettingsPage />)
+    renderWithRouter(<SettingsPage />);
 
-    expect(screen.getByText(/no schemas yet/i)).toBeInTheDocument()
-  })
+    expect(screen.getByText(/no schemas yet/i)).toBeInTheDocument();
+  });
 
-  it('renders SchemasList when schemas exist', async () => {
+  it("renders SchemasList when schemas exist", async () => {
     vi.mocked(useSchemas).mockReturnValue({
       data: mockSchemas,
       isLoading: false,
       isError: false,
-    } as any)
+    } as any);
 
-    renderWithRouter(<SettingsPage />)
+    renderWithRouter(<SettingsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Makeup Tutorial Criteria')).toBeInTheDocument()
-    })
-  })
-})
+      expect(screen.getByText("Makeup Tutorial Criteria")).toBeInTheDocument();
+    });
+  });
+});

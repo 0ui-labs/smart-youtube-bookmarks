@@ -1,6 +1,6 @@
-import { Component, ReactNode } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { AlertCircle } from "lucide-react";
+import { Component, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   children: ReactNode;
@@ -57,7 +57,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: any) {
     // Log error to error reporting service
-    console.error('ErrorBoundary caught:', error, errorInfo);
+    console.error("ErrorBoundary caught:", error, errorInfo);
 
     // TODO: Send to error tracking service (e.g., Sentry)
     // Sentry.captureException(error, { contexts: { react: errorInfo } });
@@ -72,11 +72,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
       // Default fallback UI
       return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] p-8">
-          <AlertCircle className="w-16 h-16 text-destructive mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Etwas ist schiefgelaufen</h2>
-          <p className="text-muted-foreground mb-4 text-center max-w-md">
-            {this.state.error?.message || 'Ein unerwarteter Fehler ist aufgetreten'}
+        <div className="flex min-h-[400px] flex-col items-center justify-center p-8">
+          <AlertCircle className="mb-4 h-16 w-16 text-destructive" />
+          <h2 className="mb-2 font-bold text-2xl">Etwas ist schiefgelaufen</h2>
+          <p className="mb-4 max-w-md text-center text-muted-foreground">
+            {this.state.error?.message ||
+              "Ein unerwarteter Fehler ist aufgetreten"}
           </p>
           <Button onClick={() => window.location.reload()}>
             Seite neu laden

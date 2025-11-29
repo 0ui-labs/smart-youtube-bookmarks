@@ -1,12 +1,12 @@
-import { Home } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { useSchema } from '@/hooks/useSchemas'
-import { FieldTypeBadge } from './FieldTypeBadge'
+import { Home } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useSchema } from "@/hooks/useSchemas";
+import { FieldTypeBadge } from "./FieldTypeBadge";
 
 interface WorkspaceFieldsCardProps {
-  listId: string
-  defaultSchemaId: string | null
-  onEdit: () => void
+  listId: string;
+  defaultSchemaId: string | null;
+  onEdit: () => void;
 }
 
 /**
@@ -34,13 +34,17 @@ export function WorkspaceFieldsCard({
   onEdit,
 }: WorkspaceFieldsCardProps) {
   // Fetch schema with nested fields (only if defaultSchemaId exists)
-  const { data: schema, isLoading } = useSchema(listId, defaultSchemaId ?? undefined)
+  const { data: schema, isLoading } = useSchema(
+    listId,
+    defaultSchemaId ?? undefined
+  );
 
   // Get sorted fields from schema
-  const fields = schema?.schema_fields
-    ?.slice()
-    .sort((a, b) => a.display_order - b.display_order)
-    .map((sf) => sf.field) ?? []
+  const fields =
+    schema?.schema_fields
+      ?.slice()
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((sf) => sf.field) ?? [];
 
   return (
     <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
@@ -49,37 +53,40 @@ export function WorkspaceFieldsCard({
           <Home className="h-5 w-5 text-blue-600" />
           <h3 className="font-medium">Alle Videos</h3>
         </div>
-        <Button variant="outline" size="sm" onClick={onEdit}>
+        <Button onClick={onEdit} size="sm" variant="outline">
           Bearbeiten
         </Button>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <p className="mt-2 text-muted-foreground text-sm">
         Diese Felder haben alle Videos
       </p>
 
       {/* Field list or empty state */}
       {isLoading ? (
-        <p className="mt-3 text-sm text-muted-foreground">Lade Felder...</p>
+        <p className="mt-3 text-muted-foreground text-sm">Lade Felder...</p>
       ) : fields.length > 0 ? (
         <ul className="mt-3 space-y-1">
           {fields.map((field) => (
-            <li key={field.id} className="flex items-center gap-2 text-sm">
+            <li className="flex items-center gap-2 text-sm" key={field.id}>
               <span>•</span>
               <span>{field.name}</span>
-              <FieldTypeBadge fieldType={field.field_type} className="text-[10px] px-1.5 py-0" />
+              <FieldTypeBadge
+                className="px-1.5 py-0 text-[10px]"
+                fieldType={field.field_type}
+              />
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-3 text-sm text-muted-foreground italic">
+        <p className="mt-3 text-muted-foreground text-sm italic">
           Keine Felder definiert
         </p>
       )}
 
       {/* Field count */}
-      <p className="mt-2 text-xs text-muted-foreground">
-        ({fields.length} {fields.length === 1 ? 'Feld' : 'Felder'} definiert)
+      <p className="mt-2 text-muted-foreground text-xs">
+        ({fields.length} {fields.length === 1 ? "Feld" : "Felder"} definiert)
       </p>
     </div>
-  )
+  );
 }

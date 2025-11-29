@@ -1,17 +1,18 @@
 /**
  * Test utility for rendering components with Router and Query Client context
  */
-import { render, RenderOptions } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ReactElement } from 'react'
 
-interface RouterRenderOptions extends Omit<RenderOptions, 'wrapper'> {
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { type RenderOptions, render } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router-dom";
+
+interface RouterRenderOptions extends Omit<RenderOptions, "wrapper"> {
   /**
    * Initial entries for the MemoryRouter history stack
    * @default ['/']
    */
-  initialEntries?: string[]
+  initialEntries?: string[];
 }
 
 /**
@@ -26,31 +27,29 @@ interface RouterRenderOptions extends Omit<RenderOptions, 'wrapper'> {
  */
 export const renderWithRouter = (
   ui: ReactElement,
-  { initialEntries = ['/'], ...renderOptions }: RouterRenderOptions = {}
+  { initialEntries = ["/"], ...renderOptions }: RouterRenderOptions = {}
 ) => {
   // Create a fresh Query Client for each test to prevent cache pollution
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false, // No retries in tests for faster feedback
-        gcTime: 0,    // No caching between tests
+        gcTime: 0, // No caching between tests
       },
       mutations: {
         retry: false,
       },
     },
-  })
+  });
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <MemoryRouter initialEntries={initialEntries}>
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </MemoryRouter>
-  )
+  );
 
   return {
     ...render(ui, { wrapper: Wrapper, ...renderOptions }),
     queryClient, // Expose for test assertions if needed
-  }
-}
+  };
+};

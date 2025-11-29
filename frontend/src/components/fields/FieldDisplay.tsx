@@ -1,31 +1,31 @@
-import React from 'react'
-import { VideoFieldValue } from '@/types/video'
-import { RatingStars } from './RatingStars'
-import { SelectBadge } from './SelectBadge'
-import { BooleanCheckbox } from './BooleanCheckbox'
-import { TextSnippet } from './TextSnippet'
+import type React from "react";
+import type { VideoFieldValue } from "@/types/video";
+import { BooleanCheckbox } from "./BooleanCheckbox";
+import { RatingStars } from "./RatingStars";
+import { SelectBadge } from "./SelectBadge";
+import { TextSnippet } from "./TextSnippet";
 
 export interface FieldDisplayProps {
   /**
    * Field value to display (discriminated union by field.field_type)
    */
-  fieldValue: VideoFieldValue
+  fieldValue: VideoFieldValue;
   /**
    * Whether the field is read-only (default: false)
    */
-  readonly?: boolean
+  readonly?: boolean;
   /**
    * Callback when value changes (type-safe union: number | string | boolean)
    */
-  onChange?: (value: number | string | boolean) => void
+  onChange?: (value: number | string | boolean) => void;
   /**
    * Callback when text field expand button is clicked
    */
-  onExpand?: () => void
+  onExpand?: () => void;
   /**
    * Optional custom CSS class
    */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -80,63 +80,70 @@ export const FieldDisplay: React.FC<FieldDisplayProps> = ({
   // Discriminated union switch on field.field_type
   // Note: Zod unions don't automatically narrow, so we use type assertions
   switch (fieldValue.field.field_type) {
-    case 'rating': {
+    case "rating": {
       return (
         <RatingStars
-          value={fieldValue.value as number | null}
-          maxRating={(fieldValue.field.config as { max_rating: number }).max_rating}
-          fieldName={fieldValue.field_name}
-          readonly={readonly}
-          onChange={onChange as ((value: number) => void) | undefined}
           className={className}
+          fieldName={fieldValue.field_name}
+          maxRating={
+            (fieldValue.field.config as { max_rating: number }).max_rating
+          }
+          onChange={onChange as ((value: number) => void) | undefined}
+          readonly={readonly}
+          value={fieldValue.value as number | null}
         />
-      )
+      );
     }
 
-    case 'select': {
+    case "select": {
       return (
         <SelectBadge
-          value={fieldValue.value as string | null}
-          options={(fieldValue.field.config as { options: string[] }).options}
-          fieldName={fieldValue.field_name}
-          readonly={readonly}
-          onChange={onChange as ((value: string) => void) | undefined}
           className={className}
+          fieldName={fieldValue.field_name}
+          onChange={onChange as ((value: string) => void) | undefined}
+          options={(fieldValue.field.config as { options: string[] }).options}
+          readonly={readonly}
+          value={fieldValue.value as string | null}
         />
-      )
+      );
     }
 
-    case 'boolean': {
+    case "boolean": {
       return (
         <BooleanCheckbox
-          value={fieldValue.value as boolean | null}
-          fieldName={fieldValue.field_name}
-          readonly={readonly}
-          onChange={onChange as ((value: boolean) => void) | undefined}
           className={className}
+          fieldName={fieldValue.field_name}
+          onChange={onChange as ((value: boolean) => void) | undefined}
+          readonly={readonly}
+          value={fieldValue.value as boolean | null}
         />
-      )
+      );
     }
 
-    case 'text': {
+    case "text": {
       return (
         <TextSnippet
-          value={fieldValue.value as string | null}
-          truncateAt={50} // REF MCP #2: Use truncateAt prop (NOT maxLength)
-          readOnly={readonly}
+          className={className}
+          maxLength={
+            (fieldValue.field.config as { max_length?: number }).max_length
+          } // REF MCP #2: Use truncateAt prop (NOT maxLength)
           onChange={onChange as ((value: string) => void) | undefined}
           onExpand={onExpand}
-          maxLength={(fieldValue.field.config as { max_length?: number }).max_length}
-          className={className}
+          readOnly={readonly}
+          truncateAt={50}
+          value={fieldValue.value as string | null}
         />
-      )
+      );
     }
 
     default: {
       // Runtime safety: log unknown field types
       // Note: TypeScript thinks this is never reachable, but we keep it for runtime safety
-      console.error('Unknown field type:', (fieldValue.field as { field_type: string }).field_type)
-      return null
+      console.error(
+        "Unknown field type:",
+        (fieldValue.field as { field_type: string }).field_type
+      );
+      return null;
     }
   }
-}
+};

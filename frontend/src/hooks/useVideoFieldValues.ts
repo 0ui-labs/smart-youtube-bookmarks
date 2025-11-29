@@ -10,10 +10,15 @@
  * @see Task #72 - Batch update endpoint
  */
 
-import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query'
-import { videoFieldValuesApi } from '@/lib/videoFieldValuesApi'
-import { videoKeys } from './useVideos'
-import type { FieldValueUpdate } from '@/types/video'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { videoFieldValuesApi } from "@/lib/videoFieldValuesApi";
+import type { FieldValueUpdate } from "@/types/video";
+import { videoKeys } from "./useVideos";
 
 /**
  * Query options factory for video field values.
@@ -29,7 +34,7 @@ export function videoFieldValuesOptions(videoId: string) {
     staleTime: 5 * 60 * 1000, // 5 minutes (field values change infrequently)
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-  })
+  });
 }
 
 /**
@@ -57,9 +62,8 @@ export function videoFieldValuesOptions(videoId: string) {
  * )
  * ```
  */
-export const useVideoFieldValues = (videoId: string) => {
-  return useQuery(videoFieldValuesOptions(videoId))
-}
+export const useVideoFieldValues = (videoId: string) =>
+  useQuery(videoFieldValuesOptions(videoId));
 
 /**
  * React Query mutation hook to batch update video field values.
@@ -98,31 +102,30 @@ export const useVideoFieldValues = (videoId: string) => {
  * ```
  */
 export const useUpdateVideoFieldValues = (videoId: string) => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['updateVideoFieldValues', videoId],
+    mutationKey: ["updateVideoFieldValues", videoId],
 
-    mutationFn: async (updates: FieldValueUpdate[]) => {
-      return videoFieldValuesApi.updateFieldValues(videoId, updates)
-    },
+    mutationFn: async (updates: FieldValueUpdate[]) =>
+      videoFieldValuesApi.updateFieldValues(videoId, updates),
 
     // React Query v5: Use onSettled for cache invalidation (not deprecated onSuccess)
     onSettled: async () => {
       // Invalidate field values query to refetch from server
       await queryClient.invalidateQueries({
-        queryKey: videoKeys.videoFieldValues(videoId)
-      })
+        queryKey: videoKeys.videoFieldValues(videoId),
+      });
 
       // Also invalidate video queries (field_values included in video response)
       await queryClient.invalidateQueries({
-        queryKey: videoKeys.all
-      })
+        queryKey: videoKeys.all,
+      });
     },
 
     // Error logging for debugging
     onError: (error) => {
-      console.error('Failed to update field values:', error)
+      console.error("Failed to update field values:", error);
     },
-  })
-}
+  });
+};

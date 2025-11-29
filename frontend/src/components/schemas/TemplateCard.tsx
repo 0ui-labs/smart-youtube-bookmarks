@@ -1,27 +1,41 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Eye } from 'lucide-react'
-import { TEMPLATE_ICONS, CATEGORY_BADGE_COLORS, type SchemaTemplate } from '@/constants/schemaTemplates'
+import { Eye } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  CATEGORY_BADGE_COLORS,
+  type SchemaTemplate,
+  TEMPLATE_ICONS,
+} from "@/constants/schemaTemplates";
 
 interface TemplateCardProps {
-  template: SchemaTemplate
-  onUseTemplate: (template: SchemaTemplate) => void
-  onPreview: (template: SchemaTemplate) => void
+  template: SchemaTemplate;
+  onUseTemplate: (template: SchemaTemplate) => void;
+  onPreview: (template: SchemaTemplate) => void;
 }
 
-export function TemplateCard({ template, onUseTemplate, onPreview }: TemplateCardProps) {
-  const IconComponent = TEMPLATE_ICONS[template.icon]
-  const badgeColor = CATEGORY_BADGE_COLORS[template.category]
+export function TemplateCard({
+  template,
+  onUseTemplate,
+  onPreview,
+}: TemplateCardProps) {
+  const IconComponent = TEMPLATE_ICONS[template.icon];
+  const badgeColor = CATEGORY_BADGE_COLORS[template.category];
 
   return (
-    <Card className="hover:border-primary transition-colors cursor-pointer">
+    <Card className="cursor-pointer transition-colors hover:border-primary">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             {IconComponent && (
-              <div className="p-2 rounded-lg bg-primary/10">
-                <IconComponent className="w-6 h-6 text-primary" />
+              <div className="rounded-lg bg-primary/10 p-2">
+                <IconComponent className="h-6 w-6 text-primary" />
               </div>
             )}
             <div>
@@ -32,33 +46,36 @@ export function TemplateCard({ template, onUseTemplate, onPreview }: TemplateCar
             </div>
           </div>
         </div>
-        <CardDescription className="mt-2">{template.description}</CardDescription>
+        <CardDescription className="mt-2">
+          {template.description}
+        </CardDescription>
       </CardHeader>
 
       <CardContent>
-        <div className="text-sm text-muted-foreground mb-4">
-          {template.fields.length} field{template.fields.length !== 1 ? 's' : ''} •{' '}
-          {template.fields.filter(f => f.show_on_card).length} shown on card
+        <div className="mb-4 text-muted-foreground text-sm">
+          {template.fields.length} field
+          {template.fields.length !== 1 ? "s" : ""} •{" "}
+          {template.fields.filter((f) => f.show_on_card).length} shown on card
         </div>
 
         <div className="flex gap-2">
           <Button
-            variant="default"
             className="flex-1"
             onClick={() => onUseTemplate(template)}
+            variant="default"
           >
             Use Template
           </Button>
           <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onPreview(template)}
             aria-label="Preview template"
+            onClick={() => onPreview(template)}
+            size="icon"
+            variant="outline"
           >
-            <Eye className="w-4 h-4" />
+            <Eye className="h-4 w-4" />
           </Button>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

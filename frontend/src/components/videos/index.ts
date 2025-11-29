@@ -1,4 +1,4 @@
 /**
  * Videos components barrel export
  */
-export { FilterBar } from './FilterBar';
+export { FilterBar } from "./FilterBar";

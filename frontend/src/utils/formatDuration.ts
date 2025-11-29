@@ -12,28 +12,28 @@
  */
 export function formatDuration(seconds: number | null): string {
   // Explicit null/undefined check
-  if (seconds == null) {
-    return '-'
+  if (seconds === null) {
+    return "-";
   }
 
   // Validate it's a finite number (catches NaN, Infinity, -Infinity)
   if (!Number.isFinite(seconds)) {
-    return '-'
+    return "-";
   }
 
   // Handle negative numbers
   if (seconds < 0) {
-    return '-'
+    return "-";
   }
 
   // Now seconds is guaranteed to be valid (including 0)
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
 
   if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
 
-  return `${minutes}:${secs.toString().padStart(2, '0')}`
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }

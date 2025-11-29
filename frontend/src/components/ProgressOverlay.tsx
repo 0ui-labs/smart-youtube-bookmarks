@@ -23,12 +23,12 @@ interface ProgressOverlayProps {
 }
 
 const stageLabels: Record<string, string> = {
-  created: 'Vorbereiten...',
-  metadata: 'Lade Metadaten...',
-  captions: 'Lade Untertitel...',
-  chapters: 'Lade Kapitel...',
-  complete: 'Fertig',
-  error: 'Fehler',
+  created: "Vorbereiten...",
+  metadata: "Lade Metadaten...",
+  captions: "Lade Untertitel...",
+  chapters: "Lade Kapitel...",
+  complete: "Fertig",
+  error: "Fehler",
 };
 
 export function ProgressOverlay({ progress, stage }: ProgressOverlayProps) {
@@ -42,12 +42,12 @@ export function ProgressOverlay({ progress, stage }: ProgressOverlayProps) {
 
   return (
     <div
-      className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px] rounded-t-lg"
-      role="progressbar"
-      aria-valuenow={clampedProgress}
-      aria-valuemin={0}
-      aria-valuemax={100}
       aria-label={`Import progress: ${clampedProgress}%, ${stageLabel}`}
+      aria-valuemax={100}
+      aria-valuemin={0}
+      aria-valuenow={clampedProgress}
+      className="absolute inset-0 flex flex-col items-center justify-center rounded-t-lg bg-black/60 backdrop-blur-[2px]"
+      role="progressbar"
     >
       {/* iOS-style solid pie chart - slice grows clockwise */}
       <div
@@ -56,7 +56,7 @@ export function ProgressOverlay({ progress, stage }: ProgressOverlayProps) {
         style={{
           width: size,
           height: size,
-          aspectRatio: '1', // Ensures perfect circle
+          aspectRatio: "1", // Ensures perfect circle
           // Solid pie: white slice grows from top, rest is translucent
           background: `conic-gradient(
             from -90deg,
@@ -66,19 +66,17 @@ export function ProgressOverlay({ progress, stage }: ProgressOverlayProps) {
             rgba(255, 255, 255, 0.15) 100%
           )`,
           // Subtle shadow for depth
-          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+          boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
         }}
       />
 
       {/* Progress Percentage - below the pie like iOS */}
-      <span className="text-white font-bold text-sm mt-2">
+      <span className="mt-2 font-bold text-sm text-white">
         {clampedProgress}%
       </span>
 
       {/* Stage Label */}
-      <span className="text-white/80 text-xs mt-0.5">
-        {stageLabel}
-      </span>
+      <span className="mt-0.5 text-white/80 text-xs">{stageLabel}</span>
 
       {/* Screen reader announcement */}
       <span className="sr-only">

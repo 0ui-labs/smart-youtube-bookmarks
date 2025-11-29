@@ -1,6 +1,6 @@
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient } from "@tanstack/react-query";
 
-let queryClient: QueryClient | undefined = undefined
+let queryClient: QueryClient | undefined;
 
 /**
  * Get or create a singleton QueryClient instance.
@@ -30,7 +30,7 @@ export function getQueryClient(): QueryClient {
           retry: 0,
         },
       },
-    })
+    });
   }
-  return queryClient
+  return queryClient;
 }

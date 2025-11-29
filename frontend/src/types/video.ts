@@ -1,10 +1,10 @@
-import { z } from 'zod'
+import { z } from "zod";
 import {
+  BooleanConfigSchema,
   RatingConfigSchema,
   SelectConfigSchema,
-  BooleanConfigSchema,
   TextConfigSchema,
-} from './customFields'
+} from "./customFields";
 
 // ============================================================================
 // VideoFieldValue Types - Union by field.field_type (REF MCP #1)
@@ -46,14 +46,14 @@ export const RatingFieldValueSchema = z.object({
     id: z.string().uuid(),
     list_id: z.string().uuid(),
     name: z.string().min(1).max(255),
-    field_type: z.literal('rating'),
+    field_type: z.literal("rating"),
     config: RatingConfigSchema,
     created_at: z.string(),
     updated_at: z.string(),
   }),
   value: z.number().nullable(),
   updated_at: z.string(),
-})
+});
 
 /**
  * Zod schema for select field value
@@ -91,14 +91,14 @@ export const SelectFieldValueSchema = z.object({
     id: z.string().uuid(),
     list_id: z.string().uuid(),
     name: z.string().min(1).max(255),
-    field_type: z.literal('select'),
+    field_type: z.literal("select"),
     config: SelectConfigSchema,
     created_at: z.string(),
     updated_at: z.string(),
   }),
   value: z.string().nullable(),
   updated_at: z.string(),
-})
+});
 
 /**
  * Zod schema for boolean field value
@@ -136,14 +136,14 @@ export const BooleanFieldValueSchema = z.object({
     id: z.string().uuid(),
     list_id: z.string().uuid(),
     name: z.string().min(1).max(255),
-    field_type: z.literal('boolean'),
+    field_type: z.literal("boolean"),
     config: BooleanConfigSchema,
     created_at: z.string(),
     updated_at: z.string(),
   }),
   value: z.boolean().nullable(),
   updated_at: z.string(),
-})
+});
 
 /**
  * Zod schema for text field value
@@ -181,14 +181,14 @@ export const TextFieldValueSchema = z.object({
     id: z.string().uuid(),
     list_id: z.string().uuid(),
     name: z.string().min(1).max(255),
-    field_type: z.literal('text'),
+    field_type: z.literal("text"),
     config: TextConfigSchema,
     created_at: z.string(),
     updated_at: z.string(),
   }),
   value: z.string().nullable(),
   updated_at: z.string(),
-})
+});
 
 /**
  * Union of all field value types
@@ -209,7 +209,7 @@ export const VideoFieldValueSchema = z.union([
   SelectFieldValueSchema,
   BooleanFieldValueSchema,
   TextFieldValueSchema,
-])
+]);
 
 /**
  * VideoFieldValue type inferred from Zod schema
@@ -232,7 +232,7 @@ export const VideoFieldValueSchema = z.union([
  *   }
  * }
  */
-export type VideoFieldValue = z.infer<typeof VideoFieldValueSchema>
+export type VideoFieldValue = z.infer<typeof VideoFieldValueSchema>;
 
 // ============================================================================
 // VideoResponse Interface (Extended with field_values)
@@ -252,14 +252,16 @@ export type VideoFieldValue = z.infer<typeof VideoFieldValueSchema>
 export const AvailableFieldResponseSchema = z.object({
   field_id: z.string().uuid(),
   field_name: z.string().min(1),
-  field_type: z.enum(['rating', 'select', 'text', 'boolean']),
+  field_type: z.enum(["rating", "select", "text", "boolean"]),
   schema_name: z.string().nullable(),
   display_order: z.number(),
   show_on_card: z.boolean(),
   config: z.record(z.any()).default({}),
-})
+});
 
-export type AvailableFieldResponse = z.infer<typeof AvailableFieldResponseSchema>
+export type AvailableFieldResponse = z.infer<
+  typeof AvailableFieldResponseSchema
+>;
 
 // ============================================================================
 // VideoResponse Interface (Extended with field_values)
@@ -283,7 +285,7 @@ export const VideoResponseSchema = z.object({
   duration: z.number().nullable(),
   published_at: z.string().nullable(),
   tags: z.array(z.any()), // Tag schema from tag.ts
-  processing_status: z.enum(['pending', 'processing', 'completed', 'failed']),
+  processing_status: z.enum(["pending", "processing", "completed", "failed"]),
   created_at: z.string(),
   updated_at: z.string(),
   field_values: z.array(VideoFieldValueSchema).optional().default([]),
@@ -296,7 +298,7 @@ export const VideoResponseSchema = z.object({
   // and we need to distinguish "no value" (old video, already imported) from "created" stage
   import_progress: z.number().nullable().optional(),
   import_stage: z.string().nullable().optional(),
-})
+});
 
 /**
  * VideoResponse type inferred from Zod schema
@@ -331,13 +333,13 @@ export const VideoResponseSchema = z.object({
  *   ]
  * }
  */
-export type VideoResponse = z.infer<typeof VideoResponseSchema>
+export type VideoResponse = z.infer<typeof VideoResponseSchema>;
 
 export interface VideoCreate {
-  url: string
+  url: string;
 }
 
-export type VideoStatus = 'pending' | 'processing' | 'completed' | 'failed'
+export type VideoStatus = "pending" | "processing" | "completed" | "failed";
 
 // ============================================================================
 // Type Guards for VideoFieldValue (REF MCP #1)
@@ -354,10 +356,10 @@ export type VideoStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export function isRatingFieldValue(
   fieldValue: VideoFieldValue
 ): fieldValue is VideoFieldValue & {
-  field: { field_type: 'rating'; config: { max_rating: number } }
-  value: number | null
+  field: { field_type: "rating"; config: { max_rating: number } };
+  value: number | null;
 } {
-  return fieldValue.field.field_type === 'rating'
+  return fieldValue.field.field_type === "rating";
 }
 
 /**
@@ -371,10 +373,10 @@ export function isRatingFieldValue(
 export function isSelectFieldValue(
   fieldValue: VideoFieldValue
 ): fieldValue is VideoFieldValue & {
-  field: { field_type: 'select'; config: { options: string[] } }
-  value: string | null
+  field: { field_type: "select"; config: { options: string[] } };
+  value: string | null;
 } {
-  return fieldValue.field.field_type === 'select'
+  return fieldValue.field.field_type === "select";
 }
 
 /**
@@ -388,10 +390,10 @@ export function isSelectFieldValue(
 export function isBooleanFieldValue(
   fieldValue: VideoFieldValue
 ): fieldValue is VideoFieldValue & {
-  field: { field_type: 'boolean'; config: Record<string, never> }
-  value: boolean | null
+  field: { field_type: "boolean"; config: Record<string, never> };
+  value: boolean | null;
 } {
-  return fieldValue.field.field_type === 'boolean'
+  return fieldValue.field.field_type === "boolean";
 }
 
 /**
@@ -406,12 +408,12 @@ export function isTextFieldValue(
   fieldValue: VideoFieldValue
 ): fieldValue is VideoFieldValue & {
   field: {
-    field_type: 'text'
-    config: { max_length?: number }
-  }
-  value: string | null
+    field_type: "text";
+    config: { max_length?: number };
+  };
+  value: string | null;
 } {
-  return fieldValue.field.field_type === 'text'
+  return fieldValue.field.field_type === "text";
 }
 
 // ============================================================================
@@ -442,8 +444,8 @@ export function isTextFieldValue(
  * }
  */
 export interface FieldValueUpdate {
-  field_id: string
-  value: string | number | boolean | null
+  field_id: string;
+  value: string | number | boolean | null;
 }
 
 /**
@@ -479,6 +481,6 @@ export interface FieldValueUpdate {
  * }
  */
 export interface BatchUpdateFieldValuesResponse {
-  updated_count: number
-  field_values: VideoFieldValue[]
+  updated_count: number;
+  field_values: VideoFieldValue[];
 }

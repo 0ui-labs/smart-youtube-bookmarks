@@ -9,26 +9,26 @@
  * const { volume, muted, playbackRate, setVolume, setMuted, setPlaybackRate } = usePlayerSettingsStore();
  * ```
  */
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import {
-  PlayerSettings,
   DEFAULT_PLAYER_SETTINGS,
   PLAYBACK_SPEED_OPTIONS,
-} from '@/types/player'
+  type PlayerSettings,
+} from "@/types/player";
 
 /**
  * Player settings store state and actions
  */
 interface PlayerSettingsStore extends PlayerSettings {
   /** Update volume level (0-1) */
-  setVolume: (volume: number) => void
+  setVolume: (volume: number) => void;
   /** Update mute state */
-  setMuted: (muted: boolean) => void
+  setMuted: (muted: boolean) => void;
   /** Update playback rate (0.5-2) */
-  setPlaybackRate: (rate: number) => void
+  setPlaybackRate: (rate: number) => void;
   /** Reset to default settings */
-  reset: () => void
+  reset: () => void;
 }
 
 /**
@@ -70,25 +70,27 @@ export const usePlayerSettingsStore = create<PlayerSettingsStore>()(
       // Actions
       setVolume: (volume) => {
         // Clamp volume to 0-1 range
-        const clampedVolume = Math.max(0, Math.min(1, volume))
-        set({ volume: clampedVolume })
+        const clampedVolume = Math.max(0, Math.min(1, volume));
+        set({ volume: clampedVolume });
       },
 
       setMuted: (muted) => set({ muted }),
 
       setPlaybackRate: (rate) => {
         // Validate rate is in allowed options, otherwise default to 1
-        const validRate = PLAYBACK_SPEED_OPTIONS.includes(rate as typeof PLAYBACK_SPEED_OPTIONS[number])
+        const validRate = PLAYBACK_SPEED_OPTIONS.includes(
+          rate as (typeof PLAYBACK_SPEED_OPTIONS)[number]
+        )
           ? rate
-          : 1
-        set({ playbackRate: validRate })
+          : 1;
+        set({ playbackRate: validRate });
       },
 
       reset: () => set(DEFAULT_PLAYER_SETTINGS),
     }),
     {
-      name: 'player-settings',
+      name: "player-settings",
       storage: createJSONStorage(() => localStorage),
     }
   )
-)
+);

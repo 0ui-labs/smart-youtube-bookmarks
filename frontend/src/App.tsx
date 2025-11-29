@@ -1,55 +1,55 @@
-import { ListsPage } from './components/ListsPage'
-import { VideosPage } from './components/VideosPage'
-import { MainLayout } from './components/MainLayout'
-import { Dashboard } from './pages/Dashboard'
-import { SettingsPage } from './pages/SettingsPage'
-import { NotFound } from './pages/NotFound'
-import { VideoDetailsPage } from './pages/VideoDetailsPage'
-import { ChannelsPage } from './pages/ChannelsPage'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { useLists } from './hooks/useLists'
+import { Navigate, Route, Routes } from "react-router-dom";
+import { ListsPage } from "./components/ListsPage";
+import { MainLayout } from "./components/MainLayout";
+import { VideosPage } from "./components/VideosPage";
+import { useLists } from "./hooks/useLists";
+import { ChannelsPage } from "./pages/ChannelsPage";
+import { Dashboard } from "./pages/Dashboard";
+import { NotFound } from "./pages/NotFound";
+import { SettingsPage } from "./pages/SettingsPage";
+import { VideoDetailsPage } from "./pages/VideoDetailsPage";
 
 function App() {
   // Listen laden und Zustände auswerten
-  const { data: lists, isLoading, isError } = useLists()
-  const actualListId = lists?.[0]?.id ?? null
+  const { data: lists, isLoading, isError } = useLists();
+  const actualListId = lists?.[0]?.id ?? null;
 
   return (
     <Routes>
       {/* Routes with MainLayout (shared sidebar) */}
       <Route element={<MainLayout />}>
         <Route
-          path="/videos"
           element={
             isLoading ? (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex h-full items-center justify-center">
                 <p className="text-gray-600">Lade Listen...</p>
               </div>
             ) : isError ? (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex h-full items-center justify-center">
                 <p className="text-red-600">Fehler beim Laden der Listen.</p>
               </div>
             ) : actualListId ? (
               <VideosPage listId={actualListId} />
             ) : (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex h-full items-center justify-center">
                 <p className="text-gray-600">Keine Listen gefunden.</p>
               </div>
             )
           }
+          path="/videos"
         />
-        <Route path="/videos/:videoId" element={<VideoDetailsPage />} />
-        <Route path="/channels" element={<ChannelsPage />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/settings/schemas" element={<SettingsPage />} />
+        <Route element={<VideoDetailsPage />} path="/videos/:videoId" />
+        <Route element={<ChannelsPage />} path="/channels" />
+        <Route element={<Dashboard />} path="/dashboard" />
+        <Route element={<SettingsPage />} path="/settings/schemas" />
       </Route>
 
       {/* Routes without MainLayout */}
-      <Route path="/lists" element={<ListsPage />} />
-      <Route path="/" element={<Navigate to="/videos" replace />} />
-      <Route path="*" element={<NotFound />} />
+      <Route element={<ListsPage />} path="/lists" />
+      <Route element={<Navigate replace to="/videos" />} path="/" />
+      <Route element={<NotFound />} path="*" />
     </Routes>
-  )
+  );
 }
 
-export default App
+export default App;

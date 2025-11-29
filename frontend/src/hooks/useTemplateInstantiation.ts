@@ -1,18 +1,23 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import type { SchemaTemplate } from '@/constants/schemaTemplates'
-import type { CustomField, FieldSchemaResponse } from '@/types/customFields'
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import type { SchemaTemplate } from "@/constants/schemaTemplates";
+import type { CustomField, FieldSchemaResponse } from "@/types/customFields";
 
 interface UseTemplateInstantiationOptions {
-  listId: string
-  onSuccess?: (schema: FieldSchemaResponse) => void
-  onError?: (error: Error) => void
+  listId: string;
+  onSuccess?: (schema: FieldSchemaResponse) => void;
+  onError?: (error: Error) => void;
 }
 
 interface TemplateInstantiationState {
-  currentStep: 'idle' | 'creating-fields' | 'creating-schema' | 'complete' | 'error'
-  createdFields: CustomField[]
-  error: Error | null
+  currentStep:
+    | "idle"
+    | "creating-fields"
+    | "creating-schema"
+    | "complete"
+    | "error";
+  createdFields: CustomField[];
+  error: Error | null;
 }
 
 /**
@@ -33,96 +38,102 @@ export function useTemplateInstantiation({
   onSuccess,
   onError,
 }: UseTemplateInstantiationOptions) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   const [state, setState] = useState<TemplateInstantiationState>({
-    currentStep: 'idle',
+    currentStep: "idle",
     createdFields: [],
     error: null,
-  })
+  });
 
   const instantiateMutation = useMutation({
     mutationFn: async (template: SchemaTemplate) => {
-      setState({ currentStep: 'creating-fields', createdFields: [], error: null })
+      setState({
+        currentStep: "creating-fields",
+        createdFields: [],
+        error: null,
+      });
 
       // Step 1: Create all custom fields
-      const createdFields: CustomField[] = []
+      const createdFields: CustomField[] = [];
 
       for (const fieldDef of template.fields) {
         const response = await fetch(`/api/lists/${listId}/custom-fields`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: fieldDef.name,
             field_type: fieldDef.field_type,
             config: fieldDef.config,
           }),
-        })
+        });
 
         if (!response.ok) {
-          const error = await response.json()
+          const error = await response.json();
           throw new Error(
             `Failed to create field "${fieldDef.name}": ${error.detail || response.statusText}`
-          )
+          );
         }
 
-        const field: CustomField = await response.json()
-        createdFields.push(field)
+        const field: CustomField = await response.json();
+        createdFields.push(field);
       }
 
-      setState(prev => ({ ...prev, createdFields }))
+      setState((prev) => ({ ...prev, createdFields }));
 
       // Step 2: Create schema with field associations
-      setState(prev => ({ ...prev, currentStep: 'creating-schema' }))
+      setState((prev) => ({ ...prev, currentStep: "creating-schema" }));
 
       const schemaResponse = await fetch(`/api/lists/${listId}/schemas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: template.name,
           description: template.description,
           fields: template.fields.map((fieldDef, index) => {
-            const field = createdFields[index]
+            const field = createdFields[index];
             if (!field) {
-              throw new Error(`Field at index ${index} not found in createdFields`)
+              throw new Error(
+                `Field at index ${index} not found in createdFields`
+              );
             }
             return {
               field_id: field.id,
               display_order: fieldDef.display_order,
               show_on_card: fieldDef.show_on_card,
-            }
+            };
           }),
         }),
-      })
+      });
 
       if (!schemaResponse.ok) {
-        const error = await schemaResponse.json()
+        const error = await schemaResponse.json();
         throw new Error(
           `Failed to create schema "${template.name}": ${error.detail || schemaResponse.statusText}`
-        )
+        );
       }
 
-      const schema: FieldSchemaResponse = await schemaResponse.json()
+      const schema: FieldSchemaResponse = await schemaResponse.json();
 
-      setState(prev => ({ ...prev, currentStep: 'complete' }))
+      setState((prev) => ({ ...prev, currentStep: "complete" }));
 
-      return schema
+      return schema;
     },
     onSuccess: (schema) => {
       // Invalidate queries to refresh UI
-      queryClient.invalidateQueries({ queryKey: ['custom-fields', listId] })
-      queryClient.invalidateQueries({ queryKey: ['schemas', listId] })
+      queryClient.invalidateQueries({ queryKey: ["custom-fields", listId] });
+      queryClient.invalidateQueries({ queryKey: ["schemas", listId] });
 
-      onSuccess?.(schema)
+      onSuccess?.(schema);
     },
     onError: (error: Error) => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
-        currentStep: 'error',
+        currentStep: "error",
         error,
-      }))
-      onError?.(error)
+      }));
+      onError?.(error);
     },
-  })
+  });
 
   return {
     instantiate: instantiateMutation.mutate,
@@ -131,5 +142,5 @@ export function useTemplateInstantiation({
     isError: instantiateMutation.isError,
     error: instantiateMutation.error,
     state,
-  }
+  };
 }

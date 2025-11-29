@@ -1,14 +1,14 @@
-import { Download } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { cn } from '@/lib/utils'
+import { AnimatePresence, motion } from "framer-motion";
+import { Download } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface DropZoneOverlayProps {
   /** Whether the drop is valid (affects border color) */
-  isValid?: boolean
+  isValid?: boolean;
   /** Custom message to display */
-  message?: string
+  message?: string;
   /** Additional className */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -16,40 +16,38 @@ export interface DropZoneOverlayProps {
  */
 export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
   isValid = true,
-  message = 'Videos hier ablegen',
+  message = "Videos hier ablegen",
   className,
-}) => {
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
+}) => (
+  <AnimatePresence>
+    <motion.div
+      animate={{ opacity: 1 }}
+      aria-label="Drop zone for video import"
+      className={cn(
+        "absolute inset-0 z-50 flex items-center justify-center bg-primary/5 backdrop-blur-sm",
+        className
+      )}
+      exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }}
+      role="region"
+      transition={{ duration: 0.15 }}
+    >
+      <div
         className={cn(
-          'absolute inset-0 z-50 flex items-center justify-center bg-primary/5 backdrop-blur-sm',
-          className
+          "rounded-lg border-2 border-dashed bg-background/80 p-12",
+          isValid ? "border-primary" : "border-destructive"
         )}
-        role="region"
-        aria-label="Drop zone for video import"
+        data-testid="drop-zone-overlay"
       >
-        <div
-          data-testid="drop-zone-overlay"
+        <Download
           className={cn(
-            'border-2 border-dashed rounded-lg p-12 bg-background/80',
-            isValid ? 'border-primary' : 'border-destructive'
+            "mx-auto mb-4 h-12 w-12",
+            isValid ? "text-primary" : "text-destructive"
           )}
-        >
-          <Download
-            data-testid="drop-zone-icon"
-            className={cn(
-              'w-12 h-12 mx-auto mb-4',
-              isValid ? 'text-primary' : 'text-destructive'
-            )}
-          />
-          <p className="text-lg font-medium text-center">{message}</p>
-        </div>
-      </motion.div>
-    </AnimatePresence>
-  )
-}
+          data-testid="drop-zone-icon"
+        />
+        <p className="text-center font-medium text-lg">{message}</p>
+      </div>
+    </motion.div>
+  </AnimatePresence>
+);

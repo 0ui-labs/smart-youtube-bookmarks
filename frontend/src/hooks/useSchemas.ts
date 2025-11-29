@@ -1,19 +1,19 @@
 import {
-  useQuery,
-  useMutation,
-  useQueryClient,
   queryOptions,
-} from '@tanstack/react-query'
-import { schemasApi } from '@/lib/schemasApi'
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { schemasApi } from "@/lib/schemasApi";
 import type {
-  FieldSchemaResponse,
   FieldSchemaCreate,
+  FieldSchemaResponse,
   FieldSchemaUpdate,
-  SchemaFieldCreate,
-  SchemaFieldUpdate,
   ReorderSchemaFields,
   SchemaFieldBatchUpdateRequest,
-} from '@/types/schema'
+  SchemaFieldCreate,
+  SchemaFieldUpdate,
+} from "@/types/schema";
 
 // ============================================================================
 // Query Keys Factory (Step 3)
@@ -45,12 +45,12 @@ import type {
  * ```
  */
 export const schemasKeys = {
-  all: () => ['schemas'] as const,
-  lists: () => [...schemasKeys.all(), 'list'] as const,
+  all: () => ["schemas"] as const,
+  lists: () => [...schemasKeys.all(), "list"] as const,
   list: (listId: string) => [...schemasKeys.lists(), listId] as const,
-  details: () => [...schemasKeys.all(), 'detail'] as const,
+  details: () => [...schemasKeys.all(), "detail"] as const,
   detail: (schemaId: string) => [...schemasKeys.details(), schemaId] as const,
-}
+};
 
 // ============================================================================
 // Query Options & Hooks (Step 4)
@@ -79,7 +79,7 @@ export function schemasOptions(listId: string) {
     enabled: !!listId,
     // Lower staleTime for lists (user creates/deletes schemas frequently)
     staleTime: 2 * 60 * 1000, // 2 minutes
-  })
+  });
 }
 
 /**
@@ -94,7 +94,7 @@ export function schemaOptions(listId: string, schemaId: string) {
     queryFn: async () => schemasApi.getSchema(listId, schemaId),
     // Higher staleTime for details (single schema changes less frequently)
     staleTime: 5 * 60 * 1000, // 5 minutes
-  })
+  });
 }
 
 /**
@@ -121,7 +121,7 @@ export function schemaOptions(listId: string, schemaId: string) {
  * ```
  */
 export function useSchemas(listId: string) {
-  return useQuery(schemasOptions(listId))
+  return useQuery(schemasOptions(listId));
 }
 
 /**
@@ -155,7 +155,7 @@ export function useSchema(listId: string, schemaId?: string) {
     ...schemaOptions(listId, schemaId!),
     // Dependent query: only run if schemaId exists
     enabled: !!schemaId,
-  })
+  });
 }
 
 /**
@@ -180,11 +180,11 @@ export function useSchema(listId: string, schemaId?: string) {
  * ```
  */
 export function usePrefetchSchema(listId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return (schemaId: string) => {
-    queryClient.prefetchQuery(schemaOptions(listId, schemaId))
-  }
+    queryClient.prefetchQuery(schemaOptions(listId, schemaId));
+  };
 }
 
 // ============================================================================
@@ -222,17 +222,17 @@ export function usePrefetchSchema(listId: string) {
  * ```
  */
 export function useCreateSchema(listId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['createSchema', listId],
+    mutationKey: ["createSchema", listId],
     mutationFn: async (schemaData: FieldSchemaCreate) =>
       schemasApi.createSchema(listId, schemaData),
     onSuccess: () => {
       // Invalidate schemas list to show new schema
-      queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) })
+      queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) });
     },
-  })
+  });
 }
 
 /**
@@ -264,50 +264,59 @@ export function useCreateSchema(listId: string) {
  */
 export function useUpdateSchema(listId: string) {
   return useMutation({
-    mutationKey: ['updateSchema', listId],
+    mutationKey: ["updateSchema", listId],
     mutationFn: async ({
       schemaId,
       updates,
     }: {
-      schemaId: string
-      updates: FieldSchemaUpdate
+      schemaId: string;
+      updates: FieldSchemaUpdate;
     }) => schemasApi.updateSchema(listId, schemaId, updates),
     // ✅ v5 signature: (variables, context)
     onMutate: async (variables, context) => {
-      await context.client.cancelQueries({ queryKey: schemasKeys.list(listId) })
+      await context.client.cancelQueries({
+        queryKey: schemasKeys.list(listId),
+      });
 
-      const previousSchemas = context.client.getQueryData<FieldSchemaResponse[]>(
-        schemasKeys.list(listId)
-      )
+      const previousSchemas = context.client.getQueryData<
+        FieldSchemaResponse[]
+      >(schemasKeys.list(listId));
 
       if (previousSchemas) {
         context.client.setQueryData<FieldSchemaResponse[]>(
           schemasKeys.list(listId),
           previousSchemas.map((schema) =>
             schema.id === variables.schemaId
-              ? { ...schema, ...variables.updates, updated_at: new Date().toISOString() }
+              ? {
+                  ...schema,
+                  ...variables.updates,
+                  updated_at: new Date().toISOString(),
+                }
               : schema
           )
-        )
+        );
       }
 
-      return { previousSchemas }
+      return { previousSchemas };
     },
     // ✅ v5 signature: (err, variables, onMutateResult, context)
     onError: (err, _variables, onMutateResult, context) => {
-      console.error('Failed to update schema:', err)
+      console.error("Failed to update schema:", err);
       if (onMutateResult?.previousSchemas) {
-        context.client.setQueryData(schemasKeys.list(listId), onMutateResult.previousSchemas)
+        context.client.setQueryData(
+          schemasKeys.list(listId),
+          onMutateResult.previousSchemas
+        );
       }
     },
     // ✅ v5 signature: includes context
     onSettled: (_data, _error, variables, _onMutateResult, context) => {
-      context.client.invalidateQueries({ queryKey: schemasKeys.list(listId) })
+      context.client.invalidateQueries({ queryKey: schemasKeys.list(listId) });
       context.client.invalidateQueries({
         queryKey: schemasKeys.detail(variables.schemaId),
-      })
+      });
     },
-  })
+  });
 }
 
 /**
@@ -353,41 +362,48 @@ export function useUpdateSchema(listId: string) {
  */
 export function useDeleteSchema(listId: string) {
   return useMutation({
-    mutationKey: ['deleteSchema', listId],
+    mutationKey: ["deleteSchema", listId],
     mutationFn: async ({ schemaId }: { schemaId: string }) =>
       schemasApi.deleteSchema(listId, schemaId),
     // ✅ v5 signature: (variables, context)
     onMutate: async (variables, context) => {
-      await context.client.cancelQueries({ queryKey: schemasKeys.list(listId) })
+      await context.client.cancelQueries({
+        queryKey: schemasKeys.list(listId),
+      });
 
-      const previousSchemas = context.client.getQueryData<FieldSchemaResponse[]>(
-        schemasKeys.list(listId)
-      )
+      const previousSchemas = context.client.getQueryData<
+        FieldSchemaResponse[]
+      >(schemasKeys.list(listId));
 
       if (previousSchemas) {
         context.client.setQueryData<FieldSchemaResponse[]>(
           schemasKeys.list(listId),
           previousSchemas.filter((schema) => schema.id !== variables.schemaId)
-        )
+        );
       }
 
-      return { previousSchemas }
+      return { previousSchemas };
     },
     // ✅ v5 signature: (err, variables, onMutateResult, context)
     onError: (err, _variables, onMutateResult, context) => {
-      console.error('Failed to delete schema:', err)
+      console.error("Failed to delete schema:", err);
       if (onMutateResult?.previousSchemas) {
-        context.client.setQueryData(schemasKeys.list(listId), onMutateResult.previousSchemas)
+        context.client.setQueryData(
+          schemasKeys.list(listId),
+          onMutateResult.previousSchemas
+        );
       }
     },
     // ✅ v5 signature: includes context
     onSettled: (_data, _error, variables, _onMutateResult, context) => {
-      context.client.invalidateQueries({ queryKey: schemasKeys.list(listId) })
-      context.client.removeQueries({ queryKey: schemasKeys.detail(variables.schemaId) })
+      context.client.invalidateQueries({ queryKey: schemasKeys.list(listId) });
+      context.client.removeQueries({
+        queryKey: schemasKeys.detail(variables.schemaId),
+      });
       // Also invalidate tags (schema_id may be SET NULL)
-      context.client.invalidateQueries({ queryKey: ['tags'] })
+      context.client.invalidateQueries({ queryKey: ["tags"] });
     },
-  })
+  });
 }
 
 /**
@@ -424,19 +440,19 @@ export function useDeleteSchema(listId: string) {
  * ```
  */
 export function useDuplicateSchema(listId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['duplicateSchema', listId],
+    mutationKey: ["duplicateSchema", listId],
     mutationFn: async ({
       schemaId,
       newName,
     }: {
-      schemaId: string
-      newName: string
+      schemaId: string;
+      newName: string;
     }) => {
       // Step 1: GET original schema with nested fields
-      const originalSchema = await schemasApi.getSchema(listId, schemaId)
+      const originalSchema = await schemasApi.getSchema(listId, schemaId);
 
       // Step 2: Create new schema with copied fields
       const createData: FieldSchemaCreate = {
@@ -447,18 +463,18 @@ export function useDuplicateSchema(listId: string) {
           display_order: sf.display_order,
           show_on_card: sf.show_on_card,
         })),
-      }
+      };
 
-      return schemasApi.createSchema(listId, createData)
+      return schemasApi.createSchema(listId, createData);
     },
     // No optimistic update (too complex with nested data)
     onError: (err) => {
-      console.error('Failed to duplicate schema:', err)
+      console.error("Failed to duplicate schema:", err);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) })
+      queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) });
     },
-  })
+  });
 }
 
 /**
@@ -493,15 +509,15 @@ export function useSchemaUsageStats(
   schemaId: string | null,
   tags: Array<{ schema_id?: string | null; name: string }> = []
 ) {
-  if (!schemaId || !tags) {
-    return { count: 0, tagNames: [] }
+  if (!(schemaId && tags)) {
+    return { count: 0, tagNames: [] };
   }
 
-  const usedByTags = tags.filter((tag) => tag.schema_id === schemaId)
+  const usedByTags = tags.filter((tag) => tag.schema_id === schemaId);
   return {
     count: usedByTags.length,
     tagNames: usedByTags.map((tag) => tag.name),
-  }
+  };
 }
 
 // ============================================================================
@@ -544,17 +560,17 @@ export function useSchemaUsageStats(
  * ```
  */
 export function useAddFieldToSchema(listId: string, schemaId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['addFieldToSchema', schemaId],
+    mutationKey: ["addFieldToSchema", schemaId],
     mutationFn: async (fieldData: SchemaFieldCreate) =>
       schemasApi.addFieldToSchema(listId, schemaId, fieldData),
     onSuccess: () => {
       // Only invalidate schema details (list doesn't show fields)
-      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) })
+      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) });
     },
-  })
+  });
 }
 
 /**
@@ -583,16 +599,16 @@ export function useAddFieldToSchema(listId: string, schemaId: string) {
  * ```
  */
 export function useRemoveFieldFromSchema(listId: string, schemaId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['removeFieldFromSchema', schemaId],
+    mutationKey: ["removeFieldFromSchema", schemaId],
     mutationFn: async (fieldId: string) =>
       schemasApi.removeFieldFromSchema(listId, schemaId, fieldId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) })
+      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) });
     },
-  })
+  });
 }
 
 /**
@@ -627,21 +643,21 @@ export function useRemoveFieldFromSchema(listId: string, schemaId: string) {
  * ```
  */
 export function useUpdateSchemaField(listId: string, schemaId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['updateSchemaField', schemaId],
+    mutationKey: ["updateSchemaField", schemaId],
     mutationFn: async ({
       fieldId,
       updates,
     }: {
-      fieldId: string
-      updates: SchemaFieldUpdate
+      fieldId: string;
+      updates: SchemaFieldUpdate;
     }) => schemasApi.updateSchemaField(listId, schemaId, fieldId, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) })
+      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) });
     },
-  })
+  });
 }
 
 /**
@@ -681,33 +697,35 @@ export function useUpdateSchemaField(listId: string, schemaId: string) {
  * ```
  */
 export function useReorderSchemaFields(listId: string, schemaId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['reorderSchemaFields', schemaId],
+    mutationKey: ["reorderSchemaFields", schemaId],
     mutationFn: async (reorderedFields: ReorderSchemaFields) =>
       schemasApi.reorderSchemaFields(listId, schemaId, reorderedFields),
     // Optimistic update: apply changes immediately
     onMutate: async (reorderedFields) => {
       // Cancel outgoing refetches (prevent race conditions)
-      await queryClient.cancelQueries({ queryKey: schemasKeys.detail(schemaId) })
+      await queryClient.cancelQueries({
+        queryKey: schemasKeys.detail(schemaId),
+      });
 
       // Snapshot current value for rollback
       const previousSchema = queryClient.getQueryData<FieldSchemaResponse>(
         schemasKeys.detail(schemaId)
-      )
+      );
 
       // Optimistically update cache
       if (previousSchema) {
         queryClient.setQueryData<FieldSchemaResponse>(
           schemasKeys.detail(schemaId),
           (old) => {
-            if (!old) return old
+            if (!old) return old;
 
             // Create map of field_id → new display_order
             const orderMap = new Map(
               reorderedFields.map((f) => [f.field_id, f.display_order])
-            )
+            );
 
             // Update schema_fields with new display_orders
             const updatedFields = old.schema_fields
@@ -715,18 +733,18 @@ export function useReorderSchemaFields(listId: string, schemaId: string) {
                 ...sf,
                 display_order: orderMap.get(sf.field_id) ?? sf.display_order,
               }))
-              .sort((a, b) => a.display_order - b.display_order)
+              .sort((a, b) => a.display_order - b.display_order);
 
             return {
               ...old,
               schema_fields: updatedFields,
-            }
+            };
           }
-        )
+        );
       }
 
       // Return context for rollback
-      return { previousSchema }
+      return { previousSchema };
     },
     // Rollback on error
     onError: (_error, _variables, context) => {
@@ -734,14 +752,14 @@ export function useReorderSchemaFields(listId: string, schemaId: string) {
         queryClient.setQueryData(
           schemasKeys.detail(schemaId),
           context.previousSchema
-        )
+        );
       }
     },
     // Refetch after success or error to ensure consistency
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) })
+      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) });
     },
-  })
+  });
 }
 
 /**
@@ -811,16 +829,16 @@ export function useReorderSchemaFields(listId: string, schemaId: string) {
  * ```
  */
 export function useUpdateSchemaFieldsBatch(listId: string, schemaId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['updateSchemaFieldsBatch', schemaId],
+    mutationKey: ["updateSchemaFieldsBatch", schemaId],
     mutationFn: async (request: SchemaFieldBatchUpdateRequest) =>
       schemasApi.updateSchemaFieldsBatch(listId, schemaId, request),
     onSettled: () => {
       // Invalidate ALL schema queries for this list (Task #80 pattern)
-      queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) })
-      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) })
+      queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) });
+      queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) });
     },
-  })
+  });
 }

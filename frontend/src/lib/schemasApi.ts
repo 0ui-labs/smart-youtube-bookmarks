@@ -1,19 +1,19 @@
-import { api } from './api'
 import {
-  FieldSchemaResponse,
-  FieldSchemasResponseSchema,
+  type FieldSchemaCreate,
+  type FieldSchemaResponse,
   FieldSchemaResponseSchema,
-  FieldSchemaCreate,
-  FieldSchemaUpdate,
-  SchemaFieldCreate,
-  SchemaFieldUpdate,
-  SchemaFieldResponse,
-  SchemaFieldResponseSchema,
-  ReorderSchemaFields,
-  SchemaFieldBatchUpdateRequest,
-  SchemaFieldBatchUpdateResponse,
+  FieldSchemasResponseSchema,
+  type FieldSchemaUpdate,
+  type ReorderSchemaFields,
+  type SchemaFieldBatchUpdateRequest,
+  type SchemaFieldBatchUpdateResponse,
   SchemaFieldBatchUpdateResponseSchema,
-} from '@/types/schema'
+  type SchemaFieldCreate,
+  type SchemaFieldResponse,
+  SchemaFieldResponseSchema,
+  type SchemaFieldUpdate,
+} from "@/types/schema";
+import { api } from "./api";
 
 /**
  * API client for Field Schema CRUD operations.
@@ -43,8 +43,8 @@ export const schemasApi = {
    * Each schema includes schema_fields with full CustomField details.
    */
   async getSchemas(listId: string): Promise<FieldSchemaResponse[]> {
-    const { data } = await api.get(`/lists/${listId}/schemas`)
-    return FieldSchemasResponseSchema.parse(data)
+    const { data } = await api.get(`/lists/${listId}/schemas`);
+    return FieldSchemasResponseSchema.parse(data);
   },
 
   /**
@@ -53,9 +53,12 @@ export const schemasApi = {
    * Used for schema detail modal/page.
    * Prefetch this on hover for instant modal opening.
    */
-  async getSchema(listId: string, schemaId: string): Promise<FieldSchemaResponse> {
-    const { data } = await api.get(`/lists/${listId}/schemas/${schemaId}`)
-    return FieldSchemaResponseSchema.parse(data)
+  async getSchema(
+    listId: string,
+    schemaId: string
+  ): Promise<FieldSchemaResponse> {
+    const { data } = await api.get(`/lists/${listId}/schemas/${schemaId}`);
+    return FieldSchemaResponseSchema.parse(data);
   },
 
   /**
@@ -80,8 +83,8 @@ export const schemasApi = {
     listId: string,
     schema: FieldSchemaCreate
   ): Promise<FieldSchemaResponse> {
-    const { data } = await api.post(`/lists/${listId}/schemas`, schema)
-    return FieldSchemaResponseSchema.parse(data)
+    const { data } = await api.post(`/lists/${listId}/schemas`, schema);
+    return FieldSchemaResponseSchema.parse(data);
   },
 
   /**
@@ -94,8 +97,11 @@ export const schemasApi = {
     schemaId: string,
     updates: FieldSchemaUpdate
   ): Promise<FieldSchemaResponse> {
-    const { data } = await api.put(`/lists/${listId}/schemas/${schemaId}`, updates)
-    return FieldSchemaResponseSchema.parse(data)
+    const { data } = await api.put(
+      `/lists/${listId}/schemas/${schemaId}`,
+      updates
+    );
+    return FieldSchemaResponseSchema.parse(data);
   },
 
   /**
@@ -105,7 +111,7 @@ export const schemasApi = {
    * Frontend should show confirmation modal with tag count.
    */
   async deleteSchema(listId: string, schemaId: string): Promise<void> {
-    await api.delete(`/lists/${listId}/schemas/${schemaId}`)
+    await api.delete(`/lists/${listId}/schemas/${schemaId}`);
   },
 
   // ========================================================================
@@ -128,8 +134,8 @@ export const schemasApi = {
     const { data } = await api.post(
       `/lists/${listId}/schemas/${schemaId}/fields`,
       fieldData
-    )
-    return SchemaFieldResponseSchema.parse(data)
+    );
+    return SchemaFieldResponseSchema.parse(data);
   },
 
   /**
@@ -147,13 +153,13 @@ export const schemasApi = {
     listId: string,
     schemaId: string,
     fieldId: string,
-    updates: SchemaFieldUpdate  // ✅ FIXED: Type statt Schema
+    updates: SchemaFieldUpdate // ✅ FIXED: Type statt Schema
   ): Promise<SchemaFieldResponse> {
     const { data } = await api.put(
       `/lists/${listId}/schemas/${schemaId}/fields/${fieldId}`,
       updates
-    )
-    return SchemaFieldResponseSchema.parse(data)
+    );
+    return SchemaFieldResponseSchema.parse(data);
   },
 
   /**
@@ -166,7 +172,7 @@ export const schemasApi = {
     schemaId: string,
     fieldId: string
   ): Promise<void> {
-    await api.delete(`/lists/${listId}/schemas/${schemaId}/fields/${fieldId}`)
+    await api.delete(`/lists/${listId}/schemas/${schemaId}/fields/${fieldId}`);
   },
 
   /**
@@ -194,7 +200,7 @@ export const schemasApi = {
     for (const field of reorderedFields) {
       await this.updateSchemaField(listId, schemaId, field.field_id, {
         display_order: field.display_order,
-      })
+      });
     }
   },
 
@@ -231,7 +237,7 @@ export const schemasApi = {
     const { data } = await api.put(
       `/lists/${listId}/schemas/${schemaId}/fields/batch`,
       request
-    )
-    return SchemaFieldBatchUpdateResponseSchema.parse(data)
+    );
+    return SchemaFieldBatchUpdateResponseSchema.parse(data);
   },
-}
+};

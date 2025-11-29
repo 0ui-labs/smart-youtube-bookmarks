@@ -8,7 +8,7 @@
  * import { RatingEditor, SelectEditor, TextEditor, BooleanEditor } from '@/components/fields/editors'
  */
 
-export { RatingEditor } from './RatingEditor'
-export { SelectEditor } from './SelectEditor'
-export { TextEditor } from './TextEditor'
-export { BooleanEditor } from './BooleanEditor'
+export { BooleanEditor } from "./BooleanEditor";
+export { RatingEditor } from "./RatingEditor";
+export { SelectEditor } from "./SelectEditor";
+export { TextEditor } from "./TextEditor";

@@ -1,9 +1,15 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import type { FieldCoverageStat } from '@/types/analytics'
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import type { FieldCoverageStat } from "@/types/analytics";
 
 export interface FieldCoverageStatsProps {
-  data: FieldCoverageStat[]
+  data: FieldCoverageStat[];
 }
 
 /**
@@ -34,12 +40,12 @@ export function FieldCoverageStats({ data }: FieldCoverageStatsProps) {
           <CardDescription>All fields have good coverage</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-32 text-gray-400">
+          <div className="flex h-32 items-center justify-center text-gray-400">
             <p>No coverage issues found</p>
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   /**
@@ -49,13 +55,15 @@ export function FieldCoverageStats({ data }: FieldCoverageStatsProps) {
    * - Red (<50%): Low coverage, needs attention
    */
   const getProgressColor = (percentage: number): string => {
-    if (percentage >= 75) return 'bg-green-500'
-    if (percentage >= 50) return 'bg-amber-500'
-    return 'bg-red-500'
-  }
+    if (percentage >= 75) return "bg-green-500";
+    if (percentage >= 50) return "bg-amber-500";
+    return "bg-red-500";
+  };
 
   // Sort data by coverage percentage ascending (problems first)
-  const sortedData = [...data].sort((a, b) => a.coverage_percentage - b.coverage_percentage)
+  const sortedData = [...data].sort(
+    (a, b) => a.coverage_percentage - b.coverage_percentage
+  );
 
   return (
     <Card>
@@ -70,38 +78,44 @@ export function FieldCoverageStats({ data }: FieldCoverageStatsProps) {
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b">
-                <th className="text-left p-3 font-semibold">Field Name</th>
-                <th className="text-left p-3 font-semibold">Type</th>
-                <th className="text-left p-3 font-semibold">Videos with Values</th>
-                <th className="text-left p-3 font-semibold">Total Videos</th>
-                <th className="text-left p-3 font-semibold">Coverage</th>
+                <th className="p-3 text-left font-semibold">Field Name</th>
+                <th className="p-3 text-left font-semibold">Type</th>
+                <th className="p-3 text-left font-semibold">
+                  Videos with Values
+                </th>
+                <th className="p-3 text-left font-semibold">Total Videos</th>
+                <th className="p-3 text-left font-semibold">Coverage</th>
               </tr>
             </thead>
             <tbody>
               {sortedData.map((field) => (
-                <tr key={field.field_id} className="border-b hover:bg-gray-50">
+                <tr className="border-b hover:bg-gray-50" key={field.field_id}>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
                       <span>{field.field_name}</span>
                       {field.coverage_percentage < 10 && (
-                        <Badge variant="destructive" className="text-xs">
+                        <Badge className="text-xs" variant="destructive">
                           Low Coverage
                         </Badge>
                       )}
                     </div>
                   </td>
-                  <td className="p-3 text-sm text-gray-600 capitalize">{field.field_type}</td>
+                  <td className="p-3 text-gray-600 text-sm capitalize">
+                    {field.field_type}
+                  </td>
                   <td className="p-3">{field.videos_with_values}</td>
                   <td className="p-3">{field.total_videos}</td>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[120px]">
+                      <div className="h-2 max-w-[120px] flex-1 rounded-full bg-gray-200">
                         <div
                           className={`h-2 rounded-full ${getProgressColor(field.coverage_percentage)}`}
-                          style={{ width: `${Math.min(100, field.coverage_percentage)}%` }}
+                          style={{
+                            width: `${Math.min(100, field.coverage_percentage)}%`,
+                          }}
                         />
                       </div>
-                      <span className="text-sm font-medium min-w-[45px] text-right">
+                      <span className="min-w-[45px] text-right font-medium text-sm">
                         {field.coverage_percentage.toFixed(1)}%
                       </span>
                     </div>
@@ -113,5 +127,5 @@ export function FieldCoverageStats({ data }: FieldCoverageStatsProps) {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

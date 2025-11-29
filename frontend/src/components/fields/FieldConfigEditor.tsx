@@ -16,56 +16,58 @@
  * - Conditional rendering via switch statement
  */
 
-import { useEffect } from 'react'
-import { Control } from 'react-hook-form'
-import { FieldType } from '@/types/customField'
-import { SelectConfigEditor } from './SelectConfigEditor'
-import { RatingConfigEditor } from './RatingConfigEditor'
-import { TextConfigEditor } from './TextConfigEditor'
+import { useEffect } from "react";
+import type { Control } from "react-hook-form";
+import type { FieldType } from "@/types/customField";
+import { RatingConfigEditor } from "./RatingConfigEditor";
+import { SelectConfigEditor } from "./SelectConfigEditor";
+import { TextConfigEditor } from "./TextConfigEditor";
 
 interface SelectConfig {
-  options: string[]
+  options: string[];
 }
 
 interface RatingConfig {
-  max_rating: number
+  max_rating: number;
 }
 
 interface TextConfig {
-  max_length?: number
+  max_length?: number;
 }
 
-interface BooleanConfig {
-  // Empty - no configuration needed
-}
+type BooleanConfig = {};
 
-export type FieldConfig = SelectConfig | RatingConfig | TextConfig | BooleanConfig
+export type FieldConfig =
+  | SelectConfig
+  | RatingConfig
+  | TextConfig
+  | BooleanConfig;
 
 export interface FieldConfigEditorProps {
   /**
    * The field type determines which config editor to render
    */
-  fieldType: FieldType
+  fieldType: FieldType;
 
   /**
    * Current config value (controlled component)
    */
-  config: FieldConfig
+  config: FieldConfig;
 
   /**
    * Callback when config changes (validation happens here)
    */
-  onChange: (config: FieldConfig) => void
+  onChange: (config: FieldConfig) => void;
 
   /**
    * React Hook Form control (required for SelectConfigEditor useFieldArray)
    */
-  control?: Control<any>
+  control?: Control<any>;
 
   /**
    * External error message (e.g., from form validation)
    */
-  error?: string
+  error?: string;
 }
 
 /**
@@ -98,53 +100,51 @@ export function FieldConfigEditor({
 }: FieldConfigEditorProps) {
   // Ensure empty config for boolean fields
   useEffect(() => {
-    if (fieldType === 'boolean' && Object.keys(config).length > 0) {
-      onChange({})
+    if (fieldType === "boolean" && Object.keys(config).length > 0) {
+      onChange({});
     }
-  }, [fieldType, config, onChange])
+  }, [fieldType, config, onChange]);
 
   switch (fieldType) {
-    case 'select':
+    case "select":
       // SelectConfigEditor requires control for useFieldArray
       if (!control) {
-        console.error('SelectConfigEditor requires control prop for useFieldArray')
-        return null
+        console.error(
+          "SelectConfigEditor requires control prop for useFieldArray"
+        );
+        return null;
       }
-      return (
-        <SelectConfigEditor
-          control={control}
-          error={error}
-        />
-      )
+      return <SelectConfigEditor control={control} error={error} />;
 
-    case 'rating':
+    case "rating":
       return (
         <RatingConfigEditor
           config={config as RatingConfig}
-          onChange={onChange}
           error={error}
+          onChange={onChange}
         />
-      )
+      );
 
-    case 'text':
+    case "text":
       return (
         <TextConfigEditor
           config={config as TextConfig}
-          onChange={onChange}
           error={error}
+          onChange={onChange}
         />
-      )
+      );
 
-    case 'boolean':
+    case "boolean":
       // Boolean fields have no configuration
       // Empty config is ensured via useEffect at component mount
-      return null
+      return null;
 
-    default:
+    default: {
       // TypeScript exhaustiveness check
-      const _exhaustive: never = fieldType
+      const _exhaustive: never = fieldType;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      void _exhaustive
-      return null
+      void _exhaustive;
+      return null;
+    }
   }
 }

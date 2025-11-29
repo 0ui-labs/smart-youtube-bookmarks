@@ -1,5 +1,5 @@
-import { AvailableFieldResponse, VideoFieldValue } from '@/types/video'
-import { FieldDisplay } from '@/components/fields'
+import { FieldDisplay } from "@/components/fields";
+import type { AvailableFieldResponse, VideoFieldValue } from "@/types/video";
 
 /**
  * CustomFieldsSection Component
@@ -36,22 +36,22 @@ import { FieldDisplay } from '@/components/fields'
  */
 interface CustomFieldsSectionProps {
   /** All available fields for this video (filled + empty) from available_fields */
-  availableFields: AvailableFieldResponse[]
+  availableFields: AvailableFieldResponse[];
 
   /** Current field values with metadata */
-  fieldValues: VideoFieldValue[]
+  fieldValues: VideoFieldValue[];
 
   /** Video ID for mutation context */
-  videoId: string
+  videoId: string;
 
   /** List ID for API calls */
-  listId: string
+  listId: string;
 
   /** Callback when field value changes */
-  onFieldChange: (fieldId: string, value: string | number | boolean) => void
+  onFieldChange: (fieldId: string, value: string | number | boolean) => void;
 
   /** Optional: Callback when text field expands (for modal scroll adjustment) */
-  onExpand?: () => void
+  onExpand?: () => void;
 }
 
 export const CustomFieldsSection = ({
@@ -65,10 +65,10 @@ export const CustomFieldsSection = ({
   // No fields message
   if (availableFields.length === 0) {
     return (
-      <div className="text-center text-gray-500 py-8">
+      <div className="py-8 text-center text-gray-500">
         <p>Keine benutzerdefinierten Felder verfügbar.</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -79,14 +79,14 @@ export const CustomFieldsSection = ({
           // Find existing value from field_values
           const existingValue = fieldValues.find(
             (fv) => fv.field_id === field.field_id
-          )
+          );
 
           // Create type-specific VideoFieldValue for FieldDisplay
           // TypeScript requires exact discriminated union types
-          let fieldValue: VideoFieldValue
+          let fieldValue: VideoFieldValue;
 
           if (existingValue) {
-            fieldValue = existingValue
+            fieldValue = existingValue;
           } else {
             // Create type-specific placeholder based on field_type
             const baseField = {
@@ -96,7 +96,7 @@ export const CustomFieldsSection = ({
               field_name: field.field_name,
               show_on_card: field.show_on_card,
               updated_at: new Date().toISOString(),
-            }
+            };
 
             const fieldMeta = {
               id: field.field_id,
@@ -104,69 +104,69 @@ export const CustomFieldsSection = ({
               name: field.field_name,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
-            }
+            };
 
-            if (field.field_type === 'rating') {
+            if (field.field_type === "rating") {
               fieldValue = {
                 ...baseField,
                 field: {
                   ...fieldMeta,
-                  field_type: 'rating' as const,
+                  field_type: "rating" as const,
                   config: field.config as { max_rating: number },
                 },
                 value: null,
-              }
-            } else if (field.field_type === 'select') {
+              };
+            } else if (field.field_type === "select") {
               fieldValue = {
                 ...baseField,
                 field: {
                   ...fieldMeta,
-                  field_type: 'select' as const,
+                  field_type: "select" as const,
                   config: field.config as { options: string[] },
                 },
                 value: null,
-              }
-            } else if (field.field_type === 'text') {
-              const textConfig = field.config as { max_length?: number | null }
+              };
+            } else if (field.field_type === "text") {
+              const textConfig = field.config as { max_length?: number | null };
               fieldValue = {
                 ...baseField,
                 field: {
                   ...fieldMeta,
-                  field_type: 'text' as const,
+                  field_type: "text" as const,
                   config: {
                     max_length: textConfig.max_length ?? undefined,
                   },
                 },
                 value: null,
-              }
+              };
             } else {
               // boolean
               fieldValue = {
                 ...baseField,
                 field: {
                   ...fieldMeta,
-                  field_type: 'boolean' as const,
+                  field_type: "boolean" as const,
                   config: {},
                 },
                 value: null,
-              }
+              };
             }
           }
 
           return (
-            <div key={field.field_id} className="flex items-start gap-2">
+            <div className="flex items-start gap-2" key={field.field_id}>
               <div className="flex-1">
-                <p className="text-sm font-medium mb-1">{field.field_name}</p>
+                <p className="mb-1 font-medium text-sm">{field.field_name}</p>
                 <FieldDisplay
                   fieldValue={fieldValue}
-                  readonly={false}
                   onChange={(value) => onFieldChange(field.field_id, value)}
                   onExpand={onExpand}
+                  readonly={false}
                 />
               </div>
             </div>
-          )
+          );
         })}
     </div>
-  )
-}
+  );
+};

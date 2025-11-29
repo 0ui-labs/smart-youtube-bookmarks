@@ -1,16 +1,17 @@
-import React, { useMemo } from 'react';
 import {
-  useReactTable,
+  type ColumnDef,
   flexRender,
   getCoreRowModel,
-  getSortedRowModel,
   getFilteredRowModel,
-  type ColumnDef,
-} from '@tanstack/react-table';
-import type { CustomField } from '@/types/customField';
-import { FieldTypeBadge } from './FieldTypeBadge';
-import { FieldActionsMenu } from './FieldActionsMenu';
-import { formatConfigPreview } from '@/utils/fieldConfigPreview';
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import type React from "react";
+import { useMemo } from "react";
+import type { CustomField } from "@/types/customField";
+import { formatConfigPreview } from "@/utils/fieldConfigPreview";
+import { FieldActionsMenu } from "./FieldActionsMenu";
+import { FieldTypeBadge } from "./FieldTypeBadge";
 
 /**
  * Props for FieldsList component
@@ -80,8 +81,8 @@ export const FieldsList: React.FC<FieldsListProps> = ({
     () => [
       // Field Name Column (sortable)
       {
-        accessorKey: 'name',
-        header: 'Field Name',
+        accessorKey: "name",
+        header: "Field Name",
         cell: (info) => (
           <span className="font-semibold text-gray-900">
             {info.getValue() as string}
@@ -92,29 +93,34 @@ export const FieldsList: React.FC<FieldsListProps> = ({
 
       // Field Type Column (sortable, filterable)
       {
-        accessorKey: 'field_type',
-        header: 'Type',
+        accessorKey: "field_type",
+        header: "Type",
         cell: (info) => (
-          <FieldTypeBadge fieldType={info.getValue() as CustomField['field_type']} />
+          <FieldTypeBadge
+            fieldType={info.getValue() as CustomField["field_type"]}
+          />
         ),
         enableSorting: true,
         // Custom filter function for field type
         filterFn: (row, _columnId, filterValue) => {
-          if (filterValue === 'all') return true;
+          if (filterValue === "all") return true;
           return row.original.field_type === filterValue;
         },
       },
 
       // Config Preview Column (not sortable)
       {
-        accessorKey: 'config',
-        header: 'Configuration',
+        accessorKey: "config",
+        header: "Configuration",
         cell: (info) => {
           const field = info.row.original;
           // IMPROVEMENT #5: No maxLength parameter
-          const preview = formatConfigPreview(field.field_type, info.getValue() as Record<string, any>);
+          const preview = formatConfigPreview(
+            field.field_type,
+            info.getValue() as Record<string, any>
+          );
           return (
-            <span className="text-sm text-gray-600 max-w-xs truncate block">
+            <span className="block max-w-xs truncate text-gray-600 text-sm">
               {preview}
             </span>
           );
@@ -126,14 +132,14 @@ export const FieldsList: React.FC<FieldsListProps> = ({
       ...(showUsageCount
         ? [
             {
-              id: 'usage',
-              header: 'Usage',
+              id: "usage",
+              header: "Usage",
               cell: (info: any) => {
                 const fieldId = info.row.original.id;
                 const count = usageCounts.get(fieldId) ?? 0;
                 return (
-                  <span className="text-sm text-gray-500">
-                    Used by {count} schema{count !== 1 ? 's' : ''}
+                  <span className="text-gray-500 text-sm">
+                    Used by {count} schema{count !== 1 ? "s" : ""}
                   </span>
                 );
               },
@@ -149,14 +155,14 @@ export const FieldsList: React.FC<FieldsListProps> = ({
 
       // Actions Column (empty header, right-aligned, w-12)
       {
-        id: 'actions',
+        id: "actions",
         header: () => <span className="sr-only">Actions</span>,
         cell: (info) => (
           <div className="text-right">
             <FieldActionsMenu
               field={info.row.original}
-              onEdit={() => onEdit(info.row.original)}
               onDelete={() => onDelete(info.row.original.id)}
+              onEdit={() => onEdit(info.row.original)}
             />
           </div>
         ),
@@ -189,10 +195,10 @@ export const FieldsList: React.FC<FieldsListProps> = ({
    * Updates column filter directly using TanStack Table API
    */
   const handleTypeFilterChange = (value: string) => {
-    const column = table.getColumn('field_type');
+    const column = table.getColumn("field_type");
     if (!column) return;
 
-    if (value === 'all') {
+    if (value === "all") {
       column.setFilterValue(undefined);
     } else {
       column.setFilterValue(value);
@@ -202,7 +208,8 @@ export const FieldsList: React.FC<FieldsListProps> = ({
   /**
    * Get current filter value (IMPROVEMENT #2: Direct Column Filter API)
    */
-  const currentTypeFilter = (table.getColumn('field_type')?.getFilterValue() as string) ?? 'all';
+  const currentTypeFilter =
+    (table.getColumn("field_type")?.getFilterValue() as string) ?? "all";
 
   // Loading state
   if (isLoading) {
@@ -216,7 +223,7 @@ export const FieldsList: React.FC<FieldsListProps> = ({
   // Empty state
   if (fields.length === 0) {
     return (
-      <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
+      <div className="rounded-lg border border-gray-200 bg-white py-12 text-center">
         <p className="text-gray-500 text-lg">
           No custom fields yet. Create your first field!
         </p>
@@ -227,15 +234,18 @@ export const FieldsList: React.FC<FieldsListProps> = ({
   return (
     <div className="space-y-4">
       {/* Filter Controls */}
-      <div className="flex items-center gap-4 bg-white p-4 border border-gray-200 rounded-lg">
-        <label htmlFor="type-filter" className="text-sm font-medium text-gray-700">
+      <div className="flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4">
+        <label
+          className="font-medium text-gray-700 text-sm"
+          htmlFor="type-filter"
+        >
           Filter by Type:
         </label>
         <select
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
           id="type-filter"
-          value={currentTypeFilter}
           onChange={(e) => handleTypeFilterChange(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+          value={currentTypeFilter}
         >
           <option value="all">All Types</option>
           <option value="select">Select</option>
@@ -245,13 +255,13 @@ export const FieldsList: React.FC<FieldsListProps> = ({
         </select>
 
         {/* Result count */}
-        <span className="text-sm text-gray-500 ml-auto">
+        <span className="ml-auto text-gray-500 text-sm">
           {table.getFilteredRowModel().rows.length} of {fields.length} fields
         </span>
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
+      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-gray-200">
           {/* Table Header */}
           <thead className="bg-gray-50">
@@ -262,33 +272,47 @@ export const FieldsList: React.FC<FieldsListProps> = ({
                   const sortDirection = header.column.getIsSorted();
 
                   // IMPROVEMENT #4: Add aria-sort attribute
-                  const ariaSort = sortDirection === 'asc'
-                    ? 'ascending'
-                    : sortDirection === 'desc'
-                    ? 'descending'
-                    : canSort
-                    ? 'none'
-                    : undefined;
+                  const ariaSort =
+                    sortDirection === "asc"
+                      ? "ascending"
+                      : sortDirection === "desc"
+                        ? "descending"
+                        : canSort
+                          ? "none"
+                          : undefined;
 
                   return (
                     <th
-                      key={header.id}
-                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                        header.id === 'actions' ? 'w-12 text-right' : ''
-                      }`}
-                      onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
-                      style={{ cursor: canSort ? 'pointer' : 'default' }}
                       aria-sort={ariaSort}
+                      className={`px-6 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wider ${
+                        header.id === "actions" ? "w-12 text-right" : ""
+                      }`}
+                      key={header.id}
+                      onClick={
+                        canSort
+                          ? header.column.getToggleSortingHandler()
+                          : undefined
+                      }
+                      style={{ cursor: canSort ? "pointer" : "default" }}
                     >
-                      <div className={`flex items-center gap-2 ${header.id === 'actions' ? 'justify-end' : ''}`}>
+                      <div
+                        className={`flex items-center gap-2 ${header.id === "actions" ? "justify-end" : ""}`}
+                      >
                         {header.isPlaceholder
                           ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())}
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
 
                         {/* Sort indicator */}
                         {canSort && (
                           <span className="text-gray-400">
-                            {sortDirection === 'asc' ? '↑' : sortDirection === 'desc' ? '↓' : '↕'}
+                            {sortDirection === "asc"
+                              ? "↑"
+                              : sortDirection === "desc"
+                                ? "↓"
+                                : "↕"}
                           </span>
                         )}
                       </div>
@@ -300,17 +324,11 @@ export const FieldsList: React.FC<FieldsListProps> = ({
           </thead>
 
           {/* Table Body */}
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200 bg-white">
             {table.getRowModel().rows.map((row) => (
-              <tr
-                key={row.id}
-                className="hover:bg-gray-50 transition-colors"
-              >
+              <tr className="transition-colors hover:bg-gray-50" key={row.id}>
                 {row.getVisibleCells().map((cell) => (
-                  <td
-                    key={cell.id}
-                    className="px-6 py-4 whitespace-nowrap"
-                  >
+                  <td className="whitespace-nowrap px-6 py-4" key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
@@ -322,10 +340,8 @@ export const FieldsList: React.FC<FieldsListProps> = ({
 
       {/* No results after filtering */}
       {table.getFilteredRowModel().rows.length === 0 && fields.length > 0 && (
-        <div className="text-center py-8 bg-white border border-gray-200 rounded-lg">
-          <p className="text-gray-500">
-            No fields match the current filter.
-          </p>
+        <div className="rounded-lg border border-gray-200 bg-white py-8 text-center">
+          <p className="text-gray-500">No fields match the current filter.</p>
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 // frontend/src/components/BulkOperationResultDialog.tsx
 
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,15 +8,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import type { BulkApplySchemaResponse } from '@/types/bulk'
+} from "@/components/ui/dialog";
+import type { BulkApplySchemaResponse } from "@/types/bulk";
 
 export interface BulkOperationResultDialogProps {
-  open: boolean
-  result: BulkApplySchemaResponse | null
-  onClose: () => void
-  onRetry?: (failedTagIds: string[]) => void
+  open: boolean;
+  result: BulkApplySchemaResponse | null;
+  onClose: () => void;
+  onRetry?: (failedTagIds: string[]) => void;
 }
 
 /**
@@ -42,49 +42,56 @@ export function BulkOperationResultDialog({
   onClose,
   onRetry,
 }: BulkOperationResultDialogProps) {
-  if (!result) return null
+  if (!result) return null;
 
-  const failures = result.results.filter(r => !r.success)
-  const hasFailures = failures.length > 0
+  const failures = result.results.filter((r) => !r.success);
+  const hasFailures = failures.length > 0;
 
   const handleRetry = () => {
     if (onRetry) {
-      onRetry(failures.map(f => f.tagId))
-      onClose()
+      onRetry(failures.map((f) => f.tagId));
+      onClose();
     }
-  }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+    <Dialog onOpenChange={(open) => !open && onClose()} open={open}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
-            {hasFailures ? 'Schema teilweise angewendet' : 'Schema erfolgreich angewendet'}
+            {hasFailures
+              ? "Schema teilweise angewendet"
+              : "Schema erfolgreich angewendet"}
           </DialogTitle>
           <DialogDescription>
-            {result.successCount} von {result.totalRequested} Tags erfolgreich aktualisiert
+            {result.successCount} von {result.totalRequested} Tags erfolgreich
+            aktualisiert
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4">
           {/* Success Summary */}
           {result.successCount > 0 && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-green-900">
-                ✓ {result.successCount} {result.successCount === 1 ? 'Tag wurde' : 'Tags wurden'} erfolgreich aktualisiert.
+            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p className="text-green-900 text-sm">
+                ✓ {result.successCount}{" "}
+                {result.successCount === 1 ? "Tag wurde" : "Tags wurden"}{" "}
+                erfolgreich aktualisiert.
               </p>
             </div>
           )}
 
           {/* Failure Details */}
           {hasFailures && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm font-medium text-red-900 mb-2">
-                ✗ {result.failureCount} {result.failureCount === 1 ? 'Tag konnte' : 'Tags konnten'} nicht aktualisiert werden:
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+              <p className="mb-2 font-medium text-red-900 text-sm">
+                ✗ {result.failureCount}{" "}
+                {result.failureCount === 1 ? "Tag konnte" : "Tags konnten"}{" "}
+                nicht aktualisiert werden:
               </p>
-              <ul className="space-y-1 max-h-[200px] overflow-y-auto">
-                {failures.map(failure => (
-                  <li key={failure.tagId} className="text-sm text-red-800">
+              <ul className="max-h-[200px] space-y-1 overflow-y-auto">
+                {failures.map((failure) => (
+                  <li className="text-red-800 text-sm" key={failure.tagId}>
                     <strong>{failure.tagName}:</strong> {failure.error}
                   </li>
                 ))}
@@ -95,15 +102,13 @@ export function BulkOperationResultDialog({
 
         <DialogFooter>
           {hasFailures && onRetry && (
-            <Button variant="outline" onClick={handleRetry}>
+            <Button onClick={handleRetry} variant="outline">
               Fehlgeschlagene wiederholen
             </Button>
           )}
-          <Button onClick={onClose}>
-            {hasFailures ? 'Schließen' : 'OK'}
-          </Button>
+          <Button onClick={onClose}>{hasFailures ? "Schließen" : "OK"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

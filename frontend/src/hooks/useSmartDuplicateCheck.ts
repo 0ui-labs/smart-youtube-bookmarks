@@ -1,38 +1,33 @@
-import { useState, useCallback } from 'react';
-import { useDebouncedCallback } from 'use-debounce';
+import { useCallback, useState } from "react";
+import { useDebouncedCallback } from "use-debounce";
 
 export interface SmartSuggestion {
   field: {
     id: string;
     name: string;
-    field_type: 'select' | 'rating' | 'text' | 'boolean';
+    field_type: "select" | "rating" | "text" | "boolean";
     config: Record<string, any>;
   };
   score: number;
-  similarity_type: 'exact' | 'levenshtein' | 'semantic' | 'no_match';
+  similarity_type: "exact" | "levenshtein" | "semantic" | "no_match";
   explanation: string;
 }
 
 export interface SmartDuplicateCheckResult {
   exists: boolean;
   suggestions: SmartSuggestion[];
-  mode: 'basic' | 'smart';
+  mode: "basic" | "smart";
 }
 
 export interface UseSmartDuplicateCheckOptions {
   listId: string;
-  mode?: 'basic' | 'smart';
+  mode?: "basic" | "smart";
   debounceMs?: number;
   enabled?: boolean;
 }
 
 export function useSmartDuplicateCheck(options: UseSmartDuplicateCheckOptions) {
-  const {
-    listId,
-    mode = 'smart',
-    debounceMs = 500,
-    enabled = true
-  } = options;
+  const { listId, mode = "smart", debounceMs = 500, enabled = true } = options;
 
   const [suggestions, setSuggestions] = useState<SmartSuggestion[]>([]);
   const [isChecking, setIsChecking] = useState(false);
@@ -40,7 +35,7 @@ export function useSmartDuplicateCheck(options: UseSmartDuplicateCheckOptions) {
 
   const checkDuplicate = useCallback(
     async (fieldName: string) => {
-      if (!enabled || !fieldName.trim()) {
+      if (!(enabled && fieldName.trim())) {
         setSuggestions([]);
         return;
       }
@@ -52,9 +47,9 @@ export function useSmartDuplicateCheck(options: UseSmartDuplicateCheckOptions) {
         const response = await fetch(
           `/api/lists/${listId}/custom-fields/check-duplicate?mode=${mode}`,
           {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: fieldName })
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: fieldName }),
           }
         );
 
@@ -65,16 +60,16 @@ export function useSmartDuplicateCheck(options: UseSmartDuplicateCheckOptions) {
         const data: SmartDuplicateCheckResult = await response.json();
 
         // In basic mode, convert to suggestions format
-        if (data.mode === 'basic') {
+        if (data.mode === "basic") {
           const basicResponse = data as any;
           if (basicResponse.exists && basicResponse.field) {
             setSuggestions([
               {
                 field: basicResponse.field,
                 score: 1.0,
-                similarity_type: 'exact',
-                explanation: `Exact match: '${basicResponse.field.name}'`
-              }
+                similarity_type: "exact",
+                explanation: `Exact match: '${basicResponse.field.name}'`,
+              },
             ]);
           } else {
             setSuggestions([]);
@@ -83,7 +78,7 @@ export function useSmartDuplicateCheck(options: UseSmartDuplicateCheckOptions) {
           setSuggestions(data.suggestions || []);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        setError(err instanceof Error ? err.message : "Unknown error");
         setSuggestions([]);
       } finally {
         setIsChecking(false);
@@ -101,8 +96,8 @@ export function useSmartDuplicateCheck(options: UseSmartDuplicateCheckOptions) {
     error,
     checkDuplicate,
     debouncedCheck,
-    hasExactMatch: suggestions.some(s => s.similarity_type === 'exact'),
-    hasTypoMatch: suggestions.some(s => s.similarity_type === 'levenshtein'),
-    hasSemanticMatch: suggestions.some(s => s.similarity_type === 'semantic')
+    hasExactMatch: suggestions.some((s) => s.similarity_type === "exact"),
+    hasTypoMatch: suggestions.some((s) => s.similarity_type === "levenshtein"),
+    hasSemanticMatch: suggestions.some((s) => s.similarity_type === "semantic"),
   };
 }

@@ -1,5 +1,11 @@
-import { api } from '@/lib/api'
-import { CustomFieldCreate, CustomField, DuplicateCheckResponse, DuplicateCheckResponseSchema, CustomFieldSchema } from '@/types/customField'
+import { api } from "@/lib/api";
+import {
+  type CustomField,
+  type CustomFieldCreate,
+  CustomFieldSchema,
+  type DuplicateCheckResponse,
+  DuplicateCheckResponseSchema,
+} from "@/types/customField";
 
 /**
  * Check if a field name already exists (case-insensitive)
@@ -15,10 +21,10 @@ export async function checkFieldNameDuplicate(
   const response = await api.post(
     `/lists/${listId}/custom-fields/check-duplicate`,
     { name: name.trim() }
-  )
+  );
 
   // Validate response with Zod
-  return DuplicateCheckResponseSchema.parse(response.data)
+  return DuplicateCheckResponseSchema.parse(response.data);
 }
 
 /**
@@ -30,10 +36,7 @@ export async function createCustomField(
   listId: string,
   data: CustomFieldCreate
 ): Promise<CustomField> {
-  const response = await api.post(
-    `/lists/${listId}/custom-fields`,
-    data
-  )
+  const response = await api.post(`/lists/${listId}/custom-fields`, data);
 
-  return CustomFieldSchema.parse(response.data)
+  return CustomFieldSchema.parse(response.data);
 }

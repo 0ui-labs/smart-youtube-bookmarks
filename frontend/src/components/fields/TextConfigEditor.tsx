@@ -15,19 +15,24 @@
  * - German localization
  */
 
-import { useState } from 'react'
-import { Input } from '@/components/ui/input'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Field, FieldLabel, FieldError, FieldDescription } from '@/components/ui/field'
+import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 interface TextConfig {
-  max_length?: number
+  max_length?: number;
 }
 
 export interface TextConfigEditorProps {
-  config: TextConfig
-  onChange: (config: TextConfig) => void
-  error?: string
+  config: TextConfig;
+  onChange: (config: TextConfig) => void;
+  error?: string;
 }
 
 /**
@@ -59,8 +64,8 @@ export function TextConfigEditor({
   onChange,
   error,
 }: TextConfigEditorProps) {
-  const hasMaxLength = config.max_length !== undefined
-  const [localError, setLocalError] = useState<string | null>(null)
+  const hasMaxLength = config.max_length !== undefined;
+  const [localError, setLocalError] = useState<string | null>(null);
 
   /**
    * Toggle max_length constraint on/off
@@ -68,13 +73,13 @@ export function TextConfigEditor({
   const handleToggle = (checked: boolean) => {
     if (checked) {
       // Enable with default 500 characters
-      onChange({ max_length: 500 })
+      onChange({ max_length: 500 });
     } else {
       // Disable (remove max_length)
-      onChange({})
+      onChange({});
     }
-    setLocalError(null)
-  }
+    setLocalError(null);
+  };
 
   /**
    * Update max_length value
@@ -82,48 +87,46 @@ export function TextConfigEditor({
    */
   const handleChange = (value: string) => {
     // Allow empty for typing
-    if (value === '') {
-      setLocalError('Bitte geben Sie eine Zahl ≥ 1 ein')
-      return
+    if (value === "") {
+      setLocalError("Bitte geben Sie eine Zahl ≥ 1 ein");
+      return;
     }
 
-    const num = parseInt(value, 10)
+    const num = Number.parseInt(value, 10);
 
     // Validate: is integer
-    if (isNaN(num) || !Number.isInteger(num)) {
-      setLocalError('Bitte geben Sie eine ganze Zahl ein')
-      return
+    if (Number.isNaN(num) || !Number.isInteger(num)) {
+      setLocalError("Bitte geben Sie eine ganze Zahl ein");
+      return;
     }
 
     // Validate: ≥1
     if (num < 1) {
-      setLocalError('Maximale Länge muss mindestens 1 sein')
-      return
+      setLocalError("Maximale Länge muss mindestens 1 sein");
+      return;
     }
 
     // Valid - clear error and update
-    setLocalError(null)
-    onChange({ max_length: num })
-  }
+    setLocalError(null);
+    onChange({ max_length: num });
+  };
 
-  const hasError = !!(localError || error)
+  const hasError = !!(localError || error);
 
   return (
     <div className="space-y-3">
-      <FieldLabel>
-        Maximale Länge (optional)
-      </FieldLabel>
+      <FieldLabel>Maximale Länge (optional)</FieldLabel>
 
       {/* Toggle Checkbox */}
       <div className="flex items-center gap-2">
         <Checkbox
-          id="max-length-toggle"
           checked={hasMaxLength}
+          id="max-length-toggle"
           onCheckedChange={handleToggle}
         />
         <label
+          className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           htmlFor="max-length-toggle"
-          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
         >
           Zeichenlimit festlegen
         </label>
@@ -131,35 +134,31 @@ export function TextConfigEditor({
 
       {/* Numeric Input (only shown when enabled) */}
       {hasMaxLength && (
-        <Field data-invalid={hasError} className="pl-6">
+        <Field className="pl-6" data-invalid={hasError}>
           <div className="flex items-center gap-3">
             <Input
-              id="max-length-input"
-              type="number"
-              min={1}
-              step={1}
-              value={config.max_length}
-              onChange={(e) => handleChange(e.target.value)}
-              className="w-32"
-              aria-label="Maximale Zeichenanzahl"
-              aria-invalid={hasError}
               aria-describedby="text-description"
+              aria-invalid={hasError}
+              aria-label="Maximale Zeichenanzahl"
+              className="w-32"
+              id="max-length-input"
+              min={1}
+              onChange={(e) => handleChange(e.target.value)}
+              step={1}
+              type="number"
+              value={config.max_length}
             />
 
-            <span className="text-sm text-muted-foreground">Zeichen</span>
+            <span className="text-muted-foreground text-sm">Zeichen</span>
           </div>
 
           {/* Error Messages */}
-          {localError && (
-            <FieldError errors={[{ message: localError }]} />
-          )}
+          {localError && <FieldError errors={[{ message: localError }]} />}
 
-          {error && (
-            <FieldError errors={[{ message: error }]} />
-          )}
+          {error && <FieldError errors={[{ message: error }]} />}
 
           {/* Helper Text */}
-          {!localError && !error && (
+          {!(localError || error) && (
             <FieldDescription id="text-description">
               Benutzer können bis zu {config.max_length} Zeichen eingeben
             </FieldDescription>
@@ -169,10 +168,10 @@ export function TextConfigEditor({
 
       {/* Helper Text (when disabled) */}
       {!hasMaxLength && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Keine Längenbeschränkung - Benutzer können beliebig viel Text eingeben
         </p>
       )}
     </div>
-  )
+  );
 }

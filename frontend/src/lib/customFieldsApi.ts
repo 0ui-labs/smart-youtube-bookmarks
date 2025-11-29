@@ -1,11 +1,11 @@
-import { api } from '@/lib/api'
+import { api } from "@/lib/api";
 import type {
   CustomField,
   CustomFieldCreate,
   CustomFieldUpdate,
   DuplicateCheckRequest,
   DuplicateCheckResponse,
-} from '@/types/customFields'
+} from "@/types/customFields";
 
 /**
  * API client for custom fields endpoints
@@ -20,8 +20,8 @@ export const customFieldsApi = {
   async getAll(listId: string): Promise<CustomField[]> {
     const { data } = await api.get<CustomField[]>(
       `/lists/${listId}/custom-fields`
-    )
-    return data ?? []
+    );
+    return data ?? [];
   },
 
   /**
@@ -34,8 +34,8 @@ export const customFieldsApi = {
     const { data } = await api.post<CustomField>(
       `/lists/${listId}/custom-fields`,
       fieldData
-    )
-    return data
+    );
+    return data;
   },
 
   /**
@@ -50,8 +50,8 @@ export const customFieldsApi = {
     const { data } = await api.put<CustomField>(
       `/lists/${listId}/custom-fields/${fieldId}`,
       fieldData
-    )
-    return data
+    );
+    return data;
   },
 
   /**
@@ -60,7 +60,7 @@ export const customFieldsApi = {
    * Will fail if field is used in any schema
    */
   async delete(listId: string, fieldId: string): Promise<void> {
-    await api.delete(`/lists/${listId}/custom-fields/${fieldId}`)
+    await api.delete(`/lists/${listId}/custom-fields/${fieldId}`);
   },
 
   /**
@@ -73,7 +73,7 @@ export const customFieldsApi = {
     const { data } = await api.post<DuplicateCheckResponse>(
       `/lists/${listId}/custom-fields/check-duplicate`,
       request
-    )
-    return data
+    );
+    return data;
   },
-}
+};

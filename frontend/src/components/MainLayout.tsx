@@ -1,127 +1,140 @@
-import { Outlet, useNavigate } from 'react-router-dom'
-import { Home, History, ListVideo, Clock, Star, Settings } from 'lucide-react'
-import { CollapsibleSidebar } from '@/components/CollapsibleSidebar'
-import { TagNavigation } from '@/components/TagNavigation'
-import { ChannelNavigation } from '@/components/ChannelNavigation'
-import { Button } from '@/components/ui/button'
-import { useTags } from '@/hooks/useTags'
-import { useChannels, useUpdateChannel } from '@/hooks/useChannels'
-import { useTagStore } from '@/stores/tagStore'
-import { useImportDropStore } from '@/stores/importDropStore'
-import { useShallow } from 'zustand/react/shallow'
-import { useState, useCallback } from 'react'
-import { CreateTagDialog } from './CreateTagDialog'
-import { useLists } from '@/hooks/useLists'
+import { Clock, History, Home, ListVideo, Settings, Star } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
+import { ChannelNavigation } from "@/components/ChannelNavigation";
+import { CollapsibleSidebar } from "@/components/CollapsibleSidebar";
+import { TagNavigation } from "@/components/TagNavigation";
+import { Button } from "@/components/ui/button";
+import { useChannels, useUpdateChannel } from "@/hooks/useChannels";
+import { useLists } from "@/hooks/useLists";
+import { useTags } from "@/hooks/useTags";
+import { useImportDropStore } from "@/stores/importDropStore";
+import { useTagStore } from "@/stores/tagStore";
+import { CreateTagDialog } from "./CreateTagDialog";
 
 /**
  * MainLayout - Shared layout with sidebar for all pages
  */
 export function MainLayout() {
-  const navigate = useNavigate()
-  const { data: lists } = useLists()
-  const listId = lists?.[0]?.id ?? ''
+  const navigate = useNavigate();
+  const { data: lists } = useLists();
+  const listId = lists?.[0]?.id ?? "";
 
   // Tags
-  const { data: tags = [], isLoading: tagsLoading, error: tagsError } = useTags()
-  const selectedTagIds = useTagStore(useShallow((state) => state.selectedTagIds))
-  const toggleTag = useTagStore((state) => state.toggleTag)
-  const clearTags = useTagStore((state) => state.clearTags)
-  const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
+  const {
+    data: tags = [],
+    isLoading: tagsLoading,
+    error: tagsError,
+  } = useTags();
+  const selectedTagIds = useTagStore(
+    useShallow((state) => state.selectedTagIds)
+  );
+  const toggleTag = useTagStore((state) => state.toggleTag);
+  const clearTags = useTagStore((state) => state.clearTags);
+  const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false);
 
   // Channels
-  const { data: channels = [], isLoading: channelsLoading } = useChannels()
-  const updateChannel = useUpdateChannel()
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null)
+  const { data: channels = [], isLoading: channelsLoading } = useChannels();
+  const updateChannel = useUpdateChannel();
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
+    null
+  );
 
   // Store for drag & drop imports
-  const setPendingImport = useImportDropStore((state) => state.setPendingImport)
+  const setPendingImport = useImportDropStore(
+    (state) => state.setPendingImport
+  );
 
   const handleCreateTag = () => {
-    setIsCreateTagDialogOpen(true)
-  }
+    setIsCreateTagDialogOpen(true);
+  };
 
   // Handle videos dropped on a tag
-  const handleVideosDropped = useCallback((tagId: string, urls: string[]) => {
-    // Store the pending import with preselected category
-    setPendingImport(urls, tagId)
-    // Navigate to videos page (the modal will open there)
-    navigate('/videos')
-  }, [setPendingImport, navigate])
+  const handleVideosDropped = useCallback(
+    (tagId: string, urls: string[]) => {
+      // Store the pending import with preselected category
+      setPendingImport(urls, tagId);
+      // Navigate to videos page (the modal will open there)
+      navigate("/videos");
+    },
+    [setPendingImport, navigate]
+  );
 
   const handleHideChannel = (channelId: string) => {
-    updateChannel.mutate({ channelId, data: { is_hidden: true } })
+    updateChannel.mutate({ channelId, data: { is_hidden: true } });
     if (selectedChannelId === channelId) {
-      setSelectedChannelId(null)
+      setSelectedChannelId(null);
     }
-  }
+  };
 
   const handleHomeClick = () => {
-    setSelectedChannelId(null)
-    clearTags()
-    navigate('/videos')
-  }
+    setSelectedChannelId(null);
+    clearTags();
+    navigate("/videos");
+  };
 
   const handleChannelSelect = (channelId: string | null) => {
-    setSelectedChannelId(channelId)
+    setSelectedChannelId(channelId);
     if (channelId) {
-      navigate(`/videos?channel=${channelId}`)
+      navigate(`/videos?channel=${channelId}`);
     } else {
-      navigate('/videos')
+      navigate("/videos");
     }
-  }
+  };
 
   const handleTagSelect = (tagId: string) => {
-    toggleTag(tagId)
-    navigate('/videos')
-  }
+    toggleTag(tagId);
+    navigate("/videos");
+  };
 
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
       <CollapsibleSidebar>
-        <div className="flex flex-col h-full">
+        <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="p-4 border-b">
+          <div className="border-b p-4">
             <img
-              src="https://upload.wikimedia.org/wikipedia/commons/d/dd/YouTube_Premium_logo.svg"
               alt="Logo"
               className="h-6"
+              src="https://upload.wikimedia.org/wikipedia/commons/d/dd/YouTube_Premium_logo.svg"
             />
           </div>
 
           {/* Main Navigation */}
-          <nav className="p-2 space-y-1">
+          <nav className="space-y-1 p-2">
             <button
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent"
               onClick={handleHomeClick}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors"
             >
               <Home className="h-4 w-4" />
               Home
             </button>
             <button
+              className="flex w-full cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-muted-foreground text-sm"
               disabled
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
             >
               <History className="h-4 w-4" />
               History
             </button>
             <button
+              className="flex w-full cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-muted-foreground text-sm"
               disabled
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
             >
               <ListVideo className="h-4 w-4" />
               Playlists
             </button>
             <button
+              className="flex w-full cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-muted-foreground text-sm"
               disabled
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
             >
               <Clock className="h-4 w-4" />
               Watch later
             </button>
             <button
+              className="flex w-full cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-muted-foreground text-sm"
               disabled
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground cursor-not-allowed"
             >
               <Star className="h-4 w-4" />
               Favorites
@@ -130,36 +143,40 @@ export function MainLayout() {
 
           {/* Categories/Tags */}
           {tagsLoading ? (
-            <div className="p-4 text-sm text-gray-500">Kategorien werden geladen...</div>
+            <div className="p-4 text-gray-500 text-sm">
+              Kategorien werden geladen...
+            </div>
           ) : tagsError ? (
-            <div className="p-4 text-sm text-red-600">Fehler beim Laden der Kategorien</div>
+            <div className="p-4 text-red-600 text-sm">
+              Fehler beim Laden der Kategorien
+            </div>
           ) : (
             <TagNavigation
-              tags={tags}
-              selectedTagIds={selectedTagIds}
-              onTagSelect={handleTagSelect}
               onTagCreate={handleCreateTag}
+              onTagSelect={handleTagSelect}
               onVideosDropped={handleVideosDropped}
+              selectedTagIds={selectedTagIds}
+              tags={tags}
             />
           )}
 
           {/* YouTube Channels Navigation */}
           <ChannelNavigation
             channels={channels}
-            selectedChannelId={selectedChannelId}
-            onChannelSelect={handleChannelSelect}
-            onChannelHide={handleHideChannel}
             isLoading={channelsLoading}
+            onChannelHide={handleHideChannel}
+            onChannelSelect={handleChannelSelect}
+            selectedChannelId={selectedChannelId}
           />
 
           {/* Settings Button */}
-          <div className="mt-auto pt-4 border-t border-gray-200">
+          <div className="mt-auto border-gray-200 border-t pt-4">
             <Button
+              className="w-full justify-start text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+              onClick={() => navigate("/settings/schemas")}
               variant="ghost"
-              className="w-full justify-start text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-              onClick={() => navigate('/settings/schemas')}
             >
-              <Settings className="h-4 w-4 mr-2" />
+              <Settings className="mr-2 h-4 w-4" />
               Einstellungen
             </Button>
           </div>
@@ -173,10 +190,10 @@ export function MainLayout() {
 
       {/* Create Tag Dialog */}
       <CreateTagDialog
-        open={isCreateTagDialogOpen}
-        onOpenChange={setIsCreateTagDialogOpen}
         listId={listId}
+        onOpenChange={setIsCreateTagDialogOpen}
+        open={isCreateTagDialogOpen}
       />
     </div>
-  )
+  );
 }

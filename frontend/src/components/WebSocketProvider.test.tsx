@@ -2,17 +2,18 @@
  * Tests for WebSocketProvider component
  * TDD RED phase - Tests written BEFORE implementation
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { WebSocketProvider } from './WebSocketProvider';
+
+import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { WebSocketProvider } from "./WebSocketProvider";
 
 // Mock the useWebSocket hook
 const mockUseWebSocket = vi.fn();
-vi.mock('@/hooks/useWebSocket', () => ({
+vi.mock("@/hooks/useWebSocket", () => ({
   useWebSocket: () => mockUseWebSocket(),
 }));
 
-describe('WebSocketProvider', () => {
+describe("WebSocketProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseWebSocket.mockReturnValue({
@@ -21,23 +22,23 @@ describe('WebSocketProvider', () => {
       reconnecting: false,
       jobProgress: new Map(),
       sendJsonMessage: vi.fn(),
-      authStatus: 'authenticated',
+      authStatus: "authenticated",
       historyError: null,
     });
   });
 
-  it('renders children', () => {
+  it("renders children", () => {
     render(
       <WebSocketProvider>
         <div data-testid="child">Child content</div>
       </WebSocketProvider>
     );
 
-    expect(screen.getByTestId('child')).toBeInTheDocument();
-    expect(screen.getByText('Child content')).toBeInTheDocument();
+    expect(screen.getByTestId("child")).toBeInTheDocument();
+    expect(screen.getByText("Child content")).toBeInTheDocument();
   });
 
-  it('establishes WebSocket connection on mount', () => {
+  it("establishes WebSocket connection on mount", () => {
     render(
       <WebSocketProvider>
         <div>Content</div>
@@ -48,7 +49,7 @@ describe('WebSocketProvider', () => {
     expect(mockUseWebSocket).toHaveBeenCalled();
   });
 
-  it('provides connection context to children', () => {
+  it("provides connection context to children", () => {
     // This test verifies the provider doesn't crash and children render
     render(
       <WebSocketProvider>
@@ -56,6 +57,6 @@ describe('WebSocketProvider', () => {
       </WebSocketProvider>
     );
 
-    expect(screen.getByText('Content')).toBeInTheDocument();
+    expect(screen.getByText("Content")).toBeInTheDocument();
   });
 });

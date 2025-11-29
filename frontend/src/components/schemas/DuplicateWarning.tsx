@@ -26,27 +26,26 @@
  * />
  */
 
-import { useQuery } from '@tanstack/react-query'
-import { useDebounce } from 'use-debounce'
-import { AlertCircle, Loader2 } from 'lucide-react'
-
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { checkFieldNameDuplicate } from '@/api/customFields'
+import { useQuery } from "@tanstack/react-query";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { useDebounce } from "use-debounce";
+import { checkFieldNameDuplicate } from "@/api/customFields";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
-  CustomField,
-  SelectConfigSchema,
-  RatingConfigSchema,
-  TextConfigSchema,
   BooleanConfigSchema,
-} from '@/types/customFields'
+  type CustomField,
+  RatingConfigSchema,
+  SelectConfigSchema,
+  TextConfigSchema,
+} from "@/types/customFields";
 
 interface DuplicateWarningProps {
   /** Field name to check for duplicates */
-  fieldName: string
+  fieldName: string;
   /** List ID to scope the duplicate check */
-  listId: string
+  listId: string;
   /** Debounce delay in milliseconds (default: 300) */
-  debounceMs?: number
+  debounceMs?: number;
 }
 
 /**
@@ -57,43 +56,43 @@ interface DuplicateWarningProps {
 function formatConfigPreview(field: CustomField): string {
   try {
     switch (field.field_type) {
-      case 'select': {
-        const result = SelectConfigSchema.safeParse(field.config)
-        if (!result.success) return 'Konfiguration ungültig'
+      case "select": {
+        const result = SelectConfigSchema.safeParse(field.config);
+        if (!result.success) return "Konfiguration ungültig";
 
-        const options = result.data.options
+        const options = result.data.options;
         if (options.length <= 3) {
-          return `Optionen: ${options.join(', ')}`
+          return `Optionen: ${options.join(", ")}`;
         }
-        const remaining = options.length - 3
-        return `Optionen: ${options.slice(0, 3).join(', ')} +${remaining} weitere`
+        const remaining = options.length - 3;
+        return `Optionen: ${options.slice(0, 3).join(", ")} +${remaining} weitere`;
       }
 
-      case 'rating': {
-        const result = RatingConfigSchema.safeParse(field.config)
-        if (!result.success) return 'Konfiguration ungültig'
-        return `1-${result.data.max_rating} Sterne`
+      case "rating": {
+        const result = RatingConfigSchema.safeParse(field.config);
+        if (!result.success) return "Konfiguration ungültig";
+        return `1-${result.data.max_rating} Sterne`;
       }
 
-      case 'text': {
-        const result = TextConfigSchema.safeParse(field.config)
-        if (!result.success) return 'Konfiguration ungültig'
+      case "text": {
+        const result = TextConfigSchema.safeParse(field.config);
+        if (!result.success) return "Konfiguration ungültig";
         return result.data.max_length
           ? `Max. ${result.data.max_length} Zeichen`
-          : 'Unbegrenzte Länge'
+          : "Unbegrenzte Länge";
       }
 
-      case 'boolean': {
-        const result = BooleanConfigSchema.safeParse(field.config)
-        if (!result.success) return 'Konfiguration ungültig'
-        return 'Ja/Nein'
+      case "boolean": {
+        const result = BooleanConfigSchema.safeParse(field.config);
+        if (!result.success) return "Konfiguration ungültig";
+        return "Ja/Nein";
       }
 
       default:
-        return 'Unbekannter Typ'
+        return "Unbekannter Typ";
     }
   } catch {
-    return 'Fehler beim Laden der Konfiguration'
+    return "Fehler beim Laden der Konfiguration";
   }
 }
 
@@ -102,12 +101,12 @@ function formatConfigPreview(field: CustomField): string {
  */
 function getFieldTypeLabel(fieldType: string): string {
   const labels: Record<string, string> = {
-    select: 'Auswahl',
-    rating: 'Bewertung',
-    text: 'Text',
-    boolean: 'Ja/Nein',
-  }
-  return labels[fieldType] || fieldType
+    select: "Auswahl",
+    rating: "Bewertung",
+    text: "Text",
+    boolean: "Ja/Nein",
+  };
+  return labels[fieldType] || fieldType;
 }
 
 export const DuplicateWarning = ({
@@ -116,77 +115,81 @@ export const DuplicateWarning = ({
   debounceMs = 300,
 }: DuplicateWarningProps) => {
   // REF MCP #1: useDebounce to reduce API calls
-  const [debouncedName] = useDebounce(fieldName.trim(), debounceMs)
+  const [debouncedName] = useDebounce(fieldName.trim(), debounceMs);
 
   // REF MCP #1: useQuery (NOT useMutation) for automatic cancellation and caching
   const { data, isLoading, error } = useQuery({
-    queryKey: ['checkDuplicateField', listId, debouncedName],
+    queryKey: ["checkDuplicateField", listId, debouncedName],
     queryFn: () => checkFieldNameDuplicate(listId, debouncedName),
     enabled: debouncedName.length > 0, // Only run when there's a name to check
-    staleTime: 30000, // Cache for 30 seconds (field names don't change frequently)
-  })
+    staleTime: 30_000, // Cache for 30 seconds (field names don't change frequently)
+  });
 
   // Empty field name - return nothing
   if (!fieldName.trim()) {
-    return null
+    return null;
   }
 
   // Loading state - show spinner
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
         <span>Prüfe auf Duplikate...</span>
       </div>
-    )
+    );
   }
 
   // Error state - show error message
   if (error) {
     return (
-      <Alert variant="destructive" role="alert">
-        <AlertCircle className="h-4 w-4" aria-hidden="true" />
+      <Alert role="alert" variant="destructive">
+        <AlertCircle aria-hidden="true" className="h-4 w-4" />
         <AlertTitle>Fehler beim Prüfen</AlertTitle>
         <AlertDescription>
-          Die Duplikatsprüfung konnte nicht durchgeführt werden. Bitte versuchen Sie es erneut.
+          Die Duplikatsprüfung konnte nicht durchgeführt werden. Bitte versuchen
+          Sie es erneut.
         </AlertDescription>
       </Alert>
-    )
+    );
   }
 
   // No duplicate - return nothing (silent success)
-  if (!data?.exists || !data?.field) {
-    return null
+  if (!(data?.exists && data?.field)) {
+    return null;
   }
 
   // Duplicate exists - show warning
   // REF MCP #2: variant="default" with className (NOT custom variant)
   return (
     <Alert
-      variant="default"
-      className="border-amber-500 bg-amber-50 dark:bg-amber-950 dark:border-amber-700"
+      className="border-amber-500 bg-amber-50 dark:border-amber-700 dark:bg-amber-950"
       role="alert"
+      variant="default"
     >
-      <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+      <AlertCircle
+        aria-hidden="true"
+        className="h-4 w-4 text-amber-600 dark:text-amber-400"
+      />
       <AlertTitle className="text-amber-900 dark:text-amber-100">
         Feld existiert bereits
       </AlertTitle>
       <AlertDescription className="text-amber-800 dark:text-amber-200">
         <p className="mb-2">
-          Ein Feld mit dem Namen <strong>"{data.field.name}"</strong> existiert bereits
-          in dieser Liste.
+          Ein Feld mit dem Namen <strong>"{data.field.name}"</strong> existiert
+          bereits in dieser Liste.
         </p>
         <div className="space-y-1 text-sm">
           <p>
-            <span className="font-medium">Typ:</span>{' '}
+            <span className="font-medium">Typ:</span>{" "}
             {getFieldTypeLabel(data.field.field_type)}
           </p>
           <p>
-            <span className="font-medium">Konfiguration:</span>{' '}
+            <span className="font-medium">Konfiguration:</span>{" "}
             {formatConfigPreview(data.field)}
           </p>
         </div>
       </AlertDescription>
     </Alert>
-  )
-}
+  );
+};

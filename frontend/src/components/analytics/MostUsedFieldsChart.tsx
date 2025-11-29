@@ -1,9 +1,24 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import type { MostUsedFieldStat } from '@/types/analytics'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import type { MostUsedFieldStat } from "@/types/analytics";
 
 export interface MostUsedFieldsChartProps {
-  data: MostUsedFieldStat[]
+  data: MostUsedFieldStat[];
 }
 
 /**
@@ -34,12 +49,12 @@ export function MostUsedFieldsChart({ data }: MostUsedFieldsChartProps) {
           <CardDescription>No field values set yet</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-64 text-gray-400">
+          <div className="flex h-64 items-center justify-center text-gray-400">
             <p>Start rating videos to see usage statistics</p>
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   /**
@@ -49,10 +64,10 @@ export function MostUsedFieldsChart({ data }: MostUsedFieldsChartProps) {
    * - Red (<50%): Low usage, consider removing
    */
   const getBarColor = (percentage: number): string => {
-    if (percentage >= 75) return '#10b981' // green-500
-    if (percentage >= 50) return '#f59e0b' // amber-500
-    return '#ef4444' // red-500
-  }
+    if (percentage >= 75) return "#10b981"; // green-500
+    if (percentage >= 50) return "#f59e0b"; // amber-500
+    return "#ef4444"; // red-500
+  };
 
   return (
     <Card>
@@ -63,56 +78,66 @@ export function MostUsedFieldsChart({ data }: MostUsedFieldsChartProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={400}>
+        <ResponsiveContainer height={400} width="100%">
           <BarChart
+            aria-label="Bar chart showing top 10 most-used custom fields by usage count"
             data={data}
             layout="vertical"
             margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-            aria-label="Bar chart showing top 10 most-used custom fields by usage count"
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
+              label={{
+                value: "Usage Count",
+                position: "insideBottom",
+                offset: -5,
+              }}
               type="number"
-              label={{ value: 'Usage Count', position: 'insideBottom', offset: -5 }}
             />
             <YAxis
-              type="category"
               dataKey="field_name"
-              width={90}
               tick={{ fontSize: 12 }}
+              type="category"
+              width={90}
             />
             <Tooltip
               content={({ active, payload }) => {
-                if (!active || !payload || !payload[0]) return null
+                if (!(active && payload && payload[0])) return null;
 
-                const stat = payload[0].payload as MostUsedFieldStat
+                const stat = payload[0].payload as MostUsedFieldStat;
 
                 return (
                   <div
-                    className="bg-white p-3 border rounded shadow-lg"
-                    role="status"
                     aria-live="assertive"
+                    className="rounded border bg-white p-3 shadow-lg"
+                    role="status"
                   >
                     <p className="font-semibold">{stat.field_name}</p>
-                    <p className="text-sm text-gray-600">Type: {stat.field_type}</p>
-                    <p className="text-sm">
-                      <span className="font-medium">{stat.usage_count}</span> / {stat.total_videos} videos
+                    <p className="text-gray-600 text-sm">
+                      Type: {stat.field_type}
                     </p>
-                    <p className="text-sm font-medium text-blue-600">
+                    <p className="text-sm">
+                      <span className="font-medium">{stat.usage_count}</span> /{" "}
+                      {stat.total_videos} videos
+                    </p>
+                    <p className="font-medium text-blue-600 text-sm">
                       {stat.usage_percentage.toFixed(1)}% coverage
                     </p>
                   </div>
-                )
+                );
               }}
             />
             <Bar dataKey="usage_count" radius={[0, 4, 4, 0]}>
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={getBarColor(entry.usage_percentage)} />
+                <Cell
+                  fill={getBarColor(entry.usage_percentage)}
+                  key={`cell-${index}`}
+                />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -27,20 +27,20 @@ export function ImportSummaryToast({ result }: ImportSummaryToastProps) {
   // Determine overall status
   const hasWarnings = withoutCaptions > 0;
   const hasErrors = failed > 0;
-  const isSuccess = !hasWarnings && !hasErrors;
+  const isSuccess = !(hasWarnings || hasErrors);
 
   // Choose status color
   const statusColor = hasErrors
-    ? 'text-red-500'
+    ? "text-red-500"
     : hasWarnings
-    ? 'text-amber-500'
-    : 'text-green-500';
+      ? "text-amber-500"
+      : "text-green-500";
 
   // Build summary message parts
   const parts: string[] = [];
 
   // Main import count (singular/plural)
-  const videoWord = successful === 1 ? 'Video' : 'Videos';
+  const videoWord = successful === 1 ? "Video" : "Videos";
   parts.push(`${successful} ${videoWord} importiert`);
 
   // Add warnings
@@ -55,37 +55,65 @@ export function ImportSummaryToast({ result }: ImportSummaryToastProps) {
 
   return (
     <div
+      className="flex items-start gap-3 rounded-lg border bg-white p-4 shadow-lg"
       role="status"
-      className="flex items-start gap-3 p-4 rounded-lg bg-white shadow-lg border"
     >
       {/* Status Icon */}
       <div className={`flex-shrink-0 ${statusColor}`}>
         {isSuccess ? (
           // Checkmark icon
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M5 13l4 4L19 7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         ) : hasErrors ? (
           // Error icon
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         ) : (
           // Warning icon
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         )}
       </div>
 
       {/* Message */}
       <div className="flex-1">
-        <p className="text-sm font-medium text-gray-900">
+        <p className="font-medium text-gray-900 text-sm">
           Import abgeschlossen
         </p>
-        <p className="text-sm text-gray-600">
-          {parts.join(', ')}
-        </p>
+        <p className="text-gray-600 text-sm">{parts.join(", ")}</p>
       </div>
     </div>
   );

@@ -9,8 +9,8 @@
  * const { thumbnailSize, setThumbnailSize, visibleColumns, toggleColumn } = useTableSettingsStore();
  * ```
  */
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 /**
  * Thumbnail size options for video thumbnails
@@ -28,7 +28,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
  * Actual pixel sizes are implemented in VideosPage VideoThumbnail component
  * using Tailwind classes with object mapping for PurgeCSS compatibility
  */
-export type ThumbnailSize = 'small' | 'medium' | 'large' | 'xlarge';
+export type ThumbnailSize = "small" | "medium" | "large" | "xlarge";
 
 /**
  * View mode for video display (Task #32)
@@ -38,7 +38,7 @@ export type ThumbnailSize = 'small' | 'medium' | 'large' | 'xlarge';
  * REF MCP Improvement #1: Separate from thumbnailSize for independent control
  * User can choose Grid with small thumbnails OR Table with large thumbnails
  */
-export type ViewMode = 'list' | 'grid';
+export type ViewMode = "list" | "grid";
 
 /**
  * Grid column count options for grid view layout
@@ -67,7 +67,7 @@ export type GridColumnCount = 2 | 3 | 4 | 5;
  * REF MCP #1: Extends existing tableSettingsStore pattern
  * REF MCP #5: Default 'page' preserves Task #130 behavior (non-breaking)
  */
-export type VideoDetailsView = 'page' | 'modal';
+export type VideoDetailsView = "page" | "modal";
 
 /**
  * Column visibility configuration for video table
@@ -130,10 +130,10 @@ interface TableSettingsStore {
  * All columns visible by default for full feature discovery
  */
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = {
-  thumbnail: true,  // YouTube thumbnail (column id: 'thumbnail')
-  title: true,      // Video title with link (column id: 'title')
-  duration: true,   // Video duration (column id: 'duration')
-  actions: true,    // Delete button (column id: 'actions')
+  thumbnail: true, // YouTube thumbnail (column id: 'thumbnail')
+  title: true, // Video title with link (column id: 'title')
+  duration: true, // Video duration (column id: 'duration')
+  actions: true, // Delete button (column id: 'actions')
 } as const;
 
 /**
@@ -177,11 +177,11 @@ export const useTableSettingsStore = create<TableSettingsStore>()(
   persist(
     (set) => ({
       // State
-      thumbnailSize: 'small',
+      thumbnailSize: "small",
       visibleColumns: DEFAULT_VISIBLE_COLUMNS,
-      viewMode: 'list', // Task #32: Default to list view (preserves current behavior)
+      viewMode: "list", // Task #32: Default to list view (preserves current behavior)
       gridColumns: 3, // Task #33: Default to 3 columns (balanced, matches YouTube)
-      videoDetailsView: 'page', // Task #131: Default to page (preserves existing behavior)
+      videoDetailsView: "page", // Task #131: Default to page (preserves existing behavior)
 
       // Actions
       setThumbnailSize: (size) => set({ thumbnailSize: size }),
@@ -199,7 +199,7 @@ export const useTableSettingsStore = create<TableSettingsStore>()(
       setVideoDetailsView: (view) => set({ videoDetailsView: view }), // Task #131
     }),
     {
-      name: 'video-table-settings', // localStorage key (must be unique)
+      name: "video-table-settings", // localStorage key (must be unique)
       storage: createJSONStorage(() => localStorage), // REF MCP #1: Explicit storage for clarity
     }
   )

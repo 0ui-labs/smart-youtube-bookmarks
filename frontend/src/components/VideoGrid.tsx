@@ -1,13 +1,13 @@
-import { LayoutGrid } from 'lucide-react'
-import { VideoCard } from './VideoCard'
-import type { VideoResponse } from '@/types/video'
-import type { GridColumnCount } from '@/stores/tableSettingsStore'
+import { LayoutGrid } from "lucide-react";
+import type { GridColumnCount } from "@/stores/tableSettingsStore";
+import type { VideoResponse } from "@/types/video";
+import { VideoCard } from "./VideoCard";
 
 interface VideoGridProps {
-  videos: VideoResponse[]
-  gridColumns: GridColumnCount  // NEW: Dynamic column count from store
-  onDeleteVideo?: (video: VideoResponse) => void
-  onVideoClick?: (video: VideoResponse) => void  // NEW: Video click handler
+  videos: VideoResponse[];
+  gridColumns: GridColumnCount; // NEW: Dynamic column count from store
+  onDeleteVideo?: (video: VideoResponse) => void;
+  onVideoClick?: (video: VideoResponse) => void; // NEW: Video click handler
 }
 
 /**
@@ -28,46 +28,55 @@ interface VideoGridProps {
  * - All Tailwind classes explicitly written in object (no template literals)
  * - Pattern from Task #31 (proven working with thumbnailSize)
  */
-export const VideoGrid = ({ videos, gridColumns, onDeleteVideo, onVideoClick }: VideoGridProps) => {
+export const VideoGrid = ({
+  videos,
+  gridColumns,
+  onDeleteVideo,
+  onVideoClick,
+}: VideoGridProps) => {
   // PurgeCSS-safe: All classes explicitly written in object (no template literals)
   // Responsive behavior: mobile 1-2, tablet 2, desktop user choice (2-5)
   // Pattern from Task #31 (proven working with thumbnailSize)
   // REF IMPROVEMENT #2: 5 cols uses md:grid-cols-2 instead of md:grid-cols-3 for better Tablet UX
   const gridColumnClasses = {
-    2: 'grid-cols-1 md:grid-cols-2',
-    3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
-    4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
-    5: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-5', // Changed from md:grid-cols-3
-  } as const
+    2: "grid-cols-1 md:grid-cols-2",
+    3: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
+    4: "grid-cols-1 md:grid-cols-2 lg:grid-cols-4",
+    5: "grid-cols-1 md:grid-cols-2 lg:grid-cols-5", // Changed from md:grid-cols-3
+  } as const;
   // REF MCP #5: Enhanced empty state with icon and headline
   if (videos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="rounded-full bg-muted p-4 mb-4">
-          <LayoutGrid className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+        <div className="mb-4 rounded-full bg-muted p-4">
+          <LayoutGrid
+            aria-hidden="true"
+            className="h-8 w-8 text-muted-foreground"
+          />
         </div>
-        <h3 className="text-lg font-semibold mb-2">Keine Videos im Grid</h3>
-        <p className="text-muted-foreground max-w-sm">
-          Füge Videos hinzu oder ändere deine Filter, um Inhalte in der Grid-Ansicht zu sehen.
+        <h3 className="mb-2 font-semibold text-lg">Keine Videos im Grid</h3>
+        <p className="max-w-sm text-muted-foreground">
+          Füge Videos hinzu oder ändere deine Filter, um Inhalte in der
+          Grid-Ansicht zu sehen.
         </p>
       </div>
-    )
+    );
   }
 
   return (
     <div
+      aria-label="Video Grid"
       className={`video-grid grid ${gridColumnClasses[gridColumns]} gap-4 md:gap-6`}
       role="list"
-      aria-label="Video Grid"
     >
       {videos.map((video) => (
         <VideoCard
           key={video.id}
-          video={video}
-          onDelete={onDeleteVideo ? () => onDeleteVideo(video) : undefined}
           onCardClick={onVideoClick ? () => onVideoClick(video) : undefined}
+          onDelete={onDeleteVideo ? () => onDeleteVideo(video) : undefined}
+          video={video}
         />
       ))}
     </div>
-  )
-}
+  );
+};

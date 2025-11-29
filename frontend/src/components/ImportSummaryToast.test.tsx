@@ -2,12 +2,12 @@
  * Tests for ImportSummaryToast component
  * TDD RED phase - Tests written BEFORE implementation
  */
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
-import { ImportSummaryToast } from './ImportSummaryToast';
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { ImportSummaryToast } from "./ImportSummaryToast";
 
-describe('ImportSummaryToast', () => {
-  it('shows total videos imported', () => {
+describe("ImportSummaryToast", () => {
+  it("shows total videos imported", () => {
     render(
       <ImportSummaryToast
         result={{
@@ -23,7 +23,7 @@ describe('ImportSummaryToast', () => {
     expect(screen.getByText(/importiert/i)).toBeInTheDocument();
   });
 
-  it('shows videos without captions count', () => {
+  it("shows videos without captions count", () => {
     render(
       <ImportSummaryToast
         result={{
@@ -39,7 +39,7 @@ describe('ImportSummaryToast', () => {
     expect(screen.getByText(/ohne untertitel/i)).toBeInTheDocument();
   });
 
-  it('shows failed videos count', () => {
+  it("shows failed videos count", () => {
     render(
       <ImportSummaryToast
         result={{
@@ -55,7 +55,7 @@ describe('ImportSummaryToast', () => {
     expect(screen.getByText(/fehlgeschlagen|fehler/i)).toBeInTheDocument();
   });
 
-  it('shows success icon when all imports successful', () => {
+  it("shows success icon when all imports successful", () => {
     const { container } = render(
       <ImportSummaryToast
         result={{
@@ -68,12 +68,13 @@ describe('ImportSummaryToast', () => {
     );
 
     // Should have success styling (green)
-    const successElement = container.querySelector('.text-green-500') ||
-      container.querySelector('.bg-green-500');
+    const successElement =
+      container.querySelector(".text-green-500") ||
+      container.querySelector(".bg-green-500");
     expect(successElement).toBeInTheDocument();
   });
 
-  it('shows warning state when some videos have issues', () => {
+  it("shows warning state when some videos have issues", () => {
     const { container } = render(
       <ImportSummaryToast
         result={{
@@ -86,13 +87,14 @@ describe('ImportSummaryToast', () => {
     );
 
     // Should have warning or error styling (yellow/red)
-    const warningElement = container.querySelector('.text-amber-500') ||
-      container.querySelector('.text-yellow-500') ||
-      container.querySelector('.text-red-500');
+    const warningElement =
+      container.querySelector(".text-amber-500") ||
+      container.querySelector(".text-yellow-500") ||
+      container.querySelector(".text-red-500");
     expect(warningElement).toBeInTheDocument();
   });
 
-  it('has accessible role for toast notification', () => {
+  it("has accessible role for toast notification", () => {
     render(
       <ImportSummaryToast
         result={{
@@ -105,11 +107,12 @@ describe('ImportSummaryToast', () => {
     );
 
     // Should be an alert or status role
-    const alertElement = screen.queryByRole('alert') || screen.queryByRole('status');
+    const alertElement =
+      screen.queryByRole("alert") || screen.queryByRole("status");
     expect(alertElement).toBeInTheDocument();
   });
 
-  it('handles singular/plural correctly', () => {
+  it("handles singular/plural correctly", () => {
     render(
       <ImportSummaryToast
         result={{

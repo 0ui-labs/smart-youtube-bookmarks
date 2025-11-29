@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
-import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Info } from 'lucide-react'
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Info } from "lucide-react";
+import { useEffect } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,24 +11,31 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Field, FieldLabel, FieldError, FieldDescription } from '@/components/ui/field'
-import type { FieldSchemaResponse } from '@/types/schema'
+} from "@/components/ui/dialog";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import type { FieldSchemaResponse } from "@/types/schema";
 
 const duplicateSchemaSchema = z.object({
-  newName: z.string().min(1, 'Name ist erforderlich').max(255, 'Name zu lang (max 255 Zeichen)'),
-})
+  newName: z
+    .string()
+    .min(1, "Name ist erforderlich")
+    .max(255, "Name zu lang (max 255 Zeichen)"),
+});
 
-type DuplicateSchemaFormData = z.infer<typeof duplicateSchemaSchema>
+type DuplicateSchemaFormData = z.infer<typeof duplicateSchemaSchema>;
 
 interface DuplicateSchemaDialogProps {
-  open: boolean
-  schema: FieldSchemaResponse | null
-  onConfirm: (newName: string) => void
-  onCancel: () => void
-  isLoading: boolean
+  open: boolean;
+  schema: FieldSchemaResponse | null;
+  onConfirm: (newName: string) => void;
+  onCancel: () => void;
+  isLoading: boolean;
 }
 
 export const DuplicateSchemaDialog = ({
@@ -40,40 +48,41 @@ export const DuplicateSchemaDialog = ({
   const form = useForm<DuplicateSchemaFormData>({
     resolver: zodResolver(duplicateSchemaSchema),
     defaultValues: {
-      newName: '',
+      newName: "",
     },
-  })
+  });
 
   // Generate default name when dialog opens
   useEffect(() => {
     if (schema && open) {
       form.reset({
         newName: `${schema.name} (Kopie)`,
-      })
+      });
     }
-  }, [schema, open, form])
+  }, [schema, open, form]);
 
   // Reset when dialog closes
   useEffect(() => {
     if (!open) {
-      form.reset({ newName: '' })
+      form.reset({ newName: "" });
     }
-  }, [open, form])
+  }, [open, form]);
 
   const handleSubmit = (data: DuplicateSchemaFormData) => {
-    onConfirm(data.newName.trim())
-  }
+    onConfirm(data.newName.trim());
+  };
 
-  const fieldCount = schema?.schema_fields?.length || 0
+  const fieldCount = schema?.schema_fields?.length || 0;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onCancel()}>
+    <Dialog onOpenChange={(open) => !open && onCancel()} open={open}>
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={form.handleSubmit(handleSubmit)}>
           <DialogHeader>
             <DialogTitle>Schema duplizieren</DialogTitle>
             <DialogDescription>
-              Erstellen Sie eine Kopie von "{schema?.name}" mit einem neuen Namen.
+              Erstellen Sie eine Kopie von "{schema?.name}" mit einem neuen
+              Namen.
             </DialogDescription>
           </DialogHeader>
 
@@ -89,29 +98,31 @@ export const DuplicateSchemaDialog = ({
                   </FieldLabel>
                   <Input
                     {...field}
-                    id="duplicate-schema-name"
-                    placeholder="z.B. Video Quality (Kopie)"
-                    maxLength={255}
-                    disabled={isLoading}
-                    autoFocus
                     aria-invalid={fieldState.invalid}
+                    autoFocus
+                    disabled={isLoading}
+                    id="duplicate-schema-name"
+                    maxLength={255}
+                    placeholder="z.B. Video Quality (Kopie)"
                   />
                   <FieldDescription>
                     {field.value?.length || 0}/255 Zeichen
                   </FieldDescription>
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
 
             {/* Info Badge */}
             {fieldCount > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
                 <div className="flex items-center gap-2">
-                  <Info className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                  <p className="text-sm text-blue-900">
-                    Alle {fieldCount} Feld{fieldCount !== 1 ? 'er' : ''} werden kopiert
-                    (inkl. Reihenfolge und Kartenanzeige-Einstellungen).
+                  <Info className="h-5 w-5 flex-shrink-0 text-blue-600" />
+                  <p className="text-blue-900 text-sm">
+                    Alle {fieldCount} Feld{fieldCount !== 1 ? "er" : ""} werden
+                    kopiert (inkl. Reihenfolge und Kartenanzeige-Einstellungen).
                   </p>
                 </div>
               </div>
@@ -120,19 +131,22 @@ export const DuplicateSchemaDialog = ({
 
           <DialogFooter>
             <Button
+              disabled={isLoading}
+              onClick={onCancel}
               type="button"
               variant="outline"
-              onClick={onCancel}
-              disabled={isLoading}
             >
               Abbrechen
             </Button>
-            <Button type="submit" disabled={!form.formState.isValid || isLoading}>
-              {isLoading ? 'Duplizieren...' : 'Duplizieren'}
+            <Button
+              disabled={!form.formState.isValid || isLoading}
+              type="submit"
+            >
+              {isLoading ? "Duplizieren..." : "Duplizieren"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

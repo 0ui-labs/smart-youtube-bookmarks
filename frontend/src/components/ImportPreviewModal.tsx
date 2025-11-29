@@ -1,39 +1,39 @@
-import { useState, useMemo, useEffect } from 'react'
-import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { cn } from '@/lib/utils'
-import { useCategories } from '@/hooks/useTags'
-import { extractYouTubeId } from '@/utils/urlParser'
+} from "@/components/ui/select";
+import { useCategories } from "@/hooks/useTags";
+import { cn } from "@/lib/utils";
+import { extractYouTubeId } from "@/utils/urlParser";
 
 export interface ImportPreviewModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  urls: string[]
-  existingVideoIds?: string[]
-  preselectedCategoryId?: string
-  onImport: (urls: string[], categoryId?: string) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  urls: string[];
+  existingVideoIds?: string[];
+  preselectedCategoryId?: string;
+  onImport: (urls: string[], categoryId?: string) => void;
 }
 
 interface UrlValidation {
-  url: string
-  videoId: string | null
-  isValid: boolean
-  isDuplicate: boolean
+  url: string;
+  videoId: string | null;
+  isValid: boolean;
+  isDuplicate: boolean;
 }
 
 export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
@@ -44,45 +44,47 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
   preselectedCategoryId,
   onImport,
 }) => {
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(
-    preselectedCategoryId
-  )
-  const { data: categories = [] } = useCategories()
+  const [selectedCategoryId, setSelectedCategoryId] = useState<
+    string | undefined
+  >(preselectedCategoryId);
+  const { data: categories = [] } = useCategories();
 
   // Sync selectedCategoryId when preselectedCategoryId changes
   useEffect(() => {
     if (preselectedCategoryId) {
-      setSelectedCategoryId(preselectedCategoryId)
+      setSelectedCategoryId(preselectedCategoryId);
     }
-  }, [preselectedCategoryId])
+  }, [preselectedCategoryId]);
 
   // Validate all URLs
-  const validatedUrls = useMemo<UrlValidation[]>(() => {
-    return urls.map((url) => {
-      const videoId = extractYouTubeId(url)
-      return {
-        url,
-        videoId,
-        isValid: videoId !== null,
-        isDuplicate: videoId !== null && existingVideoIds.includes(videoId),
-      }
-    })
-  }, [urls, existingVideoIds])
+  const validatedUrls = useMemo<UrlValidation[]>(
+    () =>
+      urls.map((url) => {
+        const videoId = extractYouTubeId(url);
+        return {
+          url,
+          videoId,
+          isValid: videoId !== null,
+          isDuplicate: videoId !== null && existingVideoIds.includes(videoId),
+        };
+      }),
+    [urls, existingVideoIds]
+  );
 
-  const validUrls = validatedUrls.filter((v) => v.isValid)
-  const duplicateCount = validatedUrls.filter((v) => v.isDuplicate).length
+  const validUrls = validatedUrls.filter((v) => v.isValid);
+  const duplicateCount = validatedUrls.filter((v) => v.isDuplicate).length;
 
   const handleImport = () => {
-    const urlsToImport = validUrls.map((v) => v.url)
-    onImport(urlsToImport, selectedCategoryId)
-  }
+    const urlsToImport = validUrls.map((v) => v.url);
+    onImport(urlsToImport, selectedCategoryId);
+  };
 
   const handleCancel = () => {
-    onOpenChange(false)
-  }
+    onOpenChange(false);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{urls.length} Videos erkannt</DialogTitle>
@@ -95,29 +97,29 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
           <div className="space-y-2">
             {validatedUrls.map((item, index) => (
               <div
-                key={index}
-                data-testid={`url-item-${index}`}
                 className={cn(
-                  'flex items-center gap-2 text-sm py-1',
-                  !item.isValid && 'text-destructive'
+                  "flex items-center gap-2 py-1 text-sm",
+                  !item.isValid && "text-destructive"
                 )}
+                data-testid={`url-item-${index}`}
+                key={index}
               >
                 {item.isValid ? (
                   item.isDuplicate ? (
                     <AlertTriangle
+                      className="h-4 w-4 flex-shrink-0 text-yellow-500"
                       data-testid="duplicate-url-icon"
-                      className="h-4 w-4 text-yellow-500 flex-shrink-0"
                     />
                   ) : (
                     <CheckCircle
+                      className="h-4 w-4 flex-shrink-0 text-green-500"
                       data-testid="valid-url-icon"
-                      className="h-4 w-4 text-green-500 flex-shrink-0"
                     />
                   )
                 ) : (
                   <XCircle
+                    className="h-4 w-4 flex-shrink-0 text-destructive"
                     data-testid="invalid-url-icon"
-                    className="h-4 w-4 text-destructive flex-shrink-0"
                   />
                 )}
                 <span className="truncate">{item.url}</span>
@@ -128,16 +130,17 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
 
         <div className="space-y-4">
           {duplicateCount > 0 && (
-            <p className="text-sm text-muted-foreground">
-              {duplicateCount} Duplikat{duplicateCount !== 1 ? 'e' : ''} gefunden
+            <p className="text-muted-foreground text-sm">
+              {duplicateCount} Duplikat{duplicateCount !== 1 ? "e" : ""}{" "}
+              gefunden
             </p>
           )}
 
           <Select
-            value={selectedCategoryId ?? '__none__'}
             onValueChange={(value) =>
-              setSelectedCategoryId(value === '__none__' ? undefined : value)
+              setSelectedCategoryId(value === "__none__" ? undefined : value)
             }
+            value={selectedCategoryId ?? "__none__"}
           >
             <SelectTrigger>
               <SelectValue placeholder="Keine Kategorie" />
@@ -154,14 +157,14 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleCancel}>
+          <Button onClick={handleCancel} variant="outline">
             Abbrechen
           </Button>
-          <Button onClick={handleImport} disabled={validUrls.length === 0}>
+          <Button disabled={validUrls.length === 0} onClick={handleImport}>
             Importieren ({validUrls.length})
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

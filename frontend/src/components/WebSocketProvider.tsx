@@ -11,8 +11,8 @@
  * the importProgressStore directly. This provider just ensures the hook
  * is called and the connection is active.
  */
-import { ReactNode } from 'react';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import type { ReactNode } from "react";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface WebSocketProviderProps {
   children: ReactNode;

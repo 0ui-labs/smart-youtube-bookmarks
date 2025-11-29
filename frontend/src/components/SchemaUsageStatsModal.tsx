@@ -1,4 +1,5 @@
-import { Info } from 'lucide-react'
+import { Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -6,16 +7,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import type { FieldSchemaResponse } from '@/types/schema'
-import type { Tag } from '@/types/tag'
+} from "@/components/ui/dialog";
+import type { FieldSchemaResponse } from "@/types/schema";
+import type { Tag } from "@/types/tag";
 
 interface SchemaUsageStatsModalProps {
-  open: boolean
-  schema: FieldSchemaResponse | null
-  tags: Tag[]
-  onClose: () => void
+  open: boolean;
+  schema: FieldSchemaResponse | null;
+  tags: Tag[];
+  onClose: () => void;
 }
 
 export const SchemaUsageStatsModal = ({
@@ -25,10 +25,10 @@ export const SchemaUsageStatsModal = ({
   onClose,
 }: SchemaUsageStatsModalProps) => {
   // Compute which tags use this schema
-  const usedByTags = tags.filter((tag) => tag.schema_id === schema?.id)
+  const usedByTags = tags.filter((tag) => tag.schema_id === schema?.id);
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+    <Dialog onOpenChange={(open) => !open && onClose()} open={open}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Verwendungsstatistik</DialogTitle>
@@ -40,20 +40,21 @@ export const SchemaUsageStatsModal = ({
         <div className="py-4">
           {usedByTags.length > 0 ? (
             <div className="space-y-3">
-              <p className="text-sm font-medium">
-                Verwendet von {usedByTags.length} Tag{usedByTags.length !== 1 ? 's' : ''}:
+              <p className="font-medium text-sm">
+                Verwendet von {usedByTags.length} Tag
+                {usedByTags.length !== 1 ? "s" : ""}:
               </p>
 
-              <ul className="space-y-2 max-h-[300px] overflow-y-auto">
+              <ul className="max-h-[300px] space-y-2 overflow-y-auto">
                 {usedByTags.map((tag) => (
                   <li
+                    className="flex items-center gap-2 rounded-md p-2 hover:bg-gray-50"
                     key={tag.id}
-                    className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-50"
                   >
                     {/* Tag Color Badge */}
                     {tag.color && (
                       <div
-                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        className="h-4 w-4 flex-shrink-0 rounded-full"
                         style={{ backgroundColor: tag.color }}
                       />
                     )}
@@ -64,9 +65,9 @@ export const SchemaUsageStatsModal = ({
               </ul>
             </div>
           ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-              <Info className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-sm text-gray-600">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 text-center">
+              <Info className="mx-auto mb-3 h-12 w-12 text-gray-400" />
+              <p className="text-gray-600 text-sm">
                 Dieses Schema wird aktuell nicht von Tags verwendet.
               </p>
             </div>
@@ -74,11 +75,11 @@ export const SchemaUsageStatsModal = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button onClick={onClose} variant="outline">
             Schließen
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

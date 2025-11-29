@@ -18,29 +18,29 @@
  * - className?: string - Custom Tailwind classes
  */
 
-import React from 'react'
-import { ChevronRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { TiptapEditor } from './TiptapEditor'
+import { ChevronRight } from "lucide-react";
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { TiptapEditor } from "./TiptapEditor";
 
 export interface TextSnippetProps {
   /** Text or HTML content to display */
-  value: string | null | undefined
+  value: string | null | undefined;
   /** Character limit for display truncation (read-only mode) */
-  truncateAt: number
+  truncateAt: number;
   /** Toggle between read-only and editable modes (default: true) */
-  readOnly?: boolean
+  readOnly?: boolean;
   /** Callback when input value changes (editable mode) - returns HTML */
-  onChange?: (value: string) => void
+  onChange?: (value: string) => void;
   /** Callback when expand button clicked */
-  onExpand?: () => void
+  onExpand?: () => void;
   /** Max characters for input field (editable mode) */
-  maxLength?: number
+  maxLength?: number;
   /** Placeholder text for editable mode */
-  placeholder?: string
+  placeholder?: string;
   /** Custom Tailwind classes */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -48,11 +48,11 @@ export interface TextSnippetProps {
  * HTML content (starting with <) is returned as-is.
  */
 function normalizeContent(value: string | null | undefined): string {
-  if (!value) return ''
+  if (!value) return "";
   // Already HTML? Return as-is
-  if (value.trim().startsWith('<')) return value
+  if (value.trim().startsWith("<")) return value;
   // Plain text → wrap in paragraph, escape HTML entities
-  return `<p>${value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
+  return `<p>${value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
 }
 
 /**
@@ -60,12 +60,12 @@ function normalizeContent(value: string | null | undefined): string {
  */
 function getTextContent(html: string): string {
   // Use DOMParser for accurate text extraction
-  if (typeof DOMParser !== 'undefined') {
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-    return doc.body.textContent || ''
+  if (typeof DOMParser !== "undefined") {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    return doc.body.textContent || "";
   }
   // Fallback: simple regex strip
-  return html.replace(/<[^>]*>/g, '')
+  return html.replace(/<[^>]*>/g, "");
 }
 
 export const TextSnippet = React.forwardRef<HTMLDivElement, TextSnippetProps>(
@@ -77,60 +77,60 @@ export const TextSnippet = React.forwardRef<HTMLDivElement, TextSnippetProps>(
       onChange,
       onExpand,
       maxLength,
-      placeholder = 'Notizen eingeben...',
+      placeholder = "Notizen eingeben...",
       className,
     },
     ref
   ) => {
-    const normalizedValue = normalizeContent(value)
-    const textContent = getTextContent(normalizedValue)
-    const isTruncated = textContent.length > truncateAt
+    const normalizedValue = normalizeContent(value);
+    const textContent = getTextContent(normalizedValue);
+    const isTruncated = textContent.length > truncateAt;
 
     if (readOnly) {
       // Read-only mode: Render formatted HTML
       return (
         <div
+          className={cn("inline-flex items-start gap-2 text-sm", className)}
           ref={ref}
-          className={cn('inline-flex items-start gap-2 text-sm', className)}
         >
-          {!textContent ? (
-            <span className="text-muted-foreground">—</span>
-          ) : (
+          {textContent ? (
             <div
               className="tiptap-prose"
               dangerouslySetInnerHTML={{
                 __html: isTruncated
-                  ? getTextContent(normalizedValue).slice(0, truncateAt) + '...'
+                  ? `${getTextContent(normalizedValue).slice(0, truncateAt)}...`
                   : normalizedValue,
               }}
             />
+          ) : (
+            <span className="text-muted-foreground">—</span>
           )}
           {isTruncated && onExpand && (
             <Button
-              variant="ghost"
-              size="icon"
+              aria-label="Text erweitern"
               className="h-5 w-5 shrink-0 p-0"
               onClick={onExpand}
-              aria-label="Text erweitern"
+              size="icon"
+              variant="ghost"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           )}
         </div>
-      )
+      );
     }
 
     // Edit mode: Tiptap Editor
     return (
       <TiptapEditor
+        className={className}
         content={normalizedValue}
+        maxLength={maxLength}
         onChange={(html) => onChange?.(html)}
         placeholder={placeholder}
-        maxLength={maxLength}
-        className={className}
       />
-    )
+    );
   }
-)
+);
 
-TextSnippet.displayName = 'TextSnippet'
+TextSnippet.displayName = "TextSnippet";

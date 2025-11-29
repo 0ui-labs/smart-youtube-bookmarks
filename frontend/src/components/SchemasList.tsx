@@ -1,9 +1,9 @@
-import { SchemaCard } from './SchemaCard'
-import type { FieldSchemaResponse } from '@/types/schema'
+import type { FieldSchemaResponse } from "@/types/schema";
+import { SchemaCard } from "./SchemaCard";
 
 export interface SchemasListProps {
-  schemas: FieldSchemaResponse[]
-  listId: string
+  schemas: FieldSchemaResponse[];
+  listId: string;
 }
 
 /**
@@ -29,10 +29,10 @@ export interface SchemasListProps {
  */
 export function SchemasList({ schemas, listId }: SchemasListProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
       {schemas.map((schema) => (
-        <SchemaCard key={schema.id} schema={schema} listId={listId} />
+        <SchemaCard key={schema.id} listId={listId} schema={schema} />
       ))}
     </div>
-  )
+  );
 }

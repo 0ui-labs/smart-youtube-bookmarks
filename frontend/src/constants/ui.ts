@@ -11,6 +11,6 @@
 
 export const UI_STRINGS = {
   channel: {
-    chooseCategory: 'Kategorie wählen',
+    chooseCategory: "Kategorie wählen",
   },
-} as const
+} as const;

@@ -1,7 +1,7 @@
-import { schemasHandlers } from './schemas'
-import { videosHandlers } from './videos'
-import { tagsHandlers } from './tags'
-import { customFieldsHandlers } from './customFields'
+import { customFieldsHandlers } from "./customFields";
+import { schemasHandlers } from "./schemas";
+import { tagsHandlers } from "./tags";
+import { videosHandlers } from "./videos";
 
 export const handlers = [
   ...schemasHandlers,
@@ -9,4 +9,4 @@ export const handlers = [
   ...tagsHandlers,
   ...customFieldsHandlers,
   // Add other handlers here as needed
-]
+];

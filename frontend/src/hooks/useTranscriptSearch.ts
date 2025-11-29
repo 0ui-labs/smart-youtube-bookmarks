@@ -1,25 +1,25 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import type { SearchResponse } from '@/types/search'
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import type { SearchResponse } from "@/types/search";
 
 /**
  * Query key factory for search queries.
  */
 export const searchKeys = {
-  all: ['search'] as const,
+  all: ["search"] as const,
   query: (q: string, listId?: string, limit?: number, offset?: number) =>
-    ['search', q, listId, limit, offset] as const,
-}
+    ["search", q, listId, limit, offset] as const,
+};
 
 interface UseTranscriptSearchOptions {
   /** Filter by list ID */
-  listId?: string
+  listId?: string;
   /** Results per page (default: 20) */
-  limit?: number
+  limit?: number;
   /** Pagination offset (default: 0) */
-  offset?: number
+  offset?: number;
   /** Enable/disable the query */
-  enabled?: boolean
+  enabled?: boolean;
 }
 
 /**
@@ -48,7 +48,7 @@ export const useTranscriptSearch = (
   query: string,
   options: UseTranscriptSearchOptions = {}
 ) => {
-  const { listId, limit = 20, offset = 0, enabled = true } = options
+  const { listId, limit = 20, offset = 0, enabled = true } = options;
 
   return useQuery({
     queryKey: searchKeys.query(query, listId, limit, offset),
@@ -57,22 +57,22 @@ export const useTranscriptSearch = (
         q: query,
         limit: String(limit),
         offset: String(offset),
-      })
+      });
 
       if (listId) {
-        params.append('list_id', listId)
+        params.append("list_id", listId);
       }
 
-      const { data } = await api.get<SearchResponse>(`/search?${params}`)
-      return data
+      const { data } = await api.get<SearchResponse>(`/search?${params}`);
+      return data;
     },
     enabled: enabled && query.length >= 1,
     // Keep previous data while loading new results
     placeholderData: keepPreviousData,
     // Cache for 1 minute
     staleTime: 60 * 1000,
-  })
-}
+  });
+};
 
 /**
  * Hook for debounced search input.
@@ -85,4 +85,4 @@ export const useTranscriptSearch = (
  * const { data } = useTranscriptSearch(debouncedQuery)
  * ```
  */
-export default useTranscriptSearch
+export default useTranscriptSearch;

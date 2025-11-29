@@ -1,6 +1,16 @@
-import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import { ChannelsSchema, ChannelSchema, type Channel, type ChannelUpdate } from '@/types/channel'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import {
+  type Channel,
+  ChannelSchema,
+  ChannelsSchema,
+  type ChannelUpdate,
+} from "@/types/channel";
 
 /**
  * Query options factory for channels
@@ -19,15 +29,15 @@ import { ChannelsSchema, ChannelSchema, type Channel, type ChannelUpdate } from 
  */
 export function channelsOptions(includeHidden = false) {
   return queryOptions({
-    queryKey: ['channels', { includeHidden }],
+    queryKey: ["channels", { includeHidden }],
     queryFn: async () => {
-      const { data } = await api.get<Channel[]>('/channels', {
-        params: { include_hidden: includeHidden }
-      })
+      const { data } = await api.get<Channel[]>("/channels", {
+        params: { include_hidden: includeHidden },
+      });
       // Validate response with Zod schema
-      return ChannelsSchema.parse(data)
+      return ChannelsSchema.parse(data);
     },
-  })
+  });
 }
 
 /**
@@ -47,9 +57,8 @@ export function channelsOptions(includeHidden = false) {
  * const { data: allChannels } = useChannels(true)
  * ```
  */
-export const useChannels = (includeHidden = false) => {
-  return useQuery(channelsOptions(includeHidden))
-}
+export const useChannels = (includeHidden = false) =>
+  useQuery(channelsOptions(includeHidden));
 
 /**
  * React Query mutation hook to update a channel (hide/unhide)
@@ -70,23 +79,32 @@ export const useChannels = (includeHidden = false) => {
  * ```
  */
 export const useUpdateChannel = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['updateChannel'],
-    mutationFn: async ({ channelId, data }: { channelId: string; data: ChannelUpdate }) => {
-      const { data: responseData } = await api.patch<Channel>(`/channels/${channelId}`, data)
-      return ChannelSchema.parse(responseData)
+    mutationKey: ["updateChannel"],
+    mutationFn: async ({
+      channelId,
+      data,
+    }: {
+      channelId: string;
+      data: ChannelUpdate;
+    }) => {
+      const { data: responseData } = await api.patch<Channel>(
+        `/channels/${channelId}`,
+        data
+      );
+      return ChannelSchema.parse(responseData);
     },
     onError: (error) => {
-      console.error('Failed to update channel:', error)
+      console.error("Failed to update channel:", error);
     },
     onSettled: async () => {
       // Invalidate both visible and hidden channel queries
-      await queryClient.invalidateQueries({ queryKey: ['channels'] })
+      await queryClient.invalidateQueries({ queryKey: ["channels"] });
     },
-  })
-}
+  });
+};
 
 /**
  * React Query mutation hook to delete a channel
@@ -104,21 +122,21 @@ export const useUpdateChannel = () => {
  * ```
  */
 export const useDeleteChannel = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['deleteChannel'],
+    mutationKey: ["deleteChannel"],
     mutationFn: async (channelId: string) => {
-      await api.delete(`/channels/${channelId}`)
+      await api.delete(`/channels/${channelId}`);
       // 204 No Content - no response body
     },
     onError: (error) => {
-      console.error('Failed to delete channel:', error)
+      console.error("Failed to delete channel:", error);
     },
     onSettled: async () => {
       // Invalidate channels and videos (videos may need refresh since channel_id is now null)
-      await queryClient.invalidateQueries({ queryKey: ['channels'] })
-      await queryClient.invalidateQueries({ queryKey: ['videos'] })
+      await queryClient.invalidateQueries({ queryKey: ["channels"] });
+      await queryClient.invalidateQueries({ queryKey: ["videos"] });
     },
-  })
-}
+  });
+};

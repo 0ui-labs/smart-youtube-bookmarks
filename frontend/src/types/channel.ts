@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from "zod";
 
 /**
  * Zod schema for Channel validation
@@ -15,23 +15,23 @@ export const ChannelSchema = z.object({
   video_count: z.number().int().nonnegative(),
   created_at: z.string(),
   updated_at: z.string(),
-})
+});
 
 /**
  * Channel type inferred from Zod schema
  */
-export type Channel = z.infer<typeof ChannelSchema>
+export type Channel = z.infer<typeof ChannelSchema>;
 
 /**
  * Schema for updating a channel (only is_hidden can be changed)
  */
 export const ChannelUpdateSchema = z.object({
   is_hidden: z.boolean().optional(),
-})
+});
 
-export type ChannelUpdate = z.infer<typeof ChannelUpdateSchema>
+export type ChannelUpdate = z.infer<typeof ChannelUpdateSchema>;
 
 /**
  * Array schema for validating multiple channels
  */
-export const ChannelsSchema = z.array(ChannelSchema)
+export const ChannelsSchema = z.array(ChannelSchema);

@@ -1,26 +1,26 @@
-import React from 'react'
+import React from "react";
 
 export interface BooleanCheckboxProps {
   /**
    * Current boolean value (null treated as false)
    */
-  value: boolean | null
+  value: boolean | null;
   /**
    * Field name for label and accessibility
    */
-  fieldName: string
+  fieldName: string;
   /**
    * Whether the field is editable
    */
-  readonly?: boolean
+  readonly?: boolean;
   /**
    * Callback when value changes
    */
-  onChange?: (value: boolean) => void
+  onChange?: (value: boolean) => void;
   /**
    * Optional custom CSS class
    */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -52,23 +52,23 @@ export interface BooleanCheckboxProps {
  * />
  */
 export const BooleanCheckbox = React.memo<BooleanCheckboxProps>(
-  ({ value, fieldName, readonly = false, onChange, className = '' }) => {
-    const checked = value ?? false // Treat null as false
-    const id = React.useId()
-    const checkboxId = `${id}-${fieldName}`
+  ({ value, fieldName, readonly = false, onChange, className = "" }) => {
+    const checked = value ?? false; // Treat null as false
+    const id = React.useId();
+    const checkboxId = `${id}-${fieldName}`;
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      e.stopPropagation() // REF MCP #3: Prevent event bubbling
-      onChange?.(e.target.checked)
-    }
+      e.stopPropagation(); // REF MCP #3: Prevent event bubbling
+      onChange?.(e.target.checked);
+    };
 
     const handleClick = (e: React.MouseEvent<HTMLInputElement>) => {
-      e.stopPropagation() // REF MCP #3: Prevent event bubbling
-    }
+      e.stopPropagation(); // REF MCP #3: Prevent event bubbling
+    };
 
     const handleLabelClick = (e: React.MouseEvent<HTMLLabelElement>) => {
-      e.stopPropagation() // REF MCP #3: Prevent event bubbling
-    }
+      e.stopPropagation(); // REF MCP #3: Prevent event bubbling
+    };
 
     return (
       <div
@@ -76,25 +76,25 @@ export const BooleanCheckbox = React.memo<BooleanCheckboxProps>(
         onClick={(e) => e.stopPropagation()} // REF MCP #3: Prevent VideoCard click
       >
         <input
-          id={checkboxId}
-          type="checkbox"
+          aria-label={`${fieldName}: ${checked ? "checked" : "unchecked"}`}
           checked={checked}
+          className="h-4 w-4 cursor-pointer rounded accent-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={readonly}
+          id={checkboxId}
           onChange={handleChange}
-          onClick={handleClick}
-          aria-label={`${fieldName}: ${checked ? 'checked' : 'unchecked'}`} // REF MCP #5: Screen reader context
-          className="w-4 h-4 accent-blue-600 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleClick} // REF MCP #5: Screen reader context
+          type="checkbox"
         />
         <label
+          className={`text-sm ${readonly ? "cursor-default" : "cursor-pointer"}`}
           htmlFor={checkboxId}
-          className={`text-sm ${readonly ? 'cursor-default' : 'cursor-pointer'}`}
           onClick={handleLabelClick}
         >
           {fieldName}
         </label>
       </div>
-    )
+    );
   }
-)
+);
 
-BooleanCheckbox.displayName = 'BooleanCheckbox'
+BooleanCheckbox.displayName = "BooleanCheckbox";

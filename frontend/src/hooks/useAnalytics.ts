@@ -1,5 +1,5 @@
-import { useQuery, queryOptions } from '@tanstack/react-query'
-import { getAnalytics } from '@/lib/api'
+import { queryOptions, useQuery } from "@tanstack/react-query";
+import { getAnalytics } from "@/lib/api";
 
 /**
  * Query Key Factory for analytics queries.
@@ -7,10 +7,10 @@ import { getAnalytics } from '@/lib/api'
  * Follows TanStack Query best practices for key organization.
  */
 export const analyticsKeys = {
-  all: ['analytics'] as const,
-  lists: () => [...analyticsKeys.all, 'list'] as const,
+  all: ["analytics"] as const,
+  lists: () => [...analyticsKeys.all, "list"] as const,
   list: (listId: string) => [...analyticsKeys.lists(), listId] as const,
-}
+};
 
 /**
  * Query options for analytics data.
@@ -23,9 +23,9 @@ export function analyticsOptions(listId: string) {
   return queryOptions({
     queryKey: analyticsKeys.list(listId),
     queryFn: async () => getAnalytics(listId),
-    staleTime: 5 * 60 * 1000,   // 5 minutes - analytics change slowly
-    gcTime: 10 * 60 * 1000,      // 10 minutes - garbage collection
-  })
+    staleTime: 5 * 60 * 1000, // 5 minutes - analytics change slowly
+    gcTime: 10 * 60 * 1000, // 10 minutes - garbage collection
+  });
 }
 
 /**
@@ -58,5 +58,5 @@ export function analyticsOptions(listId: string) {
  * ```
  */
 export function useAnalytics(listId: string) {
-  return useQuery(analyticsOptions(listId))
+  return useQuery(analyticsOptions(listId));
 }

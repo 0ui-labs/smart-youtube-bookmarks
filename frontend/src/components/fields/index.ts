@@ -8,38 +8,28 @@
  * import { FieldDisplay, RatingStars, SelectBadge } from '@/components/fields'
  */
 
-export { RatingStars } from './RatingStars'
-export type { RatingStarsProps } from './RatingStars'
-
-export { SelectBadge } from './SelectBadge'
-export type { SelectBadgeProps } from './SelectBadge'
-
-export { BooleanCheckbox } from './BooleanCheckbox'
-export type { BooleanCheckboxProps } from './BooleanCheckbox'
-
-export { TextSnippet } from './TextSnippet'
-export type { TextSnippetProps } from './TextSnippet'
-
-export { FieldDisplay } from './FieldDisplay'
-export type { FieldDisplayProps } from './FieldDisplay'
-
-export { CustomFieldsPreview } from './CustomFieldsPreview'
-export type { CustomFieldsPreviewProps } from './CustomFieldsPreview'
-
+export type { BooleanCheckboxProps } from "./BooleanCheckbox";
+export { BooleanCheckbox } from "./BooleanCheckbox";
+export type { CustomFieldsPreviewProps } from "./CustomFieldsPreview";
+export { CustomFieldsPreview } from "./CustomFieldsPreview";
+export * from "./editors";
+export type { FieldConfig, FieldConfigEditorProps } from "./FieldConfigEditor";
 // Field Config Editor Components (Task #124)
-export { FieldConfigEditor } from './FieldConfigEditor'
-export type { FieldConfigEditorProps, FieldConfig } from './FieldConfigEditor'
+export { FieldConfigEditor } from "./FieldConfigEditor";
+export type { FieldDisplayProps } from "./FieldDisplay";
 
-export { SelectConfigEditor } from './SelectConfigEditor'
-export type { SelectConfigEditorProps } from './SelectConfigEditor'
-
-export { RatingConfigEditor } from './RatingConfigEditor'
-export type { RatingConfigEditorProps } from './RatingConfigEditor'
-
-export { TextConfigEditor } from './TextConfigEditor'
-export type { TextConfigEditorProps } from './TextConfigEditor'
-
+export { FieldDisplay } from "./FieldDisplay";
 // Field Value Editors (Task #132)
-export { FieldEditor } from './FieldEditor'
-
-export * from './editors'
+export { FieldEditor } from "./FieldEditor";
+export type { RatingConfigEditorProps } from "./RatingConfigEditor";
+export { RatingConfigEditor } from "./RatingConfigEditor";
+export type { RatingStarsProps } from "./RatingStars";
+export { RatingStars } from "./RatingStars";
+export type { SelectBadgeProps } from "./SelectBadge";
+export { SelectBadge } from "./SelectBadge";
+export type { SelectConfigEditorProps } from "./SelectConfigEditor";
+export { SelectConfigEditor } from "./SelectConfigEditor";
+export type { TextConfigEditorProps } from "./TextConfigEditor";
+export { TextConfigEditor } from "./TextConfigEditor";
+export type { TextSnippetProps } from "./TextSnippet";
+export { TextSnippet } from "./TextSnippet";

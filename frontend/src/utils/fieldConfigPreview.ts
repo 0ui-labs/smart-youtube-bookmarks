@@ -1,4 +1,4 @@
-import type { FieldType } from '@/types/customField';
+import type { FieldType } from "@/types/customField";
 
 /**
  * Generate human-readable preview of field config
@@ -31,31 +31,27 @@ export function formatConfigPreview(
   config: Record<string, any>
 ): string {
   switch (fieldType) {
-    case 'select': {
+    case "select": {
       const options = config.options as string[] | undefined;
       if (!options || options.length === 0) {
-        return 'No options';
+        return "No options";
       }
 
-      return `Options: ${options.join(', ')}`;
+      return `Options: ${options.join(", ")}`;
     }
 
-    case 'rating': {
+    case "rating": {
       const maxRating = config.max_rating as number | undefined;
-      return maxRating
-        ? `Max: ${maxRating} stars`
-        : 'No max rating';
+      return maxRating ? `Max: ${maxRating} stars` : "No max rating";
     }
 
-    case 'text': {
+    case "text": {
       const maxLength = config.max_length as number | undefined;
-      return maxLength
-        ? `Max length: ${maxLength}`
-        : 'No length limit';
+      return maxLength ? `Max length: ${maxLength}` : "No length limit";
     }
 
-    case 'boolean': {
-      return 'Yes/No';
+    case "boolean": {
+      return "Yes/No";
     }
 
     default: {
@@ -65,9 +61,9 @@ export function formatConfigPreview(
       void _exhaustive; // Suppress unused variable warning
 
       // Development safety: log warning if somehow reached (e.g., runtime type mismatch)
-      console.warn('Unknown field type encountered:', fieldType);
+      console.warn("Unknown field type encountered:", fieldType);
 
-      return 'Unknown type';
+      return "Unknown type";
     }
   }
 }

@@ -1,12 +1,12 @@
-import { TagActionsMenu } from './TagActionsMenu'
-import type { Tag } from '@/types/tag'
+import type { Tag } from "@/types/tag";
+import { TagActionsMenu } from "./TagActionsMenu";
 
 interface TagsListProps {
   /** Categories to display (tags with is_video_type=true) */
-  tags: Tag[]
-  onEdit: (tag: Tag) => void
-  onDelete: (tag: Tag) => void
-  isLoading?: boolean
+  tags: Tag[];
+  onEdit: (tag: Tag) => void;
+  onDelete: (tag: Tag) => void;
+  isLoading?: boolean;
 }
 
 /**
@@ -42,17 +42,18 @@ export function TagsList({ tags, onEdit, onDelete, isLoading }: TagsListProps) {
       <div className="flex items-center justify-center py-12">
         <p className="text-muted-foreground">Lade Kategorien...</p>
       </div>
-    )
+    );
   }
 
   if (tags.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="text-muted-foreground mb-2">
-          Noch keine Kategorien. Erstelle deine erste Kategorie mit dem Button oben.
+        <p className="mb-2 text-muted-foreground">
+          Noch keine Kategorien. Erstelle deine erste Kategorie mit dem Button
+          oben.
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -77,36 +78,40 @@ export function TagsList({ tags, onEdit, onDelete, isLoading }: TagsListProps) {
         <tbody>
           {tags.map((tag) => (
             <tr
-              key={tag.id}
               className="border-b transition-colors hover:bg-muted/50"
+              key={tag.id}
             >
               <td className="p-4 align-middle font-medium">{tag.name}</td>
               <td className="p-4 align-middle">
                 <div className="flex items-center gap-2">
                   <div
+                    aria-label={`Farbe: ${tag.color || "#3B82F6"}`}
                     className="h-4 w-4 rounded-full border"
-                    style={{ backgroundColor: tag.color || '#3B82F6' }}
-                    aria-label={`Farbe: ${tag.color || '#3B82F6'}`}
+                    style={{ backgroundColor: tag.color || "#3B82F6" }}
                   />
-                  <span className="text-sm text-muted-foreground">
-                    {tag.color || '#3B82F6'}
+                  <span className="text-muted-foreground text-sm">
+                    {tag.color || "#3B82F6"}
                   </span>
                 </div>
               </td>
               <td className="p-4 align-middle">
                 {tag.schema_id ? (
-                  <span className="text-sm text-green-600">Felder konfiguriert</span>
+                  <span className="text-green-600 text-sm">
+                    Felder konfiguriert
+                  </span>
                 ) : (
-                  <span className="text-sm text-muted-foreground italic">Keine Felder</span>
+                  <span className="text-muted-foreground text-sm italic">
+                    Keine Felder
+                  </span>
                 )}
               </td>
-              <td className="p-4 align-middle text-right">
-                <TagActionsMenu tag={tag} onEdit={onEdit} onDelete={onDelete} />
+              <td className="p-4 text-right align-middle">
+                <TagActionsMenu onDelete={onDelete} onEdit={onEdit} tag={tag} />
               </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
-  )
+  );
 }

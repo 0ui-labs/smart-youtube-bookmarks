@@ -1,10 +1,10 @@
-import { api } from './api'
 import type {
-  FieldValueUpdate,
-  VideoResponse,
   BatchUpdateFieldValuesResponse,
+  FieldValueUpdate,
   VideoFieldValue,
-} from '@/types/video'
+  VideoResponse,
+} from "@/types/video";
+import { api } from "./api";
 
 /**
  * API client for video field values.
@@ -22,8 +22,8 @@ export const videoFieldValuesApi = {
    * @returns Field values array with field metadata
    */
   async getFieldValues(videoId: string): Promise<VideoFieldValue[]> {
-    const { data } = await api.get<VideoResponse>(`/videos/${videoId}`)
-    return data.field_values || []
+    const { data } = await api.get<VideoResponse>(`/videos/${videoId}`);
+    return data.field_values || [];
   },
 
   /**
@@ -41,7 +41,7 @@ export const videoFieldValuesApi = {
     const { data } = await api.put<BatchUpdateFieldValuesResponse>(
       `/videos/${videoId}/fields`,
       { field_values: updates } // Backend expects this shape
-    )
-    return data
+    );
+    return data;
   },
-}
+};

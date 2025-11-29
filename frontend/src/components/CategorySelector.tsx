@@ -12,25 +12,29 @@
  * - Color indicators for categories
  * - Warning dialog when changing/removing category (Step 5.7)
  */
-import { useState } from 'react'
-import { useCategories } from '@/hooks/useTags'
+
+import { Loader2, X } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
-import { X, Loader2 } from 'lucide-react'
-import { CategoryChangeWarning } from './CategoryChangeWarning'
+} from "@/components/ui/select";
+import { useCategories } from "@/hooks/useTags";
+import { CategoryChangeWarning } from "./CategoryChangeWarning";
 
 export interface CategorySelectorProps {
-  videoId: string
-  currentCategoryId: string | null
-  onCategoryChange: (categoryId: string | null, restoreBackup?: boolean) => void
-  disabled?: boolean
-  isMutating?: boolean
+  videoId: string;
+  currentCategoryId: string | null;
+  onCategoryChange: (
+    categoryId: string | null,
+    restoreBackup?: boolean
+  ) => void;
+  disabled?: boolean;
+  isMutating?: boolean;
 }
 
 export function CategorySelector({
@@ -39,122 +43,123 @@ export function CategorySelector({
   disabled = false,
   isMutating = false,
 }: CategorySelectorProps) {
-  const { data: categories, isLoading } = useCategories()
+  const { data: categories, isLoading } = useCategories();
 
   // Warning dialog state (Step 5.7)
-  const [showWarning, setShowWarning] = useState(false)
-  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null)
+  const [showWarning, setShowWarning] = useState(false);
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(
+    null
+  );
 
   // Find selected category
-  const selectedCategory = categories?.find(c => c.id === currentCategoryId)
+  const selectedCategory = categories?.find((c) => c.id === currentCategoryId);
 
   // Find pending category for warning dialog
   const pendingCategory = pendingCategoryId
-    ? categories?.find(c => c.id === pendingCategoryId) ?? null
-    : null
+    ? (categories?.find((c) => c.id === pendingCategoryId) ?? null)
+    : null;
 
   // Handle selection change
   const handleValueChange = (value: string) => {
-    const newCategoryId = value === '__none__' ? null : value
+    const newCategoryId = value === "__none__" ? null : value;
 
     // If no current category, assign directly (no warning needed)
     if (currentCategoryId === null) {
-      onCategoryChange(newCategoryId)
-      return
+      onCategoryChange(newCategoryId);
+      return;
     }
 
     // If same category, do nothing
     if (newCategoryId === currentCategoryId) {
-      return
+      return;
     }
 
     // Otherwise show warning dialog
-    setPendingCategoryId(newCategoryId)
-    setShowWarning(true)
-  }
+    setPendingCategoryId(newCategoryId);
+    setShowWarning(true);
+  };
 
   // Handle clear button click
   const handleClear = () => {
     // Show warning when removing category
-    setPendingCategoryId(null)
-    setShowWarning(true)
-  }
+    setPendingCategoryId(null);
+    setShowWarning(true);
+  };
 
   // Handle warning dialog confirm
   const handleConfirm = (restoreBackup: boolean) => {
-    onCategoryChange(pendingCategoryId, restoreBackup)
-    setShowWarning(false)
-    setPendingCategoryId(null)
-  }
+    onCategoryChange(pendingCategoryId, restoreBackup);
+    setShowWarning(false);
+    setPendingCategoryId(null);
+  };
 
   // Handle warning dialog cancel
   const handleCancel = () => {
-    setShowWarning(false)
-    setPendingCategoryId(null)
-  }
+    setShowWarning(false);
+    setPendingCategoryId(null);
+  };
 
   // Loading state - fetching categories
   if (isLoading) {
     return (
       <div className="space-y-2">
-        <label className="text-sm font-medium">Kategorie</label>
-        <div className="flex h-10 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground">
+        <label className="font-medium text-sm">Kategorie</label>
+        <div className="flex h-10 items-center gap-2 rounded-md border px-3 text-muted-foreground text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Lade Kategorien...
         </div>
       </div>
-    )
+    );
   }
 
   // Mutating state
   if (isMutating) {
     return (
       <div className="space-y-2">
-        <label className="text-sm font-medium">Kategorie</label>
-        <div className="flex h-10 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground">
+        <label className="font-medium text-sm">Kategorie</label>
+        <div className="flex h-10 items-center gap-2 rounded-md border px-3 text-muted-foreground text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Ändere Kategorie...
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">Kategorie</label>
+      <label className="font-medium text-sm">Kategorie</label>
       <div className="relative flex items-center gap-2">
         <Select
-          value={currentCategoryId || '__none__'}
-          onValueChange={handleValueChange}
           disabled={disabled}
+          onValueChange={handleValueChange}
+          value={currentCategoryId || "__none__"}
         >
-          <SelectTrigger
-            className="w-full"
-            aria-label="Kategorie auswählen"
-          >
+          <SelectTrigger aria-label="Kategorie auswählen" className="w-full">
             <SelectValue placeholder="Keine Kategorie">
               {selectedCategory ? (
                 <span className="flex items-center gap-2">
                   <span
-                    data-testid="category-color-dot"
                     className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: selectedCategory.color || '#888' }}
+                    data-testid="category-color-dot"
+                    style={{
+                      backgroundColor: selectedCategory.color || "#888",
+                    }}
                   />
                   {selectedCategory.name}
                 </span>
               ) : (
-                'Keine Kategorie'
+                "Keine Kategorie"
               )}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">Keine Kategorie</SelectItem>
-            {categories?.map(category => (
+            {categories?.map((category) => (
               <SelectItem key={category.id} value={category.id}>
                 <span className="flex items-center gap-2">
                   <span
                     className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: category.color || '#888' }}
+                    style={{ backgroundColor: category.color || "#888" }}
                   />
                   {category.name}
                 </span>
@@ -166,12 +171,12 @@ export function CategorySelector({
         {/* Clear button - only shown when category is selected */}
         {currentCategoryId && (
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClear}
-            disabled={disabled}
             aria-label="Kategorie entfernen"
             className="h-8 w-8 shrink-0"
+            disabled={disabled}
+            onClick={handleClear}
+            size="icon"
+            variant="ghost"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -180,16 +185,16 @@ export function CategorySelector({
 
       {/* Warning dialog (Step 5.7) */}
       <CategoryChangeWarning
-        open={showWarning}
-        onOpenChange={setShowWarning}
-        oldCategory={selectedCategory ?? null}
+        fieldValuesThatPersist={[]}
+        fieldValuesToBackup={[]}
+        hasBackup={false}
         newCategory={pendingCategory}
-        fieldValuesToBackup={[]} // TODO: Get from API
-        fieldValuesThatPersist={[]} // TODO: Get from API
-        hasBackup={false} // TODO: Get from API
-        onConfirm={handleConfirm}
-        onCancel={handleCancel}
+        oldCategory={selectedCategory ?? null} // TODO: Get from API
+        onCancel={handleCancel} // TODO: Get from API
+        onConfirm={handleConfirm} // TODO: Get from API
+        onOpenChange={setShowWarning}
+        open={showWarning}
       />
     </div>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import { ReadyState } from 'react-use-websocket';
+import { ReadyState } from "react-use-websocket";
 
 export interface ConnectionStatusBannerProps {
   readyState: ReadyState;
@@ -14,7 +14,10 @@ export interface ConnectionStatusBannerProps {
  * - Green: Connected (live updates active)
  * - Red: Disconnected (no connection, stopped retrying)
  */
-export function ConnectionStatusBanner({ readyState, reconnecting }: ConnectionStatusBannerProps) {
+export function ConnectionStatusBanner({
+  readyState,
+  reconnecting,
+}: ConnectionStatusBannerProps) {
   // Don't show banner if WebSocket not instantiated
   if (readyState === ReadyState.UNINSTANTIATED) {
     return null;
@@ -28,8 +31,12 @@ export function ConnectionStatusBanner({ readyState, reconnecting }: ConnectionS
 
   if (isConnecting) {
     return (
-      <div className="bg-yellow-50 border-b border-yellow-200" role="status" aria-live="polite">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+      <div
+        aria-live="polite"
+        className="border-yellow-200 border-b bg-yellow-50"
+        role="status"
+      >
+        <div className="mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
           <p className="text-sm text-yellow-800">
             <span aria-hidden="true">⏳</span> Connecting to progress feed...
           </p>
@@ -40,9 +47,13 @@ export function ConnectionStatusBanner({ readyState, reconnecting }: ConnectionS
 
   if (isReconnecting) {
     return (
-      <div className="bg-orange-50 border-b border-orange-200" role="status" aria-live="polite">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <p className="text-sm text-orange-800">
+      <div
+        aria-live="polite"
+        className="border-orange-200 border-b bg-orange-50"
+        role="status"
+      >
+        <div className="mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
+          <p className="text-orange-800 text-sm">
             <span aria-hidden="true">🔄</span> Connection lost. Reconnecting...
           </p>
         </div>
@@ -52,9 +63,13 @@ export function ConnectionStatusBanner({ readyState, reconnecting }: ConnectionS
 
   if (isConnected) {
     return (
-      <div className="bg-green-50 border-b border-green-200" role="status" aria-live="polite">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <p className="text-sm text-green-800">
+      <div
+        aria-live="polite"
+        className="border-green-200 border-b bg-green-50"
+        role="status"
+      >
+        <div className="mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
+          <p className="text-green-800 text-sm">
             <span aria-hidden="true">✓</span> Connected - Live updates enabled
           </p>
         </div>
@@ -64,9 +79,13 @@ export function ConnectionStatusBanner({ readyState, reconnecting }: ConnectionS
 
   if (isDisconnected) {
     return (
-      <div className="bg-red-50 border-b border-red-200" role="alert" aria-live="assertive">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <p className="text-sm text-red-800">
+      <div
+        aria-live="assertive"
+        className="border-red-200 border-b bg-red-50"
+        role="alert"
+      >
+        <div className="mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
+          <p className="text-red-800 text-sm">
             <span aria-hidden="true">✗</span> Disconnected - Live updates paused
           </p>
         </div>

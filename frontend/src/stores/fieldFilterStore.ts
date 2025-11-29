@@ -5,21 +5,21 @@
  * HYBRID architecture: Store state in Zustand + URL hash for shareability.
  * Uses sessionStorage for persistence (filters reset on new tab/session).
  */
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 /**
  * Generate a UUID v4 with fallback for older browsers
  * Uses crypto.randomUUID() if available, otherwise falls back to Math.random()
  */
 function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
   }
   // Fallback: Simple UUID v4 implementation for older browsers
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
@@ -28,22 +28,29 @@ function generateUUID(): string {
  * Field filter operator (matches backend FieldFilterOperator enum)
  */
 export type FilterOperator =
-  | 'eq' | 'gt' | 'gte' | 'lt' | 'lte' | 'between'  // Numeric
-  | 'contains' | 'exact' | 'in'                      // Text/Select
-  | 'is';                                            // Boolean
+  | "eq"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "between" // Numeric
+  | "contains"
+  | "exact"
+  | "in" // Text/Select
+  | "is"; // Boolean
 
 /**
  * Active field filter (UI state representation)
  */
 export interface ActiveFilter {
-  id: string;                   // Unique ID for this filter instance (UUID v4)
-  fieldId: string;              // Custom field UUID
-  fieldName: string;            // Display name (e.g., "Overall Rating")
-  fieldType: 'rating' | 'select' | 'text' | 'boolean';
+  id: string; // Unique ID for this filter instance (UUID v4)
+  fieldId: string; // Custom field UUID
+  fieldName: string; // Display name (e.g., "Overall Rating")
+  fieldType: "rating" | "select" | "text" | "boolean";
   operator: FilterOperator;
   value?: string | number | boolean;
-  valueMin?: number;            // For BETWEEN operator
-  valueMax?: number;            // For BETWEEN operator
+  valueMin?: number; // For BETWEEN operator
+  valueMax?: number; // For BETWEEN operator
 }
 
 /**
@@ -54,7 +61,7 @@ interface FieldFilterStore {
   activeFilters: ActiveFilter[];
 
   /** Add a new filter */
-  addFilter: (filter: Omit<ActiveFilter, 'id'>) => void;
+  addFilter: (filter: Omit<ActiveFilter, "id">) => void;
 
   /** Update an existing filter */
   updateFilter: (id: string, updates: Partial<ActiveFilter>) => void;
@@ -111,7 +118,7 @@ export const useFieldFilterStore = create<FieldFilterStore>()(
         set((state) => ({
           activeFilters: [
             ...state.activeFilters,
-            { ...filter, id: generateUUID() }
+            { ...filter, id: generateUUID() },
           ],
         })),
 
@@ -130,7 +137,7 @@ export const useFieldFilterStore = create<FieldFilterStore>()(
       clearFilters: () => set({ activeFilters: [] }),
     }),
     {
-      name: 'field-filter-state', // sessionStorage key
+      name: "field-filter-state", // sessionStorage key
       storage: createJSONStorage(() => sessionStorage),
     }
   )

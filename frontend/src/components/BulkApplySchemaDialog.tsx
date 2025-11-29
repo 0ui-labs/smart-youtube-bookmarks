@@ -1,6 +1,8 @@
 // frontend/src/components/BulkApplySchemaDialog.tsx
 
-import { useState, useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -8,19 +10,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
-import type { Tag } from '@/types/tag'
-import type { FieldSchemaResponse } from '@/types/schema'
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import type { FieldSchemaResponse } from "@/types/schema";
+import type { Tag } from "@/types/tag";
 
 export interface BulkApplySchemaDialogProps {
-  open: boolean
-  schema: FieldSchemaResponse | null
-  tags: Tag[]
-  onConfirm: (selectedTagIds: string[]) => void
-  onCancel: () => void
+  open: boolean;
+  schema: FieldSchemaResponse | null;
+  tags: Tag[];
+  onConfirm: (selectedTagIds: string[]) => void;
+  onCancel: () => void;
 }
 
 /**
@@ -56,116 +56,127 @@ export function BulkApplySchemaDialog({
   onConfirm,
   onCancel,
 }: BulkApplySchemaDialogProps) {
-  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set())
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
 
   // Show all tags, but track which ones already have this schema
-  const availableTags = tags
+  const availableTags = tags;
 
   const alreadyAssignedCount = useMemo(() => {
-    if (!schema) return 0
-    return tags.filter(tag => tag.schema_id === schema.id).length
-  }, [tags, schema])
+    if (!schema) return 0;
+    return tags.filter((tag) => tag.schema_id === schema.id).length;
+  }, [tags, schema]);
 
   // Reset selection when dialog closes
   useEffect(() => {
     if (!open) {
-      setSelectedTagIds(new Set())
+      setSelectedTagIds(new Set());
     }
-  }, [open])
+  }, [open]);
 
   const handleToggleTag = (tagId: string) => {
-    setSelectedTagIds(prev => {
-      const next = new Set(prev)
+    setSelectedTagIds((prev) => {
+      const next = new Set(prev);
       if (next.has(tagId)) {
-        next.delete(tagId)
+        next.delete(tagId);
       } else {
-        next.add(tagId)
+        next.add(tagId);
       }
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   const handleSelectAll = () => {
     if (selectedTagIds.size === availableTags.length) {
       // Clear all
-      setSelectedTagIds(new Set())
+      setSelectedTagIds(new Set());
     } else {
       // Select all
-      setSelectedTagIds(new Set(availableTags.map(t => t.id)))
+      setSelectedTagIds(new Set(availableTags.map((t) => t.id)));
     }
-  }
+  };
 
   const handleConfirm = () => {
-    onConfirm(Array.from(selectedTagIds))
-  }
+    onConfirm(Array.from(selectedTagIds));
+  };
 
   const hasOverwrites = availableTags.some(
-    tag => selectedTagIds.has(tag.id) && tag.schema_id !== null
-  )
+    (tag) => selectedTagIds.has(tag.id) && tag.schema_id !== null
+  );
 
-  if (!schema) return null
+  if (!schema) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col">
+    <Dialog onOpenChange={(open) => !open && onCancel()} open={open}>
+      <DialogContent className="flex max-h-[80vh] flex-col sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Schema auf Tags anwenden</DialogTitle>
           <DialogDescription>
-            Wenden Sie das Schema <strong>{schema.name}</strong> auf mehrere Tags gleichzeitig an.
+            Wenden Sie das Schema <strong>{schema.name}</strong> auf mehrere
+            Tags gleichzeitig an.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-4">
           {availableTags.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="py-8 text-center text-muted-foreground">
               <p>Keine Tags verfügbar.</p>
               {alreadyAssignedCount > 0 && (
-                <p className="text-sm mt-2">
-                  {alreadyAssignedCount} {alreadyAssignedCount === 1 ? 'Tag hat' : 'Tags haben'} bereits dieses Schema.
+                <p className="mt-2 text-sm">
+                  {alreadyAssignedCount}{" "}
+                  {alreadyAssignedCount === 1 ? "Tag hat" : "Tags haben"}{" "}
+                  bereits dieses Schema.
                 </p>
               )}
             </div>
           ) : (
             <div className="space-y-4">
               {/* Select All Checkbox */}
-              <div className="flex items-center gap-2 pb-2 border-b">
+              <div className="flex items-center gap-2 border-b pb-2">
                 <Checkbox
+                  checked={
+                    selectedTagIds.size === availableTags.length &&
+                    availableTags.length > 0
+                  }
                   id="select-all"
-                  checked={selectedTagIds.size === availableTags.length && availableTags.length > 0}
                   onCheckedChange={handleSelectAll}
                 />
-                <Label htmlFor="select-all" className="font-medium cursor-pointer">
+                <Label
+                  className="cursor-pointer font-medium"
+                  htmlFor="select-all"
+                >
                   Alle auswählen ({availableTags.length})
                 </Label>
               </div>
 
               {/* Tag List with Checkboxes */}
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {availableTags.map(tag => {
-                  const isSelected = selectedTagIds.has(tag.id)
-                  const hasExistingSchema = tag.schema_id !== null
+              <div className="max-h-[400px] space-y-2 overflow-y-auto">
+                {availableTags.map((tag) => {
+                  const isSelected = selectedTagIds.has(tag.id);
+                  const hasExistingSchema = tag.schema_id !== null;
 
                   return (
                     <div
-                      key={tag.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                        isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                      className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                        isSelected
+                          ? "border-blue-200 bg-blue-50"
+                          : "hover:bg-gray-50"
                       }`}
+                      key={tag.id}
                     >
                       <Checkbox
-                        id={`tag-${tag.id}`}
                         checked={isSelected}
+                        id={`tag-${tag.id}`}
                         onCheckedChange={() => handleToggleTag(tag.id)}
                       />
-                      <div className="flex-1 flex items-center gap-2">
+                      <div className="flex flex-1 items-center gap-2">
                         <Label
+                          className="flex flex-1 cursor-pointer items-center gap-2"
                           htmlFor={`tag-${tag.id}`}
-                          className="flex-1 cursor-pointer flex items-center gap-2"
                         >
                           {/* Tag Color Badge */}
                           {tag.color && (
                             <div
-                              className="w-4 h-4 rounded-full flex-shrink-0"
+                              className="h-4 w-4 flex-shrink-0 rounded-full"
                               style={{ backgroundColor: tag.color }}
                             />
                           )}
@@ -174,37 +185,43 @@ export function BulkApplySchemaDialog({
                         </Label>
                         {/* Current Schema Indicator */}
                         {hasExistingSchema && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-muted-foreground text-xs">
                             (hat Schema)
                           </span>
                         )}
                       </div>
                     </div>
-                  )
+                  );
                 })}
               </div>
 
               {/* Info Messages */}
               <div className="space-y-2 pt-2">
                 {/* Selection Count */}
-                <div className="text-sm text-muted-foreground">
-                  {selectedTagIds.size} {selectedTagIds.size === 1 ? 'Tag ausgewählt' : 'Tags ausgewählt'}
+                <div className="text-muted-foreground text-sm">
+                  {selectedTagIds.size}{" "}
+                  {selectedTagIds.size === 1
+                    ? "Tag ausgewählt"
+                    : "Tags ausgewählt"}
                 </div>
 
                 {/* Overwrite Warning */}
                 {hasOverwrites && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                    <p className="text-sm text-orange-900">
-                      ⚠️ Einige ausgewählte Tags haben bereits ein Schema, das wird überschrieben.
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                    <p className="text-orange-900 text-sm">
+                      ⚠️ Einige ausgewählte Tags haben bereits ein Schema, das
+                      wird überschrieben.
                     </p>
                   </div>
                 )}
 
                 {/* Already Assigned Info */}
                 {alreadyAssignedCount > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-blue-900">
-                      ℹ️ {alreadyAssignedCount} {alreadyAssignedCount === 1 ? 'Tag ist' : 'Tags sind'} bereits zugewiesen.
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <p className="text-blue-900 text-sm">
+                      ℹ️ {alreadyAssignedCount}{" "}
+                      {alreadyAssignedCount === 1 ? "Tag ist" : "Tags sind"}{" "}
+                      bereits zugewiesen.
                     </p>
                   </div>
                 )}
@@ -214,17 +231,14 @@ export function BulkApplySchemaDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onCancel}>
+          <Button onClick={onCancel} variant="outline">
             Abbrechen
           </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={selectedTagIds.size === 0}
-          >
+          <Button disabled={selectedTagIds.size === 0} onClick={handleConfirm}>
             Anwenden ({selectedTagIds.size})
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

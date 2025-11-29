@@ -1,14 +1,6 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { EyeOff, Eye, MoreHorizontal, Trash2 } from 'lucide-react'
-import { useChannels, useUpdateChannel, useDeleteChannel } from '@/hooks/useChannels'
-import type { Channel } from '@/types/channel'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { Eye, EyeOff, MoreHorizontal, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,20 +10,32 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  useChannels,
+  useDeleteChannel,
+  useUpdateChannel,
+} from "@/hooks/useChannels";
+import type { Channel } from "@/types/channel";
 
 /**
  * Get initials from channel name (max 2 characters)
  */
 function getInitials(name: string): string {
   return name
-    .split(' ')
-    .map(word => word[0])
+    .split(" ")
+    .map((word) => word[0])
     .filter(Boolean)
     .slice(0, 2)
-    .join('')
-    .toUpperCase()
+    .join("")
+    .toUpperCase();
 }
 
 /**
@@ -47,159 +51,168 @@ function getInitials(name: string): string {
  * Route: /channels
  */
 export function ChannelsPage() {
-  const navigate = useNavigate()
-  const { data: channels = [], isLoading, isError } = useChannels(true)
-  const updateChannel = useUpdateChannel()
-  const deleteChannel = useDeleteChannel()
-  const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null)
+  const navigate = useNavigate();
+  const { data: channels = [], isLoading, isError } = useChannels(true);
+  const updateChannel = useUpdateChannel();
+  const deleteChannel = useDeleteChannel();
+  const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
 
   const handleChannelClick = (channelId: string) => {
-    navigate(`/videos?channel=${channelId}`)
-  }
+    navigate(`/videos?channel=${channelId}`);
+  };
 
-  const handleToggleVisibility = (channelId: string, currentlyHidden: boolean) => {
-    updateChannel.mutate({ channelId, data: { is_hidden: !currentlyHidden } })
-  }
+  const handleToggleVisibility = (
+    channelId: string,
+    currentlyHidden: boolean
+  ) => {
+    updateChannel.mutate({ channelId, data: { is_hidden: !currentlyHidden } });
+  };
 
   const handleDeleteConfirm = () => {
-    if (!channelToDelete) return
+    if (!channelToDelete) return;
     deleteChannel.mutate(channelToDelete.id, {
       onSuccess: () => setChannelToDelete(null),
-    })
-  }
+    });
+  };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-2xl font-bold">Alle Kanäle</h1>
+          <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+            <h1 className="font-bold text-2xl">Alle Kanäle</h1>
           </div>
         </header>
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="space-y-4">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-start gap-4 p-4">
-                <div className="h-20 w-20 rounded-full bg-muted animate-pulse" />
+              <div className="flex items-start gap-4 p-4" key={i}>
+                <div className="h-20 w-20 animate-pulse rounded-full bg-muted" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-5 w-48 bg-muted animate-pulse rounded" />
-                  <div className="h-4 w-full bg-muted animate-pulse rounded" />
-                  <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+                  <div className="h-5 w-48 animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
                 </div>
               </div>
             ))}
           </div>
         </main>
       </div>
-    )
+    );
   }
 
   if (isError) {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-2xl font-bold">Alle Kanäle</h1>
+          <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+            <h1 className="font-bold text-2xl">Alle Kanäle</h1>
           </div>
         </header>
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center py-12">
+        <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="py-12 text-center">
             <p className="text-destructive">Fehler beim Laden der Kanäle.</p>
           </div>
         </main>
       </div>
-    )
+    );
   }
 
   if (channels.length === 0) {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-2xl font-bold">Alle Kanäle</h1>
+          <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+            <h1 className="font-bold text-2xl">Alle Kanäle</h1>
           </div>
         </header>
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center py-12">
+        <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="py-12 text-center">
             <p className="text-muted-foreground">
-              Noch keine Kanäle vorhanden. Füge Videos hinzu, um Kanäle zu sehen.
+              Noch keine Kanäle vorhanden. Füge Videos hinzu, um Kanäle zu
+              sehen.
             </p>
           </div>
         </main>
       </div>
-    )
+    );
   }
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <h1 className="text-2xl font-bold">Alle Kanäle</h1>
-          <p className="text-muted-foreground mt-1">
-            {channels.length} {channels.length === 1 ? 'Kanal' : 'Kanäle'}
+        <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+          <h1 className="font-bold text-2xl">Alle Kanäle</h1>
+          <p className="mt-1 text-muted-foreground">
+            {channels.length} {channels.length === 1 ? "Kanal" : "Kanäle"}
           </p>
         </div>
       </header>
 
       {/* Channel List */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="space-y-2">
           {channels.map((channel) => (
-            <div key={channel.id} className="group relative flex items-start">
+            <div className="group relative flex items-start" key={channel.id}>
               <button
+                className="flex w-full items-start gap-4 rounded-lg p-4 text-left transition-colors hover:bg-accent"
                 onClick={() => handleChannelClick(channel.id)}
-                className="w-full flex items-start gap-4 p-4 rounded-lg hover:bg-accent transition-colors text-left"
               >
-              {/* Large round avatar */}
-              {channel.thumbnail_url ? (
-                <img
-                  src={channel.thumbnail_url}
-                  alt={channel.name}
-                  className="h-20 w-20 rounded-full flex-shrink-0 object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="h-20 w-20 rounded-full flex-shrink-0 bg-muted flex items-center justify-center text-xl">
-                  {getInitials(channel.name)}
-                </div>
-              )}
-
-              {/* Channel info */}
-              <div className="flex-1 min-w-0 pt-1">
-                <h2 className="text-lg font-semibold truncate flex items-center gap-2">
-                  {channel.name}
-                  {channel.is_hidden && (
-                    <EyeOff className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  )}
-                </h2>
-                {channel.description ? (
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                    {channel.description}
-                  </p>
+                {/* Large round avatar */}
+                {channel.thumbnail_url ? (
+                  <img
+                    alt={channel.name}
+                    className="h-20 w-20 flex-shrink-0 rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                    src={channel.thumbnail_url}
+                  />
                 ) : (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {channel.video_count} {channel.video_count === 1 ? 'Video' : 'Videos'}
-                  </p>
+                  <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xl">
+                    {getInitials(channel.name)}
+                  </div>
                 )}
-              </div>
+
+                {/* Channel info */}
+                <div className="min-w-0 flex-1 pt-1">
+                  <h2 className="flex items-center gap-2 truncate font-semibold text-lg">
+                    {channel.name}
+                    {channel.is_hidden && (
+                      <EyeOff className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                    )}
+                  </h2>
+                  {channel.description ? (
+                    <p className="mt-1 line-clamp-2 text-muted-foreground text-sm">
+                      {channel.description}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-muted-foreground text-sm">
+                      {channel.video_count}{" "}
+                      {channel.video_count === 1 ? "Video" : "Videos"}
+                    </p>
+                  )}
+                </div>
               </button>
 
               {/* 3-dot menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                    className="-translate-y-1/2 absolute top-1/2 right-2 h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
                     onClick={(e) => e.stopPropagation()}
+                    size="icon"
+                    variant="ghost"
                   >
                     <MoreHorizontal className="h-4 w-4" />
                     <span className="sr-only">Menü öffnen</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleToggleVisibility(channel.id, channel.is_hidden)}>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      handleToggleVisibility(channel.id, channel.is_hidden)
+                    }
+                  >
                     {channel.is_hidden ? (
                       <>
                         <Eye className="mr-2 h-4 w-4" />
@@ -227,29 +240,33 @@ export function ChannelsPage() {
       </main>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!channelToDelete} onOpenChange={(open) => !open && setChannelToDelete(null)}>
+      <AlertDialog
+        onOpenChange={(open) => !open && setChannelToDelete(null)}
+        open={!!channelToDelete}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Kanal löschen?</AlertDialogTitle>
             <AlertDialogDescription>
               Möchtest du den Kanal „{channelToDelete?.name}" wirklich löschen?
-              <br /><br />
-              <strong>Hinweis:</strong> Die Videos dieses Kanals bleiben erhalten,
-              verlieren aber ihre Kanal-Zuordnung.
+              <br />
+              <br />
+              <strong>Hinweis:</strong> Die Videos dieses Kanals bleiben
+              erhalten, verlieren aber ihre Kanal-Zuordnung.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              disabled={deleteChannel.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteChannel.isPending}
+              onClick={handleDeleteConfirm}
             >
-              {deleteChannel.isPending ? 'Wird gelöscht...' : 'Löschen'}
+              {deleteChannel.isPending ? "Wird gelöscht..." : "Löschen"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }

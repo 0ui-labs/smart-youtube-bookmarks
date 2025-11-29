@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from "zod";
 
 /**
  * Schema field for validation (matches the structure in SchemaEditor)
@@ -13,11 +13,11 @@ interface SchemaField {
  * Validation issue type (compatible with Zod's addIssue)
  */
 interface ValidationIssue {
-  code: z.ZodIssueCode | 'custom';
+  code: z.ZodIssueCode | "custom";
   message: string;
   path: (string | number)[];
   maximum?: number;
-  type?: 'string' | 'number' | 'bigint' | 'date' | 'array' | 'set';
+  type?: "string" | "number" | "bigint" | "date" | "array" | "set";
   inclusive?: boolean;
 }
 
@@ -41,16 +41,18 @@ interface ValidationIssue {
  * // Returns: { code: "too_big", message: "Maximal 3 Felder können auf der Karte angezeigt werden", ... }
  * ```
  */
-export function validateShowOnCardLimit(fields: SchemaField[]): ValidationIssue | null {
-  const showOnCardCount = fields.filter(f => f.show_on_card).length;
+export function validateShowOnCardLimit(
+  fields: SchemaField[]
+): ValidationIssue | null {
+  const showOnCardCount = fields.filter((f) => f.show_on_card).length;
 
   if (showOnCardCount > 3) {
     return {
-      code: 'too_big',
+      code: "too_big",
       maximum: 3,
-      type: 'array',
+      type: "array",
       inclusive: true,
-      message: 'Maximal 3 Felder können auf der Karte angezeigt werden',
+      message: "Maximal 3 Felder können auf der Karte angezeigt werden",
       path: [], // Root level error for entire fields array
     };
   }
@@ -77,7 +79,9 @@ export function validateShowOnCardLimit(fields: SchemaField[]): ValidationIssue 
  * // Returns: [{ code: "custom", message: "Anzeigereihenfolge 1 ist bereits vergeben", path: [2, 'display_order'] }]
  * ```
  */
-export function validateUniqueDisplayOrder(fields: SchemaField[]): ValidationIssue[] {
+export function validateUniqueDisplayOrder(
+  fields: SchemaField[]
+): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
   // Use Map for O(n) complexity instead of O(n²)
@@ -94,11 +98,11 @@ export function validateUniqueDisplayOrder(fields: SchemaField[]): ValidationIss
   orderMap.forEach((indices, order) => {
     if (indices.length > 1) {
       // Skip first occurrence, report rest as duplicates
-      indices.slice(1).forEach(index => {
+      indices.slice(1).forEach((index) => {
         issues.push({
-          code: 'custom',
+          code: "custom",
           message: `Anzeigereihenfolge ${order} ist bereits vergeben`,
-          path: [index, 'display_order'],
+          path: [index, "display_order"],
         });
       });
     }
@@ -126,7 +130,9 @@ export function validateUniqueDisplayOrder(fields: SchemaField[]): ValidationIss
  * // Returns: [{ code: "custom", message: "Dieses Feld wurde bereits hinzugefügt", path: [2, 'field_id'] }]
  * ```
  */
-export function validateUniqueFieldIds(fields: SchemaField[]): ValidationIssue[] {
+export function validateUniqueFieldIds(
+  fields: SchemaField[]
+): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
   // Use Map for O(n) complexity instead of O(n²)
@@ -143,11 +149,11 @@ export function validateUniqueFieldIds(fields: SchemaField[]): ValidationIssue[]
   idMap.forEach((indices) => {
     if (indices.length > 1) {
       // Skip first occurrence, report rest as duplicates
-      indices.slice(1).forEach(index => {
+      indices.slice(1).forEach((index) => {
         issues.push({
-          code: 'custom',
-          message: 'Dieses Feld wurde bereits hinzugefügt',
-          path: [index, 'field_id'],
+          code: "custom",
+          message: "Dieses Feld wurde bereits hinzugefügt",
+          path: [index, "field_id"],
         });
       });
     }
@@ -184,9 +190,9 @@ export function validateAllSchemaFields(
 
   // Check 2: Unique display_order
   const displayOrderIssues = validateUniqueDisplayOrder(fields);
-  displayOrderIssues.forEach(issue => ctx.addIssue(issue as any));
+  displayOrderIssues.forEach((issue) => ctx.addIssue(issue as any));
 
   // Check 3: Unique field_id
   const fieldIdIssues = validateUniqueFieldIds(fields);
-  fieldIdIssues.forEach(issue => ctx.addIssue(issue as any));
+  fieldIdIssues.forEach((issue) => ctx.addIssue(issue as any));
 }

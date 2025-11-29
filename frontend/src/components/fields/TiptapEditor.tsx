@@ -8,31 +8,31 @@
  * - Character count display
  */
 
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Placeholder from '@tiptap/extension-placeholder'
-import Link from '@tiptap/extension-link'
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
-import CharacterCount from '@tiptap/extension-character-count'
-import { common, createLowlight } from 'lowlight'
-import { cn } from '@/lib/utils'
-import { TiptapBubbleMenu } from './TiptapBubbleMenu'
+import CharacterCount from "@tiptap/extension-character-count";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import Link from "@tiptap/extension-link";
+import Placeholder from "@tiptap/extension-placeholder";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import { common, createLowlight } from "lowlight";
+import { cn } from "@/lib/utils";
+import { TiptapBubbleMenu } from "./TiptapBubbleMenu";
 
-const lowlight = createLowlight(common)
+const lowlight = createLowlight(common);
 
 interface TiptapEditorProps {
-  content: string
-  onChange: (html: string) => void
-  placeholder?: string
-  maxLength?: number
-  className?: string
-  disabled?: boolean
+  content: string;
+  onChange: (html: string) => void;
+  placeholder?: string;
+  maxLength?: number;
+  className?: string;
+  disabled?: boolean;
 }
 
 export const TiptapEditor = ({
   content,
   onChange,
-  placeholder = 'Notizen eingeben...',
+  placeholder = "Notizen eingeben...",
   maxLength,
   className,
   disabled = false,
@@ -48,7 +48,7 @@ export const TiptapEditor = ({
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
-          class: 'text-primary underline',
+          class: "text-primary underline",
         },
       }),
       CodeBlockLowlight.configure({
@@ -61,25 +61,25 @@ export const TiptapEditor = ({
     content,
     editable: !disabled,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML())
+      onChange(editor.getHTML());
     },
-  })
+  });
 
   if (!editor) {
-    return null
+    return null;
   }
 
-  const characterCount = editor.storage.characterCount?.characters() ?? 0
+  const characterCount = editor.storage.characterCount?.characters() ?? 0;
 
   return (
-    <div className={cn('tiptap-editor', className)}>
+    <div className={cn("tiptap-editor", className)}>
       <TiptapBubbleMenu editor={editor} />
       <EditorContent editor={editor} />
       {maxLength && (
-        <div className="text-xs text-muted-foreground text-right mt-1">
+        <div className="mt-1 text-right text-muted-foreground text-xs">
           {characterCount} / {maxLength}
         </div>
       )}
     </div>
-  )
-}
+  );
+};

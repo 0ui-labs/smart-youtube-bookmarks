@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from "zod";
 
 /**
  * Field type literal union for custom fields
@@ -16,7 +16,7 @@ import { z } from 'zod'
  * // Invalid: Compile error
  * const invalid: FieldType = 'invalid' // ❌ Type '"invalid"' is not assignable to type 'FieldType'
  */
-export type FieldType = 'select' | 'rating' | 'text' | 'boolean'
+export type FieldType = "select" | "rating" | "text" | "boolean";
 
 /**
  * Zod schema for FieldType validation
@@ -29,7 +29,7 @@ export type FieldType = 'select' | 'rating' | 'text' | 'boolean'
  * // Invalid
  * FieldTypeSchema.parse('invalid') // ❌ Throws ZodError
  */
-export const FieldTypeSchema = z.enum(['select', 'rating', 'text', 'boolean'])
+export const FieldTypeSchema = z.enum(["select", "rating", "text", "boolean"]);
 
 // ============================================================================
 // Config Types (Type-Specific Configurations)
@@ -54,8 +54,8 @@ export const FieldTypeSchema = z.enum(['select', 'rating', 'text', 'boolean'])
  * }
  */
 export type SelectConfig = {
-  options: [string, ...string[]] // Non-empty array (at least 1 option)
-}
+  options: [string, ...string[]]; // Non-empty array (at least 1 option)
+};
 
 /**
  * Zod schema for SelectConfig validation
@@ -68,9 +68,11 @@ export type SelectConfig = {
  * // Invalid: Empty array
  * SelectConfigSchema.parse({ options: [] }) // ❌ ZodError: Array must contain at least 1 element(s)
  */
-export const SelectConfigSchema = z.object({
-  options: z.array(z.string().min(1)).min(1),
-}).strict()
+export const SelectConfigSchema = z
+  .object({
+    options: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
 
 /**
  * Configuration for 'rating' field type
@@ -97,8 +99,8 @@ export const SelectConfigSchema = z.object({
  * }
  */
 export type RatingConfig = {
-  max_rating: number // 1-10 (validated by backend)
-}
+  max_rating: number; // 1-10 (validated by backend)
+};
 
 /**
  * Zod schema for RatingConfig validation
@@ -111,9 +113,11 @@ export type RatingConfig = {
  * // Invalid: max_rating too high
  * RatingConfigSchema.parse({ max_rating: 20 }) // ❌ ZodError: Number must be less than or equal to 10
  */
-export const RatingConfigSchema = z.object({
-  max_rating: z.number().int().min(1).max(10),
-}).strict()
+export const RatingConfigSchema = z
+  .object({
+    max_rating: z.number().int().min(1).max(10),
+  })
+  .strict();
 
 /**
  * Configuration for 'text' field type
@@ -138,8 +142,8 @@ export const RatingConfigSchema = z.object({
  * }
  */
 export type TextConfig = {
-  max_length?: number // ≥1 if specified (validated by backend)
-}
+  max_length?: number; // ≥1 if specified (validated by backend)
+};
 
 /**
  * Zod schema for TextConfig validation
@@ -156,9 +160,11 @@ export type TextConfig = {
  * // Invalid: max_length too low
  * TextConfigSchema.parse({ max_length: 0 }) // ❌ ZodError: Number must be greater than or equal to 1
  */
-export const TextConfigSchema = z.object({
-  max_length: z.number().int().min(1).optional(),
-}).strict()
+export const TextConfigSchema = z
+  .object({
+    max_length: z.number().int().min(1).optional(),
+  })
+  .strict();
 
 /**
  * Configuration for 'boolean' field type
@@ -170,7 +176,7 @@ export const TextConfigSchema = z.object({
  * // Valid: Empty config
  * const config: BooleanConfig = {}
  */
-export type BooleanConfig = Record<string, never> // Empty object
+export type BooleanConfig = Record<string, never>; // Empty object
 
 /**
  * Zod schema for BooleanConfig validation
@@ -183,7 +189,7 @@ export type BooleanConfig = Record<string, never> // Empty object
  * // Invalid: Non-empty config
  * BooleanConfigSchema.parse({ foo: 'bar' }) // ❌ ZodError: Unrecognized key
  */
-export const BooleanConfigSchema = z.object({}).strict()
+export const BooleanConfigSchema = z.object({}).strict();
 
 /**
  * Union type for all possible field configurations
@@ -207,7 +213,11 @@ export const BooleanConfigSchema = z.object({}).strict()
  * // Valid: Boolean config (empty)
  * const config: FieldConfig = {}
  */
-export type FieldConfig = SelectConfig | RatingConfig | TextConfig | BooleanConfig
+export type FieldConfig =
+  | SelectConfig
+  | RatingConfig
+  | TextConfig
+  | BooleanConfig;
 
 /**
  * Zod discriminated union schema for CustomField with config validation
@@ -236,32 +246,38 @@ export type FieldConfig = SelectConfig | RatingConfig | TextConfig | BooleanConf
  *   config: { max_rating: 5 }
  * }) // ❌ ZodError: Config shape must match field_type
  */
-export const CustomFieldSchema = z.object({
-  id: z.string().uuid(),
-  list_id: z.string().uuid(),
-  name: z.string().min(1).max(255),
-  field_type: FieldTypeSchema,
-  config: z.record(z.any()), // Accept any object, validate shape in .refine()
-  created_at: z.string(),
-  updated_at: z.string(),
-}).strict().refine((data) => {
-  // REF MCP Improvement #2: Validate config shape matches field_type
-  switch (data.field_type) {
-    case 'select':
-      return SelectConfigSchema.safeParse(data.config).success
-    case 'rating':
-      return RatingConfigSchema.safeParse(data.config).success
-    case 'text':
-      return TextConfigSchema.safeParse(data.config).success
-    case 'boolean':
-      return BooleanConfigSchema.safeParse(data.config).success
-    default:
-      return false
-  }
-}, {
-  message: "Config shape must match field_type",
-  path: ['config'],
-})
+export const CustomFieldSchema = z
+  .object({
+    id: z.string().uuid(),
+    list_id: z.string().uuid(),
+    name: z.string().min(1).max(255),
+    field_type: FieldTypeSchema,
+    config: z.record(z.any()), // Accept any object, validate shape in .refine()
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .strict()
+  .refine(
+    (data) => {
+      // REF MCP Improvement #2: Validate config shape matches field_type
+      switch (data.field_type) {
+        case "select":
+          return SelectConfigSchema.safeParse(data.config).success;
+        case "rating":
+          return RatingConfigSchema.safeParse(data.config).success;
+        case "text":
+          return TextConfigSchema.safeParse(data.config).success;
+        case "boolean":
+          return BooleanConfigSchema.safeParse(data.config).success;
+        default:
+          return false;
+      }
+    },
+    {
+      message: "Config shape must match field_type",
+      path: ["config"],
+    }
+  );
 
 /**
  * CustomField type inferred from Zod schema
@@ -296,7 +312,7 @@ export const CustomFieldSchema = z.object({
  *   updated_at: '2025-11-06T10:30:00Z'
  * }
  */
-export type CustomField = z.infer<typeof CustomFieldSchema>
+export type CustomField = z.infer<typeof CustomFieldSchema>;
 
 /**
  * Schema for creating a new custom field
@@ -336,30 +352,36 @@ export type CustomField = z.infer<typeof CustomFieldSchema>
  *   config: {} as const
  * }
  */
-export const CustomFieldCreateSchema = z.object({
-  name: z.string().min(1).max(255),
-  field_type: FieldTypeSchema,
-  config: z.record(z.any()), // Accept any object, validate shape in .refine()
-}).strict().refine((data) => {
-  // REF MCP Improvement #2: Validate config shape matches field_type
-  switch (data.field_type) {
-    case 'select':
-      return SelectConfigSchema.safeParse(data.config).success
-    case 'rating':
-      return RatingConfigSchema.safeParse(data.config).success
-    case 'text':
-      return TextConfigSchema.safeParse(data.config).success
-    case 'boolean':
-      return BooleanConfigSchema.safeParse(data.config).success
-    default:
-      return false
-  }
-}, {
-  message: "Config shape must match field_type",
-  path: ['config'],
-})
+export const CustomFieldCreateSchema = z
+  .object({
+    name: z.string().min(1).max(255),
+    field_type: FieldTypeSchema,
+    config: z.record(z.any()), // Accept any object, validate shape in .refine()
+  })
+  .strict()
+  .refine(
+    (data) => {
+      // REF MCP Improvement #2: Validate config shape matches field_type
+      switch (data.field_type) {
+        case "select":
+          return SelectConfigSchema.safeParse(data.config).success;
+        case "rating":
+          return RatingConfigSchema.safeParse(data.config).success;
+        case "text":
+          return TextConfigSchema.safeParse(data.config).success;
+        case "boolean":
+          return BooleanConfigSchema.safeParse(data.config).success;
+        default:
+          return false;
+      }
+    },
+    {
+      message: "Config shape must match field_type",
+      path: ["config"],
+    }
+  );
 
-export type CustomFieldCreate = z.infer<typeof CustomFieldCreateSchema>
+export type CustomFieldCreate = z.infer<typeof CustomFieldCreateSchema>;
 
 /**
  * Schema for updating an existing custom field
@@ -398,34 +420,39 @@ export type CustomFieldCreate = z.infer<typeof CustomFieldCreateSchema>
  * Note: Backend validates that changing field_type on existing fields with values
  * requires confirmation.
  */
-export const CustomFieldUpdateSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  field_type: FieldTypeSchema.optional(),
-  config: z.record(z.any()).optional(),
-}).refine((data) => {
-  // REF MCP Improvement #2: Validate config shape matches field_type (if both present)
-  if (!data.field_type || !data.config) {
-    return true // Skip validation if either is missing (partial update)
-  }
+export const CustomFieldUpdateSchema = z
+  .object({
+    name: z.string().min(1).max(255).optional(),
+    field_type: FieldTypeSchema.optional(),
+    config: z.record(z.any()).optional(),
+  })
+  .refine(
+    (data) => {
+      // REF MCP Improvement #2: Validate config shape matches field_type (if both present)
+      if (!(data.field_type && data.config)) {
+        return true; // Skip validation if either is missing (partial update)
+      }
 
-  switch (data.field_type) {
-    case 'select':
-      return SelectConfigSchema.safeParse(data.config).success
-    case 'rating':
-      return RatingConfigSchema.safeParse(data.config).success
-    case 'text':
-      return TextConfigSchema.safeParse(data.config).success
-    case 'boolean':
-      return BooleanConfigSchema.safeParse(data.config).success
-    default:
-      return false
-  }
-}, {
-  message: "Config shape must match field_type",
-  path: ['config'],
-})
+      switch (data.field_type) {
+        case "select":
+          return SelectConfigSchema.safeParse(data.config).success;
+        case "rating":
+          return RatingConfigSchema.safeParse(data.config).success;
+        case "text":
+          return TextConfigSchema.safeParse(data.config).success;
+        case "boolean":
+          return BooleanConfigSchema.safeParse(data.config).success;
+        default:
+          return false;
+      }
+    },
+    {
+      message: "Config shape must match field_type",
+      path: ["config"],
+    }
+  );
 
-export type CustomFieldUpdate = z.infer<typeof CustomFieldUpdateSchema>
+export type CustomFieldUpdate = z.infer<typeof CustomFieldUpdateSchema>;
 
 // ============================================================================
 // Field Schema Types (Task #65)
@@ -454,10 +481,10 @@ export type CustomFieldUpdate = z.infer<typeof CustomFieldUpdateSchema>
  * }
  */
 export type SchemaFieldInput = {
-  field_id: string // UUID
-  display_order: number // 0-indexed
-  show_on_card: boolean
-}
+  field_id: string; // UUID
+  display_order: number; // 0-indexed
+  show_on_card: boolean;
+};
 
 /**
  * Zod schema for SchemaFieldInput validation
@@ -482,7 +509,7 @@ export const SchemaFieldInputSchema = z.object({
   field_id: z.string().uuid(),
   display_order: z.number().int().min(0),
   show_on_card: z.boolean(),
-})
+});
 
 /**
  * FieldInSchemaResponse type for full custom field details in schema response
@@ -503,14 +530,14 @@ export const SchemaFieldInputSchema = z.object({
  * }
  */
 export type FieldInSchemaResponse = {
-  id: string // UUID
-  list_id: string // UUID
-  name: string
-  field_type: FieldType
-  config: FieldConfig
-  created_at: string
-  updated_at: string
-}
+  id: string; // UUID
+  list_id: string; // UUID
+  name: string;
+  field_type: FieldType;
+  config: FieldConfig;
+  created_at: string;
+  updated_at: string;
+};
 
 /**
  * Zod schema for FieldInSchemaResponse validation
@@ -535,7 +562,7 @@ export const FieldInSchemaResponseSchema = z.object({
   config: z.record(z.any()),
   created_at: z.string(),
   updated_at: z.string(),
-})
+});
 
 /**
  * SchemaFieldResponse type combining schema field metadata with full field details
@@ -562,12 +589,12 @@ export const FieldInSchemaResponseSchema = z.object({
  * }
  */
 export type SchemaFieldResponse = {
-  field_id: string // UUID
-  schema_id: string // UUID
-  display_order: number
-  show_on_card: boolean
-  field: FieldInSchemaResponse
-}
+  field_id: string; // UUID
+  schema_id: string; // UUID
+  display_order: number;
+  show_on_card: boolean;
+  field: FieldInSchemaResponse;
+};
 
 /**
  * Zod schema for SchemaFieldResponse validation
@@ -596,7 +623,7 @@ export const SchemaFieldResponseSchema = z.object({
   display_order: z.number().int().min(0),
   show_on_card: z.boolean(),
   field: FieldInSchemaResponseSchema,
-})
+});
 
 /**
  * FieldSchemaCreate type for creating a new field schema
@@ -648,10 +675,10 @@ export const SchemaFieldResponseSchema = z.object({
  * }
  */
 export type FieldSchemaCreate = {
-  name: string // 1-255 characters
-  description?: string | null // 0-1000 characters
-  fields?: SchemaFieldInput[] // Optional initial fields
-}
+  name: string; // 1-255 characters
+  description?: string | null; // 0-1000 characters
+  fields?: SchemaFieldInput[]; // Optional initial fields
+};
 
 /**
  * Zod schema for FieldSchemaCreate validation
@@ -682,35 +709,50 @@ export type FieldSchemaCreate = {
  *   ]
  * }) // ❌ ZodError: Duplicate display_order values found
  */
-export const FieldSchemaCreateSchema = z.object({
-  name: z.string().min(1).max(255),
-  description: z.string().max(1000).optional().nullable(),
-  fields: z.array(SchemaFieldInputSchema).optional(),
-}).refine((data) => {
-  // Validator 1: Max 3 fields with show_on_card=true
-  if (!data.fields) return true
-  const showOnCardFields = data.fields.filter(f => f.show_on_card)
-  return showOnCardFields.length <= 3
-}, {
-  message: "At most 3 fields can have show_on_card=true",
-  path: ['fields'],
-}).refine((data) => {
-  // Validator 2: No duplicate display_order values
-  if (!data.fields) return true
-  const displayOrders = data.fields.map(f => f.display_order)
-  return displayOrders.length === new Set(displayOrders).size
-}, {
-  message: "Duplicate display_order values found. Each field must have a unique display_order.",
-  path: ['fields'],
-}).refine((data) => {
-  // Validator 3: No duplicate field_id values
-  if (!data.fields) return true
-  const fieldIds = data.fields.map(f => f.field_id)
-  return fieldIds.length === new Set(fieldIds).size
-}, {
-  message: "Duplicate field_id values found. Each field can only be added once to a schema.",
-  path: ['fields'],
-})
+export const FieldSchemaCreateSchema = z
+  .object({
+    name: z.string().min(1).max(255),
+    description: z.string().max(1000).optional().nullable(),
+    fields: z.array(SchemaFieldInputSchema).optional(),
+  })
+  .refine(
+    (data) => {
+      // Validator 1: Max 3 fields with show_on_card=true
+      if (!data.fields) return true;
+      const showOnCardFields = data.fields.filter((f) => f.show_on_card);
+      return showOnCardFields.length <= 3;
+    },
+    {
+      message: "At most 3 fields can have show_on_card=true",
+      path: ["fields"],
+    }
+  )
+  .refine(
+    (data) => {
+      // Validator 2: No duplicate display_order values
+      if (!data.fields) return true;
+      const displayOrders = data.fields.map((f) => f.display_order);
+      return displayOrders.length === new Set(displayOrders).size;
+    },
+    {
+      message:
+        "Duplicate display_order values found. Each field must have a unique display_order.",
+      path: ["fields"],
+    }
+  )
+  .refine(
+    (data) => {
+      // Validator 3: No duplicate field_id values
+      if (!data.fields) return true;
+      const fieldIds = data.fields.map((f) => f.field_id);
+      return fieldIds.length === new Set(fieldIds).size;
+    },
+    {
+      message:
+        "Duplicate field_id values found. Each field can only be added once to a schema.",
+      path: ["fields"],
+    }
+  );
 
 /**
  * FieldSchemaUpdate type for updating field schema metadata
@@ -735,9 +777,9 @@ export const FieldSchemaCreateSchema = z.object({
  * }
  */
 export type FieldSchemaUpdate = {
-  name?: string // 1-255 characters
-  description?: string | null // 0-1000 characters
-}
+  name?: string; // 1-255 characters
+  description?: string | null; // 0-1000 characters
+};
 
 /**
  * Zod schema for FieldSchemaUpdate validation
@@ -760,7 +802,7 @@ export type FieldSchemaUpdate = {
 export const FieldSchemaUpdateSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().max(1000).optional().nullable(),
-})
+});
 
 /**
  * FieldSchemaResponse type for field schema response from API
@@ -818,14 +860,14 @@ export const FieldSchemaUpdateSchema = z.object({
  * }
  */
 export type FieldSchemaResponse = {
-  id: string // UUID
-  list_id: string // UUID
-  name: string
-  description?: string | null
-  schema_fields: SchemaFieldResponse[]
-  created_at: string
-  updated_at: string
-}
+  id: string; // UUID
+  list_id: string; // UUID
+  name: string;
+  description?: string | null;
+  schema_fields: SchemaFieldResponse[];
+  created_at: string;
+  updated_at: string;
+};
 
 /**
  * Zod schema for FieldSchemaResponse validation
@@ -858,7 +900,7 @@ export const FieldSchemaResponseSchema = z.object({
   schema_fields: z.array(SchemaFieldResponseSchema),
   created_at: z.string(),
   updated_at: z.string(),
-})
+});
 
 // ============================================================================
 // VideoFieldValue Types (Task #62)
@@ -911,14 +953,14 @@ export const FieldSchemaResponseSchema = z.object({
  * }
  */
 export type VideoFieldValue = {
-  id: string // UUID (auto-generated)
-  video_id: string // UUID (FK to videos.id CASCADE)
-  field_id: string // UUID (FK to custom_fields.id CASCADE)
-  value_text: string | null // For 'text' and 'select' field types
-  value_numeric: number | null // For 'rating' field types
-  value_boolean: boolean | null // For 'boolean' field types
-  updated_at: string // Last update timestamp (NO created_at!)
-}
+  id: string; // UUID (auto-generated)
+  video_id: string; // UUID (FK to videos.id CASCADE)
+  field_id: string; // UUID (FK to custom_fields.id CASCADE)
+  value_text: string | null; // For 'text' and 'select' field types
+  value_numeric: number | null; // For 'rating' field types
+  value_boolean: boolean | null; // For 'boolean' field types
+  updated_at: string; // Last update timestamp (NO created_at!)
+};
 
 /**
  * Zod schema for VideoFieldValue validation
@@ -955,7 +997,7 @@ export const VideoFieldValueSchema = z.object({
   value_numeric: z.number().nullable(),
   value_boolean: z.boolean().nullable(),
   updated_at: z.string(),
-})
+});
 
 // ============================================================================
 // Type Guards (REF MCP Improvement #4: Better type narrowing helpers)
@@ -995,8 +1037,10 @@ export const VideoFieldValueSchema = z.object({
  *   console.log('Not a rating field') // ✅ Output
  * }
  */
-export function isRatingField(field: CustomField): field is CustomField & { field_type: 'rating'; config: RatingConfig } {
-  return field.field_type === 'rating'
+export function isRatingField(
+  field: CustomField
+): field is CustomField & { field_type: "rating"; config: RatingConfig } {
+  return field.field_type === "rating";
 }
 
 /**
@@ -1020,8 +1064,10 @@ export function isRatingField(field: CustomField): field is CustomField & { fiel
  *   console.log(field.config.options) // ✅ TypeScript knows config has options
  * }
  */
-export function isSelectField(field: CustomField): field is CustomField & { field_type: 'select'; config: SelectConfig } {
-  return field.field_type === 'select'
+export function isSelectField(
+  field: CustomField
+): field is CustomField & { field_type: "select"; config: SelectConfig } {
+  return field.field_type === "select";
 }
 
 /**
@@ -1045,8 +1091,10 @@ export function isSelectField(field: CustomField): field is CustomField & { fiel
  *   console.log(field.config.max_length) // ✅ TypeScript knows config has optional max_length
  * }
  */
-export function isTextField(field: CustomField): field is CustomField & { field_type: 'text'; config: TextConfig } {
-  return field.field_type === 'text'
+export function isTextField(
+  field: CustomField
+): field is CustomField & { field_type: "text"; config: TextConfig } {
+  return field.field_type === "text";
 }
 
 /**
@@ -1070,8 +1118,10 @@ export function isTextField(field: CustomField): field is CustomField & { field_
  *   console.log('This is a boolean field') // ✅ TypeScript knows field_type is 'boolean'
  * }
  */
-export function isBooleanField(field: CustomField): field is CustomField & { field_type: 'boolean'; config: BooleanConfig } {
-  return field.field_type === 'boolean'
+export function isBooleanField(
+  field: CustomField
+): field is CustomField & { field_type: "boolean"; config: BooleanConfig } {
+  return field.field_type === "boolean";
 }
 
 // ============================================================================
@@ -1091,8 +1141,8 @@ export function isBooleanField(field: CustomField): field is CustomField & { fie
  * }
  */
 export type DuplicateCheckRequest = {
-  name: string // Field name to check (1-255 chars)
-}
+  name: string; // Field name to check (1-255 chars)
+};
 
 /**
  * Zod schema for DuplicateCheckRequest validation
@@ -1107,7 +1157,7 @@ export type DuplicateCheckRequest = {
  */
 export const DuplicateCheckRequestSchema = z.object({
   name: z.string().min(1).max(255),
-})
+});
 
 /**
  * Response schema for duplicate field name check
@@ -1138,9 +1188,9 @@ export const DuplicateCheckRequestSchema = z.object({
  * }
  */
 export type DuplicateCheckResponse = {
-  exists: boolean
-  field: CustomField | null
-}
+  exists: boolean;
+  field: CustomField | null;
+};
 
 /**
  * Zod schema for DuplicateCheckResponse validation
@@ -1162,7 +1212,7 @@ export type DuplicateCheckResponse = {
 export const DuplicateCheckResponseSchema = z.object({
   exists: z.boolean(),
   field: CustomFieldSchema.nullable(),
-})
+});
 
 /**
  * Helper for parsing arrays of CustomField from API responses
@@ -1170,4 +1220,4 @@ export const DuplicateCheckResponseSchema = z.object({
  * @example
  * const fields = CustomFieldsSchema.parse(apiResponse)
  */
-export const CustomFieldsSchema = z.array(CustomFieldSchema)
+export const CustomFieldsSchema = z.array(CustomFieldSchema);

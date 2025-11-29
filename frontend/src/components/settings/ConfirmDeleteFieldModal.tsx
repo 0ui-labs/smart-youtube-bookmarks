@@ -8,16 +8,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 interface ConfirmDeleteFieldModalProps {
-  open: boolean
-  fieldName: string | null
-  usageCount: number
-  onConfirm: () => void
-  onCancel: () => void
-  isLoading: boolean
+  open: boolean;
+  fieldName: string | null;
+  usageCount: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isLoading: boolean;
 }
 
 /**
@@ -45,39 +45,40 @@ export const ConfirmDeleteFieldModal = ({
   onCancel,
   isLoading,
 }: ConfirmDeleteFieldModalProps) => {
-  const isInUse = usageCount > 0
+  const isInUse = usageCount > 0;
 
   return (
-    <AlertDialog open={open} onOpenChange={(open) => !open && onCancel()}>
+    <AlertDialog onOpenChange={(open) => !open && onCancel()} open={open}>
       <AlertDialogContent className="sm:max-w-[500px]">
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Field?</AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-3">
               <p>
-                Are you sure you want to delete the field{' '}
+                Are you sure you want to delete the field{" "}
                 <strong>"{fieldName}"</strong>?
               </p>
 
               {isInUse ? (
-                <div className="rounded-md bg-red-50 border border-red-200 p-3">
-                  <p className="text-sm text-red-900 font-semibold">
-                    ⚠️ Cannot delete: This field is used by {usageCount} schema(s)
+                <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                  <p className="font-semibold text-red-900 text-sm">
+                    ⚠️ Cannot delete: This field is used by {usageCount}{" "}
+                    schema(s)
                   </p>
-                  <p className="text-sm text-red-700 mt-1">
+                  <p className="mt-1 text-red-700 text-sm">
                     Remove this field from all schemas before deleting.
                   </p>
                 </div>
               ) : (
-                <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3">
+                <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3">
                   <p className="text-sm text-yellow-900">
                     <strong>Warning:</strong> This will permanently delete:
                   </p>
-                  <ul className="text-sm text-yellow-800 mt-2 ml-4 list-disc">
+                  <ul className="mt-2 ml-4 list-disc text-sm text-yellow-800">
                     <li>The field definition</li>
                     <li>All video values for this field</li>
                   </ul>
-                  <p className="text-sm text-yellow-900 mt-2">
+                  <p className="mt-2 text-sm text-yellow-900">
                     This action cannot be undone.
                   </p>
                 </div>
@@ -89,19 +90,19 @@ export const ConfirmDeleteFieldModal = ({
           <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
           <AlertDialogAction asChild>
             <Button
-              variant="destructive"
-              onClick={(e) => {
-                e.preventDefault() // CRITICAL: Prevents auto-close during mutation
-                onConfirm()
-              }}
-              disabled={isLoading || isInUse} // Disable if loading OR field in use
               className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
+              disabled={isLoading || isInUse}
+              onClick={(e) => {
+                e.preventDefault(); // CRITICAL: Prevents auto-close during mutation
+                onConfirm();
+              }} // Disable if loading OR field in use
+              variant="destructive"
             >
-              {isLoading ? 'Deleting...' : 'Delete Field'}
+              {isLoading ? "Deleting..." : "Delete Field"}
             </Button>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
-}
+  );
+};

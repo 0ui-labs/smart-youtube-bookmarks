@@ -21,10 +21,13 @@
  * @param defaultValue - Fallback-Wert wenn env var nicht gesetzt
  * @returns Boolean Wert
  */
-const envToBool = (envVar: string | undefined, defaultValue: boolean): boolean => {
-  if (envVar === undefined) return defaultValue
-  return envVar.toLowerCase() === 'true'
-}
+const envToBool = (
+  envVar: string | undefined,
+  defaultValue: boolean
+): boolean => {
+  if (envVar === undefined) return defaultValue;
+  return envVar.toLowerCase() === "true";
+};
 
 export const FEATURE_FLAGS = {
   /**
@@ -71,6 +74,6 @@ export const FEATURE_FLAGS = {
     import.meta.env.VITE_FEATURE_DRAG_DROP_IMPORT,
     true
   ),
-} as const
+} as const;
 
-export type FeatureFlags = typeof FEATURE_FLAGS
+export type FeatureFlags = typeof FEATURE_FLAGS;

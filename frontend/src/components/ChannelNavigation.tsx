@@ -1,33 +1,33 @@
-import { MoreHorizontal, EyeOff, ChevronRight } from 'lucide-react'
-import { Link } from 'react-router-dom'
-import { cn } from '@/lib/utils'
-import type { Channel } from '@/types/channel'
+import { ChevronRight, EyeOff, MoreHorizontal } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import type { Channel } from "@/types/channel";
 
 /**
  * Get initials from channel name (max 2 characters)
  */
 function getInitials(name: string): string {
   return name
-    .split(' ')
-    .map(word => word[0])
+    .split(" ")
+    .map((word) => word[0])
     .filter(Boolean)
     .slice(0, 2)
-    .join('')
-    .toUpperCase()
+    .join("")
+    .toUpperCase();
 }
 
 interface ChannelNavigationProps {
-  channels: Channel[]
-  selectedChannelId: string | null
-  onChannelSelect: (channelId: string | null) => void
-  onChannelHide?: (channelId: string) => void
-  isLoading?: boolean
+  channels: Channel[];
+  selectedChannelId: string | null;
+  onChannelSelect: (channelId: string | null) => void;
+  onChannelHide?: (channelId: string) => void;
+  isLoading?: boolean;
 }
 
 /**
@@ -41,7 +41,7 @@ interface ChannelNavigationProps {
  * - Context menu to hide channels
  * - Full accessibility with ARIA attributes
  */
-const MAX_VISIBLE_CHANNELS = 10
+const MAX_VISIBLE_CHANNELS = 10;
 
 export const ChannelNavigation = ({
   channels,
@@ -51,79 +51,84 @@ export const ChannelNavigation = ({
   isLoading = false,
 }: ChannelNavigationProps) => {
   // Limit displayed channels
-  const visibleChannels = channels.slice(0, MAX_VISIBLE_CHANNELS)
-  const hasMoreChannels = channels.length > MAX_VISIBLE_CHANNELS
+  const visibleChannels = channels.slice(0, MAX_VISIBLE_CHANNELS);
+  const hasMoreChannels = channels.length > MAX_VISIBLE_CHANNELS;
 
   if (isLoading) {
     return (
       <div className="channel-navigation p-4">
-        <h2 className="text-lg font-semibold mb-4 px-3">Kanäle</h2>
+        <h2 className="mb-4 px-3 font-semibold text-lg">Kanäle</h2>
         <div className="space-y-2 px-3">
-          <div className="h-8 bg-muted animate-pulse rounded-md" />
-          <div className="h-8 bg-muted animate-pulse rounded-md" />
-          <div className="h-8 bg-muted animate-pulse rounded-md" />
+          <div className="h-8 animate-pulse rounded-md bg-muted" />
+          <div className="h-8 animate-pulse rounded-md bg-muted" />
+          <div className="h-8 animate-pulse rounded-md bg-muted" />
         </div>
       </div>
-    )
+    );
   }
 
   if (channels.length === 0) {
     return (
       <div className="channel-navigation p-4">
-        <h2 className="text-lg font-semibold mb-4 px-3">Kanäle</h2>
-        <p className="text-sm text-muted-foreground px-3">
+        <h2 className="mb-4 px-3 font-semibold text-lg">Kanäle</h2>
+        <p className="px-3 text-muted-foreground text-sm">
           Noch keine Kanäle. Füge Videos hinzu um Kanäle zu sehen.
         </p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="channel-navigation p-4">
       {/* Header */}
-      <h2 className="text-lg font-semibold mb-4 px-3">Kanäle</h2>
+      <h2 className="mb-4 px-3 font-semibold text-lg">Kanäle</h2>
 
       {/* Channel list */}
       <div className="space-y-1">
         {/* Individual channels (limited to MAX_VISIBLE_CHANNELS) */}
         {visibleChannels.map((channel) => {
-          const isSelected = selectedChannelId === channel.id
+          const isSelected = selectedChannelId === channel.id;
 
           return (
             <div
-              key={channel.id}
               className={cn(
-                'group flex items-center gap-1 rounded-md transition-colors',
-                'hover:bg-accent',
-                isSelected && 'bg-accent'
+                "group flex items-center gap-1 rounded-md transition-colors",
+                "hover:bg-accent",
+                isSelected && "bg-accent"
               )}
+              key={channel.id}
             >
               <button
-                onClick={() => onChannelSelect(channel.id)}
+                aria-label={`Kanal ${channel.name} ${isSelected ? "abwählen" : "auswählen"}`}
                 aria-pressed={isSelected}
-                aria-label={`Kanal ${channel.name} ${isSelected ? 'abwählen' : 'auswählen'}`}
                 className={cn(
-                  'flex-1 flex items-center gap-2 px-3 py-2 text-sm transition-colors',
-                  isSelected && 'font-medium'
+                  "flex flex-1 items-center gap-2 px-3 py-2 text-sm transition-colors",
+                  isSelected && "font-medium"
                 )}
+                onClick={() => onChannelSelect(channel.id)}
               >
                 {/* Channel Avatar/Thumbnail */}
                 {channel.thumbnail_url ? (
                   <img
-                    src={channel.thumbnail_url}
                     alt={channel.name}
-                    className="h-6 w-6 rounded-full flex-shrink-0 object-cover"
+                    className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
                     referrerPolicy="no-referrer"
+                    src={channel.thumbnail_url}
                   />
                 ) : (
-                  <div className="h-6 w-6 rounded-full flex-shrink-0 bg-muted flex items-center justify-center text-xs">
+                  <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs">
                     {getInitials(channel.name)}
                   </div>
                 )}
-                <span className="flex-1 text-left truncate" title={channel.name}>
-                  {channel.name.length > 20 ? `${channel.name.slice(0, 20)}…` : channel.name}
+                <span
+                  className="flex-1 truncate text-left"
+                  title={channel.name}
+                >
+                  {channel.name.length > 20
+                    ? `${channel.name.slice(0, 20)}…`
+                    : channel.name}
                 </span>
-                <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0 hidden">
+                <span className="hidden flex-shrink-0 text-muted-foreground text-xs tabular-nums">
                   {channel.video_count}
                 </span>
               </button>
@@ -133,8 +138,8 @@ export const ChannelNavigation = ({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      className="p-1 mr-1 opacity-0 group-hover:opacity-100 hover:bg-accent-foreground/10 rounded transition-opacity"
                       aria-label={`Optionen für ${channel.name}`}
+                      className="mr-1 rounded p-1 opacity-0 transition-opacity hover:bg-accent-foreground/10 group-hover:opacity-100"
                     >
                       <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                     </button>
@@ -142,28 +147,28 @@ export const ChannelNavigation = ({
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
                       onClick={(e) => {
-                        e.stopPropagation()
-                        onChannelHide(channel.id)
+                        e.stopPropagation();
+                        onChannelHide(channel.id);
                       }}
                     >
-                      <EyeOff className="h-4 w-4 mr-2" />
+                      <EyeOff className="mr-2 h-4 w-4" />
                       Kanal ausblenden
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
             </div>
-          )
+          );
         })}
 
         {/* Show all link when there are more channels */}
         {hasMoreChannels && (
           <Link
-            to="/channels"
             className={cn(
-              'w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-              'hover:bg-accent text-muted-foreground hover:text-foreground'
+              "flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+              "text-muted-foreground hover:bg-accent hover:text-foreground"
             )}
+            to="/channels"
           >
             <span>Alle Kanäle</span>
             <ChevronRight className="h-4 w-4" />
@@ -171,5 +176,5 @@ export const ChannelNavigation = ({
         )}
       </div>
     </div>
-  )
-}
+  );
+};

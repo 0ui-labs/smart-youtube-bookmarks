@@ -1,25 +1,25 @@
-import { useState } from 'react'
-import { Card, CardHeader, CardContent } from '@/components/ui/card'
-import { SchemaActionsMenu } from './SchemaActionsMenu'
-import { EditSchemaDialog } from './EditSchemaDialog'
-import { ConfirmDeleteSchemaDialog } from './ConfirmDeleteSchemaDialog'
-import { DuplicateSchemaDialog } from './DuplicateSchemaDialog'
-import { SchemaUsageStatsModal } from './SchemaUsageStatsModal'
-import { BulkApplySchemaDialog } from './BulkApplySchemaDialog'
-import { BulkOperationResultDialog } from './BulkOperationResultDialog'
+import { useState } from "react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
-  useUpdateSchema,
   useDeleteSchema,
   useDuplicateSchema,
   useSchemaUsageStats,
-} from '@/hooks/useSchemas'
-import { useTags, useBulkApplySchema } from '@/hooks/useTags'
-import type { FieldSchemaResponse } from '@/types/schema'
+  useUpdateSchema,
+} from "@/hooks/useSchemas";
+import { useBulkApplySchema, useTags } from "@/hooks/useTags";
+import type { FieldSchemaResponse } from "@/types/schema";
+import { BulkApplySchemaDialog } from "./BulkApplySchemaDialog";
+import { BulkOperationResultDialog } from "./BulkOperationResultDialog";
+import { ConfirmDeleteSchemaDialog } from "./ConfirmDeleteSchemaDialog";
+import { DuplicateSchemaDialog } from "./DuplicateSchemaDialog";
+import { EditSchemaDialog } from "./EditSchemaDialog";
+import { SchemaActionsMenu } from "./SchemaActionsMenu";
+import { SchemaUsageStatsModal } from "./SchemaUsageStatsModal";
 
 export interface SchemaCardProps {
-  schema: FieldSchemaResponse
-  listId: string
-  onClick?: (schema: FieldSchemaResponse) => void
+  schema: FieldSchemaResponse;
+  listId: string;
+  onClick?: (schema: FieldSchemaResponse) => void;
 }
 
 /**
@@ -46,22 +46,22 @@ export interface SchemaCardProps {
  * />
  */
 export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
-  const { data: tags = [] } = useTags()
-  const usageStats = useSchemaUsageStats(schema.id, tags)
+  const { data: tags = [] } = useTags();
+  const usageStats = useSchemaUsageStats(schema.id, tags);
 
   // Mutations
-  const updateSchema = useUpdateSchema(listId)
-  const deleteSchema = useDeleteSchema(listId)
-  const duplicateSchema = useDuplicateSchema(listId)
-  const bulkApply = useBulkApplySchema()
+  const updateSchema = useUpdateSchema(listId);
+  const deleteSchema = useDeleteSchema(listId);
+  const duplicateSchema = useDuplicateSchema(listId);
+  const bulkApply = useBulkApplySchema();
 
   // Modal states
-  const [editOpen, setEditOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [duplicateOpen, setDuplicateOpen] = useState(false)
-  const [usageStatsOpen, setUsageStatsOpen] = useState(false)
-  const [bulkApplyOpen, setBulkApplyOpen] = useState(false)
-  const [showResults, setShowResults] = useState(false)
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [usageStatsOpen, setUsageStatsOpen] = useState(false);
+  const [bulkApplyOpen, setBulkApplyOpen] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
   // Action handlers
   const handleEdit = (data: { name: string; description: string | null }) => {
@@ -69,36 +69,36 @@ export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
       { schemaId: schema.id, updates: data },
       {
         onSuccess: () => {
-          setEditOpen(false)
+          setEditOpen(false);
         },
         // Keep modal open on error for retry
       }
-    )
-  }
+    );
+  };
 
   const handleDelete = () => {
     deleteSchema.mutate(
       { schemaId: schema.id },
       {
         onSuccess: () => {
-          setDeleteOpen(false)
+          setDeleteOpen(false);
         },
         // Keep modal open on error (e.g., 409 Conflict)
       }
-    )
-  }
+    );
+  };
 
   const handleDuplicate = (newName: string) => {
     duplicateSchema.mutate(
       { schemaId: schema.id, newName },
       {
         onSuccess: () => {
-          setDuplicateOpen(false)
+          setDuplicateOpen(false);
         },
         // Keep modal open on error for retry
       }
-    )
-  }
+    );
+  };
 
   const handleBulkApply = (selectedTagIds: string[]) => {
     bulkApply.mutate(
@@ -108,13 +108,13 @@ export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
       },
       {
         onSuccess: () => {
-          setBulkApplyOpen(false)
-          setShowResults(true)
+          setBulkApplyOpen(false);
+          setShowResults(true);
         },
         // Errors handled by mutation's onError (rollback)
       }
-    )
-  }
+    );
+  };
 
   const handleRetry = (failedTagIds: string[]) => {
     bulkApply.mutate(
@@ -124,24 +124,24 @@ export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
       },
       {
         onSuccess: () => {
-          setShowResults(true)
+          setShowResults(true);
         },
         // Errors handled by mutation's onError (rollback)
       }
-    )
-  }
+    );
+  };
 
   return (
     <>
       <Card
-        className="hover:shadow-md transition-shadow cursor-pointer"
+        className="cursor-pointer transition-shadow hover:shadow-md"
         onClick={() => onClick?.(schema)}
       >
         <CardHeader className="flex flex-row items-start gap-2">
           <div className="flex-1">
-            <h3 className="text-lg font-semibold">{schema.name}</h3>
+            <h3 className="font-semibold text-lg">{schema.name}</h3>
             {schema.description && (
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="mt-1 text-muted-foreground text-sm">
                 {schema.description}
               </p>
             )}
@@ -149,74 +149,74 @@ export function SchemaCard({ schema, listId, onClick }: SchemaCardProps) {
 
           {/* Actions Menu */}
           <SchemaActionsMenu
-            schema={schema}
-            usageCount={usageStats.count}
-            onEdit={() => setEditOpen(true)}
+            onBulkApply={() => setBulkApplyOpen(true)}
             onDelete={() => setDeleteOpen(true)}
             onDuplicate={() => setDuplicateOpen(true)}
+            onEdit={() => setEditOpen(true)}
             onViewUsage={() => setUsageStatsOpen(true)}
-            onBulkApply={() => setBulkApplyOpen(true)}
+            schema={schema}
+            usageCount={usageStats.count}
           />
         </CardHeader>
 
         <CardContent>
           {/* Field count */}
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {schema.schema_fields.length} Feld
-            {schema.schema_fields.length !== 1 ? 'er' : ''}
+            {schema.schema_fields.length !== 1 ? "er" : ""}
           </p>
         </CardContent>
       </Card>
 
       {/* Modals */}
       <EditSchemaDialog
+        isLoading={updateSchema.isPending}
+        onCancel={() => setEditOpen(false)}
+        onConfirm={handleEdit}
         open={editOpen}
         schema={schema}
-        onConfirm={handleEdit}
-        onCancel={() => setEditOpen(false)}
-        isLoading={updateSchema.isPending}
       />
 
       <ConfirmDeleteSchemaDialog
+        isLoading={deleteSchema.isPending}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
         open={deleteOpen}
         schema={schema}
         usageStats={usageStats}
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteOpen(false)}
-        isLoading={deleteSchema.isPending}
       />
 
       <DuplicateSchemaDialog
+        isLoading={duplicateSchema.isPending}
+        onCancel={() => setDuplicateOpen(false)}
+        onConfirm={handleDuplicate}
         open={duplicateOpen}
         schema={schema}
-        onConfirm={handleDuplicate}
-        onCancel={() => setDuplicateOpen(false)}
-        isLoading={duplicateSchema.isPending}
       />
 
       <SchemaUsageStatsModal
+        onClose={() => setUsageStatsOpen(false)}
         open={usageStatsOpen}
         schema={schema}
         tags={tags}
-        onClose={() => setUsageStatsOpen(false)}
       />
 
       {/* Bulk Apply Dialog */}
       <BulkApplySchemaDialog
+        onCancel={() => setBulkApplyOpen(false)}
+        onConfirm={handleBulkApply}
         open={bulkApplyOpen}
         schema={schema}
         tags={tags}
-        onConfirm={handleBulkApply}
-        onCancel={() => setBulkApplyOpen(false)}
       />
 
       {/* Results Dialog */}
       <BulkOperationResultDialog
-        open={showResults}
-        result={bulkApply.data || null}
         onClose={() => setShowResults(false)}
         onRetry={handleRetry}
+        open={showResults}
+        result={bulkApply.data || null}
       />
     </>
-  )
+  );
 }

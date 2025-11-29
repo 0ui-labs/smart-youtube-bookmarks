@@ -22,19 +22,22 @@
  * />
  * ```
  */
-import { X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { useFieldFilterStore, ActiveFilter } from '@/stores/fieldFilterStore';
-import { useCustomFields } from '@/hooks/useCustomFields';
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useCustomFields } from "@/hooks/useCustomFields";
+import {
+  type ActiveFilter,
+  useFieldFilterStore,
+} from "@/stores/fieldFilterStore";
 
 interface FieldFilterInputProps {
   filter: ActiveFilter;
@@ -57,24 +60,29 @@ export function FieldFilterInput({
   if (!field) return null;
 
   // Rating Filter (Operator selector + Number input/Range)
-  if (filter.fieldType === 'rating') {
+  if (filter.fieldType === "rating") {
     const maxRating = field.config?.max_rating || 5;
 
     return (
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">{filter.fieldName}</span>
+        <span className="font-medium text-sm">{filter.fieldName}</span>
 
         {/* Operator selector */}
         <Select
-          value={filter.operator}
           onValueChange={(op) => {
             // Type guard: Only values from SelectItem are valid FilterOperators
-            if (op === 'gte' || op === 'lte' || op === 'eq' || op === 'between') {
+            if (
+              op === "gte" ||
+              op === "lte" ||
+              op === "eq" ||
+              op === "between"
+            ) {
               updateFilter(filter.id, { operator: op });
             }
           }}
+          value={filter.operator}
         >
-          <SelectTrigger className="w-[70px] h-7">
+          <SelectTrigger className="h-7 w-[70px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -86,16 +94,15 @@ export function FieldFilterInput({
         </Select>
 
         {/* Value input(s) */}
-        {filter.operator === 'between' ? (
+        {filter.operator === "between" ? (
           <div className="flex items-center gap-1">
             <Input
-              type="number"
-              min={1}
+              className="h-7 w-12 text-xs"
               max={maxRating}
-              value={filter.valueMin ?? 1}
+              min={1}
               onChange={(e) => {
-                const parsed = parseInt(e.target.value, 10);
-                if (!isNaN(parsed)) {
+                const parsed = Number.parseInt(e.target.value, 10);
+                if (!Number.isNaN(parsed)) {
                   const clamped = Math.max(1, Math.min(parsed, maxRating));
                   const max = filter.valueMax ?? maxRating;
                   updateFilter(filter.id, {
@@ -103,17 +110,17 @@ export function FieldFilterInput({
                   });
                 }
               }}
-              className="w-12 h-7 text-xs"
+              type="number"
+              value={filter.valueMin ?? 1}
             />
             <span className="text-xs">-</span>
             <Input
-              type="number"
-              min={1}
+              className="h-7 w-12 text-xs"
               max={maxRating}
-              value={filter.valueMax ?? maxRating}
+              min={1}
               onChange={(e) => {
-                const parsed = parseInt(e.target.value, 10);
-                if (!isNaN(parsed)) {
+                const parsed = Number.parseInt(e.target.value, 10);
+                if (!Number.isNaN(parsed)) {
                   const clamped = Math.max(1, Math.min(parsed, maxRating));
                   const min = filter.valueMin ?? 1;
                   updateFilter(filter.id, {
@@ -121,31 +128,32 @@ export function FieldFilterInput({
                   });
                 }
               }}
-              className="w-12 h-7 text-xs"
+              type="number"
+              value={filter.valueMax ?? maxRating}
             />
           </div>
         ) : (
           <Input
-            type="number"
-            min={1}
+            className="h-7 w-12 text-xs"
             max={maxRating}
-            value={typeof filter.value === 'number' ? filter.value : 1}
+            min={1}
             onChange={(e) => {
-              const parsed = parseInt(e.target.value, 10);
-              if (!isNaN(parsed)) {
+              const parsed = Number.parseInt(e.target.value, 10);
+              if (!Number.isNaN(parsed)) {
                 const clamped = Math.max(1, Math.min(parsed, maxRating));
                 updateFilter(filter.id, { value: clamped });
               }
             }}
-            className="w-12 h-7 text-xs"
+            type="number"
+            value={typeof filter.value === "number" ? filter.value : 1}
           />
         )}
 
         <Button
-          variant="ghost"
-          size="icon"
           className="h-5 w-5"
           onClick={onRemove}
+          size="icon"
+          variant="ghost"
         >
           <X className="h-3 w-3" />
         </Button>
@@ -154,19 +162,20 @@ export function FieldFilterInput({
   }
 
   // Select Filter (Dropdown)
-  if (filter.fieldType === 'select') {
+  if (filter.fieldType === "select") {
     const options = field.config?.options || [];
-    const selectValue = typeof filter.value === 'string' ? filter.value : undefined;
+    const selectValue =
+      typeof filter.value === "string" ? filter.value : undefined;
 
     return (
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">{filter.fieldName}</span>
+        <span className="font-medium text-sm">{filter.fieldName}</span>
 
         <Select
-          value={selectValue}
           onValueChange={(val) => updateFilter(filter.id, { value: val })}
+          value={selectValue}
         >
-          <SelectTrigger className="w-[120px] h-7">
+          <SelectTrigger className="h-7 w-[120px]">
             <SelectValue placeholder="Select..." />
           </SelectTrigger>
           <SelectContent>
@@ -179,10 +188,10 @@ export function FieldFilterInput({
         </Select>
 
         <Button
-          variant="ghost"
-          size="icon"
           className="h-5 w-5"
           onClick={onRemove}
+          size="icon"
+          variant="ghost"
         >
           <X className="h-3 w-3" />
         </Button>
@@ -191,26 +200,26 @@ export function FieldFilterInput({
   }
 
   // Text Filter (Search Input)
-  if (filter.fieldType === 'text') {
-    const textValue = typeof filter.value === 'string' ? filter.value : '';
+  if (filter.fieldType === "text") {
+    const textValue = typeof filter.value === "string" ? filter.value : "";
 
     return (
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">{filter.fieldName}</span>
+        <span className="font-medium text-sm">{filter.fieldName}</span>
 
         <Input
-          type="text"
-          placeholder="Search..."
-          value={textValue}
+          className="h-7 w-32"
           onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-          className="w-32 h-7"
+          placeholder="Search..."
+          type="text"
+          value={textValue}
         />
 
         <Button
-          variant="ghost"
-          size="icon"
           className="h-5 w-5"
           onClick={onRemove}
+          size="icon"
+          variant="ghost"
         >
           <X className="h-3 w-3" />
         </Button>
@@ -219,12 +228,12 @@ export function FieldFilterInput({
   }
 
   // Boolean Filter (Switch)
-  if (filter.fieldType === 'boolean') {
-    const boolValue = typeof filter.value === 'boolean' ? filter.value : false;
+  if (filter.fieldType === "boolean") {
+    const boolValue = typeof filter.value === "boolean" ? filter.value : false;
 
     return (
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">{filter.fieldName}</span>
+        <span className="font-medium text-sm">{filter.fieldName}</span>
 
         <Switch
           checked={boolValue}
@@ -233,15 +242,15 @@ export function FieldFilterInput({
           }
         />
 
-        <span className="text-xs text-muted-foreground">
-          {boolValue ? 'Yes' : 'No'}
+        <span className="text-muted-foreground text-xs">
+          {boolValue ? "Yes" : "No"}
         </span>
 
         <Button
-          variant="ghost"
-          size="icon"
           className="h-5 w-5"
           onClick={onRemove}
+          size="icon"
+          variant="ghost"
         >
           <X className="h-3 w-3" />
         </Button>

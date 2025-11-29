@@ -7,11 +7,11 @@
  */
 export interface PlayerSettings {
   /** Volume level (0-1) */
-  volume: number
+  volume: number;
   /** Whether audio is muted */
-  muted: boolean
+  muted: boolean;
   /** Playback speed (0.5-2) */
-  playbackRate: number
+  playbackRate: number;
 }
 
 /**
@@ -21,37 +21,39 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   volume: 1,
   muted: false,
   playbackRate: 1,
-}
+};
 
 /**
  * Watch progress data from/to backend.
  */
 export interface WatchProgress {
-  videoId: string
-  position: number
-  updatedAt: string
+  videoId: string;
+  position: number;
+  updatedAt: string;
 }
 
 /**
  * Response from PATCH /api/videos/{id}/progress endpoint.
  */
 export interface UpdateWatchProgressResponse {
-  video_id: string
-  watch_position: number
-  updated_at: string
+  video_id: string;
+  watch_position: number;
+  updated_at: string;
 }
 
 /**
  * Request body for PATCH /api/videos/{id}/progress endpoint.
  */
 export interface UpdateWatchProgressRequest {
-  position: number
+  position: number;
 }
 
 /**
  * Available playback speed options.
  */
-export const PLAYBACK_SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const
+export const PLAYBACK_SPEED_OPTIONS = [
+  0.5, 0.75, 1, 1.25, 1.5, 1.75, 2,
+] as const;
 
 /**
  * Text track kind for Vidstack player.
@@ -61,12 +63,17 @@ export const PLAYBACK_SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as cons
  * - descriptions: Audio descriptions for blind users
  * - metadata: Machine-readable data
  */
-export type TextTrackKind = 'subtitles' | 'captions' | 'chapters' | 'descriptions' | 'metadata'
+export type TextTrackKind =
+  | "subtitles"
+  | "captions"
+  | "chapters"
+  | "descriptions"
+  | "metadata";
 
 /**
  * Text track format type.
  */
-export type TextTrackType = 'vtt' | 'srt' | 'ssa' | 'ass'
+export type TextTrackType = "vtt" | "srt" | "ssa" | "ass";
 
 /**
  * Text track definition for video player.
@@ -94,15 +101,15 @@ export type TextTrackType = 'vtt' | 'srt' | 'ssa' | 'ass'
  */
 export interface TextTrack {
   /** URL to the text track file (VTT, SRT, SSA) */
-  src: string
+  src: string;
   /** Human-readable label (e.g., "English", "Deutsch") */
-  label?: string
+  label?: string;
   /** BCP 47 language code (e.g., "en-US", "de-DE") */
-  language: string
+  language: string;
   /** Type of text track */
-  kind: TextTrackKind
+  kind: TextTrackKind;
   /** File format */
-  type?: TextTrackType
+  type?: TextTrackType;
   /** Whether this track should be active by default */
-  default?: boolean
+  default?: boolean;
 }

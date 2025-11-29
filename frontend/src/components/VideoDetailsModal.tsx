@@ -1,18 +1,26 @@
-import { useState, useEffect, useRef } from 'react'
-import { VideoResponse } from '@/types/video'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { CustomFieldsSection } from '@/components/CustomFieldsSection'
-import { ChannelInfo } from '@/components/ChannelInfo'
-import { useSetVideoCategory } from '@/hooks/useVideos'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { formatDuration } from '@/utils/formatDuration'
-import { useVideoDetail } from '@/hooks/useVideoDetail'
-import { VideoPlayer } from '@/components/VideoPlayer'
-import { useVideoEnrichment, useRetryEnrichment } from '@/hooks/useVideoEnrichment'
-import { EnrichmentStatus } from '@/components/EnrichmentStatus'
-import type { TextTrack } from '@/types/player'
-import { getLanguageLabel } from '@/lib/enrichmentUtils'
+import { useEffect, useRef, useState } from "react";
+import { ChannelInfo } from "@/components/ChannelInfo";
+import { CustomFieldsSection } from "@/components/CustomFieldsSection";
+import { EnrichmentStatus } from "@/components/EnrichmentStatus";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { VideoPlayer } from "@/components/VideoPlayer";
+import { useVideoDetail } from "@/hooks/useVideoDetail";
+import {
+  useRetryEnrichment,
+  useVideoEnrichment,
+} from "@/hooks/useVideoEnrichment";
+import { useSetVideoCategory } from "@/hooks/useVideos";
+import { getLanguageLabel } from "@/lib/enrichmentUtils";
+import type { TextTrack } from "@/types/player";
+import type { VideoResponse } from "@/types/video";
+import { formatDuration } from "@/utils/formatDuration";
 
 /**
  * VideoDetailsModal Component
@@ -52,19 +60,19 @@ import { getLanguageLabel } from '@/lib/enrichmentUtils'
  */
 interface VideoDetailsModalProps {
   /** Video data with available_fields (from Task #74 Two-Tier Strategy) */
-  video: VideoResponse | null
+  video: VideoResponse | null;
 
   /** Controlled open state (REF MCP #3) */
-  open: boolean
+  open: boolean;
 
   /** Controlled close handler (REF MCP #3) */
-  onOpenChange: (open: boolean) => void
+  onOpenChange: (open: boolean) => void;
 
   /** List ID for mutations */
-  listId: string
+  listId: string;
 
   /** Callback when field value changes */
-  onFieldChange: (fieldId: string, value: string | number | boolean) => void
+  onFieldChange: (fieldId: string, value: string | number | boolean) => void;
 }
 
 export const VideoDetailsModal = ({
@@ -80,103 +88,116 @@ export const VideoDetailsModal = ({
   const { data: videoDetail, isLoading } = useVideoDetail(
     video?.id || null,
     open // Only fetch when modal is open
-  )
+  );
 
   // Use videoDetail if loaded, fallback to prop video for basic info
-  const displayVideo = videoDetail || video
+  const displayVideo = videoDetail || video;
 
   // Enrichment data (captions, chapters)
-  const {
-    data: enrichment,
-    isLoading: isEnrichmentLoading,
-  } = useVideoEnrichment(video?.id, { enabled: open })
+  const { data: enrichment, isLoading: isEnrichmentLoading } =
+    useVideoEnrichment(video?.id, { enabled: open });
 
-  const retryEnrichment = useRetryEnrichment()
+  const retryEnrichment = useRetryEnrichment();
 
   // Generate text tracks from enrichment data with proper cleanup
-  const [textTracks, setTextTracks] = useState<TextTrack[]>([])
-  const blobUrlsRef = useRef<string[]>([])
+  const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
+  const blobUrlsRef = useRef<string[]>([]);
 
   useEffect(() => {
     // Cleanup previous blob URLs
-    blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
-    blobUrlsRef.current = []
+    blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    blobUrlsRef.current = [];
 
-    const tracks: TextTrack[] = []
+    const tracks: TextTrack[] = [];
 
     if (enrichment?.captions_vtt) {
       // Create a blob URL from VTT content
-      const blob = new Blob([enrichment.captions_vtt], { type: 'text/vtt' })
-      const src = URL.createObjectURL(blob)
-      blobUrlsRef.current.push(src)
+      const blob = new Blob([enrichment.captions_vtt], { type: "text/vtt" });
+      const src = URL.createObjectURL(blob);
+      blobUrlsRef.current.push(src);
 
       tracks.push({
         src,
-        label: getLanguageLabel(enrichment.captions_language, enrichment.captions_source),
-        language: enrichment.captions_language || 'en',
-        kind: 'captions',
-        type: 'vtt',
+        label: getLanguageLabel(
+          enrichment.captions_language,
+          enrichment.captions_source
+        ),
+        language: enrichment.captions_language || "en",
+        kind: "captions",
+        type: "vtt",
         default: true,
-      })
+      });
     }
 
     if (enrichment?.chapters_vtt) {
-      const blob = new Blob([enrichment.chapters_vtt], { type: 'text/vtt' })
-      const src = URL.createObjectURL(blob)
-      blobUrlsRef.current.push(src)
+      const blob = new Blob([enrichment.chapters_vtt], { type: "text/vtt" });
+      const src = URL.createObjectURL(blob);
+      blobUrlsRef.current.push(src);
 
       tracks.push({
         src,
-        label: 'Chapters',
-        language: 'en',
-        kind: 'chapters',
-        type: 'vtt',
+        label: "Chapters",
+        language: "en",
+        kind: "chapters",
+        type: "vtt",
         default: true,
-      })
+      });
     }
 
-    setTextTracks(tracks)
+    setTextTracks(tracks);
 
     // Cleanup on unmount
     return () => {
-      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
-      blobUrlsRef.current = []
-    }
-  }, [enrichment?.captions_vtt, enrichment?.captions_language, enrichment?.captions_source, enrichment?.chapters_vtt])
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      blobUrlsRef.current = [];
+    };
+  }, [
+    enrichment?.captions_vtt,
+    enrichment?.captions_language,
+    enrichment?.captions_source,
+    enrichment?.chapters_vtt,
+  ]);
 
   // Category change mutation (Step 5.12)
-  const setVideoCategory = useSetVideoCategory()
-  const [categoryError, setCategoryError] = useState<string | null>(null)
+  const setVideoCategory = useSetVideoCategory();
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   // Handle category change
-  const handleCategoryChange = (categoryId: string | null, restoreBackup?: boolean) => {
-    if (!displayVideo?.id) return
+  const handleCategoryChange = (
+    categoryId: string | null,
+    restoreBackup?: boolean
+  ) => {
+    if (!displayVideo?.id) return;
 
     // TODO: Pass restoreBackup to API when endpoint supports it
     setVideoCategory.mutate(
       { videoId: displayVideo.id, categoryId, restoreBackup },
       {
         onSuccess: () => {
-          setCategoryError(null)
+          setCategoryError(null);
         },
         onError: (error: any) => {
-          const message = error.response?.data?.detail || error.message || 'Kategorie konnte nicht geändert werden'
-          setCategoryError(message)
+          const message =
+            error.response?.data?.detail ||
+            error.message ||
+            "Kategorie konnte nicht geändert werden";
+          setCategoryError(message);
         },
       }
-    )
-  }
+    );
+  };
 
   // Get current category and labels
-  const currentCategory = displayVideo?.tags?.find((t) => t.is_video_type) ?? null
-  const labels = displayVideo?.tags?.filter((t) => !t.is_video_type) ?? []
+  const currentCategory =
+    displayVideo?.tags?.find((t) => t.is_video_type) ?? null;
+  const labels = displayVideo?.tags?.filter((t) => !t.is_video_type) ?? [];
 
   // Early return if no video
-  if (!displayVideo) return null
+  if (!displayVideo) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         {/* Video Header */}
         <DialogHeader>
           <DialogTitle>{displayVideo.title}</DialogTitle>
@@ -187,34 +208,34 @@ export const VideoDetailsModal = ({
           {/* Video Player (replaces thumbnail) */}
           {/* key forces remount on video change to prevent "provider destroyed" errors */}
           <VideoPlayer
-            key={displayVideo.youtube_id}
-            youtubeId={displayVideo.youtube_id}
-            videoId={displayVideo.id}
             initialPosition={displayVideo.watch_position}
-            thumbnailUrl={displayVideo.thumbnail_url}
+            key={displayVideo.youtube_id}
             textTracks={textTracks}
             thumbnailsVtt={enrichment?.thumbnails_vtt_url}
+            thumbnailUrl={displayVideo.thumbnail_url}
+            videoId={displayVideo.id}
+            youtubeId={displayVideo.youtube_id}
           />
 
           {/* Duration */}
           {displayVideo.duration && (
-            <div className="text-sm text-gray-600">
+            <div className="text-gray-600 text-sm">
               {formatDuration(displayVideo.duration)}
             </div>
           )}
 
           {/* Channel Info with Category (YouTube-style) */}
           <ChannelInfo
-            channelName={displayVideo.channel}
             channelAvatarUrl={displayVideo.channel_thumbnail_url}
+            channelName={displayVideo.channel}
             currentCategory={currentCategory}
-            onCategoryChange={handleCategoryChange}
             isCategoryMutating={setVideoCategory.isPending}
+            onCategoryChange={handleCategoryChange}
           />
 
           {/* Category Error */}
           {categoryError && (
-            <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+            <div className="rounded bg-red-50 p-2 text-red-600 text-sm">
               {categoryError}
             </div>
           )}
@@ -234,8 +255,8 @@ export const VideoDetailsModal = ({
           <EnrichmentStatus
             enrichment={enrichment}
             isLoading={isEnrichmentLoading}
-            onRetry={() => retryEnrichment.mutate(displayVideo.id)}
             isRetrying={retryEnrichment.isPending}
+            onRetry={() => retryEnrichment.mutate(displayVideo.id)}
           />
 
           <Separator />
@@ -251,13 +272,13 @@ export const VideoDetailsModal = ({
             <CustomFieldsSection
               availableFields={displayVideo.available_fields || []}
               fieldValues={displayVideo.field_values || []}
-              videoId={displayVideo.id}
               listId={listId}
               onFieldChange={onFieldChange}
+              videoId={displayVideo.id}
             />
           )}
         </div>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

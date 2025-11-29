@@ -1,11 +1,16 @@
-import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import { TagsSchema, TagSchema, type Tag, type TagCreate } from '@/types/tag'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import type {
   BulkApplySchemaRequest,
   BulkApplySchemaResponse,
-  TagUpdateResult
-} from '@/types/bulk'
+  TagUpdateResult,
+} from "@/types/bulk";
+import { type Tag, type TagCreate, TagSchema, TagsSchema } from "@/types/tag";
 
 /**
  * Query options factory for tags
@@ -23,13 +28,13 @@ import type {
  */
 export function tagsOptions() {
   return queryOptions({
-    queryKey: ['tags'],
+    queryKey: ["tags"],
     queryFn: async () => {
-      const { data } = await api.get<Tag[]>('/tags')
+      const { data } = await api.get<Tag[]>("/tags");
       // Validate response with Zod schema
-      return TagsSchema.parse(data)
+      return TagsSchema.parse(data);
     },
-  })
+  });
 }
 
 /**
@@ -42,9 +47,7 @@ export function tagsOptions() {
  * const { data: tags, isLoading, error } = useTags()
  * ```
  */
-export const useTags = () => {
-  return useQuery(tagsOptions())
-}
+export const useTags = () => useQuery(tagsOptions());
 
 /**
  * React Query hook to fetch only categories (is_video_type=true)
@@ -59,12 +62,12 @@ export const useTags = () => {
  * ```
  */
 export const useCategories = () => {
-  const { data: tags, ...rest } = useTags()
+  const { data: tags, ...rest } = useTags();
   return {
-    data: tags?.filter(t => t.is_video_type) ?? [],
-    ...rest
-  }
-}
+    data: tags?.filter((t) => t.is_video_type) ?? [],
+    ...rest,
+  };
+};
 
 /**
  * React Query hook to fetch only labels (is_video_type=false)
@@ -79,12 +82,12 @@ export const useCategories = () => {
  * ```
  */
 export const useLabels = () => {
-  const { data: tags, ...rest } = useTags()
+  const { data: tags, ...rest } = useTags();
   return {
-    data: tags?.filter(t => !t.is_video_type) ?? [],
-    ...rest
-  }
-}
+    data: tags?.filter((t) => !t.is_video_type) ?? [],
+    ...rest,
+  };
+};
 
 /**
  * React Query mutation hook to create a new tag
@@ -102,25 +105,25 @@ export const useLabels = () => {
  * ```
  */
 export const useCreateTag = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['createTag'],
+    mutationKey: ["createTag"],
     mutationFn: async (tagData: TagCreate) => {
-      const { data } = await api.post<Tag>('/tags', tagData)
+      const { data } = await api.post<Tag>("/tags", tagData);
       // Validate response with Zod schema (consistent with tagsOptions)
-      return TagSchema.parse(data)
+      return TagSchema.parse(data);
     },
     onError: (error) => {
-      console.error('Failed to create tag:', error)
+      console.error("Failed to create tag:", error);
     },
     onSettled: async () => {
       // Invalidate and refetch to ensure UI consistency
       // This runs on both success and error to handle edge cases
-      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey })
+      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
     },
-  })
-}
+  });
+};
 
 /**
  * Hook to apply schema to multiple tags in bulk
@@ -149,7 +152,7 @@ export const useCreateTag = () => {
  * ```
  */
 export const useBulkApplySchema = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation<
     BulkApplySchemaResponse,
@@ -157,85 +160,91 @@ export const useBulkApplySchema = () => {
     BulkApplySchemaRequest,
     { previousTags: Tag[] | undefined }
   >({
-    mutationKey: ['bulkApplySchema'],
+    mutationKey: ["bulkApplySchema"],
     mutationFn: async ({ tagIds, schemaId }: BulkApplySchemaRequest) => {
       // Fetch current tags to get names for error reporting
-      const currentTags = queryClient.getQueryData<Tag[]>(tagsOptions().queryKey) || []
-      const tagMap = new Map(currentTags.map(t => [t.id, t]))
+      const currentTags =
+        queryClient.getQueryData<Tag[]>(tagsOptions().queryKey) || [];
+      const tagMap = new Map(currentTags.map((t) => [t.id, t]));
 
       // Execute all updates in parallel with Promise.all
-      const updatePromises = tagIds.map(async (tagId): Promise<TagUpdateResult> => {
-        try {
-          await api.put(`/tags/${tagId}`, { schema_id: schemaId })
-          return {
-            tagId,
-            tagName: tagMap.get(tagId)?.name || 'Unknown',
-            success: true,
-          }
-        } catch (error: any) {
-          return {
-            tagId,
-            tagName: tagMap.get(tagId)?.name || 'Unknown',
-            success: false,
-            error: error.response?.data?.detail || error.message || 'Unknown error',
+      const updatePromises = tagIds.map(
+        async (tagId): Promise<TagUpdateResult> => {
+          try {
+            await api.put(`/tags/${tagId}`, { schema_id: schemaId });
+            return {
+              tagId,
+              tagName: tagMap.get(tagId)?.name || "Unknown",
+              success: true,
+            };
+          } catch (error: any) {
+            return {
+              tagId,
+              tagName: tagMap.get(tagId)?.name || "Unknown",
+              success: false,
+              error:
+                error.response?.data?.detail ||
+                error.message ||
+                "Unknown error",
+            };
           }
         }
-      })
+      );
 
-      const results = await Promise.all(updatePromises)
+      const results = await Promise.all(updatePromises);
 
-      const successCount = results.filter(r => r.success).length
-      const failureCount = results.filter(r => !r.success).length
+      const successCount = results.filter((r) => r.success).length;
+      const failureCount = results.filter((r) => !r.success).length;
 
       return {
         successCount,
         failureCount,
         totalRequested: tagIds.length,
         results,
-      }
+      };
     },
 
     // Optimistic updates
     onMutate: async ({ tagIds, schemaId }) => {
       // Cancel outgoing queries to prevent overwrites
-      await queryClient.cancelQueries({ queryKey: tagsOptions().queryKey })
+      await queryClient.cancelQueries({ queryKey: tagsOptions().queryKey });
 
       // Snapshot previous state for rollback
-      const previousTags = queryClient.getQueryData<Tag[]>(tagsOptions().queryKey)
+      const previousTags = queryClient.getQueryData<Tag[]>(
+        tagsOptions().queryKey
+      );
 
       // Optimistically update tags
       if (previousTags) {
         queryClient.setQueryData<Tag[]>(
           tagsOptions().queryKey,
-          previousTags.map(tag =>
-            tagIds.includes(tag.id)
-              ? { ...tag, schema_id: schemaId }
-              : tag
+          previousTags.map((tag) =>
+            tagIds.includes(tag.id) ? { ...tag, schema_id: schemaId } : tag
           )
-        )
+        );
       }
 
-      return { previousTags }
+      return { previousTags };
     },
 
     // Rollback on error
     // Note: This only rolls back the optimistic updates, not individual tag failures.
     // Individual failures are captured in the response and handled by the UI.
     onError: (error, _variables, context) => {
-      console.error('Bulk schema application failed:', error)
+      console.error("Bulk schema application failed:", error);
       if (context?.previousTags) {
-        queryClient.setQueryData(tagsOptions().queryKey, context.previousTags)
+        queryClient.setQueryData(tagsOptions().queryKey, context.previousTags);
       }
     },
 
     // Always invalidate to ensure consistency
     // REF MCP Improvement: Invalidate both tags AND schemas to keep schema usage counts accurate
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey })
-      queryClient.invalidateQueries({ queryKey: ['schemas'] })
+      queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
+      queryClient.invalidateQueries({ queryKey: ["schemas"] });
     },
-  })
-}
+  });
+};
 
 /**
  * React Query mutation hook to update an existing tag
@@ -255,24 +264,30 @@ export const useBulkApplySchema = () => {
  * ```
  */
 export const useUpdateTag = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['updateTag'],
-    mutationFn: async ({ tagId, data }: { tagId: string; data: Partial<TagCreate> }) => {
-      const { data: responseData } = await api.put<Tag>(`/tags/${tagId}`, data)
+    mutationKey: ["updateTag"],
+    mutationFn: async ({
+      tagId,
+      data,
+    }: {
+      tagId: string;
+      data: Partial<TagCreate>;
+    }) => {
+      const { data: responseData } = await api.put<Tag>(`/tags/${tagId}`, data);
       // Validate response with Zod schema
-      return TagSchema.parse(responseData)
+      return TagSchema.parse(responseData);
     },
     onError: (error) => {
-      console.error('Failed to update tag:', error)
+      console.error("Failed to update tag:", error);
     },
     onSettled: async () => {
       // Invalidate tags query to refresh UI
-      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey })
+      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
     },
-  })
-}
+  });
+};
 
 /**
  * React Query mutation hook to delete a tag
@@ -290,22 +305,22 @@ export const useUpdateTag = () => {
  * ```
  */
 export const useDeleteTag = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['deleteTag'],
+    mutationKey: ["deleteTag"],
     mutationFn: async (tagId: string) => {
-      await api.delete(`/tags/${tagId}`)
+      await api.delete(`/tags/${tagId}`);
       // 204 No Content - no response body
     },
     onError: (error) => {
-      console.error('Failed to delete tag:', error)
+      console.error("Failed to delete tag:", error);
     },
     onSettled: async () => {
       // Invalidate both tags and videos queries
       // Videos query needs refresh to remove deleted tag badges
-      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey })
-      await queryClient.invalidateQueries({ queryKey: ['videos'] })
+      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
+      await queryClient.invalidateQueries({ queryKey: ["videos"] });
     },
-  })
-}
+  });
+};

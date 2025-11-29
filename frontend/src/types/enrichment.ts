@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from "zod";
 
 // ============================================================================
 // Enrichment Status
@@ -9,14 +9,14 @@ import { z } from 'zod'
  * Matches backend EnrichmentStatus enum.
  */
 export const EnrichmentStatusSchema = z.enum([
-  'pending',
-  'processing',
-  'completed',
-  'partial',
-  'failed',
-])
+  "pending",
+  "processing",
+  "completed",
+  "partial",
+  "failed",
+]);
 
-export type EnrichmentStatus = z.infer<typeof EnrichmentStatusSchema>
+export type EnrichmentStatus = z.infer<typeof EnrichmentStatusSchema>;
 
 // ============================================================================
 // Chapter Types
@@ -30,9 +30,9 @@ export const ChapterSchema = z.object({
   title: z.string(),
   start: z.number(), // Start time in seconds
   end: z.number(), // End time in seconds
-})
+});
 
-export type Chapter = z.infer<typeof ChapterSchema>
+export type Chapter = z.infer<typeof ChapterSchema>;
 
 // ============================================================================
 // Enrichment Response
@@ -74,9 +74,9 @@ export const EnrichmentResponseSchema = z.object({
   created_at: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
   processed_at: z.string().nullable().optional(),
-})
+});
 
-export type EnrichmentResponse = z.infer<typeof EnrichmentResponseSchema>
+export type EnrichmentResponse = z.infer<typeof EnrichmentResponseSchema>;
 
 // ============================================================================
 // Enrichment Retry Response
@@ -88,9 +88,11 @@ export type EnrichmentResponse = z.infer<typeof EnrichmentResponseSchema>
 export const EnrichmentRetryResponseSchema = z.object({
   message: z.string(),
   enrichment: EnrichmentResponseSchema,
-})
+});
 
-export type EnrichmentRetryResponse = z.infer<typeof EnrichmentRetryResponseSchema>
+export type EnrichmentRetryResponse = z.infer<
+  typeof EnrichmentRetryResponseSchema
+>;
 
 // ============================================================================
 // Helper Types
@@ -100,31 +102,31 @@ export type EnrichmentRetryResponse = z.infer<typeof EnrichmentRetryResponseSche
  * Caption source labels for display
  */
 export const CAPTION_SOURCE_LABELS: Record<string, string> = {
-  youtube_manual: 'YouTube (Manual)',
-  youtube_auto: 'YouTube (Auto)',
-  groq_whisper: 'Groq Whisper',
-}
+  youtube_manual: "YouTube (Manual)",
+  youtube_auto: "YouTube (Auto)",
+  groq_whisper: "Groq Whisper",
+};
 
 /**
  * Chapter source labels for display
  */
 export const CHAPTER_SOURCE_LABELS: Record<string, string> = {
-  youtube: 'YouTube',
-  description: 'Description',
-}
+  youtube: "YouTube",
+  description: "Description",
+};
 
 /**
  * Language code to human-readable name mapping
  */
 export const LANGUAGE_LABELS: Record<string, string> = {
-  en: 'English',
-  de: 'German',
-  es: 'Spanish',
-  fr: 'French',
-  it: 'Italian',
-  pt: 'Portuguese',
-  ja: 'Japanese',
-  ko: 'Korean',
-  zh: 'Chinese',
-  ru: 'Russian',
-}
+  en: "English",
+  de: "German",
+  es: "Spanish",
+  fr: "French",
+  it: "Italian",
+  pt: "Portuguese",
+  ja: "Japanese",
+  ko: "Korean",
+  zh: "Chinese",
+  ru: "Russian",
+};

@@ -15,18 +15,23 @@
  * - German localization
  */
 
-import { useState } from 'react'
-import { Input } from '@/components/ui/input'
-import { Field, FieldLabel, FieldError, FieldDescription } from '@/components/ui/field'
+import { useState } from "react";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 interface RatingConfig {
-  max_rating: number
+  max_rating: number;
 }
 
 export interface RatingConfigEditorProps {
-  config: RatingConfig
-  onChange: (config: RatingConfig) => void
-  error?: string
+  config: RatingConfig;
+  onChange: (config: RatingConfig) => void;
+  error?: string;
 }
 
 /**
@@ -51,7 +56,7 @@ export function RatingConfigEditor({
   onChange,
   error,
 }: RatingConfigEditorProps) {
-  const [localError, setLocalError] = useState<string | null>(null)
+  const [localError, setLocalError] = useState<string | null>(null);
 
   /**
    * Validate and update max_rating
@@ -59,73 +64,68 @@ export function RatingConfigEditor({
    */
   const handleChange = (value: string) => {
     // Don't allow empty - keep current value visible
-    if (value === '') {
-      return
+    if (value === "") {
+      return;
     }
 
-    const num = parseInt(value, 10)
+    const num = Number.parseInt(value, 10);
 
     // Validate: is integer
-    if (isNaN(num) || !Number.isInteger(num)) {
-      setLocalError('Bitte geben Sie eine ganze Zahl ein')
-      return
+    if (Number.isNaN(num) || !Number.isInteger(num)) {
+      setLocalError("Bitte geben Sie eine ganze Zahl ein");
+      return;
     }
 
     // Validate: 1-10 range
     if (num < 1 || num > 10) {
-      setLocalError('Maximale Bewertung muss zwischen 1 und 10 liegen')
-      return
+      setLocalError("Maximale Bewertung muss zwischen 1 und 10 liegen");
+      return;
     }
 
     // Valid - clear error and update
-    setLocalError(null)
-    onChange({ max_rating: num })
-  }
+    setLocalError(null);
+    onChange({ max_rating: num });
+  };
 
-  const hasError = !!(localError || error)
+  const hasError = !!(localError || error);
 
   return (
     <Field data-invalid={hasError}>
-      <FieldLabel htmlFor="max-rating-input">
-        Maximale Bewertung *
-      </FieldLabel>
+      <FieldLabel htmlFor="max-rating-input">Maximale Bewertung *</FieldLabel>
 
       <div className="flex items-center gap-3">
         <Input
-          id="max-rating-input"
-          type="number"
-          min={1}
-          max={10}
-          step={1}
-          value={config.max_rating}
-          onChange={(e) => handleChange(e.target.value)}
-          className="w-24"
-          aria-invalid={hasError}
           aria-describedby={
-            hasError ? 'rating-error rating-description' : 'rating-description'
+            hasError ? "rating-error rating-description" : "rating-description"
           }
+          aria-invalid={hasError}
+          className="w-24"
+          id="max-rating-input"
+          max={10}
+          min={1}
+          onChange={(e) => handleChange(e.target.value)}
+          step={1}
+          type="number"
+          value={config.max_rating}
         />
 
-        <span className="text-sm text-muted-foreground">
+        <span className="text-muted-foreground text-sm">
           (1-{config.max_rating} Sterne)
         </span>
       </div>
 
       {/* Error Messages */}
-      {localError && (
-        <FieldError errors={[{ message: localError }]} />
-      )}
+      {localError && <FieldError errors={[{ message: localError }]} />}
 
-      {error && (
-        <FieldError errors={[{ message: error }]} />
-      )}
+      {error && <FieldError errors={[{ message: error }]} />}
 
       {/* Helper Text */}
-      {!localError && !error && (
+      {!(localError || error) && (
         <FieldDescription id="rating-description">
-          Geben Sie die maximale Anzahl der Sterne ein (1-10). Standard: 5 Sterne.
+          Geben Sie die maximale Anzahl der Sterne ein (1-10). Standard: 5
+          Sterne.
         </FieldDescription>
       )}
     </Field>
-  )
+  );
 }

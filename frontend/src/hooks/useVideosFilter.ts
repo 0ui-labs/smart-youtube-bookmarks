@@ -1,17 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import type { VideoResponse } from '@/types/video';
-import type { ActiveFilter } from '@/stores/fieldFilterStore';
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import type { ActiveFilter } from "@/stores/fieldFilterStore";
+import type { VideoResponse } from "@/types/video";
 
 interface UseVideosFilterOptions {
   listId: string;
   tags?: string[];
-  channelId?: string;  // Filter by channel (YouTube Channels feature)
+  channelId?: string; // Filter by channel (YouTube Channels feature)
   fieldFilters?: ActiveFilter[];
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  enabled?: boolean;  // Allow disabling the query
-  refetchInterval?: number;  // Polling interval in ms (for real-time updates after import)
+  sortOrder?: "asc" | "desc";
+  enabled?: boolean; // Allow disabling the query
+  refetchInterval?: number; // Polling interval in ms (for real-time updates after import)
 }
 
 /**
@@ -44,7 +44,9 @@ interface BackendFieldFilter {
  * // Result: [{ field_id: 'field-123', operator: 'gte', value: 4 }]
  * ```
  */
-export function convertToBackendFilters(filters: ActiveFilter[]): BackendFieldFilter[] {
+export function convertToBackendFilters(
+  filters: ActiveFilter[]
+): BackendFieldFilter[] {
   return filters.map((f) => {
     const backendFilter: BackendFieldFilter = {
       field_id: f.fieldId,
@@ -52,7 +54,7 @@ export function convertToBackendFilters(filters: ActiveFilter[]): BackendFieldFi
     };
 
     // BETWEEN operator requires both min and max values
-    if (f.operator === 'between') {
+    if (f.operator === "between") {
       if (f.valueMin === undefined || f.valueMax === undefined) {
         throw new Error(
           `BETWEEN operator requires both valueMin and valueMax for field "${f.fieldName}" (${f.fieldId})`
@@ -136,7 +138,8 @@ export function convertToBackendFilters(filters: ActiveFilter[]): BackendFieldFi
  * Used to filter out temporary IDs from optimistic updates
  */
 function isValidUUID(str: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
 }
 
@@ -147,18 +150,18 @@ function isValidUUID(str: string): boolean {
  * All other operators require a value
  */
 function isFilterComplete(filter: ActiveFilter): boolean {
-  const noValueOperators = ['is_empty', 'is_not_empty'];
+  const noValueOperators = ["is_empty", "is_not_empty"];
 
   if (noValueOperators.includes(filter.operator)) {
     return true;
   }
 
-  if (filter.operator === 'between') {
+  if (filter.operator === "between") {
     return filter.valueMin !== undefined && filter.valueMax !== undefined;
   }
 
   // All other operators require a value
-  return filter.value !== undefined && filter.value !== '';
+  return filter.value !== undefined && filter.value !== "";
 }
 
 export function useVideosFilter({
@@ -167,21 +170,30 @@ export function useVideosFilter({
   channelId,
   fieldFilters,
   sortBy,
-  sortOrder = 'asc',
+  sortOrder = "asc",
   enabled = true,
   refetchInterval,
 }: UseVideosFilterOptions) {
   const isQueryEnabled = enabled && !!listId;
 
   return useQuery({
-    queryKey: ['videos', 'filter', listId, tags, channelId, fieldFilters, sortBy, sortOrder],
+    queryKey: [
+      "videos",
+      "filter",
+      listId,
+      tags,
+      channelId,
+      fieldFilters,
+      sortBy,
+      sortOrder,
+    ],
     queryFn: async () => {
       const requestBody: {
         tags?: string[];
         channel_id?: string;
         field_filters?: BackendFieldFilter[];
         sort_by?: string;
-        sort_order?: 'asc' | 'desc';
+        sort_order?: "asc" | "desc";
       } = {};
 
       // Add tags if provided
@@ -199,7 +211,9 @@ export function useVideosFilter({
       // - Filters with invalid UUIDs (e.g., temp IDs from optimistic updates)
       // - Incomplete filters (e.g., text filter without a value yet)
       if (fieldFilters && fieldFilters.length > 0) {
-        const validFilters = fieldFilters.filter(f => isValidUUID(f.fieldId) && isFilterComplete(f));
+        const validFilters = fieldFilters.filter(
+          (f) => isValidUUID(f.fieldId) && isFilterComplete(f)
+        );
         if (validFilters.length > 0) {
           requestBody.field_filters = convertToBackendFilters(validFilters);
         }
@@ -218,12 +232,12 @@ export function useVideosFilter({
 
       return response.data;
     },
-    enabled: isQueryEnabled,  // Only run if enabled and listId exists
-    staleTime: 30 * 1000,  // 30 seconds - filters don't change often
+    enabled: isQueryEnabled, // Only run if enabled and listId exists
+    staleTime: 30 * 1000, // 30 seconds - filters don't change often
     // Prevent excessive refetching that causes UI flicker
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     refetchOnReconnect: false,
-    refetchInterval,  // Polling for real-time updates (undefined = disabled)
+    refetchInterval, // Polling for real-time updates (undefined = disabled)
   });
 }

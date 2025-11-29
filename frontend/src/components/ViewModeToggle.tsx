@@ -1,11 +1,11 @@
 // frontend/src/components/ViewModeToggle.tsx
-import { LayoutList, LayoutGrid } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import type { ViewMode } from '@/stores/tableSettingsStore'
+import { LayoutGrid, LayoutList } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { ViewMode } from "@/stores/tableSettingsStore";
 
 interface ViewModeToggleProps {
-  viewMode: ViewMode
-  onToggle: (mode: ViewMode) => void
+  viewMode: ViewMode;
+  onToggle: (mode: ViewMode) => void;
 }
 
 /**
@@ -19,24 +19,26 @@ interface ViewModeToggleProps {
  */
 export const ViewModeToggle = ({ viewMode, onToggle }: ViewModeToggleProps) => {
   const handleToggle = () => {
-    onToggle(viewMode === 'list' ? 'grid' : 'list')
-  }
+    onToggle(viewMode === "list" ? "grid" : "list");
+  };
 
   return (
     <Button
-      variant="ghost"
-      size="icon"
-      onClick={handleToggle}
-      className="rounded-full"
       aria-label={
-        viewMode === 'list' ? 'Grid-Ansicht anzeigen' : 'Listen-Ansicht anzeigen'
+        viewMode === "list"
+          ? "Grid-Ansicht anzeigen"
+          : "Listen-Ansicht anzeigen"
       }
+      className="rounded-full"
+      onClick={handleToggle}
+      size="icon"
+      variant="ghost"
     >
-      {viewMode === 'list' ? (
+      {viewMode === "list" ? (
         <LayoutGrid className="h-4 w-4" />
       ) : (
         <LayoutList className="h-4 w-4" />
       )}
     </Button>
-  )
-}
+  );
+};

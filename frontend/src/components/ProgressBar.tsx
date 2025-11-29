@@ -1,40 +1,40 @@
-import { useId } from 'react';
-import { ProgressUpdate } from '../hooks/useWebSocket';
+import { useId } from "react";
+import type { ProgressUpdate } from "../hooks/useWebSocket";
 
 export interface ProgressBarProps {
   progress: ProgressUpdate;
 }
 
 const statusColors = {
-  pending: 'bg-gray-400',
-  processing: 'bg-blue-500',
-  completed: 'bg-green-500',
-  failed: 'bg-red-500',
-  completed_with_errors: 'bg-amber-500',
+  pending: "bg-gray-400",
+  processing: "bg-blue-500",
+  completed: "bg-green-500",
+  failed: "bg-red-500",
+  completed_with_errors: "bg-amber-500",
 };
 
 const statusBadgeClasses = {
-  pending: 'bg-gray-100 text-gray-800 border border-gray-300',
-  processing: 'bg-blue-50 text-blue-900 border border-blue-200',
-  completed: 'bg-green-50 text-green-900 border border-green-200',
-  failed: 'bg-red-50 text-red-900 border border-red-200',
-  completed_with_errors: 'bg-amber-50 text-amber-900 border border-amber-300',
+  pending: "bg-gray-100 text-gray-800 border border-gray-300",
+  processing: "bg-blue-50 text-blue-900 border border-blue-200",
+  completed: "bg-green-50 text-green-900 border border-green-200",
+  failed: "bg-red-50 text-red-900 border border-red-200",
+  completed_with_errors: "bg-amber-50 text-amber-900 border border-amber-300",
 };
 
 const statusLabels = {
-  pending: 'Pending',
-  processing: 'Processing',
-  completed: 'Completed',
-  failed: 'Failed',
-  completed_with_errors: 'Completed with errors',
+  pending: "Pending",
+  processing: "Processing",
+  completed: "Completed",
+  failed: "Failed",
+  completed_with_errors: "Completed with errors",
 };
 
 const statusIcons = {
-  pending: '⏳',
-  processing: '⚙️',
-  completed: '✓',
-  failed: '✗',
-  completed_with_errors: '⚠️',
+  pending: "⏳",
+  processing: "⚙️",
+  completed: "✓",
+  failed: "✗",
+  completed_with_errors: "⚠️",
 };
 
 export function ProgressBar({ progress }: ProgressBarProps) {
@@ -51,26 +51,26 @@ export function ProgressBar({ progress }: ProgressBarProps) {
   const statusIcon = statusIcons[progress.status];
 
   return (
-    <div className="progress-bar-container bg-white rounded-lg shadow p-4 mb-4">
+    <div className="progress-bar-container mb-4 rounded-lg bg-white p-4 shadow">
       {/* Header: Message and Percentage */}
-      <div className="flex justify-between items-center mb-2">
-        <span id={messageId} className="text-sm font-medium text-gray-700">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-medium text-gray-700 text-sm" id={messageId}>
           {progress.message}
         </span>
-        <span className="text-sm font-bold text-gray-900">
+        <span className="font-bold text-gray-900 text-sm">
           {clampedProgress}%
         </span>
       </div>
 
       {/* Progress Track and Fill */}
       <div
-        className="progress-track w-full bg-gray-200 rounded-full h-3 mb-2"
-        role="progressbar"
-        aria-valuenow={clampedProgress}
-        aria-valuemin={0}
-        aria-valuemax={100}
         aria-labelledby={messageId}
+        aria-valuemax={100}
+        aria-valuemin={0}
+        aria-valuenow={clampedProgress}
+        className="progress-track mb-2 h-3 w-full rounded-full bg-gray-200"
         id={progressId}
+        role="progressbar"
       >
         <div
           className={`progress-fill ${colorClass} h-full rounded-full motion-safe:transition-all motion-safe:duration-300 motion-reduce:transition-none`}
@@ -79,32 +79,34 @@ export function ProgressBar({ progress }: ProgressBarProps) {
       </div>
 
       {/* Footer: Video Counter and Status Badge */}
-      <div className="flex justify-between items-center">
-        <span className="text-xs text-gray-600">
+      <div className="flex items-center justify-between">
+        <span className="text-gray-600 text-xs">
           {progress.current_video}/{progress.total_videos} videos
         </span>
-        <span className={`px-2 py-1 text-xs font-semibold rounded ${badgeClass}`}>
+        <span
+          className={`rounded px-2 py-1 font-semibold text-xs ${badgeClass}`}
+        >
           <span aria-hidden="true">{statusIcon}</span> {statusLabel}
         </span>
       </div>
 
       {/* Live Region for Screen Reader Announcements */}
       <div
-        role="status"
-        aria-live="polite"
         aria-atomic="true"
+        aria-live="polite"
         className="sr-only"
+        role="status"
       >
-        {progress.message} - {clampedProgress}% complete. Processing video{' '}
+        {progress.message} - {clampedProgress}% complete. Processing video{" "}
         {progress.current_video} of {progress.total_videos}.
       </div>
 
       {/* Error Message (if present) */}
       {progress.error && (
         <div
-          role="alert"
           aria-live="assertive"
-          className="error-message mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-900"
+          className="error-message mt-3 rounded border border-red-200 bg-red-50 p-2 text-red-900 text-sm"
+          role="alert"
         >
           <span className="font-semibold">Error:</span> {progress.error}
         </div>

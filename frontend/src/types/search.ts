@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from "zod";
 
 /**
  * Single search result with video info and matching snippet.
@@ -13,9 +13,9 @@ export const SearchResultSchema = z.object({
   duration: z.number().nullable().optional(),
   snippet: z.string(),
   rank: z.number(),
-})
+});
 
-export type SearchResult = z.infer<typeof SearchResultSchema>
+export type SearchResult = z.infer<typeof SearchResultSchema>;
 
 /**
  * Paginated search response.
@@ -26,6 +26,6 @@ export const SearchResponseSchema = z.object({
   limit: z.number(),
   offset: z.number(),
   query: z.string(),
-})
+});
 
-export type SearchResponse = z.infer<typeof SearchResponseSchema>
+export type SearchResponse = z.infer<typeof SearchResponseSchema>;

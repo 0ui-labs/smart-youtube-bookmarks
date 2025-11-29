@@ -16,10 +16,11 @@
  * <FilterBar listId="list-uuid" />
  * ```
  */
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useFieldFilterStore } from '@/stores/fieldFilterStore';
-import { FieldFilterInput } from './FieldFilterInput';
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useFieldFilterStore } from "@/stores/fieldFilterStore";
+import { FieldFilterInput } from "./FieldFilterInput";
 
 interface FilterBarProps {
   listId: string;
@@ -34,11 +35,11 @@ export function FilterBar({ listId }: FilterBarProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 p-4 border-b bg-background">
+    <div className="flex items-center gap-2 border-b bg-background p-4">
       {/* Active Filters */}
-      <div className="flex items-center gap-2 flex-wrap flex-1">
+      <div className="flex flex-1 flex-wrap items-center gap-2">
         {activeFilters.map((filter) => (
-          <Badge key={filter.id} variant="secondary" className="gap-1 pr-1">
+          <Badge className="gap-1 pr-1" key={filter.id} variant="secondary">
             <FieldFilterInput
               filter={filter}
               listId={listId}
@@ -49,7 +50,7 @@ export function FilterBar({ listId }: FilterBarProps) {
       </div>
 
       {/* Clear All Button */}
-      <Button variant="ghost" size="sm" onClick={clearFilters}>
+      <Button onClick={clearFilters} size="sm" variant="ghost">
         Clear All
       </Button>
     </div>

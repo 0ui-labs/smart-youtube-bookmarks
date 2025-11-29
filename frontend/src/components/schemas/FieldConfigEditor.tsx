@@ -11,13 +11,13 @@
  * - BooleanConfigEditor: Info text (no config needed)
  */
 
-import { FieldType, FieldConfig } from '@/types/customField'
+import type { FieldConfig, FieldType } from "@/types/customField";
 
 interface FieldConfigEditorProps {
-  fieldType: FieldType
-  config: FieldConfig
-  onChange: (config: FieldConfig) => void
-  errors?: Record<string, string>
+  fieldType: FieldType;
+  config: FieldConfig;
+  onChange: (config: FieldConfig) => void;
+  errors?: Record<string, string>;
 }
 
 export const FieldConfigEditor = ({
@@ -25,15 +25,13 @@ export const FieldConfigEditor = ({
   config,
   onChange: _onChange,
   errors: _errors,
-}: FieldConfigEditorProps) => {
-  return (
-    <div className="border rounded-md p-3 bg-muted/50">
-      <p className="text-sm text-muted-foreground">
-        FieldConfigEditor for type "{fieldType}" (Task #124 pending)
-      </p>
-      <pre className="text-xs mt-2 p-2 bg-background rounded">
-        {JSON.stringify(config, null, 2)}
-      </pre>
-    </div>
-  )
-}
+}: FieldConfigEditorProps) => (
+  <div className="rounded-md border bg-muted/50 p-3">
+    <p className="text-muted-foreground text-sm">
+      FieldConfigEditor for type "{fieldType}" (Task #124 pending)
+    </p>
+    <pre className="mt-2 rounded bg-background p-2 text-xs">
+      {JSON.stringify(config, null, 2)}
+    </pre>
+  </div>
+);

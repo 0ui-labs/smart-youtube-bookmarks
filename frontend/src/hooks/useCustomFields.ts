@@ -1,20 +1,20 @@
 import {
-  useQuery,
-  useMutation,
-  useQueryClient,
   queryOptions,
-} from '@tanstack/react-query'
-import { customFieldsApi } from '@/lib/customFieldsApi'
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/useDebounce";
+import { customFieldsApi } from "@/lib/customFieldsApi";
 import {
-  CustomFieldsSchema,
-  CustomFieldSchema,
-  DuplicateCheckResponseSchema,
   type CustomField,
   type CustomFieldCreate,
+  CustomFieldSchema,
+  CustomFieldsSchema,
   type CustomFieldUpdate,
-} from '@/types/customFields'
-import { useDebounce } from '@/hooks/useDebounce'
-import { useSchemas } from './useSchemas'
+  DuplicateCheckResponseSchema,
+} from "@/types/customFields";
+import { useSchemas } from "./useSchemas";
 
 // ============================================================================
 // Query Key Factory
@@ -38,20 +38,20 @@ import { useSchemas } from './useSchemas'
  */
 export const customFieldKeys = {
   /** Base key for all custom field queries */
-  all: ['custom-fields'] as const,
+  all: ["custom-fields"] as const,
 
   /** Key factory for list-scoped queries */
-  lists: () => [...customFieldKeys.all, 'list'] as const,
+  lists: () => [...customFieldKeys.all, "list"] as const,
 
   /** Key for all fields in a specific list */
   list: (listId: string) => [...customFieldKeys.lists(), listId] as const,
 
   /** Key factory for detail queries */
-  details: () => [...customFieldKeys.all, 'detail'] as const,
+  details: () => [...customFieldKeys.all, "detail"] as const,
 
   /** Key for a specific field detail (future use for GET /custom-fields/{id}) */
   detail: (fieldId: string) => [...customFieldKeys.details(), fieldId] as const,
-}
+};
 
 // ============================================================================
 // Query Options Helper
@@ -75,16 +75,16 @@ export function customFieldsOptions(listId: string) {
   return queryOptions({
     queryKey: customFieldKeys.list(listId),
     queryFn: async () => {
-      const data = await customFieldsApi.getAll(listId)
+      const data = await customFieldsApi.getAll(listId);
       // Validate response with Zod schema for runtime safety
-      return CustomFieldsSchema.parse(data)
+      return CustomFieldsSchema.parse(data);
     },
     // Prevent API calls with empty listId (causes 422 errors)
     enabled: !!listId,
     // REF MCP: staleTime prevents unnecessary refetches
     // Custom fields change infrequently, so 5 minutes is reasonable
     staleTime: 5 * 60 * 1000, // 5 minutes
-  })
+  });
 }
 
 // ============================================================================
@@ -107,9 +107,8 @@ export function customFieldsOptions(listId: string) {
  * return fields.map(field => <FieldCard key={field.id} field={field} />)
  * ```
  */
-export const useCustomFields = (listId: string) => {
-  return useQuery(customFieldsOptions(listId))
-}
+export const useCustomFields = (listId: string) =>
+  useQuery(customFieldsOptions(listId));
 
 /**
  * React Query hook to check if a field name already exists (case-insensitive)
@@ -140,21 +139,21 @@ export const useCheckDuplicateField = (
   options?: { enabled?: boolean }
 ) => {
   // Debounce the name value (300ms)
-  const debouncedName = useDebounce(name, 300)
+  const debouncedName = useDebounce(name, 300);
 
   return useQuery({
-    queryKey: ['checkDuplicateField', listId, debouncedName] as const,
+    queryKey: ["checkDuplicateField", listId, debouncedName] as const,
     queryFn: async () => {
       const data = await customFieldsApi.checkDuplicate(listId, {
         name: debouncedName,
-      })
-      return DuplicateCheckResponseSchema.parse(data)
+      });
+      return DuplicateCheckResponseSchema.parse(data);
     },
     enabled: (options?.enabled ?? true) && debouncedName.length > 0,
     staleTime: 0, // Always fresh
     retry: false, // Fast fail
-  })
-}
+  });
+};
 
 // ============================================================================
 // Mutation Hooks
@@ -186,26 +185,26 @@ export const useCheckDuplicateField = (
  * ```
  */
 export const useCreateCustomField = (listId: string) => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['createCustomField', listId],
+    mutationKey: ["createCustomField", listId],
     mutationFn: async (fieldData: CustomFieldCreate) => {
-      const data = await customFieldsApi.create(listId, fieldData)
+      const data = await customFieldsApi.create(listId, fieldData);
       // Validate response with Zod schema (consistent with query)
-      return CustomFieldSchema.parse(data)
+      return CustomFieldSchema.parse(data);
     },
     // Optimistic update: immediately add to UI with temporary ID
     onMutate: async (newField) => {
       // Cancel outgoing refetches (so they don't overwrite optimistic update)
       await queryClient.cancelQueries({
         queryKey: customFieldKeys.list(listId),
-      })
+      });
 
       // Snapshot current value for rollback
       const previous = queryClient.getQueryData<CustomField[]>(
         customFieldKeys.list(listId)
-      )
+      );
 
       // Optimistically update cache with temporary field
       queryClient.setQueryData<CustomField[]>(
@@ -214,21 +213,24 @@ export const useCreateCustomField = (listId: string) => {
           ...(old ?? []),
           {
             ...newField,
-            id: 'temp-' + Date.now(), // Temporary ID until backend returns real one
+            id: `temp-${Date.now()}`, // Temporary ID until backend returns real one
             list_id: listId,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           } as CustomField,
         ]
-      )
+      );
 
-      return { previous }
+      return { previous };
     },
     // Rollback on error
     onError: (error, _newField, context) => {
-      console.error('Failed to create custom field:', error)
+      console.error("Failed to create custom field:", error);
       if (context?.previous) {
-        queryClient.setQueryData(customFieldKeys.list(listId), context.previous)
+        queryClient.setQueryData(
+          customFieldKeys.list(listId),
+          context.previous
+        );
       }
     },
     // Refetch to get real ID and server-generated fields
@@ -237,10 +239,10 @@ export const useCreateCustomField = (listId: string) => {
       // This runs on both success and error to handle edge cases
       await queryClient.invalidateQueries({
         queryKey: customFieldKeys.list(listId),
-      })
+      });
     },
-  })
-}
+  });
+};
 
 /**
  * React Query mutation hook to update an existing custom field
@@ -273,31 +275,31 @@ export const useCreateCustomField = (listId: string) => {
  * ```
  */
 export const useUpdateCustomField = (listId: string) => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['updateCustomField', listId],
+    mutationKey: ["updateCustomField", listId],
     mutationFn: async ({
       fieldId,
       data,
     }: {
-      fieldId: string
-      data: CustomFieldUpdate
+      fieldId: string;
+      data: CustomFieldUpdate;
     }) => {
-      const result = await customFieldsApi.update(listId, fieldId, data)
-      return CustomFieldSchema.parse(result)
+      const result = await customFieldsApi.update(listId, fieldId, data);
+      return CustomFieldSchema.parse(result);
     },
     // Optimistic update: immediately apply changes in UI
     onMutate: async ({ fieldId, data }) => {
       // Cancel outgoing refetches (so they don't overwrite optimistic update)
       await queryClient.cancelQueries({
         queryKey: customFieldKeys.list(listId),
-      })
+      });
 
       // Snapshot current value for rollback
       const previous = queryClient.getQueryData<CustomField[]>(
         customFieldKeys.list(listId)
-      )
+      );
 
       // Optimistically update cache
       queryClient.setQueryData<CustomField[]>(
@@ -312,25 +314,28 @@ export const useUpdateCustomField = (listId: string) => {
                 }
               : field
           ) ?? []
-      )
+      );
 
-      return { previous }
+      return { previous };
     },
     // Rollback on error
     onError: (error, _variables, context) => {
-      console.error('Failed to update custom field:', error)
+      console.error("Failed to update custom field:", error);
       if (context?.previous) {
-        queryClient.setQueryData(customFieldKeys.list(listId), context.previous)
+        queryClient.setQueryData(
+          customFieldKeys.list(listId),
+          context.previous
+        );
       }
     },
     // Refetch to ensure server state is correct
     onSettled: async () => {
       await queryClient.invalidateQueries({
         queryKey: customFieldKeys.list(listId),
-      })
+      });
     },
-  })
-}
+  });
+};
 
 /**
  * React Query mutation hook to delete a custom field
@@ -358,48 +363,51 @@ export const useUpdateCustomField = (listId: string) => {
  * ```
  */
 export const useDeleteCustomField = (listId: string) => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['deleteCustomField', listId],
+    mutationKey: ["deleteCustomField", listId],
     mutationFn: async (fieldId: string) => {
-      await customFieldsApi.delete(listId, fieldId)
+      await customFieldsApi.delete(listId, fieldId);
     },
     // Optimistic update: immediately remove from UI
     onMutate: async (fieldId) => {
       // Cancel outgoing refetches (so they don't overwrite optimistic update)
       await queryClient.cancelQueries({
         queryKey: customFieldKeys.list(listId),
-      })
+      });
 
       // Snapshot current value for rollback
       const previous = queryClient.getQueryData<CustomField[]>(
         customFieldKeys.list(listId)
-      )
+      );
 
       // Optimistically update cache
       queryClient.setQueryData<CustomField[]>(
         customFieldKeys.list(listId),
         (old) => old?.filter((field) => field.id !== fieldId) ?? []
-      )
+      );
 
-      return { previous }
+      return { previous };
     },
     // Rollback on error
     onError: (error, _fieldId, context) => {
-      console.error('Failed to delete custom field:', error)
+      console.error("Failed to delete custom field:", error);
       if (context?.previous) {
-        queryClient.setQueryData(customFieldKeys.list(listId), context.previous)
+        queryClient.setQueryData(
+          customFieldKeys.list(listId),
+          context.previous
+        );
       }
     },
     // Refetch to ensure consistency after success or error
     onSettled: async () => {
       await queryClient.invalidateQueries({
         queryKey: customFieldKeys.list(listId),
-      })
+      });
     },
-  })
-}
+  });
+};
 
 // ============================================================================
 // Usage Count Hook
@@ -436,16 +444,16 @@ export const useDeleteCustomField = (listId: string) => {
  * ```
  */
 export const useFieldUsageCounts = (listId: string): Map<string, number> => {
-  const { data: schemas = [] } = useSchemas(listId)
+  const { data: schemas = [] } = useSchemas(listId);
 
-  const usageCounts = new Map<string, number>()
+  const usageCounts = new Map<string, number>();
 
   schemas.forEach((schema) => {
     schema.schema_fields?.forEach((schemaField) => {
-      const fieldId = schemaField.field_id
-      usageCounts.set(fieldId, (usageCounts.get(fieldId) || 0) + 1)
-    })
-  })
+      const fieldId = schemaField.field_id;
+      usageCounts.set(fieldId, (usageCounts.get(fieldId) || 0) + 1);
+    });
+  });
 
-  return usageCounts
-}
+  return usageCounts;
+};

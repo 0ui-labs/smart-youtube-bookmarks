@@ -1,44 +1,44 @@
-import React from 'react'
-import { Check } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
+import { Check } from "lucide-react";
+import React from "react";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuRadioItem,
   DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 export interface SelectBadgeProps {
   /**
    * Current selected value
    */
-  value: string | null
+  value: string | null;
   /**
    * Available options to select from
    */
-  options: string[]
+  options: string[];
   /**
    * Field name for accessibility
    */
-  fieldName: string
+  fieldName: string;
   /**
    * Whether the field is read-only
    */
-  readonly?: boolean
+  readonly?: boolean;
   /**
    * Whether the field is disabled
    */
-  disabled?: boolean
+  disabled?: boolean;
   /**
    * Callback when value changes
    */
-  onChange?: (value: string) => void
+  onChange?: (value: string) => void;
   /**
    * Custom CSS class
    */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -80,19 +80,19 @@ export const SelectBadge = React.memo<SelectBadgeProps>(
     className,
   }) => {
     // Display value: use placeholder dash for null
-    const displayValue = value ?? '—'
+    const displayValue = value ?? "—";
 
     // Read-only mode: static badge
     if (readonly) {
       return (
         <Badge
-          variant="secondary"
-          className={cn('cursor-default', className)}
+          className={cn("cursor-default", className)}
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          variant="secondary"
         >
           {displayValue}
         </Badge>
-      )
+      );
     }
 
     // Editable mode: badge as dropdown trigger
@@ -100,45 +100,45 @@ export const SelectBadge = React.memo<SelectBadgeProps>(
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <button
-            type="button"
-            disabled={disabled}
+            aria-label={`${fieldName}: ${displayValue}, click to edit`}
             className={cn(
-              'inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold',
-              'border-transparent bg-secondary text-secondary-foreground',
-              'hover:bg-secondary/80 transition-colors cursor-pointer',
-              disabled && 'cursor-not-allowed opacity-50',
+              "inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold text-xs",
+              "border-transparent bg-secondary text-secondary-foreground",
+              "cursor-pointer transition-colors hover:bg-secondary/80",
+              disabled && "cursor-not-allowed opacity-50",
               className
             )}
+            disabled={disabled}
             onClick={(e) => {
-              e.stopPropagation()
-              if (disabled) e.preventDefault()
+              e.stopPropagation();
+              if (disabled) e.preventDefault();
             }}
-            aria-label={`${fieldName}: ${displayValue}, click to edit`}
+            type="button"
           >
             {displayValue}
           </button>
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align="start" className="w-48">
-          <DropdownMenuRadioGroup value={value ?? ''}>
+          <DropdownMenuRadioGroup value={value ?? ""}>
             {options.map((option) => (
               <DropdownMenuRadioItem
                 key={option}
-                value={option}
                 onClick={(e) => {
                   // REF MCP #4: stopPropagation to prevent VideoCard click
-                  e.stopPropagation()
+                  e.stopPropagation();
                   if (onChange) {
-                    onChange(option)
+                    onChange(option);
                   }
                 }}
+                value={option}
               >
                 <span className="flex-1">{option}</span>
                 {value === option && (
                   <Check
-                    className="h-4 w-4 ml-2 shrink-0"
-                    // REF MCP #5: aria-hidden="true" to hide icon from screen readers
                     aria-hidden="true"
+                    // REF MCP #5: aria-hidden="true" to hide icon from screen readers
+                    className="ml-2 h-4 w-4 shrink-0"
                   />
                 )}
               </DropdownMenuRadioItem>
@@ -146,8 +146,8 @@ export const SelectBadge = React.memo<SelectBadgeProps>(
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
-    )
+    );
   }
-)
+);
 
-SelectBadge.displayName = 'SelectBadge'
+SelectBadge.displayName = "SelectBadge";

@@ -3,19 +3,19 @@
  */
 
 // Import jest-dom custom matchers for toBeInTheDocument, toHaveAttribute, etc.
-import '@testing-library/jest-dom/vitest';
+import "@testing-library/jest-dom/vitest";
 
 // Import vi from vitest for mocking
-import { vi, beforeAll, afterEach, afterAll } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from "vitest";
 
 // Import MSW server
-import { server } from './mocks/server';
+import { server } from "./mocks/server";
 
 // Auto-mock Zustand for test isolation (uses __mocks__/zustand.ts)
-vi.mock('zustand');
+vi.mock("zustand");
 
 // Start MSW server before all tests
-beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
+beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
 
 // Reset handlers after each test to prevent state leakage
 afterEach(() => server.resetHandlers());
@@ -58,25 +58,23 @@ global.localStorage = new LocalStorageMock() as Storage;
 // Polyfill for Radix UI components (hasPointerCapture, setPointerCapture, releasePointerCapture, scrollIntoView)
 // JSDOM doesn't implement these methods, but Radix UI requires them
 if (!Element.prototype.hasPointerCapture) {
-  Element.prototype.hasPointerCapture = function() {
-    return false;
-  };
+  Element.prototype.hasPointerCapture = () => false;
 }
 
 if (!Element.prototype.setPointerCapture) {
-  Element.prototype.setPointerCapture = function() {
+  Element.prototype.setPointerCapture = () => {
     // No-op for JSDOM
   };
 }
 
 if (!Element.prototype.releasePointerCapture) {
-  Element.prototype.releasePointerCapture = function() {
+  Element.prototype.releasePointerCapture = () => {
     // No-op for JSDOM
   };
 }
 
 if (!Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = function() {
+  Element.prototype.scrollIntoView = () => {
     // No-op for JSDOM
   };
 }
@@ -84,7 +82,6 @@ if (!Element.prototype.scrollIntoView) {
 // Polyfill for ResizeObserver (required by Radix UI Slider)
 if (!global.ResizeObserver) {
   global.ResizeObserver = class ResizeObserver {
-    constructor(_callback: ResizeObserverCallback) {}
     observe() {}
     unobserve() {}
     disconnect() {}
@@ -92,7 +89,7 @@ if (!global.ResizeObserver) {
 }
 
 // Mock matchMedia (required by embla-carousel)
-Object.defineProperty(window, 'matchMedia', {
+Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
     matches: false,
@@ -109,13 +106,20 @@ Object.defineProperty(window, 'matchMedia', {
 // Mock IntersectionObserver (required by embla-carousel)
 if (!global.IntersectionObserver) {
   global.IntersectionObserver = class IntersectionObserver {
-    constructor(_callback: IntersectionObserverCallback) {}
     observe() {}
     unobserve() {}
     disconnect() {}
-    takeRecords() { return []; }
-    get root() { return null; }
-    get rootMargin() { return ''; }
-    get thresholds() { return []; }
+    takeRecords() {
+      return [];
+    }
+    get root() {
+      return null;
+    }
+    get rootMargin() {
+      return "";
+    }
+    get thresholds() {
+      return [];
+    }
   } as any;
 }

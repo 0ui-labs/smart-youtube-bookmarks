@@ -1,14 +1,14 @@
-import { create } from 'zustand'
+import { create } from "zustand";
 
 interface PendingImport {
-  urls: string[]
-  preselectedCategoryId?: string
+  urls: string[];
+  preselectedCategoryId?: string;
 }
 
 interface ImportDropStore {
-  pendingImport: PendingImport | null
-  setPendingImport: (urls: string[], categoryId?: string) => void
-  clearPendingImport: () => void
+  pendingImport: PendingImport | null;
+  setPendingImport: (urls: string[], categoryId?: string) => void;
+  clearPendingImport: () => void;
 }
 
 /**
@@ -22,10 +22,10 @@ export const useImportDropStore = create<ImportDropStore>((set) => ({
   pendingImport: null,
 
   setPendingImport: (urls, categoryId) => {
-    set({ pendingImport: { urls, preselectedCategoryId: categoryId } })
+    set({ pendingImport: { urls, preselectedCategoryId: categoryId } });
   },
 
   clearPendingImport: () => {
-    set({ pendingImport: null })
+    set({ pendingImport: null });
   },
-}))
+}));

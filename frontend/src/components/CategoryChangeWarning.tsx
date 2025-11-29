@@ -8,7 +8,11 @@
  * - Fields that will persist (workspace fields)
  * - Option to restore previous backup if available
  */
-import { useState } from 'react'
+
+import { AlertTriangle, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -16,42 +20,39 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { AlertTriangle, Sparkles } from 'lucide-react'
-import type { Tag } from '@/types/tag'
+} from "@/components/ui/dialog";
+import type { Tag } from "@/types/tag";
 
 interface FieldValue {
-  id: string
-  field_id: string
-  value: string | number | boolean | null
+  id: string;
+  field_id: string;
+  value: string | number | boolean | null;
   field: {
-    id: string
-    name: string
-    field_type: string
-  }
+    id: string;
+    name: string;
+    field_type: string;
+  };
 }
 
 export interface CategoryChangeWarningProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  oldCategory: Tag | null
-  newCategory: Tag | null
-  fieldValuesToBackup: FieldValue[]
-  fieldValuesThatPersist: FieldValue[]
-  hasBackup: boolean
-  onConfirm: (restoreBackup: boolean) => void
-  onCancel: () => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  oldCategory: Tag | null;
+  newCategory: Tag | null;
+  fieldValuesToBackup: FieldValue[];
+  fieldValuesThatPersist: FieldValue[];
+  hasBackup: boolean;
+  onConfirm: (restoreBackup: boolean) => void;
+  onCancel: () => void;
 }
 
 /**
  * Format a field value for display
  */
 function formatFieldValue(value: string | number | boolean | null): string {
-  if (value === null || value === undefined) return '-'
-  if (typeof value === 'boolean') return value ? 'Ja' : 'Nein'
-  return String(value)
+  if (value === null || value === undefined) return "-";
+  if (typeof value === "boolean") return value ? "Ja" : "Nein";
+  return String(value);
 }
 
 export function CategoryChangeWarning({
@@ -65,37 +66,38 @@ export function CategoryChangeWarning({
   onConfirm,
   onCancel,
 }: CategoryChangeWarningProps) {
-  const [restoreBackup, setRestoreBackup] = useState(false)
+  const [restoreBackup, setRestoreBackup] = useState(false);
 
   // Determine dialog title based on operation
-  const isRemoving = newCategory === null
-  const title = isRemoving ? 'Kategorie entfernen' : 'Kategorie ändern'
+  const isRemoving = newCategory === null;
+  const title = isRemoving ? "Kategorie entfernen" : "Kategorie ändern";
 
   const handleConfirm = () => {
-    onConfirm(restoreBackup)
-    setRestoreBackup(false) // Reset state
-  }
+    onConfirm(restoreBackup);
+    setRestoreBackup(false); // Reset state
+  };
 
   const handleCancel = () => {
-    setRestoreBackup(false) // Reset state
-    onCancel()
-  }
+    setRestoreBackup(false); // Reset state
+    onCancel();
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle
-              data-testid="warning-icon"
               className="h-5 w-5 text-amber-500"
+              data-testid="warning-icon"
             />
             {title}
           </DialogTitle>
           <DialogDescription>
             {oldCategory && newCategory && (
               <>
-                Von <strong>{oldCategory.name}</strong> zu <strong>{newCategory.name}</strong> wechseln.
+                Von <strong>{oldCategory.name}</strong> zu{" "}
+                <strong>{newCategory.name}</strong> wechseln.
               </>
             )}
             {oldCategory && !newCategory && (
@@ -115,13 +117,15 @@ export function CategoryChangeWarning({
           {/* Fields that will be backed up */}
           {fieldValuesToBackup.length > 0 && (
             <div>
-              <p className="text-sm font-medium mb-2">
+              <p className="mb-2 font-medium text-sm">
                 Folgende Werte werden gesichert:
               </p>
-              <div className="rounded-lg border bg-muted/50 p-3 space-y-1">
-                {fieldValuesToBackup.map(fv => (
-                  <div key={fv.id} className="text-sm flex justify-between">
-                    <span className="text-muted-foreground">{fv.field.name}</span>
+              <div className="space-y-1 rounded-lg border bg-muted/50 p-3">
+                {fieldValuesToBackup.map((fv) => (
+                  <div className="flex justify-between text-sm" key={fv.id}>
+                    <span className="text-muted-foreground">
+                      {fv.field.name}
+                    </span>
                     <span>{formatFieldValue(fv.value)}</span>
                   </div>
                 ))}
@@ -132,12 +136,15 @@ export function CategoryChangeWarning({
           {/* Fields that will persist (workspace fields) */}
           {fieldValuesThatPersist.length > 0 && (
             <div>
-              <p className="text-sm font-medium mb-2">
+              <p className="mb-2 font-medium text-sm">
                 Die folgenden Felder bleiben:
               </p>
-              <div className="rounded-lg border bg-green-50 p-3 space-y-1">
-                {fieldValuesThatPersist.map(fv => (
-                  <div key={fv.id} className="text-sm flex justify-between text-green-900">
+              <div className="space-y-1 rounded-lg border bg-green-50 p-3">
+                {fieldValuesThatPersist.map((fv) => (
+                  <div
+                    className="flex justify-between text-green-900 text-sm"
+                    key={fv.id}
+                  >
                     <span>{fv.field.name}</span>
                     <span>{formatFieldValue(fv.value)}</span>
                   </div>
@@ -150,25 +157,28 @@ export function CategoryChangeWarning({
           {hasBackup && (
             <>
               <div className="flex items-start gap-2 rounded-lg bg-blue-50 p-4">
-                <Sparkles className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
+                <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" />
                 <div>
                   <p className="font-medium">Gesicherte Werte gefunden!</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Du hattest dieses Video schon mal als &quot;{newCategory?.name}&quot; kategorisiert.
+                  <p className="mt-1 text-muted-foreground text-sm">
+                    Du hattest dieses Video schon mal als &quot;
+                    {newCategory?.name}&quot; kategorisiert.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center space-x-2">
                 <Checkbox
-                  id="restore-backup"
-                  checked={restoreBackup}
-                  onCheckedChange={(checked) => setRestoreBackup(checked === true)}
                   aria-label="Gesicherte Werte wiederherstellen"
+                  checked={restoreBackup}
+                  id="restore-backup"
+                  onCheckedChange={(checked) =>
+                    setRestoreBackup(checked === true)
+                  }
                 />
                 <label
+                  className="cursor-pointer text-sm"
                   htmlFor="restore-backup"
-                  className="text-sm cursor-pointer"
                 >
                   Gesicherte Werte wiederherstellen
                 </label>
@@ -178,14 +188,14 @@ export function CategoryChangeWarning({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleCancel}>
+          <Button onClick={handleCancel} variant="outline">
             Abbrechen
           </Button>
           <Button onClick={handleConfirm}>
-            {isRemoving ? 'Kategorie entfernen' : 'Kategorie ändern'}
+            {isRemoving ? "Kategorie entfernen" : "Kategorie ändern"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
