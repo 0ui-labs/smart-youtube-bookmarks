@@ -1,11 +1,14 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.video import Video
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_by_tags_or(client: AsyncClient, test_db: AsyncSession, test_list):
+async def test_filter_videos_by_tags_or(
+    client: AsyncClient, test_db: AsyncSession, test_list
+):
     """Test filtering videos by tags with OR logic (any matching tag)."""
     # Arrange: Create tags
     tag1_resp = await client.post("/api/tags", json={"name": "Python"})
@@ -15,15 +18,9 @@ async def test_filter_videos_by_tags_or(client: AsyncClient, test_db: AsyncSessi
     tag2_id = tag2_resp.json()["id"]
 
     # Create videos directly in database
-    video1 = Video(
-        list_id=test_list.id,
-        youtube_id="VIDEO_ID_1",
-        title="Python Video"
-    )
+    video1 = Video(list_id=test_list.id, youtube_id="VIDEO_ID_1", title="Python Video")
     video2 = Video(
-        list_id=test_list.id,
-        youtube_id="VIDEO_ID_2",
-        title="Tutorial Video"
+        list_id=test_list.id, youtube_id="VIDEO_ID_2", title="Tutorial Video"
     )
     test_db.add(video1)
     test_db.add(video2)
@@ -36,10 +33,7 @@ async def test_filter_videos_by_tags_or(client: AsyncClient, test_db: AsyncSessi
     await client.post(f"/api/videos/{video2.id}/tags", json={"tag_ids": [tag2_id]})
 
     # Act: Filter by Python OR Tutorial (using repeated params)
-    response = await client.get(
-        "/api/videos",
-        params={"tags": ["Python", "Tutorial"]}
-    )
+    response = await client.get("/api/videos", params={"tags": ["Python", "Tutorial"]})
 
     # Assert: Both videos should match
     assert response.status_code == 200
@@ -51,7 +45,9 @@ async def test_filter_videos_by_tags_or(client: AsyncClient, test_db: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_by_tags_and(client: AsyncClient, test_db: AsyncSession, test_list):
+async def test_filter_videos_by_tags_and(
+    client: AsyncClient, test_db: AsyncSession, test_list
+):
     """Test filtering videos by tags with AND logic (all tags required)."""
     # Arrange: Create tags (use different names than OR test to avoid conflicts)
     tag1_resp = await client.post("/api/tags", json={"name": "JavaScript"})
@@ -63,15 +59,11 @@ async def test_filter_videos_by_tags_and(client: AsyncClient, test_db: AsyncSess
     # Create videos
     # Video 1 has BOTH JavaScript and Expert tags
     video1 = Video(
-        list_id=test_list.id,
-        youtube_id="VIDEO_ID_1",
-        title="Advanced JavaScript Video"
+        list_id=test_list.id, youtube_id="VIDEO_ID_1", title="Advanced JavaScript Video"
     )
     # Video 2 has ONLY JavaScript tag
     video2 = Video(
-        list_id=test_list.id,
-        youtube_id="VIDEO_ID_2",
-        title="Basic JavaScript Video"
+        list_id=test_list.id, youtube_id="VIDEO_ID_2", title="Basic JavaScript Video"
     )
     test_db.add(video1)
     test_db.add(video2)
@@ -80,13 +72,14 @@ async def test_filter_videos_by_tags_and(client: AsyncClient, test_db: AsyncSess
     await test_db.refresh(video2)
 
     # Assign tags
-    await client.post(f"/api/videos/{video1.id}/tags", json={"tag_ids": [tag1_id, tag2_id]})
+    await client.post(
+        f"/api/videos/{video1.id}/tags", json={"tag_ids": [tag1_id, tag2_id]}
+    )
     await client.post(f"/api/videos/{video2.id}/tags", json={"tag_ids": [tag1_id]})
 
     # Act: Filter by JavaScript AND Expert (using tags_all param)
     response = await client.get(
-        "/api/videos",
-        params={"tags_all": ["JavaScript", "Expert"]}
+        "/api/videos", params={"tags_all": ["JavaScript", "Expert"]}
     )
 
     # Assert: Only video1 should match (has both tags)
@@ -97,7 +90,9 @@ async def test_filter_videos_by_tags_and(client: AsyncClient, test_db: AsyncSess
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_by_tags_or_case_insensitive(client: AsyncClient, test_db: AsyncSession, test_list):
+async def test_filter_videos_by_tags_or_case_insensitive(
+    client: AsyncClient, test_db: AsyncSession, test_list
+):
     """Test filtering videos by tags with OR logic is case-insensitive."""
     # Arrange: Create tags with UPPERCASE names
     tag1_resp = await client.post("/api/tags", json={"name": "GOLANG"})
@@ -108,14 +103,10 @@ async def test_filter_videos_by_tags_or_case_insensitive(client: AsyncClient, te
 
     # Create videos
     video1 = Video(
-        list_id=test_list.id,
-        youtube_id="VIDEO_ID_GOLANG",
-        title="Golang Video"
+        list_id=test_list.id, youtube_id="VIDEO_ID_GOLANG", title="Golang Video"
     )
     video2 = Video(
-        list_id=test_list.id,
-        youtube_id="VIDEO_ID_BEGINNERS",
-        title="Beginners Video"
+        list_id=test_list.id, youtube_id="VIDEO_ID_BEGINNERS", title="Beginners Video"
     )
     test_db.add(video1)
     test_db.add(video2)
@@ -128,10 +119,7 @@ async def test_filter_videos_by_tags_or_case_insensitive(client: AsyncClient, te
     await client.post(f"/api/videos/{video2.id}/tags", json={"tag_ids": [tag2_id]})
 
     # Act: Search with lowercase tags (tags in DB are uppercase)
-    response = await client.get(
-        "/api/videos",
-        params={"tags": ["golang", "beginners"]}
-    )
+    response = await client.get("/api/videos", params={"tags": ["golang", "beginners"]})
 
     # Assert: Should find both videos (case-insensitive match)
     assert response.status_code == 200
@@ -143,7 +131,9 @@ async def test_filter_videos_by_tags_or_case_insensitive(client: AsyncClient, te
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_by_tags_and_case_insensitive(client: AsyncClient, test_db: AsyncSession, test_list):
+async def test_filter_videos_by_tags_and_case_insensitive(
+    client: AsyncClient, test_db: AsyncSession, test_list
+):
     """Test filtering videos by tags with AND logic is case-insensitive."""
     # Arrange: Create tags with MixedCase names
     tag1_resp = await client.post("/api/tags", json={"name": "MachineLearning"})
@@ -153,22 +143,19 @@ async def test_filter_videos_by_tags_and_case_insensitive(client: AsyncClient, t
     tag2_id = tag2_resp.json()["id"]
 
     # Create video with both tags
-    video = Video(
-        list_id=test_list.id,
-        youtube_id="VIDEO_ID_ML",
-        title="ML Deep Dive"
-    )
+    video = Video(list_id=test_list.id, youtube_id="VIDEO_ID_ML", title="ML Deep Dive")
     test_db.add(video)
     await test_db.commit()
     await test_db.refresh(video)
 
     # Assign both tags
-    await client.post(f"/api/videos/{video.id}/tags", json={"tag_ids": [tag1_id, tag2_id]})
+    await client.post(
+        f"/api/videos/{video.id}/tags", json={"tag_ids": [tag1_id, tag2_id]}
+    )
 
     # Act: Search with LOWERCASE tags (tags in DB are MixedCase)
     response = await client.get(
-        "/api/videos",
-        params={"tags_all": ["machinelearning", "deepdive"]}
+        "/api/videos", params={"tags_all": ["machinelearning", "deepdive"]}
     )
 
     # Assert: Should find the video (case-insensitive match)
@@ -179,14 +166,13 @@ async def test_filter_videos_by_tags_and_case_insensitive(client: AsyncClient, t
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_or_too_many_tags(client: AsyncClient, test_db: AsyncSession, test_list):
+async def test_filter_videos_or_too_many_tags(
+    client: AsyncClient, test_db: AsyncSession, test_list
+):
     """Test OR filter with more than 10 tags returns 422 validation error."""
     # Act: Try to filter with 11 tags (exceeds max of 10)
     tags_list = [f"Tag{i}" for i in range(11)]
-    response = await client.get(
-        "/api/videos",
-        params={"tags": tags_list}
-    )
+    response = await client.get("/api/videos", params={"tags": tags_list})
 
     # Assert: Should return 422 validation error
     assert response.status_code == 422
@@ -197,14 +183,13 @@ async def test_filter_videos_or_too_many_tags(client: AsyncClient, test_db: Asyn
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_and_too_many_tags(client: AsyncClient, test_db: AsyncSession, test_list):
+async def test_filter_videos_and_too_many_tags(
+    client: AsyncClient, test_db: AsyncSession, test_list
+):
     """Test AND filter with more than 10 tags returns 422 validation error."""
     # Act: Try to filter with 11 tags (exceeds max of 10)
     tags_list = [f"Tag{i}" for i in range(11)]
-    response = await client.get(
-        "/api/videos",
-        params={"tags_all": tags_list}
-    )
+    response = await client.get("/api/videos", params={"tags_all": tags_list})
 
     # Assert: Should return 422 validation error
     assert response.status_code == 422
@@ -214,7 +199,9 @@ async def test_filter_videos_and_too_many_tags(client: AsyncClient, test_db: Asy
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_exactly_10_tags(client: AsyncClient, test_db: AsyncSession, test_list):
+async def test_filter_videos_exactly_10_tags(
+    client: AsyncClient, test_db: AsyncSession, test_list
+):
     """Test filtering with exactly 10 tags works (boundary test)."""
     # Arrange: Create 10 tags
     tag_ids = []
@@ -226,7 +213,7 @@ async def test_filter_videos_exactly_10_tags(client: AsyncClient, test_db: Async
     video = Video(
         list_id=test_list.id,
         youtube_id="VIDEO_ID_BOUNDARY",
-        title="Boundary Test Video"
+        title="Boundary Test Video",
     )
     test_db.add(video)
     await test_db.commit()
@@ -237,10 +224,7 @@ async def test_filter_videos_exactly_10_tags(client: AsyncClient, test_db: Async
 
     # Act: Filter with exactly 10 tags (boundary - should work)
     tags_list = [f"BoundaryTag{i}" for i in range(10)]
-    response = await client.get(
-        "/api/videos",
-        params={"tags": tags_list}
-    )
+    response = await client.get("/api/videos", params={"tags": tags_list})
 
     # Assert: Should return 200 and find the video
     assert response.status_code == 200
@@ -264,7 +248,7 @@ async def test_field_rating(test_db: AsyncSession, test_list):
         list_id=test_list.id,
         name="Overall Rating",
         field_type="rating",
-        config={"max_rating": 5}
+        config={"max_rating": 5},
     )
     test_db.add(field)
     await test_db.commit()
@@ -281,7 +265,7 @@ async def test_field_select(test_db: AsyncSession, test_list):
         list_id=test_list.id,
         name="Quality",
         field_type="select",
-        config={"options": ["bad", "good", "great"]}
+        config={"options": ["bad", "good", "great"]},
     )
     test_db.add(field)
     await test_db.commit()
@@ -295,10 +279,7 @@ async def test_field_text(test_db: AsyncSession, test_list):
     from app.models.custom_field import CustomField
 
     field = CustomField(
-        list_id=test_list.id,
-        name="Notes",
-        field_type="text",
-        config={}
+        list_id=test_list.id, name="Notes", field_type="text", config={}
     )
     test_db.add(field)
     await test_db.commit()
@@ -312,10 +293,7 @@ async def test_field_boolean(test_db: AsyncSession, test_list):
     from app.models.custom_field import CustomField
 
     field = CustomField(
-        list_id=test_list.id,
-        name="Recommended",
-        field_type="boolean",
-        config={}
+        list_id=test_list.id, name="Recommended", field_type="boolean", config={}
     )
     test_db.add(field)
     await test_db.commit()
@@ -323,13 +301,15 @@ async def test_field_boolean(test_db: AsyncSession, test_list):
     return field
 
 
-async def create_test_video(test_db: AsyncSession, list_id, youtube_id: str, title: str) -> Video:
+async def create_test_video(
+    test_db: AsyncSession, list_id, youtube_id: str, title: str
+) -> Video:
     """Helper to create a test video."""
     video = Video(
         list_id=list_id,
         youtube_id=youtube_id,
         title=title,
-        processing_status="completed"
+        processing_status="completed",
     )
     test_db.add(video)
     await test_db.commit()
@@ -341,11 +321,7 @@ async def set_field_value(test_db: AsyncSession, video_id, field_id, **kwargs):
     """Helper to set a custom field value for a video."""
     from app.models.video_field_value import VideoFieldValue
 
-    field_value = VideoFieldValue(
-        video_id=video_id,
-        field_id=field_id,
-        **kwargs
-    )
+    field_value = VideoFieldValue(video_id=video_id, field_id=field_id, **kwargs)
     test_db.add(field_value)
     await test_db.commit()
 
@@ -357,10 +333,7 @@ async def set_field_value(test_db: AsyncSession, video_id, field_id, **kwargs):
 
 @pytest.mark.asyncio
 async def test_filter_videos_by_rating_gte(
-    client: AsyncClient,
-    test_list,
-    test_field_rating,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_rating, test_db: AsyncSession
 ):
     """Filter videos with rating >= 4."""
     # Arrange: Create videos with different ratings
@@ -377,13 +350,9 @@ async def test_filter_videos_by_rating_gte(
         f"/api/lists/{test_list.id}/videos/filter",
         json={
             "field_filters": [
-                {
-                    "field_id": str(test_field_rating.id),
-                    "operator": "gte",
-                    "value": 4
-                }
+                {"field_id": str(test_field_rating.id), "operator": "gte", "value": 4}
             ]
-        }
+        },
     )
 
     # Assert
@@ -398,10 +367,7 @@ async def test_filter_videos_by_rating_gte(
 
 @pytest.mark.asyncio
 async def test_filter_videos_by_rating_lte(
-    client: AsyncClient,
-    test_list,
-    test_field_rating,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_rating, test_db: AsyncSession
 ):
     """Filter videos with rating <= 3."""
     # Arrange
@@ -418,13 +384,9 @@ async def test_filter_videos_by_rating_lte(
         f"/api/lists/{test_list.id}/videos/filter",
         json={
             "field_filters": [
-                {
-                    "field_id": str(test_field_rating.id),
-                    "operator": "lte",
-                    "value": 3
-                }
+                {"field_id": str(test_field_rating.id), "operator": "lte", "value": 3}
             ]
-        }
+        },
     )
 
     # Assert
@@ -439,10 +401,7 @@ async def test_filter_videos_by_rating_lte(
 
 @pytest.mark.asyncio
 async def test_filter_videos_by_rating_eq(
-    client: AsyncClient,
-    test_list,
-    test_field_rating,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_rating, test_db: AsyncSession
 ):
     """Filter videos with rating == 5."""
     # Arrange
@@ -459,13 +418,9 @@ async def test_filter_videos_by_rating_eq(
         f"/api/lists/{test_list.id}/videos/filter",
         json={
             "field_filters": [
-                {
-                    "field_id": str(test_field_rating.id),
-                    "operator": "eq",
-                    "value": 5
-                }
+                {"field_id": str(test_field_rating.id), "operator": "eq", "value": 5}
             ]
-        }
+        },
     )
 
     # Assert
@@ -480,10 +435,7 @@ async def test_filter_videos_by_rating_eq(
 
 @pytest.mark.asyncio
 async def test_filter_videos_by_rating_between(
-    client: AsyncClient,
-    test_list,
-    test_field_rating,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_rating, test_db: AsyncSession
 ):
     """Filter videos with rating between 3-5."""
     # Arrange
@@ -506,10 +458,10 @@ async def test_filter_videos_by_rating_between(
                     "field_id": str(test_field_rating.id),
                     "operator": "between",
                     "value_min": 3,
-                    "value_max": 5
+                    "value_max": 5,
                 }
             ]
-        }
+        },
     )
 
     # Assert
@@ -530,20 +482,32 @@ async def test_filter_videos_by_rating_between(
 
 @pytest.mark.asyncio
 async def test_filter_videos_by_text_contains(
-    client: AsyncClient,
-    test_list,
-    test_field_text,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_text, test_db: AsyncSession
 ):
     """Filter videos where text contains 'tutorial' (tests ILIKE + GIN index)."""
     # Arrange
-    video1 = await create_test_video(test_db, test_list.id, "VIDEO_TUT", "Tutorial video")
-    video2 = await create_test_video(test_db, test_list.id, "VIDEO_INTRO", "Intro video")
-    video3 = await create_test_video(test_db, test_list.id, "VIDEO_ADVANCED", "Advanced tutorial")
+    video1 = await create_test_video(
+        test_db, test_list.id, "VIDEO_TUT", "Tutorial video"
+    )
+    video2 = await create_test_video(
+        test_db, test_list.id, "VIDEO_INTRO", "Intro video"
+    )
+    video3 = await create_test_video(
+        test_db, test_list.id, "VIDEO_ADVANCED", "Advanced tutorial"
+    )
 
-    await set_field_value(test_db, video1.id, test_field_text.id, value_text="Great tutorial for beginners")
-    await set_field_value(test_db, video2.id, test_field_text.id, value_text="Introduction to Python")
-    await set_field_value(test_db, video3.id, test_field_text.id, value_text="Advanced TUTORIAL content")
+    await set_field_value(
+        test_db,
+        video1.id,
+        test_field_text.id,
+        value_text="Great tutorial for beginners",
+    )
+    await set_field_value(
+        test_db, video2.id, test_field_text.id, value_text="Introduction to Python"
+    )
+    await set_field_value(
+        test_db, video3.id, test_field_text.id, value_text="Advanced TUTORIAL content"
+    )
 
     # Act: Filter for text containing "tutorial"
     response = await client.post(
@@ -553,10 +517,10 @@ async def test_filter_videos_by_text_contains(
                 {
                     "field_id": str(test_field_text.id),
                     "operator": "contains",
-                    "value": "tutorial"
+                    "value": "tutorial",
                 }
             ]
-        }
+        },
     )
 
     # Assert
@@ -571,20 +535,21 @@ async def test_filter_videos_by_text_contains(
 
 @pytest.mark.asyncio
 async def test_filter_videos_by_text_exact(
-    client: AsyncClient,
-    test_list,
-    test_field_text,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_text, test_db: AsyncSession
 ):
     """Filter videos with exact text match (case-sensitive)."""
     # Arrange
-    video1 = await create_test_video(test_db, test_list.id, "VIDEO_EXACT", "Exact match")
+    video1 = await create_test_video(
+        test_db, test_list.id, "VIDEO_EXACT", "Exact match"
+    )
     video2 = await create_test_video(test_db, test_list.id, "VIDEO_UPPER", "Uppercase")
     video3 = await create_test_video(test_db, test_list.id, "VIDEO_PARTIAL", "Partial")
 
     await set_field_value(test_db, video1.id, test_field_text.id, value_text="Python")
     await set_field_value(test_db, video2.id, test_field_text.id, value_text="PYTHON")
-    await set_field_value(test_db, video3.id, test_field_text.id, value_text="Python programming")
+    await set_field_value(
+        test_db, video3.id, test_field_text.id, value_text="Python programming"
+    )
 
     # Act: Filter for exact match "Python" (case-sensitive)
     response = await client.post(
@@ -594,10 +559,10 @@ async def test_filter_videos_by_text_exact(
                 {
                     "field_id": str(test_field_text.id),
                     "operator": "exact",
-                    "value": "Python"
+                    "value": "Python",
                 }
             ]
-        }
+        },
     )
 
     # Assert
@@ -609,20 +574,29 @@ async def test_filter_videos_by_text_exact(
 
 @pytest.mark.asyncio
 async def test_filter_videos_text_contains_escaping(
-    client: AsyncClient,
-    test_list,
-    test_field_text,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_text, test_db: AsyncSession
 ):
     """Test special characters (%, _, \\) are properly escaped in ILIKE."""
     # Arrange
-    video1 = await create_test_video(test_db, test_list.id, "VIDEO_PERCENT", "Percent test")
-    video2 = await create_test_video(test_db, test_list.id, "VIDEO_UNDERSCORE", "Underscore test")
-    video3 = await create_test_video(test_db, test_list.id, "VIDEO_NORMAL", "Normal text")
+    video1 = await create_test_video(
+        test_db, test_list.id, "VIDEO_PERCENT", "Percent test"
+    )
+    video2 = await create_test_video(
+        test_db, test_list.id, "VIDEO_UNDERSCORE", "Underscore test"
+    )
+    video3 = await create_test_video(
+        test_db, test_list.id, "VIDEO_NORMAL", "Normal text"
+    )
 
-    await set_field_value(test_db, video1.id, test_field_text.id, value_text="100% complete")
-    await set_field_value(test_db, video2.id, test_field_text.id, value_text="my_function")
-    await set_field_value(test_db, video3.id, test_field_text.id, value_text="no special chars")
+    await set_field_value(
+        test_db, video1.id, test_field_text.id, value_text="100% complete"
+    )
+    await set_field_value(
+        test_db, video2.id, test_field_text.id, value_text="my_function"
+    )
+    await set_field_value(
+        test_db, video3.id, test_field_text.id, value_text="no special chars"
+    )
 
     # Act: Search for "%" literal (should be escaped)
     response = await client.post(
@@ -632,10 +606,10 @@ async def test_filter_videos_text_contains_escaping(
                 {
                     "field_id": str(test_field_text.id),
                     "operator": "contains",
-                    "value": "%"
+                    "value": "%",
                 }
             ]
-        }
+        },
     )
 
     # Assert: Should only find "100% complete"
@@ -652,10 +626,10 @@ async def test_filter_videos_text_contains_escaping(
                 {
                     "field_id": str(test_field_text.id),
                     "operator": "contains",
-                    "value": "_"
+                    "value": "_",
                 }
             ]
-        }
+        },
     )
 
     # Assert: Should only find "my_function"
@@ -672,15 +646,16 @@ async def test_filter_videos_text_contains_escaping(
 
 @pytest.mark.asyncio
 async def test_filter_videos_by_select_in(
-    client: AsyncClient,
-    test_list,
-    test_field_select,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_select, test_db: AsyncSession
 ):
     """Filter videos where Quality is in ['great', 'good']."""
     # Arrange
-    video1 = await create_test_video(test_db, test_list.id, "VIDEO_GREAT", "Great quality")
-    video2 = await create_test_video(test_db, test_list.id, "VIDEO_GOOD", "Good quality")
+    video1 = await create_test_video(
+        test_db, test_list.id, "VIDEO_GREAT", "Great quality"
+    )
+    video2 = await create_test_video(
+        test_db, test_list.id, "VIDEO_GOOD", "Good quality"
+    )
     video3 = await create_test_video(test_db, test_list.id, "VIDEO_BAD", "Bad quality")
 
     await set_field_value(test_db, video1.id, test_field_select.id, value_text="great")
@@ -695,10 +670,10 @@ async def test_filter_videos_by_select_in(
                 {
                     "field_id": str(test_field_select.id),
                     "operator": "in",
-                    "value": "great,good"  # Comma-separated
+                    "value": "great,good",  # Comma-separated
                 }
             ]
-        }
+        },
     )
 
     # Assert
@@ -718,18 +693,19 @@ async def test_filter_videos_by_select_in(
 
 @pytest.mark.asyncio
 async def test_filter_videos_by_boolean_is_true(
-    client: AsyncClient,
-    test_list,
-    test_field_boolean,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_boolean, test_db: AsyncSession
 ):
     """Filter videos where Recommended is True."""
     # Arrange
     video1 = await create_test_video(test_db, test_list.id, "VIDEO_REC", "Recommended")
-    video2 = await create_test_video(test_db, test_list.id, "VIDEO_NOT_REC", "Not recommended")
+    video2 = await create_test_video(
+        test_db, test_list.id, "VIDEO_NOT_REC", "Not recommended"
+    )
 
     await set_field_value(test_db, video1.id, test_field_boolean.id, value_boolean=True)
-    await set_field_value(test_db, video2.id, test_field_boolean.id, value_boolean=False)
+    await set_field_value(
+        test_db, video2.id, test_field_boolean.id, value_boolean=False
+    )
 
     # Act: Filter for Recommended == True
     response = await client.post(
@@ -739,10 +715,10 @@ async def test_filter_videos_by_boolean_is_true(
                 {
                     "field_id": str(test_field_boolean.id),
                     "operator": "is",
-                    "value": True
+                    "value": True,
                 }
             ]
-        }
+        },
     )
 
     # Assert
@@ -754,18 +730,19 @@ async def test_filter_videos_by_boolean_is_true(
 
 @pytest.mark.asyncio
 async def test_filter_videos_by_boolean_is_false(
-    client: AsyncClient,
-    test_list,
-    test_field_boolean,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_boolean, test_db: AsyncSession
 ):
     """Filter videos where Recommended is False."""
     # Arrange
     video1 = await create_test_video(test_db, test_list.id, "VIDEO_REC", "Recommended")
-    video2 = await create_test_video(test_db, test_list.id, "VIDEO_NOT_REC", "Not recommended")
+    video2 = await create_test_video(
+        test_db, test_list.id, "VIDEO_NOT_REC", "Not recommended"
+    )
 
     await set_field_value(test_db, video1.id, test_field_boolean.id, value_boolean=True)
-    await set_field_value(test_db, video2.id, test_field_boolean.id, value_boolean=False)
+    await set_field_value(
+        test_db, video2.id, test_field_boolean.id, value_boolean=False
+    )
 
     # Act: Filter for Recommended == False
     response = await client.post(
@@ -775,10 +752,10 @@ async def test_filter_videos_by_boolean_is_false(
                 {
                     "field_id": str(test_field_boolean.id),
                     "operator": "is",
-                    "value": False
+                    "value": False,
                 }
             ]
-        }
+        },
     )
 
     # Assert
@@ -799,13 +776,19 @@ async def test_filter_videos_multiple_fields_and_logic(
     test_list,
     test_field_rating,
     test_field_select,
-    test_db: AsyncSession
+    test_db: AsyncSession,
 ):
     """Filter videos with Rating >= 4 AND Quality = 'great' (AND logic)."""
     # Arrange
-    video1 = await create_test_video(test_db, test_list.id, "VIDEO_PERFECT", "Perfect video")
-    video2 = await create_test_video(test_db, test_list.id, "VIDEO_HIGHRATING", "High rating but not great")
-    video3 = await create_test_video(test_db, test_list.id, "VIDEO_GREAT", "Great but low rating")
+    video1 = await create_test_video(
+        test_db, test_list.id, "VIDEO_PERFECT", "Perfect video"
+    )
+    video2 = await create_test_video(
+        test_db, test_list.id, "VIDEO_HIGHRATING", "High rating but not great"
+    )
+    video3 = await create_test_video(
+        test_db, test_list.id, "VIDEO_GREAT", "Great but low rating"
+    )
 
     # Video 1: Rating=5, Quality=great (matches both)
     await set_field_value(test_db, video1.id, test_field_rating.id, value_numeric=5)
@@ -824,18 +807,14 @@ async def test_filter_videos_multiple_fields_and_logic(
         f"/api/lists/{test_list.id}/videos/filter",
         json={
             "field_filters": [
-                {
-                    "field_id": str(test_field_rating.id),
-                    "operator": "gte",
-                    "value": 4
-                },
+                {"field_id": str(test_field_rating.id), "operator": "gte", "value": 4},
                 {
                     "field_id": str(test_field_select.id),
                     "operator": "exact",
-                    "value": "great"
-                }
+                    "value": "great",
+                },
             ]
-        }
+        },
     )
 
     # Assert: Only video1 matches both filters
@@ -847,10 +826,7 @@ async def test_filter_videos_multiple_fields_and_logic(
 
 @pytest.mark.asyncio
 async def test_filter_videos_tags_and_fields(
-    client: AsyncClient,
-    test_list,
-    test_field_rating,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_rating, test_db: AsyncSession
 ):
     """Filter videos with Tag 'Rust' AND Rating >= 4."""
     # Arrange: Create tag (use unique name to avoid conflicts with other tests)
@@ -858,9 +834,15 @@ async def test_filter_videos_tags_and_fields(
     tag_id = tag_resp.json()["id"]
 
     # Create videos
-    video1 = await create_test_video(test_db, test_list.id, "VIDEO_RUST_HIGH", "Rust high rating")
-    video2 = await create_test_video(test_db, test_list.id, "VIDEO_RUST_LOW", "Rust low rating")
-    video3 = await create_test_video(test_db, test_list.id, "VIDEO_JS_HIGH", "JavaScript high rating")
+    video1 = await create_test_video(
+        test_db, test_list.id, "VIDEO_RUST_HIGH", "Rust high rating"
+    )
+    video2 = await create_test_video(
+        test_db, test_list.id, "VIDEO_RUST_LOW", "Rust low rating"
+    )
+    video3 = await create_test_video(
+        test_db, test_list.id, "VIDEO_JS_HIGH", "JavaScript high rating"
+    )
 
     # Assign Rust tag to video1 and video2
     await client.post(f"/api/videos/{video1.id}/tags", json={"tag_ids": [tag_id]})
@@ -877,13 +859,9 @@ async def test_filter_videos_tags_and_fields(
         json={
             "tags": ["Rust"],
             "field_filters": [
-                {
-                    "field_id": str(test_field_rating.id),
-                    "operator": "gte",
-                    "value": 4
-                }
-            ]
-        }
+                {"field_id": str(test_field_rating.id), "operator": "gte", "value": 4}
+            ],
+        },
     )
 
     # Assert: Only video1 matches (Rust tag AND rating >= 4)
@@ -900,10 +878,7 @@ async def test_filter_videos_tags_and_fields(
 
 @pytest.mark.asyncio
 async def test_filter_videos_empty_results(
-    client: AsyncClient,
-    test_list,
-    test_field_rating,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_field_rating, test_db: AsyncSession
 ):
     """Filter that matches no videos returns empty list."""
     # Arrange: Create videos with ratings 1-3
@@ -918,13 +893,9 @@ async def test_filter_videos_empty_results(
         f"/api/lists/{test_list.id}/videos/filter",
         json={
             "field_filters": [
-                {
-                    "field_id": str(test_field_rating.id),
-                    "operator": "gte",
-                    "value": 5
-                }
+                {"field_id": str(test_field_rating.id), "operator": "gte", "value": 5}
             ]
-        }
+        },
     )
 
     # Assert: Returns 200 with empty array
@@ -934,10 +905,7 @@ async def test_filter_videos_empty_results(
 
 
 @pytest.mark.asyncio
-async def test_filter_videos_invalid_list_id(
-    client: AsyncClient,
-    test_field_rating
-):
+async def test_filter_videos_invalid_list_id(client: AsyncClient, test_field_rating):
     """Filter with invalid list_id returns 404."""
     from uuid import uuid4
 
@@ -948,13 +916,9 @@ async def test_filter_videos_invalid_list_id(
         f"/api/lists/{fake_list_id}/videos/filter",
         json={
             "field_filters": [
-                {
-                    "field_id": str(test_field_rating.id),
-                    "operator": "gte",
-                    "value": 4
-                }
+                {"field_id": str(test_field_rating.id), "operator": "gte", "value": 4}
             ]
-        }
+        },
     )
 
     # Assert
@@ -964,9 +928,7 @@ async def test_filter_videos_invalid_list_id(
 
 @pytest.mark.asyncio
 async def test_filter_videos_no_filters(
-    client: AsyncClient,
-    test_list,
-    test_db: AsyncSession
+    client: AsyncClient, test_list, test_db: AsyncSession
 ):
     """Filter with no filters returns all videos in list."""
     # Arrange: Create videos
@@ -974,10 +936,7 @@ async def test_filter_videos_no_filters(
     video2 = await create_test_video(test_db, test_list.id, "VIDEO_2", "Video 2")
 
     # Act: Filter with empty request
-    response = await client.post(
-        f"/api/lists/{test_list.id}/videos/filter",
-        json={}
-    )
+    response = await client.post(f"/api/lists/{test_list.id}/videos/filter", json={})
 
     # Assert: Returns all videos
     assert response.status_code == 200
@@ -987,9 +946,7 @@ async def test_filter_videos_no_filters(
 
 @pytest.mark.asyncio
 async def test_filter_in_operator_type_validation(
-    client: AsyncClient,
-    test_list,
-    test_field_select
+    client: AsyncClient, test_list, test_field_select
 ):
     """IN operator should reject non-string values."""
     # Act: Try to use IN operator with integer value (should fail)
@@ -1000,10 +957,10 @@ async def test_filter_in_operator_type_validation(
                 {
                     "field_id": str(test_field_select.id),
                     "operator": "in",
-                    "value": 123  # Invalid: should be string
+                    "value": 123,  # Invalid: should be string
                 }
             ]
-        }
+        },
     )
 
     # Assert: Should return 422 validation error

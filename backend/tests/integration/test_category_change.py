@@ -8,20 +8,20 @@ Tests the PUT /api/videos/{video_id}/category endpoint:
 - test_change_category_without_values_no_backup
 """
 
+import shutil
+
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.list import BookmarkList
-from app.models.video import Video
-from app.models.tag import Tag, video_tags
 from app.models.custom_field import CustomField
 from app.models.field_schema import FieldSchema
+from app.models.list import BookmarkList
 from app.models.schema_field import SchemaField
+from app.models.tag import Tag
+from app.models.video import Video
 from app.models.video_field_value import VideoFieldValue
-from app.services.field_value_backup import list_backups, BACKUP_DIR
-import shutil
+from app.services.field_value_backup import BACKUP_DIR, list_backups
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ async def test_change_category_creates_backup(
     test_list: BookmarkList,
     test_video: Video,
     test_user,
-    cleanup_backups
+    cleanup_backups,
 ):
     """
     Test: Changing category creates backup of existing field values.
@@ -60,19 +60,13 @@ async def test_change_category_creates_backup(
 
     # Create field and schema for first category
     rating_field = CustomField(
-        list_id=list_id,
-        name="Rating",
-        field_type="rating",
-        config={"max_rating": 5}
+        list_id=list_id, name="Rating", field_type="rating", config={"max_rating": 5}
     )
     test_db.add(rating_field)
     await test_db.commit()
     await test_db.refresh(rating_field)
 
-    tutorial_schema = FieldSchema(
-        list_id=list_id,
-        name="Tutorial Schema"
-    )
+    tutorial_schema = FieldSchema(list_id=list_id, name="Tutorial Schema")
     test_db.add(tutorial_schema)
     await test_db.commit()
     await test_db.refresh(tutorial_schema)
@@ -81,7 +75,7 @@ async def test_change_category_creates_backup(
         schema_id=tutorial_schema.id,
         field_id=rating_field.id,
         display_order=0,
-        show_on_card=True
+        show_on_card=True,
     )
     test_db.add(schema_field)
     await test_db.commit()
@@ -91,13 +85,9 @@ async def test_change_category_creates_backup(
         user_id=user_id,
         name="Tutorial",
         is_video_type=True,
-        schema_id=tutorial_schema.id
+        schema_id=tutorial_schema.id,
     )
-    category2 = Tag(
-        user_id=user_id,
-        name="Review",
-        is_video_type=True
-    )
+    category2 = Tag(user_id=user_id, name="Review", is_video_type=True)
     test_db.add_all([category1, category2])
     await test_db.commit()
     await test_db.refresh(category1)
@@ -108,28 +98,26 @@ async def test_change_category_creates_backup(
 
     # Assign first category to video via PUT endpoint
     response = await client.put(
-        f"/api/videos/{video_id}/category",
-        json={"category_id": str(category1_id)}
+        f"/api/videos/{video_id}/category", json={"category_id": str(category1_id)}
     )
     assert response.status_code == 200
 
     # Add field value for the video
     field_value = VideoFieldValue(
-        video_id=video_id,
-        field_id=rating_field.id,
-        value_numeric=4.5
+        video_id=video_id, field_id=rating_field.id, value_numeric=4.5
     )
     test_db.add(field_value)
     await test_db.commit()
 
     # Act: Change category
     response = await client.put(
-        f"/api/videos/{video_id}/category",
-        json={"category_id": str(category2_id)}
+        f"/api/videos/{video_id}/category", json={"category_id": str(category2_id)}
     )
 
     # Assert
-    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    assert response.status_code == 200, (
+        f"Expected 200, got {response.status_code}: {response.text}"
+    )
     result = response.json()
     assert result["backup_created"] is True, "Should have created backup"
 
@@ -146,7 +134,7 @@ async def test_change_category_detects_existing_backup(
     test_list: BookmarkList,
     test_video: Video,
     test_user,
-    cleanup_backups
+    cleanup_backups,
 ):
     """
     Test: Changing back to a previous category detects existing backup.
@@ -167,19 +155,13 @@ async def test_change_category_detects_existing_backup(
 
     # Create field and schema for first category
     rating_field = CustomField(
-        list_id=list_id,
-        name="Rating",
-        field_type="rating",
-        config={"max_rating": 5}
+        list_id=list_id, name="Rating", field_type="rating", config={"max_rating": 5}
     )
     test_db.add(rating_field)
     await test_db.commit()
     await test_db.refresh(rating_field)
 
-    tutorial_schema = FieldSchema(
-        list_id=list_id,
-        name="Tutorial Schema"
-    )
+    tutorial_schema = FieldSchema(list_id=list_id, name="Tutorial Schema")
     test_db.add(tutorial_schema)
     await test_db.commit()
     await test_db.refresh(tutorial_schema)
@@ -188,7 +170,7 @@ async def test_change_category_detects_existing_backup(
         schema_id=tutorial_schema.id,
         field_id=rating_field.id,
         display_order=0,
-        show_on_card=True
+        show_on_card=True,
     )
     test_db.add(schema_field)
     await test_db.commit()
@@ -198,13 +180,9 @@ async def test_change_category_detects_existing_backup(
         user_id=user_id,
         name="Tutorial",
         is_video_type=True,
-        schema_id=tutorial_schema.id
+        schema_id=tutorial_schema.id,
     )
-    category2 = Tag(
-        user_id=user_id,
-        name="Review",
-        is_video_type=True
-    )
+    category2 = Tag(user_id=user_id, name="Review", is_video_type=True)
     test_db.add_all([category1, category2])
     await test_db.commit()
     await test_db.refresh(category1)
@@ -215,34 +193,31 @@ async def test_change_category_detects_existing_backup(
 
     # Setup: Assign category1, add field value
     await client.put(
-        f"/api/videos/{video_id}/category",
-        json={"category_id": str(category1_id)}
+        f"/api/videos/{video_id}/category", json={"category_id": str(category1_id)}
     )
 
     field_value = VideoFieldValue(
-        video_id=video_id,
-        field_id=rating_field.id,
-        value_numeric=4.5
+        video_id=video_id, field_id=rating_field.id, value_numeric=4.5
     )
     test_db.add(field_value)
     await test_db.commit()
 
     # Change to category2 (creates backup)
     await client.put(
-        f"/api/videos/{video_id}/category",
-        json={"category_id": str(category2_id)}
+        f"/api/videos/{video_id}/category", json={"category_id": str(category2_id)}
     )
 
     # Act: Change back to category1
     response = await client.put(
-        f"/api/videos/{video_id}/category",
-        json={"category_id": str(category1_id)}
+        f"/api/videos/{video_id}/category", json={"category_id": str(category1_id)}
     )
 
     # Assert
     assert response.status_code == 200
     result = response.json()
-    assert result["backup_available"] is True, "Should detect existing backup for category1"
+    assert result["backup_available"] is True, (
+        "Should detect existing backup for category1"
+    )
 
 
 @pytest.mark.asyncio
@@ -252,7 +227,7 @@ async def test_remove_category_creates_backup(
     test_list: BookmarkList,
     test_video: Video,
     test_user,
-    cleanup_backups
+    cleanup_backups,
 ):
     """
     Test: Removing category (setting to null) creates backup.
@@ -267,19 +242,13 @@ async def test_remove_category_creates_backup(
 
     # Create field and schema
     rating_field = CustomField(
-        list_id=list_id,
-        name="Rating",
-        field_type="rating",
-        config={"max_rating": 5}
+        list_id=list_id, name="Rating", field_type="rating", config={"max_rating": 5}
     )
     test_db.add(rating_field)
     await test_db.commit()
     await test_db.refresh(rating_field)
 
-    schema = FieldSchema(
-        list_id=list_id,
-        name="Test Schema"
-    )
+    schema = FieldSchema(list_id=list_id, name="Test Schema")
     test_db.add(schema)
     await test_db.commit()
     await test_db.refresh(schema)
@@ -288,17 +257,14 @@ async def test_remove_category_creates_backup(
         schema_id=schema.id,
         field_id=rating_field.id,
         display_order=0,
-        show_on_card=True
+        show_on_card=True,
     )
     test_db.add(schema_field)
     await test_db.commit()
 
     # Create category
     category = Tag(
-        user_id=user_id,
-        name="Tutorial",
-        is_video_type=True,
-        schema_id=schema.id
+        user_id=user_id, name="Tutorial", is_video_type=True, schema_id=schema.id
     )
     test_db.add(category)
     await test_db.commit()
@@ -308,28 +274,26 @@ async def test_remove_category_creates_backup(
 
     # Setup: Assign category and add field value
     await client.put(
-        f"/api/videos/{video_id}/category",
-        json={"category_id": str(category_id)}
+        f"/api/videos/{video_id}/category", json={"category_id": str(category_id)}
     )
 
     field_value = VideoFieldValue(
-        video_id=video_id,
-        field_id=rating_field.id,
-        value_numeric=4.5
+        video_id=video_id, field_id=rating_field.id, value_numeric=4.5
     )
     test_db.add(field_value)
     await test_db.commit()
 
     # Act: Remove category
     response = await client.put(
-        f"/api/videos/{video_id}/category",
-        json={"category_id": None}
+        f"/api/videos/{video_id}/category", json={"category_id": None}
     )
 
     # Assert
     assert response.status_code == 200
     result = response.json()
-    assert result["backup_created"] is True, "Should create backup when removing category"
+    assert result["backup_created"] is True, (
+        "Should create backup when removing category"
+    )
 
 
 @pytest.mark.asyncio
@@ -339,7 +303,7 @@ async def test_change_category_without_values_no_backup(
     test_list: BookmarkList,
     test_video: Video,
     test_user,
-    cleanup_backups
+    cleanup_backups,
 ):
     """
     Test: Changing category when no field values exist does not create backup.
@@ -352,16 +316,8 @@ async def test_change_category_without_values_no_backup(
     user_id = test_user.id
 
     # Create two categories (without schemas/fields)
-    category1 = Tag(
-        user_id=user_id,
-        name="Tutorial",
-        is_video_type=True
-    )
-    category2 = Tag(
-        user_id=user_id,
-        name="Review",
-        is_video_type=True
-    )
+    category1 = Tag(user_id=user_id, name="Tutorial", is_video_type=True)
+    category2 = Tag(user_id=user_id, name="Review", is_video_type=True)
     test_db.add_all([category1, category2])
     await test_db.commit()
     await test_db.refresh(category1)
@@ -369,17 +325,17 @@ async def test_change_category_without_values_no_backup(
 
     # Setup: Assign category1 (no field values)
     await client.put(
-        f"/api/videos/{video_id}/category",
-        json={"category_id": str(category1.id)}
+        f"/api/videos/{video_id}/category", json={"category_id": str(category1.id)}
     )
 
     # Act: Change to category2
     response = await client.put(
-        f"/api/videos/{video_id}/category",
-        json={"category_id": str(category2.id)}
+        f"/api/videos/{video_id}/category", json={"category_id": str(category2.id)}
     )
 
     # Assert
     assert response.status_code == 200
     result = response.json()
-    assert result["backup_created"] is False, "Should not create backup when no values exist"
+    assert result["backup_created"] is False, (
+        "Should not create backup when no values exist"
+    )

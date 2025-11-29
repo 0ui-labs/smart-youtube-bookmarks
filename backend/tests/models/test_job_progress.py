@@ -1,8 +1,8 @@
 import pytest
-from datetime import datetime
-from uuid import uuid4
-from app.models.job_progress import JobProgressEvent
+
 from app.models.job import ProcessingJob
+from app.models.job_progress import JobProgressEvent
+
 
 @pytest.mark.asyncio
 async def test_create_job_progress_event(test_db, test_list):
@@ -13,7 +13,7 @@ async def test_create_job_progress_event(test_db, test_list):
         total_videos=10,
         processed_count=0,
         failed_count=0,
-        status="running"
+        status="running",
     )
     test_db.add(job)
     await test_db.commit()
@@ -25,13 +25,10 @@ async def test_create_job_progress_event(test_db, test_list):
         "progress": 50,
         "current_video": 5,
         "total_videos": 10,
-        "message": "Processing video 5/10"
+        "message": "Processing video 5/10",
     }
 
-    event = JobProgressEvent(
-        job_id=job.id,
-        progress_data=progress_data
-    )
+    event = JobProgressEvent(job_id=job.id, progress_data=progress_data)
 
     test_db.add(event)
     await test_db.commit()
@@ -42,6 +39,7 @@ async def test_create_job_progress_event(test_db, test_list):
     assert event.progress_data["progress"] == 50
     assert event.created_at is not None
 
+
 @pytest.mark.asyncio
 async def test_query_events_chronologically(test_db, test_list):
     """Test querying events in chronological order"""
@@ -51,7 +49,7 @@ async def test_query_events_chronologically(test_db, test_list):
         total_videos=10,
         processed_count=0,
         failed_count=0,
-        status="running"
+        status="running",
     )
     test_db.add(job)
     await test_db.commit()
@@ -60,8 +58,7 @@ async def test_query_events_chronologically(test_db, test_list):
     # Create multiple events
     for i in range(3):
         event = JobProgressEvent(
-            job_id=job.id,
-            progress_data={"progress": i * 30, "current_video": i + 1}
+            job_id=job.id, progress_data={"progress": i * 30, "current_video": i + 1}
         )
         test_db.add(event)
 
@@ -69,9 +66,12 @@ async def test_query_events_chronologically(test_db, test_list):
 
     # Query events ordered by created_at
     from sqlalchemy import select
-    stmt = select(JobProgressEvent).where(
-        JobProgressEvent.job_id == job.id
-    ).order_by(JobProgressEvent.created_at)
+
+    stmt = (
+        select(JobProgressEvent)
+        .where(JobProgressEvent.job_id == job.id)
+        .order_by(JobProgressEvent.created_at)
+    )
 
     result = await test_db.execute(stmt)
     events = result.scalars().all()
@@ -80,6 +80,7 @@ async def test_query_events_chronologically(test_db, test_list):
     assert events[0].progress_data["progress"] == 0
     assert events[1].progress_data["progress"] == 30
     assert events[2].progress_data["progress"] == 60
+
 
 @pytest.mark.asyncio
 async def test_cascade_delete_job_progress_events(test_db, test_list):
@@ -90,7 +91,7 @@ async def test_cascade_delete_job_progress_events(test_db, test_list):
         total_videos=5,
         processed_count=0,
         failed_count=0,
-        status="running"
+        status="running",
     )
     test_db.add(job)
     await test_db.commit()
@@ -103,8 +104,8 @@ async def test_cascade_delete_job_progress_events(test_db, test_list):
             progress_data={
                 "progress": i * 33,
                 "current_video": i + 1,
-                "message": f"Processing video {i + 1}"
-            }
+                "message": f"Processing video {i + 1}",
+            },
         )
         test_db.add(event)
 
@@ -112,6 +113,7 @@ async def test_cascade_delete_job_progress_events(test_db, test_list):
 
     # Verify events exist
     from sqlalchemy import select
+
     stmt = select(JobProgressEvent).where(JobProgressEvent.job_id == job.id)
     result = await test_db.execute(stmt)
     events_before = result.scalars().all()

@@ -1,9 +1,10 @@
 """
 Tests for fetch_with_retry helper.
 """
-import pytest
-import asyncio
+
 from unittest.mock import AsyncMock
+
+import pytest
 
 
 @pytest.mark.asyncio
@@ -26,11 +27,9 @@ async def test_fetch_with_retry_retries_on_failure():
     from app.workers.video_processor import fetch_with_retry
 
     # Fail twice, then succeed
-    mock_func = AsyncMock(side_effect=[
-        Exception("Error 1"),
-        Exception("Error 2"),
-        "success"
-    ])
+    mock_func = AsyncMock(
+        side_effect=[Exception("Error 1"), Exception("Error 2"), "success"]
+    )
 
     result = await fetch_with_retry(mock_func, max_retries=3, base_delay=0.01)
 
@@ -55,8 +54,9 @@ async def test_fetch_with_retry_raises_after_max_retries():
 @pytest.mark.asyncio
 async def test_fetch_with_retry_exponential_backoff():
     """Test that delay increases exponentially."""
-    from app.workers.video_processor import fetch_with_retry
     import time
+
+    from app.workers.video_processor import fetch_with_retry
 
     # Track timing
     call_times = []

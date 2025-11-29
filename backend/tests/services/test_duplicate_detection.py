@@ -1,13 +1,14 @@
-import pytest
-import numpy as np
 from uuid import uuid4
 
+import numpy as np
+import pytest
+
+from app.models.custom_field import CustomField
 from app.services.duplicate_detection import (
     DuplicateDetector,
+    SimilarityResult,
     SimilarityType,
-    SimilarityResult
 )
-from app.models.custom_field import CustomField
 
 
 class TestLevenshteinDetection:
@@ -27,29 +28,29 @@ class TestLevenshteinDetection:
                 list_id=uuid4(),
                 name="Presentation Quality",
                 field_type="select",
-                config={"options": ["bad", "good", "great"]}
+                config={"options": ["bad", "good", "great"]},
             ),
             CustomField(
                 id=uuid4(),
                 list_id=uuid4(),
                 name="Presentation",
                 field_type="select",
-                config={"options": ["bad", "good", "great"]}
+                config={"options": ["bad", "good", "great"]},
             ),
             CustomField(
                 id=uuid4(),
                 list_id=uuid4(),
                 name="Overall Rating",
                 field_type="rating",
-                config={"max_rating": 5}
+                config={"max_rating": 5},
             ),
             CustomField(
                 id=uuid4(),
                 list_id=uuid4(),
                 name="Video Length",
                 field_type="text",
-                config={}
-            )
+                config={},
+            ),
         ]
 
     @pytest.mark.asyncio
@@ -58,7 +59,7 @@ class TestLevenshteinDetection:
         results = await detector.find_similar_fields(
             "presentation quality",  # lowercase
             sample_fields,
-            include_semantic=False
+            include_semantic=False,
         )
 
         assert len(results) == 1
@@ -72,7 +73,7 @@ class TestLevenshteinDetection:
         results = await detector.find_similar_fields(
             "Presentaton",  # missing 'i'
             sample_fields,
-            include_semantic=False
+            include_semantic=False,
         )
 
         assert len(results) >= 1
@@ -87,7 +88,7 @@ class TestLevenshteinDetection:
         results = await detector.find_similar_fields(
             "Presntttion",  # 2 character differences
             sample_fields,
-            include_semantic=False
+            include_semantic=False,
         )
 
         assert len(results) >= 1
@@ -101,7 +102,7 @@ class TestLevenshteinDetection:
         results = await detector.find_similar_fields(
             "Presntttio",  # 3 character differences
             sample_fields,
-            include_semantic=False
+            include_semantic=False,
         )
 
         # Should still suggest (distance <= 3)
@@ -114,7 +115,7 @@ class TestLevenshteinDetection:
         results = await detector.find_similar_fields(
             "Presntto",  # 4 character differences (distance > 3)
             sample_fields,
-            include_semantic=False
+            include_semantic=False,
         )
 
         # Should NOT suggest (distance > 3)
@@ -124,9 +125,7 @@ class TestLevenshteinDetection:
     async def test_completely_different_no_match(self, detector, sample_fields):
         """Completely different name should not match."""
         results = await detector.find_similar_fields(
-            "Audio Quality",
-            sample_fields,
-            include_semantic=False
+            "Audio Quality", sample_fields, include_semantic=False
         )
 
         # No high-score matches expected
@@ -141,28 +140,26 @@ class TestLevenshteinDetection:
                 list_id=uuid4(),
                 name="Ratng",  # closer typo (distance 1)
                 field_type="rating",
-                config={"max_rating": 5}
+                config={"max_rating": 5},
             ),
             CustomField(
                 id=uuid4(),
                 list_id=uuid4(),
                 name="Rtng",  # further typo (distance 2)
                 field_type="rating",
-                config={"max_rating": 5}
+                config={"max_rating": 5},
             ),
             CustomField(
                 id=uuid4(),
                 list_id=uuid4(),
                 name="Other Field",  # no match
                 field_type="rating",
-                config={"max_rating": 5}
-            )
+                config={"max_rating": 5},
+            ),
         ]
 
         results = await detector.find_similar_fields(
-            "Rating",
-            fields,
-            include_semantic=False
+            "Rating", fields, include_semantic=False
         )
 
         # Should return 2 fuzzy matches sorted by proximity
@@ -180,14 +177,14 @@ class TestLevenshteinDetection:
                 list_id=uuid4(),
                 name="Test Field (v2)",
                 field_type="text",
-                config={}
+                config={},
             )
         ]
 
         results = await detector.find_similar_fields(
             "Test Field (v3)",  # different version
             fields,
-            include_semantic=False
+            include_semantic=False,
         )
 
         assert len(results) >= 1
@@ -202,14 +199,14 @@ class TestLevenshteinDetection:
                 list_id=uuid4(),
                 name="Qualität",  # German
                 field_type="text",
-                config={}
+                config={},
             )
         ]
 
         results = await detector.find_similar_fields(
             "Qualitat",  # Missing umlaut
             fields,
-            include_semantic=False
+            include_semantic=False,
         )
 
         assert len(results) >= 1
@@ -273,18 +270,14 @@ class TestSimilarityScoring:
     async def test_similarity_result_to_dict(self, detector):
         """SimilarityResult should convert to dict correctly."""
         field = CustomField(
-            id=uuid4(),
-            list_id=uuid4(),
-            name="Test Field",
-            field_type="text",
-            config={}
+            id=uuid4(), list_id=uuid4(), name="Test Field", field_type="text", config={}
         )
 
         result = SimilarityResult(
             field=field,
             score=0.95,
             similarity_type=SimilarityType.LEVENSHTEIN,
-            explanation="Test explanation"
+            explanation="Test explanation",
         )
 
         result_dict = result.to_dict()

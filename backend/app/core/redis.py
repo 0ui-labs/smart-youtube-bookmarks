@@ -5,12 +5,13 @@ Provides singleton Redis client for pub/sub and caching operations.
 """
 
 import asyncio
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
+
 import redis.asyncio as redis
 from arq import create_pool
-from arq.connections import RedisSettings, ArqRedis
-from app.core.config import settings
+from arq.connections import ArqRedis, RedisSettings
 
+from app.core.config import settings
 
 # Global Redis client instance (singleton)
 _redis_client: redis.Redis | None = None
@@ -42,9 +43,7 @@ async def get_redis_client() -> redis.Redis:
         # Double-check: another coroutine might have initialized it
         if _redis_client is None:
             _redis_client = redis.from_url(
-                settings.redis_url,
-                encoding="utf-8",
-                decode_responses=True
+                settings.redis_url, encoding="utf-8", decode_responses=True
             )
         return _redis_client
 
@@ -83,21 +82,25 @@ async def get_arq_pool() -> ArqRedis:
 
             # Try to get db from query string first (e.g., ?db=5)
             query_params = parse_qs(redis_dsn.query)
-            if 'db' in query_params and query_params['db']:
-                db_value = query_params['db'][0].strip()
+            if query_params.get("db"):
+                db_value = query_params["db"][0].strip()
                 if not db_value.isdigit():
-                    raise ValueError(f"Invalid Redis database index in query string: {db_value}")
+                    raise ValueError(
+                        f"Invalid Redis database index in query string: {db_value}"
+                    )
                 try:
                     redis_db = int(db_value)
                 except ValueError:
-                    raise ValueError(f"Invalid Redis database index in query string: {db_value}")
+                    raise ValueError(
+                        f"Invalid Redis database index in query string: {db_value}"
+                    )
             else:
                 # Fall back to path (e.g., /5)
-                db_str = redis_dsn.path.lstrip('/') if redis_dsn.path else ''
+                db_str = redis_dsn.path.lstrip("/") if redis_dsn.path else ""
                 redis_db = int(db_str) if db_str.isdigit() else 0  # Safe int conversion
 
             redis_settings = RedisSettings(
-                host=redis_dsn.hostname or 'localhost',
+                host=redis_dsn.hostname or "localhost",
                 port=redis_dsn.port or 6379,
                 database=redis_db,
                 password=redis_dsn.password,

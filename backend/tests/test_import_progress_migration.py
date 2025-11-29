@@ -3,6 +3,7 @@ Test for import_progress migration.
 
 Verifies that the import_progress and import_stage columns exist in videos table.
 """
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,14 +13,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 async def test_import_progress_columns_exist(test_db: AsyncSession):
     """Test that import_progress and import_stage columns exist in videos table."""
     # Use raw SQL to check column existence
-    result = await test_db.execute(text("""
+    result = await test_db.execute(
+        text("""
         SELECT column_name, data_type, column_default
         FROM information_schema.columns
         WHERE table_name = 'videos'
         AND column_name IN ('import_progress', 'import_stage')
         ORDER BY column_name
-    """))
-    columns = {row[0]: {"data_type": row[1], "default": row[2]} for row in result.fetchall()}
+    """)
+    )
+    columns = {
+        row[0]: {"data_type": row[1], "default": row[2]} for row in result.fetchall()
+    }
 
     # Verify import_progress column
     assert "import_progress" in columns, "import_progress column should exist"
@@ -36,10 +41,7 @@ async def test_import_progress_default_values(test_db: AsyncSession, test_list):
     from app.models.video import Video
 
     # Create video without explicit import values
-    video = Video(
-        list_id=test_list.id,
-        youtube_id="test123abc"
-    )
+    video = Video(list_id=test_list.id, youtube_id="test123abc")
     test_db.add(video)
     await test_db.flush()
 

@@ -1,12 +1,11 @@
 """Tests for timestamp utility functions."""
-import pytest
 
 from app.services.enrichment.utils.timestamp_utils import (
-    seconds_to_vtt_time,
-    vtt_time_to_seconds,
+    format_display_time,
     offset_timestamps,
     parse_description_timestamp,
-    format_display_time,
+    seconds_to_vtt_time,
+    vtt_time_to_seconds,
 )
 
 

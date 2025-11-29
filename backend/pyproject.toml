@@ -5,3 +5,84 @@ testpaths = ["tests"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
+
+[tool.ruff]
+# Target Python 3.11
+target-version = "py311"
+line-length = 88
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "alembic/versions",
+]
+
+[tool.ruff.lint]
+# Enable recommended rules + FastAPI-specific
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort (import sorting)
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "PTH",    # flake8-use-pathlib
+    "RUF",    # Ruff-specific rules
+]
+
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+    "B008",   # Do not perform function calls in argument defaults (FastAPI Depends)
+    "ARG001", # Unused function argument (common in FastAPI endpoints)
+    "ARG002", # Unused method argument
+    "RUF001", # String contains ambiguous unicode (intentional in error messages)
+    "RUF002", # Docstring contains ambiguous unicode
+    "RUF003", # Comment contains ambiguous unicode
+    # Stylistic rules - would require significant refactoring
+    "B904",   # raise-without-from-inside-except (best practice but not critical)
+    "B007",   # unused-loop-control-variable (minor, use _ prefix)
+    "E712",   # true-false-comparison (SQLAlchemy needs == False for queries)
+    "UP038",  # non-pep604-isinstance (Python 3.10+ union syntax)
+    "SIM105", # suppressible-exception (contextlib.suppress style)
+    "SIM117", # multiple-with-statements (combine with statements)
+    "SIM102", # collapsible-if
+    "SIM103", # needless-bool
+    "SIM108", # if-else-block-instead-of-if-exp
+    "RUF012", # mutable-class-default
+    "RUF022", # unsorted-dunder-all
+    "C401",   # unnecessary-generator-set
+    "PTH",    # flake8-use-pathlib (would require significant refactoring)
+    # Type checking imports - would affect runtime behavior
+    "TC001",  # typing-only-first-party-import
+    "TC002",  # typing-only-third-party-import
+    "TC003",  # typing-only-standard-library-import
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can have undefined names (pytest fixtures), unused variables
+"tests/**/*.py" = ["F821", "F841", "PTH"]
+# Models use SQLAlchemy forward references ("ModelName" strings)
+"app/models/**/*.py" = ["F821"]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+force-single-line = false
+combine-as-imports = true
+
+[tool.ruff.format]
+# Use double quotes like Black
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

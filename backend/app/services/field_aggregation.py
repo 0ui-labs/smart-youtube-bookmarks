@@ -1,22 +1,20 @@
 """Service for aggregating available fields for videos."""
+
 from typing import TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.list import BookmarkList
 from app.models.custom_field import CustomField
 from app.models.field_schema import FieldSchema
+from app.models.list import BookmarkList
 from app.models.schema_field import SchemaField
 
 if TYPE_CHECKING:
     from app.models.video import Video
 
 
-async def get_available_fields(
-    video: "Video",
-    db: AsyncSession
-) -> list[CustomField]:
+async def get_available_fields(video: "Video", db: AsyncSession) -> list[CustomField]:
     """
     Get all fields available for this video.
 
@@ -45,7 +43,7 @@ async def get_available_fields(
             selectinload(BookmarkList.default_schema)
             .selectinload(FieldSchema.schema_fields)
             .selectinload(SchemaField.field)
-        ]
+        ],
     )
 
     if bookmark_list and bookmark_list.default_schema:
@@ -60,7 +58,9 @@ async def get_available_fields(
 
     if category and category.schema:
         for sf in category.schema.schema_fields:
-            if sf.field_id not in field_ids and sf.field is not None:  # Deduplicate + null check
+            if (
+                sf.field_id not in field_ids and sf.field is not None
+            ):  # Deduplicate + null check
                 field_ids.add(sf.field_id)
                 fields.append(sf.field)
 

@@ -4,24 +4,23 @@ Implements:
 - GET /api/videos/{video_id}/enrichment - Get enrichment data
 - POST /api/videos/{video_id}/enrichment/retry - Retry enrichment
 """
+
 import logging
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
+from redis.exceptions import ConnectionError as RedisConnectionError, RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.redis import get_arq_pool
 from app.models.video import Video
-from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
+from app.models.video_enrichment import EnrichmentStatus, VideoEnrichment
 from app.schemas.enrichment import (
+    ChapterSchema,
     EnrichmentResponse,
     EnrichmentRetryResponse,
-    ChapterSchema,
     EnrichmentStatus as SchemaEnrichmentStatus,
 )
 
@@ -39,7 +38,7 @@ def _enrichment_to_response(enrichment: VideoEnrichment) -> EnrichmentResponse:
             ChapterSchema(
                 title=ch.get("title", ""),
                 start=ch.get("start", 0.0),
-                end=ch.get("end", 0.0)
+                end=ch.get("end", 0.0),
             )
             for ch in enrichment.chapters_json
         ]
@@ -68,13 +67,10 @@ def _enrichment_to_response(enrichment: VideoEnrichment) -> EnrichmentResponse:
 @router.get(
     "/{video_id}/enrichment",
     response_model=EnrichmentResponse,
-    responses={
-        404: {"description": "Video or enrichment not found"}
-    }
+    responses={404: {"description": "Video or enrichment not found"}},
 )
 async def get_enrichment(
-    video_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    video_id: UUID, db: AsyncSession = Depends(get_db)
 ) -> EnrichmentResponse:
     """Get enrichment data for a video.
 
@@ -94,8 +90,7 @@ async def get_enrichment(
 
     if not video:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Video not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
         )
 
     # Get enrichment
@@ -106,7 +101,7 @@ async def get_enrichment(
     if not enrichment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Enrichment not found for this video"
+            detail="Enrichment not found for this video",
         )
 
     return _enrichment_to_response(enrichment)
@@ -118,12 +113,11 @@ async def get_enrichment(
     responses={
         404: {"description": "Video not found"},
         409: {"description": "Enrichment already processing"},
-        503: {"description": "Failed to enqueue job (Redis unavailable)"}
-    }
+        503: {"description": "Failed to enqueue job (Redis unavailable)"},
+    },
 )
 async def retry_enrichment(
-    video_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    video_id: UUID, db: AsyncSession = Depends(get_db)
 ) -> EnrichmentRetryResponse:
     """Retry enrichment for a video.
 
@@ -147,8 +141,7 @@ async def retry_enrichment(
 
     if not video:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Video not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
         )
 
     # Get or create enrichment
@@ -161,7 +154,7 @@ async def retry_enrichment(
         if enrichment.status == EnrichmentStatus.processing.value:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Enrichment is already processing"
+                detail="Enrichment is already processing",
             )
 
         # Reset to pending
@@ -171,8 +164,7 @@ async def retry_enrichment(
     else:
         # Create new enrichment
         enrichment = VideoEnrichment(
-            video_id=video_id,
-            status=EnrichmentStatus.pending.value
+            video_id=video_id, status=EnrichmentStatus.pending.value
         )
         db.add(enrichment)
 
@@ -187,7 +179,7 @@ async def retry_enrichment(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Failed to enqueue enrichment job: {type(e).__name__}"
+            detail=f"Failed to enqueue enrichment job: {type(e).__name__}",
         )
 
     # Only commit after successful enqueue
@@ -196,5 +188,5 @@ async def retry_enrichment(
 
     return EnrichmentRetryResponse(
         message="Enrichment retry started",
-        enrichment=_enrichment_to_response(enrichment)
+        enrichment=_enrichment_to_response(enrichment),
     )

@@ -1,16 +1,18 @@
 """Tests for audio chunking functionality."""
-import pytest
-from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
-import tempfile
+
 import os
+import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.enrichment.providers.audio_chunker import (
-    AudioChunker,
-    AudioChunk,
-    CHUNK_DURATION_MS,
     AUDIO_BITRATE,
+    CHUNK_DURATION_MS,
     MAX_CHUNK_SIZE_BYTES,
+    AudioChunk,
+    AudioChunker,
 )
 
 
@@ -24,12 +26,7 @@ class TestAudioChunk:
             path = Path(f.name)
 
         try:
-            chunk = AudioChunk(
-                path=path,
-                start_time=0.0,
-                end_time=600.0,
-                chunk_index=0
-            )
+            chunk = AudioChunk(path=path, start_time=0.0, end_time=600.0, chunk_index=0)
 
             assert chunk.path == path
             assert chunk.start_time == 0.0
@@ -41,10 +38,7 @@ class TestAudioChunk:
     def test_audio_chunk_duration(self):
         """AudioChunk duration property works correctly."""
         chunk = AudioChunk(
-            path=Path("/tmp/test.mp3"),
-            start_time=600.0,
-            end_time=1200.0,
-            chunk_index=1
+            path=Path("/tmp/test.mp3"), start_time=600.0, end_time=1200.0, chunk_index=1
         )
 
         assert chunk.duration == 600.0
@@ -80,7 +74,9 @@ class TestAudioChunkerDownload:
         """Download creates temporary directory."""
         chunker = AudioChunker()
 
-        with patch.object(chunker, '_download_with_ytdlp', new_callable=AsyncMock) as mock_dl:
+        with patch.object(
+            chunker, "_download_with_ytdlp", new_callable=AsyncMock
+        ) as mock_dl:
             mock_dl.return_value = Path("/tmp/test.mp3")
 
             await chunker.download_audio("dQw4w9WgXcQ")
@@ -92,7 +88,9 @@ class TestAudioChunkerDownload:
         """Download returns path to audio file."""
         chunker = AudioChunker()
 
-        with patch.object(chunker, '_download_with_ytdlp', new_callable=AsyncMock) as mock_dl:
+        with patch.object(
+            chunker, "_download_with_ytdlp", new_callable=AsyncMock
+        ) as mock_dl:
             expected_path = Path("/tmp/audio.mp3")
             mock_dl.return_value = expected_path
 
@@ -105,7 +103,9 @@ class TestAudioChunkerDownload:
         """Download requests audio-only format."""
         chunker = AudioChunker()
 
-        with patch.object(chunker, '_download_with_ytdlp', new_callable=AsyncMock) as mock_dl:
+        with patch.object(
+            chunker, "_download_with_ytdlp", new_callable=AsyncMock
+        ) as mock_dl:
             mock_dl.return_value = Path("/tmp/test.mp3")
 
             await chunker.download_audio("dQw4w9WgXcQ")
@@ -119,6 +119,7 @@ class TestAudioChunkerDownload:
 
         # Create a real temp dir
         import tempfile
+
         chunker._temp_dir = tempfile.mkdtemp()
         temp_path = chunker._temp_dir
 
@@ -142,7 +143,7 @@ class TestAudioChunkerDownload:
     @pytest.mark.asyncio
     async def test_context_manager(self):
         """AudioChunker works as async context manager."""
-        with patch.object(AudioChunker, 'cleanup') as mock_cleanup:
+        with patch.object(AudioChunker, "cleanup") as mock_cleanup:
             async with AudioChunker() as chunker:
                 assert isinstance(chunker, AudioChunker)
 
@@ -161,7 +162,9 @@ class TestAudioChunkerSplit:
         mock_audio = MagicMock()
         mock_audio.__len__ = MagicMock(return_value=5 * 60 * 1000)  # 5 minutes
 
-        with patch('app.services.enrichment.providers.audio_chunker.AudioSegment') as mock_as:
+        with patch(
+            "app.services.enrichment.providers.audio_chunker.AudioSegment"
+        ) as mock_as:
             mock_as.from_mp3.return_value = mock_audio
             mock_audio.__getitem__ = MagicMock(return_value=mock_audio)
             mock_audio.export = MagicMock()
@@ -189,7 +192,9 @@ class TestAudioChunkerSplit:
         chunk_mock = MagicMock()
         chunk_mock.export = MagicMock()
 
-        with patch('app.services.enrichment.providers.audio_chunker.AudioSegment') as mock_as:
+        with patch(
+            "app.services.enrichment.providers.audio_chunker.AudioSegment"
+        ) as mock_as:
             mock_as.from_mp3.return_value = mock_audio
             mock_audio.__getitem__ = MagicMock(return_value=chunk_mock)
 
@@ -216,7 +221,9 @@ class TestAudioChunkerSplit:
         chunk_mock = MagicMock()
         chunk_mock.export = MagicMock()
 
-        with patch('app.services.enrichment.providers.audio_chunker.AudioSegment') as mock_as:
+        with patch(
+            "app.services.enrichment.providers.audio_chunker.AudioSegment"
+        ) as mock_as:
             mock_as.from_mp3.return_value = mock_audio
             mock_audio.__getitem__ = MagicMock(return_value=chunk_mock)
 
@@ -241,7 +248,9 @@ class TestAudioChunkerIntegration:
     @pytest.mark.asyncio
     async def test_full_workflow(self):
         """Test complete download and split workflow."""
-        with patch('app.services.enrichment.providers.audio_chunker.AudioSegment') as mock_as:
+        with patch(
+            "app.services.enrichment.providers.audio_chunker.AudioSegment"
+        ) as mock_as:
             # Mock 15-minute audio
             mock_audio = MagicMock()
             mock_audio.__len__ = MagicMock(return_value=15 * 60 * 1000)
@@ -253,9 +262,12 @@ class TestAudioChunkerIntegration:
             mock_audio.__getitem__ = MagicMock(return_value=chunk_mock)
 
             async with AudioChunker() as chunker:
-                with patch.object(chunker, '_download_with_ytdlp', new_callable=AsyncMock) as mock_dl:
+                with patch.object(
+                    chunker, "_download_with_ytdlp", new_callable=AsyncMock
+                ) as mock_dl:
                     # Create a real temp file for the download mock to return
                     import tempfile
+
                     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
                         f.write(b"fake")
                         mock_dl.return_value = Path(f.name)

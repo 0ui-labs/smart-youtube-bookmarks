@@ -1,18 +1,22 @@
 """Tests for bulk tag assignment endpoint."""
-import pytest
+
 import random
 import string
+
+import pytest
 from httpx import AsyncClient
 
 
 def generate_youtube_id() -> str:
     """Generate a realistic YouTube video ID (11 chars from [A-Za-z0-9_-])."""
-    chars = string.ascii_letters + string.digits + '_-'
-    return ''.join(random.choices(chars, k=11))
+    chars = string.ascii_letters + string.digits + "_-"
+    return "".join(random.choices(chars, k=11))
 
 
 @pytest.mark.asyncio
-async def test_bulk_assign_tags_to_videos(client: AsyncClient, test_user, test_list, test_video):
+async def test_bulk_assign_tags_to_videos(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test bulk assigning tags to multiple videos."""
     # Use existing test_video and create one more video
     video1_id = str(test_video.id)
@@ -20,7 +24,7 @@ async def test_bulk_assign_tags_to_videos(client: AsyncClient, test_user, test_l
     # Create second video with unique YouTube ID
     video2_response = await client.post(
         f"/api/lists/{test_list.id}/videos",
-        json={"url": f"https://www.youtube.com/watch?v={generate_youtube_id()}"}
+        json={"url": f"https://www.youtube.com/watch?v={generate_youtube_id()}"},
     )
     assert video2_response.status_code == 201
     video2_id = video2_response.json()["id"]
@@ -34,10 +38,7 @@ async def test_bulk_assign_tags_to_videos(client: AsyncClient, test_user, test_l
     # Bulk assign: 2 videos × 2 tags = 4 assignments
     response = await client.post(
         "/api/videos/bulk/tags",
-        json={
-            "video_ids": [video1_id, video2_id],
-            "tag_ids": [tag1_id, tag2_id]
-        }
+        json={"video_ids": [video1_id, video2_id], "tag_ids": [tag1_id, tag2_id]},
     )
 
     assert response.status_code == 200
@@ -47,9 +48,10 @@ async def test_bulk_assign_tags_to_videos(client: AsyncClient, test_user, test_l
 
 
 @pytest.mark.asyncio
-async def test_bulk_assign_idempotency(client: AsyncClient, test_user, test_list, test_video):
+async def test_bulk_assign_idempotency(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test that bulk assign is idempotent (duplicates ignored)."""
-    import uuid
     video_id = str(test_video.id)
 
     # Create tag
@@ -58,11 +60,7 @@ async def test_bulk_assign_idempotency(client: AsyncClient, test_user, test_list
 
     # First bulk assign
     response1 = await client.post(
-        "/api/videos/bulk/tags",
-        json={
-            "video_ids": [video_id],
-            "tag_ids": [tag_id]
-        }
+        "/api/videos/bulk/tags", json={"video_ids": [video_id], "tag_ids": [tag_id]}
     )
     assert response1.status_code == 200
     data1 = response1.json()
@@ -71,11 +69,7 @@ async def test_bulk_assign_idempotency(client: AsyncClient, test_user, test_list
 
     # Second bulk assign (same IDs) - should be idempotent
     response2 = await client.post(
-        "/api/videos/bulk/tags",
-        json={
-            "video_ids": [video_id],
-            "tag_ids": [tag_id]
-        }
+        "/api/videos/bulk/tags", json={"video_ids": [video_id], "tag_ids": [tag_id]}
     )
     assert response2.status_code == 200
     data2 = response2.json()
@@ -84,7 +78,9 @@ async def test_bulk_assign_idempotency(client: AsyncClient, test_user, test_list
 
 
 @pytest.mark.asyncio
-async def test_bulk_assign_nonexistent_video(client: AsyncClient, test_user, test_list, test_video):
+async def test_bulk_assign_nonexistent_video(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test bulk assign with non-existent video_id returns 404."""
     import uuid
 
@@ -97,10 +93,7 @@ async def test_bulk_assign_nonexistent_video(client: AsyncClient, test_user, tes
 
     response = await client.post(
         "/api/videos/bulk/tags",
-        json={
-            "video_ids": [fake_video_id],
-            "tag_ids": [tag_id]
-        }
+        json={"video_ids": [fake_video_id], "tag_ids": [tag_id]},
     )
 
     assert response.status_code == 404
@@ -108,7 +101,9 @@ async def test_bulk_assign_nonexistent_video(client: AsyncClient, test_user, tes
 
 
 @pytest.mark.asyncio
-async def test_bulk_assign_nonexistent_tag(client: AsyncClient, test_user, test_list, test_video):
+async def test_bulk_assign_nonexistent_tag(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test bulk assign with non-existent tag_id returns 404."""
     import uuid
 
@@ -117,10 +112,7 @@ async def test_bulk_assign_nonexistent_tag(client: AsyncClient, test_user, test_
 
     response = await client.post(
         "/api/videos/bulk/tags",
-        json={
-            "video_ids": [video_id],
-            "tag_ids": [fake_tag_id]
-        }
+        json={"video_ids": [video_id], "tag_ids": [fake_tag_id]},
     )
 
     assert response.status_code == 404
@@ -128,14 +120,12 @@ async def test_bulk_assign_nonexistent_tag(client: AsyncClient, test_user, test_
 
 
 @pytest.mark.asyncio
-async def test_bulk_assign_empty_arrays(client: AsyncClient, test_user, test_list, test_video):
+async def test_bulk_assign_empty_arrays(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test bulk assign with empty arrays gracefully handled."""
     response = await client.post(
-        "/api/videos/bulk/tags",
-        json={
-            "video_ids": [],
-            "tag_ids": []
-        }
+        "/api/videos/bulk/tags", json={"video_ids": [], "tag_ids": []}
     )
 
     # Should succeed with 0 assignments
@@ -146,7 +136,9 @@ async def test_bulk_assign_empty_arrays(client: AsyncClient, test_user, test_lis
 
 
 @pytest.mark.asyncio
-async def test_bulk_assign_batch_too_large(client: AsyncClient, test_user, test_list, test_video):
+async def test_bulk_assign_batch_too_large(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test bulk assign rejects batches larger than 10,000 assignments."""
     import uuid
 
@@ -157,10 +149,7 @@ async def test_bulk_assign_batch_too_large(client: AsyncClient, test_user, test_
 
     response = await client.post(
         "/api/videos/bulk/tags",
-        json={
-            "video_ids": fake_video_ids,
-            "tag_ids": fake_tag_ids
-        }
+        json={"video_ids": fake_video_ids, "tag_ids": fake_tag_ids},
     )
 
     assert response.status_code == 400
@@ -168,7 +157,9 @@ async def test_bulk_assign_batch_too_large(client: AsyncClient, test_user, test_
 
 
 @pytest.mark.asyncio
-async def test_bulk_assign_partial_overlap(client: AsyncClient, test_user, test_list, test_video):
+async def test_bulk_assign_partial_overlap(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test bulk assign with partial overlap (some tags already assigned)."""
     video_id = str(test_video.id)
 
@@ -182,17 +173,13 @@ async def test_bulk_assign_partial_overlap(client: AsyncClient, test_user, test_
 
     # Assign 2 tags first
     await client.post(
-        f"/api/videos/{video_id}/tags",
-        json={"tag_ids": [tag1_id, tag2_id]}
+        f"/api/videos/{video_id}/tags", json={"tag_ids": [tag1_id, tag2_id]}
     )
 
     # Now bulk assign all 3 tags (2 existing, 1 new)
     response = await client.post(
         "/api/videos/bulk/tags",
-        json={
-            "video_ids": [video_id],
-            "tag_ids": [tag1_id, tag2_id, tag3_id]
-        }
+        json={"video_ids": [video_id], "tag_ids": [tag1_id, tag2_id, tag3_id]},
     )
 
     assert response.status_code == 200

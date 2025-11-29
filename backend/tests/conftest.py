@@ -1,23 +1,24 @@
-import pytest
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.pool import NullPool
-from sqlalchemy import text
-from unittest.mock import AsyncMock, patch
 import asyncio
+from datetime import UTC
+from unittest.mock import AsyncMock, patch
 
-from app.main import app
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
+
+from app.core.config import settings
 from app.core.database import get_db
+from app.main import app
 from app.models import Base
 from app.models.list import BookmarkList
-from app.models.video import Video
 from app.models.user import User
-from app.core.config import settings
-
+from app.models.video import Video
 
 # Test database URL
 # Replace the database name in the URL with _test suffix
-TEST_DATABASE_URL = settings.database_url.rsplit('/', 1)[0] + '/youtube_bookmarks_test'
+TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/youtube_bookmarks_test"
 
 
 @pytest.fixture(scope="session")
@@ -36,11 +37,7 @@ def event_loop():
 @pytest.fixture(scope="session")
 async def test_engine():
     """Create test database engine."""
-    engine = create_async_engine(
-        TEST_DATABASE_URL,
-        echo=False,
-        poolclass=NullPool
-    )
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -101,6 +98,7 @@ async def mock_redis_client():
 @pytest.fixture
 async def client(test_db, mock_arq_pool, mock_redis_client):
     """Create test client with database override and mocked ARQ/Redis."""
+
     async def override_get_db():
         yield test_db
 
@@ -108,9 +106,11 @@ async def client(test_db, mock_arq_pool, mock_redis_client):
 
     # Mock both get_arq_pool and get_redis_client to avoid Redis connection
     # Patch for both videos and processing APIs
-    with patch('app.api.videos.get_arq_pool', return_value=mock_arq_pool), \
-         patch('app.api.processing.get_arq_pool', return_value=mock_arq_pool), \
-         patch('app.core.redis.get_redis_client', return_value=mock_redis_client):
+    with (
+        patch("app.api.videos.get_arq_pool", return_value=mock_arq_pool),
+        patch("app.api.processing.get_arq_pool", return_value=mock_arq_pool),
+        patch("app.core.redis.get_redis_client", return_value=mock_redis_client),
+    ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
@@ -122,11 +122,12 @@ async def client(test_db, mock_arq_pool, mock_redis_client):
 async def test_user(test_db: AsyncSession) -> User:
     """Create a test user for each test."""
     import uuid
+
     # Use unique email per test to avoid conflicts
     user = User(
         email=f"test-{uuid.uuid4()}@example.com",
         hashed_password="$2b$12$placeholder_hash",
-        is_active=True
+        is_active=True,
     )
     test_db.add(user)
     await test_db.commit()
@@ -138,9 +139,7 @@ async def test_user(test_db: AsyncSession) -> User:
 async def test_list(test_db: AsyncSession, test_user: User) -> BookmarkList:
     """Create a test bookmark list."""
     bookmark_list = BookmarkList(
-        name="Test List",
-        description="A test bookmark list",
-        user_id=test_user.id
+        name="Test List", description="A test bookmark list", user_id=test_user.id
     )
     test_db.add(bookmark_list)
     await test_db.commit()
@@ -152,9 +151,7 @@ async def test_list(test_db: AsyncSession, test_user: User) -> BookmarkList:
 async def test_video(test_db: AsyncSession, test_list: BookmarkList) -> Video:
     """Create a test video."""
     video = Video(
-        list_id=test_list.id,
-        youtube_id="dQw4w9WgXcQ",
-        processing_status="pending"
+        list_id=test_list.id, youtube_id="dQw4w9WgXcQ", processing_status="pending"
     )
     test_db.add(video)
     await test_db.commit()
@@ -166,6 +163,7 @@ async def test_video(test_db: AsyncSession, test_list: BookmarkList) -> Video:
 async def mock_redis():
     """Mock Redis client for testing."""
     from unittest.mock import AsyncMock
+
     redis_mock = AsyncMock()
     redis_mock.publish = AsyncMock(return_value=1)
     return redis_mock
@@ -174,7 +172,8 @@ async def mock_redis():
 @pytest.fixture
 async def mock_session_factory(test_engine):
     """Mock AsyncSessionLocal factory to use test database."""
-    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
     return async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -186,7 +185,7 @@ async def test_schema(test_db: AsyncSession, test_list: BookmarkList):
     schema = FieldSchema(
         list_id=test_list.id,
         name="Test Schema",
-        description="Test schema for integration tests"
+        description="Test schema for integration tests",
     )
     test_db.add(schema)
     await test_db.commit()
@@ -209,10 +208,11 @@ async def user_factory(test_db: AsyncSession):
     async def _create_user(name_prefix: str = "test"):
         """Create a test user with unique email."""
         import uuid
+
         user = User(
             email=f"{name_prefix}-{uuid.uuid4()}@example.com",
             hashed_password="$2b$12$placeholder_hash",
-            is_active=True
+            is_active=True,
         )
         test_db.add(user)
         await test_db.commit()
@@ -228,7 +228,7 @@ async def user_factory(test_db: AsyncSession):
 @pytest.fixture
 async def arq_context(test_db: AsyncSession):
     """Create ARQ worker context for testing."""
-    from datetime import datetime, timezone
+    from datetime import datetime
     from unittest.mock import AsyncMock
 
     # Create mock Redis client that mimics ArqRedis
@@ -240,8 +240,8 @@ async def arq_context(test_db: AsyncSession):
         "redis": mock_redis,  # Required for job enqueuing in workers
         "job_id": "test-job-123",
         "job_try": 1,
-        "enqueue_time": datetime.now(timezone.utc),
-        "score": 1
+        "enqueue_time": datetime.now(UTC),
+        "score": 1,
     }
 
 

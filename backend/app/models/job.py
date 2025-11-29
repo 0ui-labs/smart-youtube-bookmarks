@@ -1,7 +1,7 @@
-from typing import Optional
-from sqlalchemy import String, Integer, ForeignKey, Index, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from .base import BaseModel
 
 
@@ -12,25 +12,23 @@ class ProcessingJob(BaseModel):
     Each job is associated with a bookmark list and tracks the number
     of videos processed, failed, and the overall job status.
     """
+
     __tablename__ = "processing_jobs"
 
     list_id: Mapped[UUID] = mapped_column(
-        ForeignKey("bookmarks_lists.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("bookmarks_lists.id", ondelete="CASCADE"), nullable=False
     )
     total_videos: Mapped[int] = mapped_column(Integer, nullable=False)
     processed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    status: Mapped[str] = mapped_column(
-        String(30),
-        nullable=False,
-        default="running"
-    )
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="running")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
     list: Mapped["BookmarkList"] = relationship("BookmarkList", back_populates="jobs")
-    progress_events = relationship("JobProgressEvent", back_populates="job", cascade="all, delete-orphan")
+    progress_events = relationship(
+        "JobProgressEvent", back_populates="job", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("idx_jobs_list_id", "list_id"),

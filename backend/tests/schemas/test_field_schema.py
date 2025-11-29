@@ -11,31 +11,30 @@ Tests cover all validation scenarios specified in Task #65:
 Total: 20 tests covering comprehensive validation logic
 """
 
-import pytest
-from uuid import uuid4
 from datetime import datetime
+from uuid import uuid4
+
+import pytest
 from pydantic import ValidationError
 
-from app.schemas.field_schema import (
-    SchemaFieldInput,
-    FieldSchemaCreate,
-    FieldSchemaUpdate,
-    SchemaFieldResponse,
-    FieldSchemaResponse,
-)
 from app.schemas.custom_field import CustomFieldResponse
-
+from app.schemas.field_schema import (
+    FieldSchemaCreate,
+    FieldSchemaResponse,
+    FieldSchemaUpdate,
+    SchemaFieldInput,
+    SchemaFieldResponse,
+)
 
 # ============================================================================
 # Test Group 1: Valid Creation Tests (4 tests)
 # ============================================================================
 
+
 def test_create_schema_with_empty_fields_list():
     """Test creating a valid FieldSchema with no fields."""
     schema = FieldSchemaCreate(
-        name="Video Quality",
-        description="Standard video quality metrics",
-        fields=[]
+        name="Video Quality", description="Standard video quality metrics", fields=[]
     )
     assert schema.name == "Video Quality"
     assert schema.description == "Standard video quality metrics"
@@ -49,12 +48,8 @@ def test_create_schema_with_single_field():
         name="Simple Schema",
         description="A schema with one field",
         fields=[
-            SchemaFieldInput(
-                field_id=field_id,
-                display_order=0,
-                show_on_card=True
-            )
-        ]
+            SchemaFieldInput(field_id=field_id, display_order=0, show_on_card=True)
+        ],
     )
     assert schema.name == "Simple Schema"
     assert len(schema.fields) == 1
@@ -78,7 +73,7 @@ def test_create_schema_with_exactly_three_show_on_card():
             SchemaFieldInput(field_id=field2_id, display_order=1, show_on_card=True),
             SchemaFieldInput(field_id=field3_id, display_order=2, show_on_card=True),
             SchemaFieldInput(field_id=field4_id, display_order=3, show_on_card=False),
-        ]
+        ],
     )
     assert len(schema.fields) == 4
     show_on_card_count = sum(1 for f in schema.fields if f.show_on_card)
@@ -88,11 +83,7 @@ def test_create_schema_with_exactly_three_show_on_card():
 def test_schema_field_item_with_all_fields():
     """Test creating a valid SchemaFieldInput with all fields."""
     field_id = uuid4()
-    item = SchemaFieldInput(
-        field_id=field_id,
-        display_order=5,
-        show_on_card=False
-    )
+    item = SchemaFieldInput(field_id=field_id, display_order=5, show_on_card=False)
     assert item.field_id == field_id
     assert item.display_order == 5
     assert item.show_on_card is False
@@ -101,6 +92,7 @@ def test_schema_field_item_with_all_fields():
 # ============================================================================
 # Test Group 2: Validator Tests (8 tests)
 # ============================================================================
+
 
 def test_show_on_card_limit_exceeded():
     """Test that more than 3 show_on_card=true fields raises ValidationError."""
@@ -113,11 +105,19 @@ def test_show_on_card_limit_exceeded():
         FieldSchemaCreate(
             name="Invalid Schema",
             fields=[
-                SchemaFieldInput(field_id=field1_id, display_order=0, show_on_card=True),
-                SchemaFieldInput(field_id=field2_id, display_order=1, show_on_card=True),
-                SchemaFieldInput(field_id=field3_id, display_order=2, show_on_card=True),
-                SchemaFieldInput(field_id=field4_id, display_order=3, show_on_card=True),
-            ]
+                SchemaFieldInput(
+                    field_id=field1_id, display_order=0, show_on_card=True
+                ),
+                SchemaFieldInput(
+                    field_id=field2_id, display_order=1, show_on_card=True
+                ),
+                SchemaFieldInput(
+                    field_id=field3_id, display_order=2, show_on_card=True
+                ),
+                SchemaFieldInput(
+                    field_id=field4_id, display_order=3, show_on_card=True
+                ),
+            ],
         )
 
     error_message = str(exc_info.value)
@@ -139,7 +139,7 @@ def test_show_on_card_limit_exactly_three():
             SchemaFieldInput(field_id=field1_id, display_order=0, show_on_card=True),
             SchemaFieldInput(field_id=field2_id, display_order=1, show_on_card=True),
             SchemaFieldInput(field_id=field3_id, display_order=2, show_on_card=True),
-        ]
+        ],
     )
     assert len([f for f in schema.fields if f.show_on_card]) == 3
 
@@ -153,9 +153,13 @@ def test_duplicate_display_order():
         FieldSchemaCreate(
             name="Invalid Schema",
             fields=[
-                SchemaFieldInput(field_id=field1_id, display_order=0, show_on_card=False),
-                SchemaFieldInput(field_id=field2_id, display_order=0, show_on_card=False),
-            ]
+                SchemaFieldInput(
+                    field_id=field1_id, display_order=0, show_on_card=False
+                ),
+                SchemaFieldInput(
+                    field_id=field2_id, display_order=0, show_on_card=False
+                ),
+            ],
         )
 
     error_message = str(exc_info.value)
@@ -172,9 +176,13 @@ def test_duplicate_field_ids():
         FieldSchemaCreate(
             name="Invalid Schema",
             fields=[
-                SchemaFieldInput(field_id=field_id, display_order=0, show_on_card=False),
-                SchemaFieldInput(field_id=field_id, display_order=1, show_on_card=False),
-            ]
+                SchemaFieldInput(
+                    field_id=field_id, display_order=0, show_on_card=False
+                ),
+                SchemaFieldInput(
+                    field_id=field_id, display_order=1, show_on_card=False
+                ),
+            ],
         )
 
     error_message = str(exc_info.value)
@@ -189,11 +197,7 @@ def test_negative_display_order():
     field_id = uuid4()
 
     with pytest.raises(ValidationError) as exc_info:
-        SchemaFieldInput(
-            field_id=field_id,
-            display_order=-1,
-            show_on_card=False
-        )
+        SchemaFieldInput(field_id=field_id, display_order=-1, show_on_card=False)
 
     error_message = str(exc_info.value)
     assert "greater than or equal to 0" in error_message
@@ -214,7 +218,7 @@ def test_multiple_validators_pass_with_valid_data():
             SchemaFieldInput(field_id=field2_id, display_order=1, show_on_card=True),
             SchemaFieldInput(field_id=field3_id, display_order=5, show_on_card=False),
             SchemaFieldInput(field_id=field4_id, display_order=10, show_on_card=False),
-        ]
+        ],
     )
     assert len(schema.fields) == 4
     assert len([f for f in schema.fields if f.show_on_card]) == 2
@@ -230,10 +234,16 @@ def test_duplicate_display_order_with_three_fields():
         FieldSchemaCreate(
             name="Invalid Schema",
             fields=[
-                SchemaFieldInput(field_id=field1_id, display_order=1, show_on_card=False),
-                SchemaFieldInput(field_id=field2_id, display_order=1, show_on_card=False),
-                SchemaFieldInput(field_id=field3_id, display_order=1, show_on_card=False),
-            ]
+                SchemaFieldInput(
+                    field_id=field1_id, display_order=1, show_on_card=False
+                ),
+                SchemaFieldInput(
+                    field_id=field2_id, display_order=1, show_on_card=False
+                ),
+                SchemaFieldInput(
+                    field_id=field3_id, display_order=1, show_on_card=False
+                ),
+            ],
         )
 
     error_message = str(exc_info.value)
@@ -254,7 +264,7 @@ def test_validator_order_show_on_card_before_duplicates():
                 SchemaFieldInput(field_id=field_id, display_order=1, show_on_card=True),
                 SchemaFieldInput(field_id=field_id, display_order=2, show_on_card=True),
                 SchemaFieldInput(field_id=field_id, display_order=3, show_on_card=True),
-            ]
+            ],
         )
 
     # show_on_card validator should trigger first
@@ -265,6 +275,7 @@ def test_validator_order_show_on_card_before_duplicates():
 # ============================================================================
 # Test Group 3: Partial Update Tests (3 tests)
 # ============================================================================
+
 
 def test_update_with_name_only():
     """Test partial update with name only using exclude_unset."""
@@ -288,10 +299,7 @@ def test_update_with_description_only():
 
 def test_update_with_both_fields():
     """Test partial update with both name and description using exclude_unset."""
-    update = FieldSchemaUpdate(
-        name="New Name",
-        description="New Description"
-    )
+    update = FieldSchemaUpdate(name="New Name", description="New Description")
     data = update.model_dump(exclude_unset=True)
 
     assert "name" in data
@@ -303,6 +311,7 @@ def test_update_with_both_fields():
 # ============================================================================
 # Test Group 4: Response Schema Tests (3 tests)
 # ============================================================================
+
 
 def test_schema_field_response_with_nested_custom_field():
     """Test SchemaFieldResponse serializes with nested CustomFieldResponse."""
@@ -323,7 +332,7 @@ def test_schema_field_response_with_nested_custom_field():
         schema_id=schema_id,
         field=custom_field,
         display_order=0,
-        show_on_card=True
+        show_on_card=True,
     )
 
     assert schema_field.field_id == field_id
@@ -384,7 +393,7 @@ def test_field_schema_response_with_multiple_nested_fields():
         schema_id=schema_id,
         field=custom_field1,
         display_order=0,
-        show_on_card=True
+        show_on_card=True,
     )
 
     schema_field2 = SchemaFieldResponse(
@@ -392,7 +401,7 @@ def test_field_schema_response_with_multiple_nested_fields():
         schema_id=schema_id,
         field=custom_field2,
         display_order=1,
-        show_on_card=False
+        show_on_card=False,
     )
 
     response = FieldSchemaResponse(
@@ -416,13 +425,11 @@ def test_field_schema_response_with_multiple_nested_fields():
 # Test Group 5: Edge Cases (2 tests)
 # ============================================================================
 
+
 def test_empty_name_string():
     """Test that empty name string raises ValidationError."""
     with pytest.raises(ValidationError) as exc_info:
-        FieldSchemaCreate(
-            name="",
-            fields=[]
-        )
+        FieldSchemaCreate(name="", fields=[])
 
     error_message = str(exc_info.value)
     assert "String should have at least 1 character" in error_message
@@ -433,10 +440,7 @@ def test_whitespace_only_name():
     # Note: Unlike CustomFieldCreate, FieldSchemaCreate doesn't have
     # a whitespace validator. Pydantic's min_length=1 only checks length,
     # not content. This is intentional - schema names aren't stripped.
-    schema = FieldSchemaCreate(
-        name="   ",
-        fields=[]
-    )
+    schema = FieldSchemaCreate(name="   ", fields=[])
     assert schema.name == "   "  # Whitespace preserved
 
 
@@ -448,14 +452,12 @@ def test_large_fields_list():
             SchemaFieldInput(
                 field_id=uuid4(),
                 display_order=i,
-                show_on_card=(i < 3)  # Only first 3 show on card
+                show_on_card=(i < 3),  # Only first 3 show on card
             )
         )
 
     schema = FieldSchemaCreate(
-        name="Large Schema",
-        description="Schema with 10 fields",
-        fields=fields
+        name="Large Schema", description="Schema with 10 fields", fields=fields
     )
 
     assert len(schema.fields) == 10

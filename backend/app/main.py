@@ -6,11 +6,25 @@ and provides the health check endpoint.
 """
 
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import lists, videos, processing, websocket, tags, custom_fields, schemas, schema_fields, analytics, channels, enrichment, search
-from app.core.redis import close_redis_client, close_arq_pool, get_arq_pool
+from app.api import (
+    analytics,
+    channels,
+    custom_fields,
+    enrichment,
+    lists,
+    processing,
+    schema_fields,
+    schemas,
+    search,
+    tags,
+    videos,
+    websocket,
+)
+from app.core.redis import close_arq_pool, close_redis_client, get_arq_pool
 
 
 @asynccontextmanager
@@ -24,6 +38,7 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize ARQ pool eagerly (not lazy on first request)
     # If Redis is unavailable, log warning and continue in degraded mode
     import logging
+
     logger = logging.getLogger(__name__)
 
     try:

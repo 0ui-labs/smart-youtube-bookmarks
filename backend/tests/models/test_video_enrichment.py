@@ -1,11 +1,12 @@
 """Tests for VideoEnrichment model."""
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.models.video import Video
-from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
+from app.models.video_enrichment import EnrichmentStatus, VideoEnrichment
 
 
 class TestEnrichmentStatus:
@@ -43,8 +44,7 @@ class TestVideoEnrichmentModel:
     async def test_create_enrichment(self, test_db, test_video):
         """VideoEnrichment can be created with minimal fields."""
         enrichment = VideoEnrichment(
-            video_id=test_video.id,
-            status=EnrichmentStatus.pending
+            video_id=test_video.id, status=EnrichmentStatus.pending
         )
         test_db.add(enrichment)
         await test_db.commit()
@@ -76,7 +76,7 @@ class TestVideoEnrichmentModel:
             status=EnrichmentStatus.completed,
             captions_vtt=vtt_content,
             captions_language="en",
-            captions_source="youtube_auto"
+            captions_source="youtube_auto",
         )
         test_db.add(enrichment)
         await test_db.commit()
@@ -92,7 +92,7 @@ class TestVideoEnrichmentModel:
         chapters_vtt = "WEBVTT\n\nchapter-1\n00:00:00.000 --> 00:02:30.000\nIntro"
         chapters_json = [
             {"start": 0, "end": 150, "title": "Intro"},
-            {"start": 150, "end": 600, "title": "Main"}
+            {"start": 150, "end": 600, "title": "Main"},
         ]
 
         enrichment = VideoEnrichment(
@@ -100,7 +100,7 @@ class TestVideoEnrichmentModel:
             status=EnrichmentStatus.completed,
             chapters_vtt=chapters_vtt,
             chapters_json=chapters_json,
-            chapters_source="youtube"
+            chapters_source="youtube",
         )
         test_db.add(enrichment)
         await test_db.commit()
@@ -117,7 +117,7 @@ class TestVideoEnrichmentModel:
             video_id=test_video.id,
             status=EnrichmentStatus.failed,
             error_message="Video not available",
-            retry_count=3
+            retry_count=3,
         )
         test_db.add(enrichment)
         await test_db.commit()
@@ -145,8 +145,7 @@ class TestVideoEnrichmentRelationship:
     async def test_video_enrichment_relationship(self, test_db, test_video):
         """Video.enrichment returns associated VideoEnrichment."""
         enrichment = VideoEnrichment(
-            video_id=test_video.id,
-            status=EnrichmentStatus.completed
+            video_id=test_video.id, status=EnrichmentStatus.completed
         )
         test_db.add(enrichment)
         await test_db.commit()
@@ -166,8 +165,7 @@ class TestVideoEnrichmentRelationship:
     async def test_enrichment_video_relationship(self, test_db, test_video):
         """VideoEnrichment.video returns associated Video."""
         enrichment = VideoEnrichment(
-            video_id=test_video.id,
-            status=EnrichmentStatus.pending
+            video_id=test_video.id, status=EnrichmentStatus.pending
         )
         test_db.add(enrichment)
         await test_db.commit()
@@ -180,8 +178,7 @@ class TestVideoEnrichmentRelationship:
     async def test_cascade_delete(self, test_db, test_list, test_video):
         """VideoEnrichment is deleted when Video is deleted."""
         enrichment = VideoEnrichment(
-            video_id=test_video.id,
-            status=EnrichmentStatus.completed
+            video_id=test_video.id, status=EnrichmentStatus.completed
         )
         test_db.add(enrichment)
         await test_db.commit()
@@ -201,16 +198,14 @@ class TestVideoEnrichmentRelationship:
     async def test_unique_video_constraint(self, test_db, test_video):
         """Only one enrichment per video is allowed."""
         enrichment1 = VideoEnrichment(
-            video_id=test_video.id,
-            status=EnrichmentStatus.completed
+            video_id=test_video.id, status=EnrichmentStatus.completed
         )
         test_db.add(enrichment1)
         await test_db.commit()
 
         # Try to create second enrichment for same video
         enrichment2 = VideoEnrichment(
-            video_id=test_video.id,
-            status=EnrichmentStatus.pending
+            video_id=test_video.id, status=EnrichmentStatus.pending
         )
         test_db.add(enrichment2)
 

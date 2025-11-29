@@ -14,6 +14,7 @@ Usage:
 Note: Either --user-id or --all must be provided. This prevents accidental
 processing of all users' data, which could cause rate-limiting and privacy issues.
 """
+
 import argparse
 import asyncio
 import os
@@ -24,10 +25,11 @@ from uuid import UUID
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select
-from app.core.database import AsyncSessionLocal
-from app.models.channel import Channel
+
 from app.clients.youtube import YouTubeClient
 from app.core.config import settings
+from app.core.database import AsyncSessionLocal
+from app.models.channel import Channel
 
 
 def parse_args() -> argparse.Namespace:
@@ -102,14 +104,16 @@ async def refresh_channel_descriptions(user_id: UUID | None = None):
                 if info.get("description"):
                     channel.description = info["description"]
                     updated += 1
-                    print(f"  -> Updated description ({len(info['description'])} chars)")
+                    print(
+                        f"  -> Updated description ({len(info['description'])} chars)"
+                    )
                 else:
-                    print(f"  -> No description available")
+                    print("  -> No description available")
 
                 # Also update thumbnail if missing
                 if not channel.thumbnail_url and info.get("thumbnail_url"):
                     channel.thumbnail_url = info["thumbnail_url"]
-                    print(f"  -> Updated thumbnail")
+                    print("  -> Updated thumbnail")
 
             except Exception as e:
                 print(f"  -> Error: {e}")

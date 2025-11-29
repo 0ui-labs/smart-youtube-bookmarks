@@ -13,28 +13,28 @@ Performance:
 - Single query per metric (4 queries total, parallelizable)
 - Target: <1s for 1000 videos, 50 fields, 20 schemas
 """
+
 from uuid import UUID
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func, case, and_, exists, or_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models.list import BookmarkList
 from app.models.custom_field import CustomField
 from app.models.field_schema import FieldSchema
+from app.models.list import BookmarkList
 from app.models.schema_field import SchemaField
+from app.models.tag import Tag, video_tags
 from app.models.video import Video
 from app.models.video_field_value import VideoFieldValue
-from app.models.tag import Tag, video_tags
 from app.schemas.analytics import (
     AnalyticsResponse,
-    MostUsedFieldStat,
-    UnusedSchemaStat,
     FieldCoverageStat,
-    SchemaEffectivenessStat
+    MostUsedFieldStat,
+    SchemaEffectivenessStat,
+    UnusedSchemaStat,
 )
 
 router = APIRouter(prefix="/api/lists", tags=["analytics"])
@@ -43,11 +43,10 @@ router = APIRouter(prefix="/api/lists", tags=["analytics"])
 @router.get(
     "/{list_id}/analytics",
     response_model=AnalyticsResponse,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def get_analytics(
-    list_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    list_id: UUID, db: AsyncSession = Depends(get_db)
 ) -> AnalyticsResponse:
     """
     Get custom fields usage analytics for a bookmark list.
@@ -99,7 +98,7 @@ async def get_analytics(
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Get total video count for percentage calculations
@@ -123,15 +122,13 @@ async def get_analytics(
         most_used_fields=most_used_fields,
         unused_schemas=unused_schemas,
         field_coverage=field_coverage,
-        schema_effectiveness=schema_effectiveness
+        schema_effectiveness=schema_effectiveness,
     )
 
 
 async def _get_most_used_fields(
-    db: AsyncSession,
-    list_id: UUID,
-    total_videos: int
-) -> List[MostUsedFieldStat]:
+    db: AsyncSession, list_id: UUID, total_videos: int
+) -> list[MostUsedFieldStat]:
     """
     Get top 10 most-used fields by VideoFieldValue count.
 
@@ -151,7 +148,7 @@ async def _get_most_used_fields(
             CustomField.id,
             CustomField.name,
             CustomField.field_type,
-            func.count(VideoFieldValue.id).label('usage_count')
+            func.count(VideoFieldValue.id).label("usage_count"),
         )
         .outerjoin(VideoFieldValue, CustomField.id == VideoFieldValue.field_id)
         .where(CustomField.list_id == list_id)
@@ -170,16 +167,17 @@ async def _get_most_used_fields(
             field_type=row.field_type,
             usage_count=row.usage_count,
             total_videos=total_videos,
-            usage_percentage=round((row.usage_count / total_videos * 100), 2) if total_videos > 0 else 0.0
+            usage_percentage=round((row.usage_count / total_videos * 100), 2)
+            if total_videos > 0
+            else 0.0,
         )
         for row in rows
     ]
 
 
 async def _get_unused_schemas(
-    db: AsyncSession,
-    list_id: UUID
-) -> List[UnusedSchemaStat]:
+    db: AsyncSession, list_id: UUID
+) -> list[UnusedSchemaStat]:
     """
     Get schemas that are unused (no tags OR no field values).
 
@@ -206,10 +204,10 @@ async def _get_unused_schemas(
         select(
             FieldSchema.id,
             FieldSchema.name,
-            func.count(func.distinct(SchemaField.field_id)).label('field_count'),
-            func.count(func.distinct(Tag.id)).label('tag_count'),
-            func.count(VideoFieldValue.id).label('value_count'),
-            func.max(VideoFieldValue.updated_at).label('last_used')
+            func.count(func.distinct(SchemaField.field_id)).label("field_count"),
+            func.count(func.distinct(Tag.id)).label("tag_count"),
+            func.count(VideoFieldValue.id).label("value_count"),
+            func.max(VideoFieldValue.updated_at).label("last_used"),
         )
         .outerjoin(SchemaField, FieldSchema.id == SchemaField.schema_id)
         .outerjoin(Tag, FieldSchema.id == Tag.schema_id)
@@ -226,32 +224,34 @@ async def _get_unused_schemas(
     unused = []
     for row in rows:
         if row.tag_count == 0:
-            unused.append(UnusedSchemaStat(
-                schema_id=str(row.id),
-                schema_name=row.name,
-                field_count=row.field_count,
-                tag_count=row.tag_count,
-                last_used=row.last_used,
-                reason="no_tags"
-            ))
+            unused.append(
+                UnusedSchemaStat(
+                    schema_id=str(row.id),
+                    schema_name=row.name,
+                    field_count=row.field_count,
+                    tag_count=row.tag_count,
+                    last_used=row.last_used,
+                    reason="no_tags",
+                )
+            )
         elif row.value_count == 0:
-            unused.append(UnusedSchemaStat(
-                schema_id=str(row.id),
-                schema_name=row.name,
-                field_count=row.field_count,
-                tag_count=row.tag_count,
-                last_used=row.last_used,
-                reason="no_values"
-            ))
+            unused.append(
+                UnusedSchemaStat(
+                    schema_id=str(row.id),
+                    schema_name=row.name,
+                    field_count=row.field_count,
+                    tag_count=row.tag_count,
+                    last_used=row.last_used,
+                    reason="no_values",
+                )
+            )
 
     return unused
 
 
 async def _get_field_coverage(
-    db: AsyncSession,
-    list_id: UUID,
-    total_videos: int
-) -> List[FieldCoverageStat]:
+    db: AsyncSession, list_id: UUID, total_videos: int
+) -> list[FieldCoverageStat]:
     """
     Get coverage statistics for all fields.
 
@@ -272,7 +272,9 @@ async def _get_field_coverage(
             CustomField.id,
             CustomField.name,
             CustomField.field_type,
-            func.count(func.distinct(VideoFieldValue.video_id)).label('videos_with_values')
+            func.count(func.distinct(VideoFieldValue.video_id)).label(
+                "videos_with_values"
+            ),
         )
         .outerjoin(VideoFieldValue, CustomField.id == VideoFieldValue.field_id)
         .where(CustomField.list_id == list_id)
@@ -289,7 +291,9 @@ async def _get_field_coverage(
             field_type=row.field_type,
             videos_with_values=row.videos_with_values,
             total_videos=total_videos,
-            coverage_percentage=round((row.videos_with_values / total_videos * 100), 2) if total_videos > 0 else 0.0
+            coverage_percentage=round((row.videos_with_values / total_videos * 100), 2)
+            if total_videos > 0
+            else 0.0,
         )
         for row in rows
     ]
@@ -299,9 +303,8 @@ async def _get_field_coverage(
 
 
 async def _get_schema_effectiveness(
-    db: AsyncSession,
-    list_id: UUID
-) -> List[SchemaEffectivenessStat]:
+    db: AsyncSession, list_id: UUID
+) -> list[SchemaEffectivenessStat]:
     """
     Get effectiveness statistics for all schemas.
 
@@ -353,12 +356,7 @@ async def _get_schema_effectiveness(
             select(func.distinct(Video.id))
             .join(video_tags, Video.id == video_tags.c.video_id)
             .join(Tag, video_tags.c.tag_id == Tag.id)
-            .where(
-                and_(
-                    Tag.schema_id == schema.id,
-                    Video.list_id == list_id
-                )
-            )
+            .where(and_(Tag.schema_id == schema.id, Video.list_id == list_id))
         )
         videos_result = await db.execute(videos_stmt)
         video_ids = [row[0] for row in videos_result.all()]
@@ -371,12 +369,12 @@ async def _get_schema_effectiveness(
         filled_stmt = (
             select(
                 VideoFieldValue.video_id,
-                func.count(VideoFieldValue.id).label('filled_count')
+                func.count(VideoFieldValue.id).label("filled_count"),
             )
             .where(
                 and_(
                     VideoFieldValue.video_id.in_(video_ids),
-                    VideoFieldValue.field_id.in_(field_ids)
+                    VideoFieldValue.field_id.in_(field_ids),
                 )
             )
             .group_by(VideoFieldValue.video_id)
@@ -390,16 +388,20 @@ async def _get_schema_effectiveness(
         avg_fields_filled = total_filled / len(video_ids) if video_ids else 0.0
         # Round avg first, then compute completion from rounded value to satisfy validator
         rounded_avg = round(avg_fields_filled, 2)
-        completion_percentage = (rounded_avg / field_count * 100) if field_count > 0 else 0.0
+        completion_percentage = (
+            (rounded_avg / field_count * 100) if field_count > 0 else 0.0
+        )
 
-        stats.append(SchemaEffectivenessStat(
-            schema_id=str(schema.id),
-            schema_name=schema.name,
-            field_count=field_count,
-            avg_fields_filled=rounded_avg,
-            completion_percentage=round(completion_percentage, 2),
-            video_count=len(video_ids)
-        ))
+        stats.append(
+            SchemaEffectivenessStat(
+                schema_id=str(schema.id),
+                schema_name=schema.name,
+                field_count=field_count,
+                avg_fields_filled=rounded_avg,
+                completion_percentage=round(completion_percentage, 2),
+                video_count=len(video_ids),
+            )
+        )
 
     # Sort by completion % descending (most effective first)
     return sorted(stats, key=lambda s: s.completion_percentage, reverse=True)

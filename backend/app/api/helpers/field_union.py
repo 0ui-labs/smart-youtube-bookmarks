@@ -30,22 +30,20 @@ Related:
 """
 
 from uuid import UUID
-from typing import List, Dict, Tuple, Set
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.video import Video
-from app.models.schema_field import SchemaField
-from app.models.field_schema import FieldSchema
 from app.models.custom_field import CustomField
+from app.models.field_schema import FieldSchema
+from app.models.schema_field import SchemaField
+from app.models.video import Video
 
 
 def compute_field_union_with_conflicts(
-    schema_ids: List[UUID],
-    fields_by_schema: Dict[UUID, List[Tuple[SchemaField, str]]]
-) -> List[Tuple[CustomField, str | None, int, bool]]:
+    schema_ids: list[UUID], fields_by_schema: dict[UUID, list[tuple[SchemaField, str]]]
+) -> list[tuple[CustomField, str | None, int, bool]]:
     """
     Compute union of fields from multiple schemas with conflict resolution.
 
@@ -81,7 +79,7 @@ def compute_field_union_with_conflicts(
 
     # PASS 1: Detect conflicts
     # Build mapping: field_name_lower → set of field_types
-    field_types_by_name: Dict[str, Set[str]] = {}
+    field_types_by_name: dict[str, set[str]] = {}
 
     for schema_id in schema_ids:
         if schema_id not in fields_by_schema:
@@ -97,12 +95,11 @@ def compute_field_union_with_conflicts(
 
     # Identify conflicting field names (multiple types)
     conflicting_names = {
-        name for name, types in field_types_by_name.items()
-        if len(types) > 1
+        name for name, types in field_types_by_name.items() if len(types) > 1
     }
 
     # PASS 2: Build registry with conflict resolution
-    field_registry: Dict[str, Dict] = {}
+    field_registry: dict[str, dict] = {}
 
     for schema_id in schema_ids:
         if schema_id not in fields_by_schema:
@@ -128,21 +125,23 @@ def compute_field_union_with_conflicts(
 
             # Add to registry
             field_registry[registry_key] = {
-                'field': field,
-                'schema_name': schema_name if is_conflicting else None,
-                'display_order': schema_field.display_order,
-                'show_on_card': schema_field.show_on_card
+                "field": field,
+                "schema_name": schema_name if is_conflicting else None,
+                "display_order": schema_field.display_order,
+                "show_on_card": schema_field.show_on_card,
             }
 
     # Build result list
     result = []
     for entry in field_registry.values():
-        result.append((
-            entry['field'],
-            entry['schema_name'],
-            entry['display_order'],
-            entry['show_on_card']
-        ))
+        result.append(
+            (
+                entry["field"],
+                entry["schema_name"],
+                entry["display_order"],
+                entry["show_on_card"],
+            )
+        )
 
     # Sort by display_order (preserve schema ordering)
     result.sort(key=lambda x: x[2])
@@ -151,9 +150,8 @@ def compute_field_union_with_conflicts(
 
 
 async def get_available_fields_for_videos(
-    videos: List[Video],
-    db: AsyncSession
-) -> Dict[UUID, List[Tuple[CustomField, str | None, int, bool]]]:
+    videos: list[Video], db: AsyncSession
+) -> dict[UUID, list[tuple[CustomField, str | None, int, bool]]]:
     """
     Batch-load applicable fields for ALL videos in a single query.
 
@@ -191,15 +189,15 @@ async def get_available_fields_for_videos(
     """
     # Step 1: Collect ALL unique schema_ids from ALL videos
     # Two-Layer System: Workspace schema (list.default_schema_id) + Category schemas (tag.schema_id)
-    all_schema_ids: Set[UUID] = set()
-    video_schemas: Dict[UUID, List[UUID]] = {}  # video_id → [schema_ids]
+    all_schema_ids: set[UUID] = set()
+    video_schemas: dict[UUID, list[UUID]] = {}  # video_id → [schema_ids]
 
     for video in videos:
-        schema_ids: List[UUID] = []
+        schema_ids: list[UUID] = []
 
         # Layer 1: Workspace schema (applies to ALL videos in this list)
         # Check if video.list is loaded and has default_schema_id
-        if hasattr(video, 'list') and video.list and video.list.default_schema_id:
+        if hasattr(video, "list") and video.list and video.list.default_schema_id:
             schema_ids.append(video.list.default_schema_id)
 
         # Layer 2: Category schemas (from video's tags)
@@ -215,7 +213,7 @@ async def get_available_fields_for_videos(
         except TypeError as e:
             # If we get TypeError accessing video.tags, try to get it as a single object
             if "'Tag' object is not iterable" in str(e):
-                tags = [video.tags] if hasattr(video, 'tags') and video.tags else []
+                tags = [video.tags] if hasattr(video, "tags") and video.tags else []
             else:
                 raise
 
@@ -251,14 +249,14 @@ async def get_available_fields_for_videos(
     all_schema_fields = result.all()  # List of (SchemaField, schema_name) tuples
 
     # Step 3: Group SchemaFields by schema_id
-    fields_by_schema: Dict[UUID, List[Tuple[SchemaField, str]]] = {}
+    fields_by_schema: dict[UUID, list[tuple[SchemaField, str]]] = {}
     for schema_field, schema_name in all_schema_fields:
         if schema_field.schema_id not in fields_by_schema:
             fields_by_schema[schema_field.schema_id] = []
         fields_by_schema[schema_field.schema_id].append((schema_field, schema_name))
 
     # Step 4: Compute applicable fields for each video (pure logic, no DB access)
-    result_by_video: Dict[UUID, List[Tuple[CustomField, str | None, int, bool]]] = {}
+    result_by_video: dict[UUID, list[tuple[CustomField, str | None, int, bool]]] = {}
 
     for video in videos:
         if video.id not in video_schemas:
@@ -276,9 +274,8 @@ async def get_available_fields_for_videos(
 
 
 async def get_available_fields_for_video(
-    video: Video,
-    db: AsyncSession
-) -> List[Tuple[CustomField, str | None, int, bool]]:
+    video: Video, db: AsyncSession
+) -> list[tuple[CustomField, str | None, int, bool]]:
     """
     Single-video wrapper for get_available_fields_for_videos().
 

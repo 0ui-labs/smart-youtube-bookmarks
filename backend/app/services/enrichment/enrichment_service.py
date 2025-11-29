@@ -24,23 +24,28 @@ Future improvements:
 - Separate ARQ worker instance for enrichment with max_jobs=1
 - Redis-based distributed rate limiter for multi-worker deployments
 """
+
 import asyncio
-import os
-from typing import List, Optional
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.video import Video
-from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
 from app.core.config import settings
-from .providers.base import CaptionProvider, CaptionResult
-from .providers.youtube_captions import YoutubeCaptionProvider
-from .providers.chapter_extractor import Chapter, ChapterExtractor, chapters_to_json, chapters_to_vtt
+from app.models.video import Video
+from app.models.video_enrichment import EnrichmentStatus, VideoEnrichment
+
 from .providers.audio_chunker import AudioChunker
+from .providers.base import CaptionProvider
+from .providers.chapter_extractor import (
+    Chapter,
+    ChapterExtractor,
+    chapters_to_json,
+    chapters_to_vtt,
+)
 from .providers.groq_transcriber import GroqTranscriber
-import logging
+from .providers.youtube_captions import YoutubeCaptionProvider
 
 logger = logging.getLogger(__name__)
 
@@ -69,15 +74,11 @@ class EnrichmentService:
         self._db = db
 
         # Initialize caption providers in priority order
-        self._caption_providers: List[CaptionProvider] = [
+        self._caption_providers: list[CaptionProvider] = [
             YoutubeCaptionProvider(),
         ]
 
-    async def _update_progress(
-        self,
-        enrichment: VideoEnrichment,
-        message: str
-    ) -> None:
+    async def _update_progress(self, enrichment: VideoEnrichment, message: str) -> None:
         """Update enrichment progress message and flush to DB.
 
         This allows frontend polling to see real-time progress.
@@ -90,9 +91,7 @@ class EnrichmentService:
         await self._db.flush()
 
     async def _get_or_create_enrichment(
-        self,
-        video_id: UUID,
-        retry: bool = False
+        self, video_id: UUID, retry: bool = False
     ) -> VideoEnrichment:
         """Get existing enrichment or create new one.
 
@@ -117,20 +116,13 @@ class EnrichmentService:
             return enrichment
 
         # Create new enrichment
-        enrichment = VideoEnrichment(
-            video_id=video_id,
-            status=EnrichmentStatus.pending
-        )
+        enrichment = VideoEnrichment(video_id=video_id, status=EnrichmentStatus.pending)
         self._db.add(enrichment)
         await self._db.flush()
 
         return enrichment
 
-    async def _fetch_captions(
-        self,
-        enrichment: VideoEnrichment,
-        video: Video
-    ) -> bool:
+    async def _fetch_captions(self, enrichment: VideoEnrichment, video: Video) -> bool:
         """Fetch captions using provider chain.
 
         Tries each provider in order until one succeeds.
@@ -161,13 +153,13 @@ class EnrichmentService:
                 )
                 continue
 
-        logger.warning(f"No captions available from YouTube for video {video.youtube_id}")
+        logger.warning(
+            f"No captions available from YouTube for video {video.youtube_id}"
+        )
         return False
 
     async def _fetch_captions_groq(
-        self,
-        enrichment: VideoEnrichment,
-        video: Video
+        self, enrichment: VideoEnrichment, video: Video
     ) -> bool:
         """Fetch captions using Groq Whisper transcription as fallback.
 
@@ -188,27 +180,34 @@ class EnrichmentService:
         try:
             async with AudioChunker() as chunker:
                 # Download audio
-                await self._update_progress(enrichment, "Downloading audio for transcription...")
+                await self._update_progress(
+                    enrichment, "Downloading audio for transcription..."
+                )
                 audio_path = await chunker.download_audio(video.youtube_id)
 
                 # Split into chunks
-                await self._update_progress(enrichment, "Splitting audio into chunks...")
+                await self._update_progress(
+                    enrichment, "Splitting audio into chunks..."
+                )
                 chunks = chunker.split_audio(audio_path)
 
                 if not chunks:
-                    logger.warning(f"No audio chunks created for video {video.youtube_id}")
+                    logger.warning(
+                        f"No audio chunks created for video {video.youtube_id}"
+                    )
                     return False
 
                 # Transcribe with Groq
                 await self._update_progress(
-                    enrichment,
-                    f"Transcribing audio ({len(chunks)} chunks)..."
+                    enrichment, f"Transcribing audio ({len(chunks)} chunks)..."
                 )
                 transcriber = GroqTranscriber(api_key=settings.groq_api_key)
                 results = await transcriber.transcribe_chunks(chunks)
 
                 if not results:
-                    logger.warning(f"No transcription results for video {video.youtube_id}")
+                    logger.warning(
+                        f"No transcription results for video {video.youtube_id}"
+                    )
                     return False
 
                 # Convert to VTT
@@ -233,11 +232,7 @@ class EnrichmentService:
             )
             return False
 
-    async def _fetch_chapters(
-        self,
-        enrichment: VideoEnrichment,
-        video: Video
-    ) -> bool:
+    async def _fetch_chapters(self, enrichment: VideoEnrichment, video: Video) -> bool:
         """Fetch chapters from YouTube or parse from description.
 
         Args:
@@ -284,7 +279,7 @@ class EnrichmentService:
             )
             return False
 
-    async def _get_video(self, video_id: UUID) -> Optional[Video]:
+    async def _get_video(self, video_id: UUID) -> Video | None:
         """Get video by ID.
 
         Args:
@@ -298,9 +293,7 @@ class EnrichmentService:
         return result.scalar_one_or_none()
 
     async def enrich_video(
-        self,
-        video_id: UUID,
-        retry: bool = False
+        self, video_id: UUID, retry: bool = False
     ) -> VideoEnrichment:
         """Enrich a video with captions and chapters.
 
@@ -336,7 +329,9 @@ class EnrichmentService:
                 logger.debug(f"Acquired YouTube API semaphore for video {video_id}")
 
                 # Fetch captions - try YouTube first, then Groq Whisper fallback
-                await self._update_progress(enrichment, "Fetching captions from YouTube...")
+                await self._update_progress(
+                    enrichment, "Fetching captions from YouTube..."
+                )
                 # NOTE: import_stage/import_progress updates moved to enrich_video worker
                 # to avoid duplicate updates and enable WebSocket broadcasting
 
@@ -344,7 +339,9 @@ class EnrichmentService:
 
                 # If YouTube failed, try Groq Whisper as fallback (outside rate limit)
                 if not has_captions:
-                    await self._update_progress(enrichment, "YouTube unavailable, trying Groq Whisper...")
+                    await self._update_progress(
+                        enrichment, "YouTube unavailable, trying Groq Whisper..."
+                    )
                     has_captions = await self._fetch_captions_groq(enrichment, video)
 
                 # Short delay between API calls (yt-dlp has its own rate limiting)
@@ -362,11 +359,7 @@ class EnrichmentService:
             if has_chapters and enrichment.chapters_json:
                 await self._update_progress(enrichment, "Generating chapter markers...")
                 chapters = [
-                    Chapter(
-                        title=ch["title"],
-                        start=ch["start"],
-                        end=ch["end"]
-                    )
+                    Chapter(title=ch["title"], start=ch["start"], end=ch["end"])
                     for ch in enrichment.chapters_json
                 ]
                 enrichment.chapters_vtt = chapters_to_vtt(chapters)

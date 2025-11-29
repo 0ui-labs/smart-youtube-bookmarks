@@ -16,31 +16,31 @@ Includes:
 - Real-time duplicate checking for UI validation
 """
 
-from uuid import UUID
-from typing import List, Literal
 import logging
+from typing import Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis
-from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
+from redis.exceptions import ConnectionError as RedisConnectionError, RedisError
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.clients.gemini import GeminiClient
 from app.core.config import settings
-from app.models.list import BookmarkList
+from app.core.database import get_db
 from app.models.custom_field import CustomField
+from app.models.list import BookmarkList
 from app.models.schema_field import SchemaField
 from app.schemas.custom_field import (
     CustomFieldCreate,
-    CustomFieldUpdate,
     CustomFieldResponse,
+    CustomFieldUpdate,
     DuplicateCheckRequest,
     DuplicateCheckResponse,
-    SmartDuplicateCheckResponse
+    SmartDuplicateCheckResponse,
 )
 from app.services.duplicate_detection import DuplicateDetector
-from app.clients.gemini import GeminiClient
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +49,11 @@ router = APIRouter(prefix="/api/lists", tags=["custom-fields"])
 
 @router.get(
     "/{list_id}/custom-fields",
-    response_model=List[CustomFieldResponse],
-    status_code=status.HTTP_200_OK
+    response_model=list[CustomFieldResponse],
+    status_code=status.HTTP_200_OK,
 )
 async def list_custom_fields(
-    list_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    list_id: UUID, db: AsyncSession = Depends(get_db)
 ) -> list[CustomFieldResponse]:
     """
     List all custom fields for a bookmark list.
@@ -97,15 +96,13 @@ async def list_custom_fields(
         ]
     """
     # Validate list exists
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
+    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     bookmark_list = result.scalar_one_or_none()
 
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Query all fields for this list (ordered by created_at DESC)
@@ -123,12 +120,10 @@ async def list_custom_fields(
 @router.post(
     "/{list_id}/custom-fields",
     response_model=CustomFieldResponse,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
 )
 async def create_custom_field(
-    list_id: UUID,
-    field_data: CustomFieldCreate,
-    db: AsyncSession = Depends(get_db)
+    list_id: UUID, field_data: CustomFieldCreate, db: AsyncSession = Depends(get_db)
 ) -> CustomFieldResponse:
     """
     Create a new custom field in a bookmark list.
@@ -162,22 +157,20 @@ async def create_custom_field(
         }
     """
     # Validate list exists
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
+    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     bookmark_list = result.scalar_one_or_none()
 
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Check for duplicate name (case-insensitive)
     # Uses SQL LOWER() for proper case-insensitive comparison
     stmt = select(CustomField).where(
         CustomField.list_id == list_id,
-        func.lower(CustomField.name) == field_data.name.lower()
+        func.lower(CustomField.name) == field_data.name.lower(),
     )
     result = await db.execute(stmt)
     existing_field = result.scalar_one_or_none()
@@ -185,7 +178,7 @@ async def create_custom_field(
     if existing_field:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Field '{field_data.name}' already exists in this list"
+            detail=f"Field '{field_data.name}' already exists in this list",
         )
 
     # Create new field
@@ -194,7 +187,7 @@ async def create_custom_field(
         list_id=list_id,
         name=field_data.name,
         field_type=field_data.field_type,
-        config=field_data.config
+        config=field_data.config,
     )
     db.add(new_field)
     await db.commit()
@@ -206,13 +199,13 @@ async def create_custom_field(
 @router.put(
     "/{list_id}/custom-fields/{field_id}",
     response_model=CustomFieldResponse,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def update_custom_field(
     list_id: UUID,
     field_id: UUID,
     field_update: CustomFieldUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> CustomFieldResponse:
     """
     Update an existing custom field.
@@ -251,21 +244,18 @@ async def update_custom_field(
     data inconsistencies. Frontend should warn users before allowing this.
     """
     # Validate list exists
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
+    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     bookmark_list = result.scalar_one_or_none()
 
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Validate field exists and belongs to this list
     stmt = select(CustomField).where(
-        CustomField.id == field_id,
-        CustomField.list_id == list_id
+        CustomField.id == field_id, CustomField.list_id == list_id
     )
     result = await db.execute(stmt)
     field = result.scalar_one_or_none()
@@ -273,15 +263,18 @@ async def update_custom_field(
     if not field:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Field with id {field_id} not found in list {list_id}"
+            detail=f"Field with id {field_id} not found in list {list_id}",
         )
 
     # Check for duplicate name if name is being updated (case-insensitive)
-    if field_update.name is not None and field_update.name.lower() != field.name.lower():
+    if (
+        field_update.name is not None
+        and field_update.name.lower() != field.name.lower()
+    ):
         duplicate_check = select(CustomField).where(
             CustomField.list_id == list_id,
             func.lower(CustomField.name) == field_update.name.lower(),
-            CustomField.id != field_id  # Exclude current field
+            CustomField.id != field_id,  # Exclude current field
         )
         duplicate_result = await db.execute(duplicate_check)
         existing = duplicate_result.scalar_one_or_none()
@@ -289,7 +282,7 @@ async def update_custom_field(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Field '{field_update.name}' already exists in this list"
+                detail=f"Field '{field_update.name}' already exists in this list",
             )
 
     # Validate config against field_type for partial updates
@@ -317,13 +310,10 @@ async def update_custom_field(
 
 
 @router.delete(
-    "/{list_id}/custom-fields/{field_id}",
-    status_code=status.HTTP_204_NO_CONTENT
+    "/{list_id}/custom-fields/{field_id}", status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_custom_field(
-    list_id: UUID,
-    field_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    list_id: UUID, field_id: UUID, db: AsyncSession = Depends(get_db)
 ) -> None:
     """
     Delete a custom field from a bookmark list.
@@ -359,21 +349,18 @@ async def delete_custom_field(
         }
     """
     # Validate list exists
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
+    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     bookmark_list = result.scalar_one_or_none()
 
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Validate field exists and belongs to this list
     stmt = select(CustomField).where(
-        CustomField.id == field_id,
-        CustomField.list_id == list_id
+        CustomField.id == field_id, CustomField.list_id == list_id
     )
     result = await db.execute(stmt)
     field = result.scalar_one_or_none()
@@ -381,19 +368,21 @@ async def delete_custom_field(
     if not field:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Field with id {field_id} not found in list {list_id}"
+            detail=f"Field with id {field_id} not found in list {list_id}",
         )
 
     # Check if field is used in any schema (via SchemaField join table)
-    usage_stmt = select(func.count()).select_from(SchemaField).where(
-        SchemaField.field_id == field_id
+    usage_stmt = (
+        select(func.count())
+        .select_from(SchemaField)
+        .where(SchemaField.field_id == field_id)
     )
     usage_count = await db.scalar(usage_stmt)
 
     if usage_count > 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Cannot delete field '{field.name}' - used in {usage_count} schema(s). Remove field from schemas first."
+            detail=f"Cannot delete field '{field.name}' - used in {usage_count} schema(s). Remove field from schemas first.",
         )
 
     # Delete field (CASCADE will delete VideoFieldValue records)
@@ -406,13 +395,13 @@ async def delete_custom_field(
 @router.post(
     "/{list_id}/custom-fields/check-duplicate",
     response_model=DuplicateCheckResponse | SmartDuplicateCheckResponse,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def check_duplicate_field(
     list_id: UUID,
     request: DuplicateCheckRequest,
     mode: Literal["basic", "smart"] = "basic",
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> DuplicateCheckResponse | SmartDuplicateCheckResponse:
     """
     Check if a custom field with the given name already exists.
@@ -457,7 +446,7 @@ async def check_duplicate_field(
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Get all existing fields in this list
@@ -471,14 +460,10 @@ async def check_duplicate_field(
         for field in existing_fields:
             if field.name.lower() == request.name.lower():
                 return DuplicateCheckResponse(
-                    exists=True,
-                    field=CustomFieldResponse.model_validate(field)
+                    exists=True, field=CustomFieldResponse.model_validate(field)
                 )
 
-        return DuplicateCheckResponse(
-            exists=False,
-            field=None
-        )
+        return DuplicateCheckResponse(exists=False, field=None)
 
     # SMART MODE (AI-powered)
     else:
@@ -509,15 +494,14 @@ async def check_duplicate_field(
 
             # Create detector
             detector = DuplicateDetector(
-                gemini_client=gemini_client,
-                redis_client=redis_client
+                gemini_client=gemini_client, redis_client=redis_client
             )
 
             # Find similar fields
             similarity_results = await detector.find_similar_fields(
                 field_name=request.name,
                 existing_fields=existing_fields,
-                include_semantic=True
+                include_semantic=True,
             )
 
             # Convert to response format
@@ -527,9 +511,7 @@ async def check_duplicate_field(
             suggestions = [s for s in suggestions if s["score"] >= 0.60]
 
             return SmartDuplicateCheckResponse(
-                exists=len(suggestions) > 0,
-                suggestions=suggestions,
-                mode="smart"
+                exists=len(suggestions) > 0, suggestions=suggestions, mode="smart"
             )
 
         finally:

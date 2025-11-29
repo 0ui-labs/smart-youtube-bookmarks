@@ -5,20 +5,23 @@ Tests system behavior when things go wrong: video processing failures,
 partial batch failures, and graceful degradation.
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from unittest.mock import AsyncMock, patch, MagicMock
 
-from app.models.list import BookmarkList
-from app.models.video import Video
 from app.models.job import ProcessingJob
 from app.models.job_progress import JobProgressEvent
+from app.models.list import BookmarkList
 from app.models.user import User
+from app.models.video import Video
 
 
 @pytest.mark.asyncio
-async def test_progress_with_partial_video_failures(test_db: AsyncSession, test_user: User, mock_redis, arq_context):
+async def test_progress_with_partial_video_failures(
+    test_db: AsyncSession, test_user: User, mock_redis, arq_context
+):
     """
     Test that worker continues processing when some videos fail.
 
@@ -28,20 +31,13 @@ async def test_progress_with_partial_video_failures(test_db: AsyncSession, test_
     from app.workers.video_processor import process_video_list
 
     # Arrange: Create test list
-    bookmark_list = BookmarkList(
-        name="Partial Failure Test",
-        user_id=test_user.id
-    )
+    bookmark_list = BookmarkList(name="Partial Failure Test", user_id=test_user.id)
     test_db.add(bookmark_list)
     await test_db.commit()
     list_id = bookmark_list.id
 
     # Arrange: Create processing job
-    job = ProcessingJob(
-        list_id=list_id,
-        total_videos=10,
-        status="running"
-    )
+    job = ProcessingJob(list_id=list_id, total_videos=10, status="running")
     test_db.add(job)
     await test_db.commit()
     job_id = job.id
@@ -59,6 +55,7 @@ async def test_progress_with_partial_video_failures(test_db: AsyncSession, test_
     original_process_video = None
     try:
         from app.workers import video_processor
+
         original_process_video = video_processor.process_video
 
         async def mock_process_video(ctx, video_id, list_id, job_metadata, job_id=None):
@@ -71,21 +68,26 @@ async def test_progress_with_partial_video_failures(test_db: AsyncSession, test_
                 return {
                     "status": "error",
                     "video_id": video_id,
-                    "error": "Video not found (404)"
+                    "error": "Video not found (404)",
                 }
             else:
                 # Success case
-                return await original_process_video(ctx, video_id, list_id, job_metadata, job_id)
+                return await original_process_video(
+                    ctx, video_id, list_id, job_metadata, job_id
+                )
 
         video_processor.process_video = mock_process_video
 
         # Act: Process videos (should handle failures gracefully)
         ctx = {"redis": mock_redis, "db": arq_context["db"]}
-        result = await process_video_list(ctx, str(job_id), str(list_id), video_ids, schema={})
+        result = await process_video_list(
+            ctx, str(job_id), str(list_id), video_ids, schema={}
+        )
 
         # Assert: Worker completed despite failures
-        assert "processed" in result or "completed" in str(result).lower(), \
+        assert "processed" in result or "completed" in str(result).lower(), (
             "Worker should complete processing"
+        )
 
         # Assert: Progress events were created
         stmt = select(JobProgressEvent).where(JobProgressEvent.job_id == job_id)
@@ -96,8 +98,9 @@ async def test_progress_with_partial_video_failures(test_db: AsyncSession, test_
 
         # Assert: Final status indicates partial success
         last_event = events[-1]
-        assert last_event.progress_data["progress"] == 100, \
+        assert last_event.progress_data["progress"] == 100, (
             "Final progress should reach 100% even with failures"
+        )
 
         # Note: Exact error tracking depends on worker implementation
         # This test verifies system doesn't crash on partial failures
@@ -109,7 +112,9 @@ async def test_progress_with_partial_video_failures(test_db: AsyncSession, test_
 
 
 @pytest.mark.asyncio
-async def test_progress_continues_when_redis_fails(test_db: AsyncSession, test_user: User, arq_context):
+async def test_progress_continues_when_redis_fails(
+    test_db: AsyncSession, test_user: User, arq_context
+):
     """
     Test that worker continues processing when Redis is unavailable.
 
@@ -123,20 +128,13 @@ async def test_progress_continues_when_redis_fails(test_db: AsyncSession, test_u
     failing_redis.publish = AsyncMock(side_effect=Exception("Redis connection failed"))
 
     # Arrange: Create test list
-    bookmark_list = BookmarkList(
-        name="Redis Failure Test",
-        user_id=test_user.id
-    )
+    bookmark_list = BookmarkList(name="Redis Failure Test", user_id=test_user.id)
     test_db.add(bookmark_list)
     await test_db.commit()
     list_id = bookmark_list.id
 
     # Arrange: Create processing job
-    job = ProcessingJob(
-        list_id=list_id,
-        total_videos=3,
-        status="running"
-    )
+    job = ProcessingJob(list_id=list_id, total_videos=3, status="running")
     test_db.add(job)
     await test_db.commit()
     job_id = job.id
@@ -152,21 +150,26 @@ async def test_progress_continues_when_redis_fails(test_db: AsyncSession, test_u
 
     # Act: Process videos with failing Redis
     ctx = {"redis": failing_redis, "db": arq_context["db"]}
-    result = await process_video_list(ctx, str(job_id), str(list_id), video_ids, schema={})
+    result = await process_video_list(
+        ctx, str(job_id), str(list_id), video_ids, schema={}
+    )
 
     # Assert: Processing completed despite Redis failures
-    assert result["processed"] == 3, \
+    assert result["processed"] == 3, (
         "Worker should process all videos despite Redis failure"
-    assert result["failed"] == 0, \
+    )
+    assert result["failed"] == 0, (
         "Videos should not be marked as failed due to Redis issues"
+    )
 
     # Assert: Database events were still created (dual-write fallback)
     stmt = select(JobProgressEvent).where(JobProgressEvent.job_id == job_id)
     db_result = await test_db.execute(stmt)
     db_events = db_result.scalars().all()
 
-    assert len(db_events) >= 2, \
+    assert len(db_events) >= 2, (
         "DB events should be created even when Redis fails (best-effort dual-write)"
+    )
 
     # Assert: Events contain progress data
     assert db_events[0].progress_data["progress"] == 0, "First event should be 0%"
@@ -174,7 +177,9 @@ async def test_progress_continues_when_redis_fails(test_db: AsyncSession, test_u
 
 
 @pytest.mark.asyncio
-async def test_progress_with_database_write_errors(test_db: AsyncSession, test_user: User, mock_redis, arq_context):
+async def test_progress_with_database_write_errors(
+    test_db: AsyncSession, test_user: User, mock_redis, arq_context
+):
     """
     Test that worker continues when progress event DB writes fail.
 
@@ -184,20 +189,13 @@ async def test_progress_with_database_write_errors(test_db: AsyncSession, test_u
     from app.workers.video_processor import process_video_list
 
     # Arrange: Create test list
-    bookmark_list = BookmarkList(
-        name="DB Failure Test",
-        user_id=test_user.id
-    )
+    bookmark_list = BookmarkList(name="DB Failure Test", user_id=test_user.id)
     test_db.add(bookmark_list)
     await test_db.commit()
     list_id = bookmark_list.id
 
     # Arrange: Create processing job
-    job = ProcessingJob(
-        list_id=list_id,
-        total_videos=3,
-        status="running"
-    )
+    job = ProcessingJob(list_id=list_id, total_videos=3, status="running")
     test_db.add(job)
     await test_db.commit()
     job_id = job.id
@@ -228,15 +226,19 @@ async def test_progress_with_database_write_errors(test_db: AsyncSession, test_u
     try:
         # Act: Process videos (should continue despite DB failures)
         ctx = {"redis": mock_redis, "db": arq_context["db"]}
-        result = await process_video_list(ctx, str(job_id), str(list_id), video_ids, schema={})
+        result = await process_video_list(
+            ctx, str(job_id), str(list_id), video_ids, schema={}
+        )
 
         # Assert: Processing completed
-        assert result["processed"] == 3, \
+        assert result["processed"] == 3, (
             "Worker should process all videos despite DB write failures"
+        )
 
         # Assert: Redis publish was still called (best-effort)
-        assert mock_redis.publish.called, \
+        assert mock_redis.publish.called, (
             "Redis publish should still be attempted when DB fails"
+        )
 
     finally:
         # Restore original add method
@@ -244,36 +246,33 @@ async def test_progress_with_database_write_errors(test_db: AsyncSession, test_u
 
 
 @pytest.mark.asyncio
-async def test_error_details_captured_in_progress_events(test_db: AsyncSession, test_user: User, mock_redis, arq_context):
+async def test_error_details_captured_in_progress_events(
+    test_db: AsyncSession, test_user: User, mock_redis, arq_context
+):
     """
     Test that error details are captured in progress events.
 
     Scenario: Video processing fails with specific error message
     Expected: Progress event contains error details for user visibility
     """
-    from app.workers.video_processor import process_video_list, process_video
+    from app.workers.video_processor import process_video_list
 
     # Arrange: Create test list
-    bookmark_list = BookmarkList(
-        name="Error Detail Test",
-        user_id=test_user.id
-    )
+    bookmark_list = BookmarkList(name="Error Detail Test", user_id=test_user.id)
     test_db.add(bookmark_list)
     await test_db.commit()
     list_id = bookmark_list.id
 
     # Arrange: Create processing job
-    job = ProcessingJob(
-        list_id=list_id,
-        total_videos=1,
-        status="running"
-    )
+    job = ProcessingJob(list_id=list_id, total_videos=1, status="running")
     test_db.add(job)
     await test_db.commit()
     job_id = job.id
 
     # Arrange: Create test video
-    video = Video(list_id=list_id, youtube_id="error_video", processing_status="pending")
+    video = Video(
+        list_id=list_id, youtube_id="error_video", processing_status="pending"
+    )
     test_db.add(video)
     await test_db.commit()
     video_id = str(video.id)
@@ -283,10 +282,10 @@ async def test_error_details_captured_in_progress_events(test_db: AsyncSession, 
         return {
             "status": "error",
             "video_id": vid,
-            "error": "YouTube API rate limit exceeded"
+            "error": "YouTube API rate limit exceeded",
         }
 
-    with patch('app.workers.video_processor.process_video', mock_error_process_video):
+    with patch("app.workers.video_processor.process_video", mock_error_process_video):
         # Act: Process video
         ctx = {"redis": mock_redis, "db": arq_context["db"]}
         await process_video_list(ctx, str(job_id), str(list_id), [video_id], schema={})
@@ -302,7 +301,10 @@ async def test_error_details_captured_in_progress_events(test_db: AsyncSession, 
     # Note: Implementation may vary - this tests the pattern
     error_logged = False
     for event in events:
-        if "error" in event.progress_data or "failed" in str(event.progress_data.get("status", "")).lower():
+        if (
+            "error" in event.progress_data
+            or "failed" in str(event.progress_data.get("status", "")).lower()
+        ):
             error_logged = True
             break
 

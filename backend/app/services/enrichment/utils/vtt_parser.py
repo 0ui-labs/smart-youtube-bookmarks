@@ -1,15 +1,16 @@
 """VTT (WebVTT) parsing and generation utilities."""
+
 import re
 from dataclasses import dataclass
-from typing import List, Optional
 
 
 @dataclass
 class VTTSegment:
     """A single VTT cue segment."""
+
     start: float  # Start time in seconds
-    end: float    # End time in seconds
-    text: str     # Cue text content
+    end: float  # End time in seconds
+    text: str  # Cue text content
 
     @property
     def duration(self) -> float:
@@ -19,8 +20,8 @@ class VTTSegment:
 
 # Regex pattern for timestamp line: "00:00:00.000 --> 00:00:05.000"
 TIMESTAMP_LINE_PATTERN = re.compile(
-    r'^(\d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}\.\d{3})\s*-->\s*'
-    r'(\d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}\.\d{3})'
+    r"^(\d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}\.\d{3})\s*-->\s*"
+    r"(\d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}\.\d{3})"
 )
 
 
@@ -33,7 +34,7 @@ def _timestamp_to_seconds(timestamp: str) -> float:
     Returns:
         Time in seconds
     """
-    parts = timestamp.replace(',', '.').split(':')
+    parts = timestamp.replace(",", ".").split(":")
 
     if len(parts) == 3:
         # HH:MM:SS.mmm
@@ -63,7 +64,7 @@ def _seconds_to_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
 
 
-def parse_vtt(vtt_content: str) -> List[VTTSegment]:
+def parse_vtt(vtt_content: str) -> list[VTTSegment]:
     """Parse VTT content into segments.
 
     Args:
@@ -72,28 +73,28 @@ def parse_vtt(vtt_content: str) -> List[VTTSegment]:
     Returns:
         List of VTTSegment objects
     """
-    segments: List[VTTSegment] = []
+    segments: list[VTTSegment] = []
 
     # Skip header check
-    if not vtt_content.strip().startswith('WEBVTT'):
+    if not vtt_content.strip().startswith("WEBVTT"):
         return segments
 
-    lines = vtt_content.split('\n')
+    lines = vtt_content.split("\n")
 
-    current_start: Optional[float] = None
-    current_end: Optional[float] = None
-    current_text_lines: List[str] = []
+    current_start: float | None = None
+    current_end: float | None = None
+    current_text_lines: list[str] = []
     in_style_block = False
 
     for line in lines:
         line_stripped = line.strip()
 
         # Skip STYLE blocks
-        if line_stripped == 'STYLE':
+        if line_stripped == "STYLE":
             in_style_block = True
             continue
         if in_style_block:
-            if line_stripped == '':
+            if line_stripped == "":
                 in_style_block = False
             continue
 
@@ -102,13 +103,11 @@ def parse_vtt(vtt_content: str) -> List[VTTSegment]:
         if match:
             # Save previous cue if we have one
             if current_start is not None and current_text_lines:
-                text = '\n'.join(current_text_lines).strip()
+                text = "\n".join(current_text_lines).strip()
                 if text:
-                    segments.append(VTTSegment(
-                        start=current_start,
-                        end=current_end,
-                        text=text
-                    ))
+                    segments.append(
+                        VTTSegment(start=current_start, end=current_end, text=text)
+                    )
 
             # Start new cue
             current_start = _timestamp_to_seconds(match.group(1))
@@ -116,40 +115,36 @@ def parse_vtt(vtt_content: str) -> List[VTTSegment]:
             current_text_lines = []
         elif current_start is not None:
             # This is cue text (could be empty line ending the cue or text content)
-            if line_stripped == '':
+            if line_stripped == "":
                 # Empty line - save cue and reset
                 if current_text_lines:
-                    text = '\n'.join(current_text_lines).strip()
+                    text = "\n".join(current_text_lines).strip()
                     if text:
-                        segments.append(VTTSegment(
-                            start=current_start,
-                            end=current_end,
-                            text=text
-                        ))
+                        segments.append(
+                            VTTSegment(start=current_start, end=current_end, text=text)
+                        )
                 current_start = None
                 current_end = None
                 current_text_lines = []
             else:
                 # Add text line (but not cue identifiers or header lines)
-                if not line_stripped.startswith('WEBVTT') and \
-                   not line_stripped.startswith('Kind:') and \
-                   not line_stripped.startswith('Language:'):
+                if (
+                    not line_stripped.startswith("WEBVTT")
+                    and not line_stripped.startswith("Kind:")
+                    and not line_stripped.startswith("Language:")
+                ):
                     current_text_lines.append(line_stripped)
 
     # Don't forget the last cue
     if current_start is not None and current_text_lines:
-        text = '\n'.join(current_text_lines).strip()
+        text = "\n".join(current_text_lines).strip()
         if text:
-            segments.append(VTTSegment(
-                start=current_start,
-                end=current_end,
-                text=text
-            ))
+            segments.append(VTTSegment(start=current_start, end=current_end, text=text))
 
     return segments
 
 
-def generate_vtt(segments: List[VTTSegment]) -> str:
+def generate_vtt(segments: list[VTTSegment]) -> str:
     """Generate VTT content from segments.
 
     Args:
@@ -189,8 +184,8 @@ def vtt_to_text(vtt_content: str) -> str:
         return ""
 
     # Remove duplicate text from rolling captions
-    seen_texts: List[str] = []
-    result_parts: List[str] = []
+    seen_texts: list[str] = []
+    result_parts: list[str] = []
 
     for segment in segments:
         text = segment.text.strip()
@@ -200,7 +195,7 @@ def vtt_to_text(vtt_content: str) -> str:
         for seen in reversed(seen_texts[-5:]):  # Check last 5 segments
             if text.startswith(seen) and len(text) > len(seen):
                 # This is a continuation - extract only the new part
-                new_part = text[len(seen):].strip()
+                new_part = text[len(seen) :].strip()
                 if new_part:
                     result_parts.append(new_part)
                 is_continuation = True

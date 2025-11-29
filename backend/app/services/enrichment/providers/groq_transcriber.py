@@ -1,16 +1,15 @@
 """Groq Whisper transcription provider."""
+
 import asyncio
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 from groq import Groq
 
-from .audio_chunker import AudioChunk
-from ..exceptions import TranscriptionError, RateLimitError
+from ..exceptions import RateLimitError, TranscriptionError
 from ..utils.vtt_parser import VTTSegment, generate_vtt
-
+from .audio_chunker import AudioChunk
 
 # Rate limiting constants
 MAX_CONCURRENT = 3  # Max concurrent Groq API requests
@@ -20,18 +19,20 @@ DELAY_BETWEEN_REQUESTS = 3.0  # Seconds between request batches
 @dataclass
 class TranscriptionSegment:
     """A segment from Groq transcription."""
+
     start: float  # Start time in seconds (relative to chunk)
-    end: float    # End time in seconds (relative to chunk)
-    text: str     # Transcribed text
+    end: float  # End time in seconds (relative to chunk)
+    text: str  # Transcribed text
 
 
 @dataclass
 class TranscriptionResult:
     """Result from transcribing a single chunk."""
-    text: str                          # Full text
-    segments: List[TranscriptionSegment]  # Timed segments
-    language: str                      # Detected language
-    chunk_index: int                   # Index in chunk sequence
+
+    text: str  # Full text
+    segments: list[TranscriptionSegment]  # Timed segments
+    language: str  # Detected language
+    chunk_index: int  # Index in chunk sequence
 
 
 class GroqTranscriber:
@@ -43,7 +44,7 @@ class GroqTranscriber:
     - Converts results to VTT format with correct offsets
     """
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """Initialize transcriber.
 
         Args:
@@ -54,12 +55,16 @@ class GroqTranscriber:
         """
         self._api_key = api_key or os.environ.get("GROQ_API_KEY")
         if not self._api_key:
-            raise ValueError("Groq API key required. Set GROQ_API_KEY or pass api_key parameter.")
+            raise ValueError(
+                "Groq API key required. Set GROQ_API_KEY or pass api_key parameter."
+            )
 
         self._client = Groq(api_key=self._api_key)
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
-    async def transcribe_chunks(self, chunks: List[AudioChunk]) -> List[TranscriptionResult]:
+    async def transcribe_chunks(
+        self, chunks: list[AudioChunk]
+    ) -> list[TranscriptionResult]:
         """Transcribe multiple audio chunks with rate limiting.
 
         Processes up to MAX_CONCURRENT chunks concurrently using a semaphore.
@@ -110,28 +115,30 @@ class GroqTranscriber:
             for seg in raw_segments:
                 # Support both dict and object access patterns
                 if isinstance(seg, dict):
-                    segments.append(TranscriptionSegment(
-                        start=seg.get('start', 0),
-                        end=seg.get('end', 0),
-                        text=seg.get('text', '')
-                    ))
+                    segments.append(
+                        TranscriptionSegment(
+                            start=seg.get("start", 0),
+                            end=seg.get("end", 0),
+                            text=seg.get("text", ""),
+                        )
+                    )
                 else:
-                    segments.append(TranscriptionSegment(
-                        start=seg.start,
-                        end=seg.end,
-                        text=seg.text
-                    ))
+                    segments.append(
+                        TranscriptionSegment(
+                            start=seg.start, end=seg.end, text=seg.text
+                        )
+                    )
 
             return TranscriptionResult(
                 text=response.text,
                 segments=segments,
-                language=getattr(response, 'language', 'en') or 'en',
-                chunk_index=chunk.chunk_index
+                language=getattr(response, "language", "en") or "en",
+                chunk_index=chunk.chunk_index,
             )
 
         except Exception as e:
             # Check for rate limit
-            if hasattr(e, 'status_code') and e.status_code == 429:
+            if hasattr(e, "status_code") and e.status_code == 429:
                 raise RateLimitError(f"Groq rate limit exceeded: {e}") from e
             raise TranscriptionError(f"Transcription failed: {e}") from e
 
@@ -152,15 +159,13 @@ class GroqTranscriber:
                     file=(audio_path.name, audio_file.read()),
                     model="whisper-large-v3",
                     response_format="verbose_json",
-                    timestamp_granularities=["segment"]
+                    timestamp_granularities=["segment"],
                 )
 
         return await loop.run_in_executor(None, _sync_call)
 
     def results_to_vtt(
-        self,
-        results: List[TranscriptionResult],
-        chunk_offsets: List[float]
+        self, results: list[TranscriptionResult], chunk_offsets: list[float]
     ) -> str:
         """Convert transcription results to VTT format.
 
@@ -174,16 +179,22 @@ class GroqTranscriber:
         if not results:
             return "WEBVTT\n"
 
-        all_segments: List[VTTSegment] = []
+        all_segments: list[VTTSegment] = []
 
         for result in results:
-            offset = chunk_offsets[result.chunk_index] if result.chunk_index < len(chunk_offsets) else 0.0
+            offset = (
+                chunk_offsets[result.chunk_index]
+                if result.chunk_index < len(chunk_offsets)
+                else 0.0
+            )
 
             for seg in result.segments:
-                all_segments.append(VTTSegment(
-                    start=seg.start + offset,
-                    end=seg.end + offset,
-                    text=seg.text.strip()
-                ))
+                all_segments.append(
+                    VTTSegment(
+                        start=seg.start + offset,
+                        end=seg.end + offset,
+                        text=seg.text.strip(),
+                    )
+                )
 
         return generate_vtt(all_segments)

@@ -1,17 +1,16 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload  # ADD THIS
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
-from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.models.field_schema import FieldSchema  # ADD THIS
 from app.models.tag import Tag
 from app.models.user import User
-from app.models.field_schema import FieldSchema  # ADD THIS
-from app.schemas.tag import TagCreate, TagUpdate, TagResponse
+from app.schemas.tag import TagCreate, TagResponse, TagUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +37,10 @@ router = APIRouter(prefix="/api/tags", tags=["tags"])
 # ============================================================================
 async def get_user_for_testing(
     db: AsyncSession,
-    user_id: Optional[UUID] = Query(
+    user_id: UUID | None = Query(
         None,
-        description="[TESTING ONLY] User ID - defaults to first user if not provided"
-    )
+        description="[TESTING ONLY] User ID - defaults to first user if not provided",
+    ),
 ) -> User:
     """
     Get user for testing purposes.
@@ -66,7 +65,7 @@ async def get_user_for_testing(
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Testing helper not available in production environment"
+            detail="Testing helper not available in production environment",
         )
 
     # Log usage in development/testing (for visibility)
@@ -81,18 +80,14 @@ async def get_user_for_testing(
         user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(
-                status_code=404,
-                detail=f"User with ID {user_id} not found"
+                status_code=404, detail=f"User with ID {user_id} not found"
             )
     else:
         # Default to first user (backwards compatibility)
         result = await db.execute(select(User))
         user = result.scalars().first()
         if not user:
-            raise HTTPException(
-                status_code=400,
-                detail="No user found in database"
-            )
+            raise HTTPException(status_code=400, detail="No user found in database")
 
     return user
 
@@ -101,7 +96,7 @@ async def get_user_for_testing(
 async def create_tag(
     tag: TagCreate,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Query(None, description="[TESTING ONLY] User ID")
+    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ):
     """Create a new tag."""
     current_user = await get_user_for_testing(db, user_id)
@@ -110,8 +105,7 @@ async def create_tag(
     # This prevents case-sensitive duplicates (e.g., "Python" and "python")
     # which would break the AND filter logic with ilike() queries
     stmt = select(Tag).where(
-        Tag.user_id == current_user.id,
-        func.lower(Tag.name) == tag.name.lower()
+        Tag.user_id == current_user.id, func.lower(Tag.name) == tag.name.lower()
     )
     result = await db.execute(stmt)
     existing = result.scalar_one_or_none()
@@ -119,33 +113,36 @@ async def create_tag(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Tag '{tag.name}' already exists"
+            detail=f"Tag '{tag.name}' already exists",
         )
 
     # BUG FIX: Validate schema_id if provided (same logic as update_tag)
     if tag.schema_id is not None:
-        from app.models.list import BookmarkList
-        from app.models.field_schema import FieldSchema
         from sqlalchemy import exists
+
+        from app.models.field_schema import FieldSchema
+        from app.models.list import BookmarkList
 
         # Validate schema exists AND belongs to user's list
         # FIX BUG #002B: Use exists() to avoid loading FieldSchema into session
         # Loading FieldSchema causes bidirectional relationship sync that clears schema_id
-        schema_exists_stmt = (
-            select(exists().where(
-                FieldSchema.id == tag.schema_id
-            ).where(
+        schema_exists_stmt = select(
+            exists()
+            .where(FieldSchema.id == tag.schema_id)
+            .where(
                 FieldSchema.list_id.in_(
-                    select(BookmarkList.id).where(BookmarkList.user_id == current_user.id)
+                    select(BookmarkList.id).where(
+                        BookmarkList.user_id == current_user.id
+                    )
                 )
-            ))
+            )
         )
         schema_exists = (await db.execute(schema_exists_stmt)).scalar()
 
         if not schema_exists:
             raise HTTPException(
                 status_code=404,
-                detail=f"Schema mit ID '{str(tag.schema_id)[:8]}...' nicht gefunden oder gehört zu anderer Liste"
+                detail=f"Schema mit ID '{str(tag.schema_id)[:8]}...' nicht gefunden oder gehört zu anderer Liste",
             )
 
     # Create new tag
@@ -154,7 +151,7 @@ async def create_tag(
         color=tag.color,
         schema_id=tag.schema_id,  # Include schema_id (will be preserved!)
         is_video_type=tag.is_video_type,  # Category vs Label distinction
-        user_id=current_user.id
+        user_id=current_user.id,
     )
     db.add(new_tag)
     await db.commit()
@@ -170,17 +167,13 @@ async def create_tag(
 @router.get("", response_model=list[TagResponse])
 async def list_tags(
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Query(None, description="[TESTING ONLY] User ID")
+    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ):
     """List all tags for current user."""
     current_user = await get_user_for_testing(db, user_id)
 
     # Load tags (no need to load schema relationship - TagResponse doesn't include it)
-    stmt = (
-        select(Tag)
-        .where(Tag.user_id == current_user.id)
-        .order_by(Tag.name)
-    )
+    stmt = select(Tag).where(Tag.user_id == current_user.id).order_by(Tag.name)
     result = await db.execute(stmt)
     tags = result.scalars().all()
 
@@ -194,16 +187,13 @@ async def list_tags(
 async def get_tag(
     tag_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Query(None, description="[TESTING ONLY] User ID")
+    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ):
     """Get a specific tag by ID."""
     current_user = await get_user_for_testing(db, user_id)
 
     # Load tag (no need to load schema relationship - TagResponse doesn't include it)
-    stmt = (
-        select(Tag)
-        .where(Tag.id == tag_id, Tag.user_id == current_user.id)
-    )
+    stmt = select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)
     result = await db.execute(stmt)
     tag = result.scalar_one_or_none()
 
@@ -221,16 +211,13 @@ async def update_tag(
     tag_id: UUID,
     tag_update: TagUpdate,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Query(None, description="[TESTING ONLY] User ID")
+    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ):
     """Update a tag (rename, change color, or bind/unbind schema)."""
     current_user = await get_user_for_testing(db, user_id)
 
     # Fetch tag (no need to load schema - TagResponse doesn't include it)
-    stmt = select(Tag).where(
-        Tag.id == tag_id,
-        Tag.user_id == current_user.id
-    )
+    stmt = select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)
     result = await db.execute(stmt)
     tag = result.scalar_one_or_none()
 
@@ -241,7 +228,7 @@ async def update_tag(
     if tag_update.name is not None and tag_update.name.lower() != tag.name.lower():
         duplicate_check = select(Tag).where(
             Tag.user_id == current_user.id,
-            func.lower(Tag.name) == tag_update.name.lower()
+            func.lower(Tag.name) == tag_update.name.lower(),
         )
         duplicate_result = await db.execute(duplicate_check)
         existing = duplicate_result.scalar_one_or_none()
@@ -249,7 +236,7 @@ async def update_tag(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Tag '{tag_update.name}' already exists"
+                detail=f"Tag '{tag_update.name}' already exists",
             )
 
     # Validate schema_id if provided (check field exists in update)
@@ -262,17 +249,20 @@ async def update_tag(
         if schema_id_value is not None:
             # REF MCP Improvement #3: Validate schema exists AND belongs to user's list in ONE query
             # FIX BUG #002B: Use exists() to avoid loading FieldSchema into session
-            from app.models.list import BookmarkList
             from sqlalchemy import exists
 
-            schema_exists_stmt = (
-                select(exists().where(
-                    FieldSchema.id == schema_id_value
-                ).where(
+            from app.models.list import BookmarkList
+
+            schema_exists_stmt = select(
+                exists()
+                .where(FieldSchema.id == schema_id_value)
+                .where(
                     FieldSchema.list_id.in_(
-                        select(BookmarkList.id).where(BookmarkList.user_id == current_user.id)
+                        select(BookmarkList.id).where(
+                            BookmarkList.user_id == current_user.id
+                        )
                     )
-                ))
+                )
             )
             schema_exists = (await db.execute(schema_exists_stmt)).scalar()
 
@@ -280,7 +270,7 @@ async def update_tag(
                 # Combined error: schema not found OR doesn't belong to user's list
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Schema mit ID '{str(schema_id_value)[:8]}...' nicht gefunden oder gehört zu anderer Liste"
+                    detail=f"Schema mit ID '{str(schema_id_value)[:8]}...' nicht gefunden oder gehört zu anderer Liste",
                 )
         # If schema_id_value is None, we're unbinding (allow this)
 
@@ -310,7 +300,7 @@ async def update_tag(
 async def delete_tag(
     tag_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Query(None, description="[TESTING ONLY] User ID")
+    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ):
     """Delete a tag."""
     current_user = await get_user_for_testing(db, user_id)

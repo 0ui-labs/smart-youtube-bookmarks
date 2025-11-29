@@ -14,12 +14,12 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.list import BookmarkList
-from app.models.video import Video
 from app.models.custom_field import CustomField
 from app.models.field_schema import FieldSchema
+from app.models.list import BookmarkList
 from app.models.schema_field import SchemaField
 from app.models.tag import Tag
+from app.models.video import Video
 from app.models.video_field_value import VideoFieldValue
 
 
@@ -28,7 +28,7 @@ async def test_batch_update_field_values_with_typed_columns(
     client: AsyncClient,
     test_db: AsyncSession,
     test_list: BookmarkList,
-    test_video: Video
+    test_video: Video,
 ):
     """
     Test batch update of field values with correct typed column storage.
@@ -52,25 +52,22 @@ async def test_batch_update_field_values_with_typed_columns(
         list_id=test_list.id,
         name="Overall Rating",
         field_type="rating",
-        config={"max_rating": 5}
+        config={"max_rating": 5},
     )
     select_field = CustomField(
         list_id=test_list.id,
         name="Quality",
         field_type="select",
-        config={"options": ["bad", "good", "great"]}
+        config={"options": ["bad", "good", "great"]},
     )
     text_field = CustomField(
         list_id=test_list.id,
         name="Notes",
         field_type="text",
-        config={"max_length": 500}
+        config={"max_length": 500},
     )
     boolean_field = CustomField(
-        list_id=test_list.id,
-        name="Recommended",
-        field_type="boolean",
-        config={}
+        list_id=test_list.id, name="Recommended", field_type="boolean", config={}
     )
     test_db.add_all([rating_field, select_field, text_field, boolean_field])
     await test_db.commit()
@@ -93,14 +90,19 @@ async def test_batch_update_field_values_with_typed_columns(
             "field_values": [
                 {"field_id": str(rating_field_id), "value": 4.5},
                 {"field_id": str(select_field_id), "value": "great"},
-                {"field_id": str(text_field_id), "value": "Excellent tutorial with clear examples"},
-                {"field_id": str(boolean_field_id), "value": True}
+                {
+                    "field_id": str(text_field_id),
+                    "value": "Excellent tutorial with clear examples",
+                },
+                {"field_id": str(boolean_field_id), "value": True},
             ]
-        }
+        },
     )
 
     # Assert: Response
-    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    assert response.status_code == 200, (
+        f"Expected 200, got {response.status_code}: {response.text}"
+    )
     result = response.json()
     assert result["updated_count"] == 4, "Should update 4 field values"
 
@@ -127,13 +129,17 @@ async def test_batch_update_field_values_with_typed_columns(
 
     # Assert: Text field uses value_text
     text_value = next(v for v in db_values if v.field_id == text_field_id)
-    assert text_value.value_text == "Excellent tutorial with clear examples", "Text should use value_text column"
+    assert text_value.value_text == "Excellent tutorial with clear examples", (
+        "Text should use value_text column"
+    )
     assert text_value.value_numeric is None, "Text should NOT use value_numeric"
     assert text_value.value_boolean is None, "Text should NOT use value_boolean"
 
     # Assert: Boolean field uses value_boolean
     boolean_value = next(v for v in db_values if v.field_id == boolean_field_id)
-    assert boolean_value.value_boolean is True, "Boolean should use value_boolean column"
+    assert boolean_value.value_boolean is True, (
+        "Boolean should use value_boolean column"
+    )
     assert boolean_value.value_text is None, "Boolean should NOT use value_text"
     assert boolean_value.value_numeric is None, "Boolean should NOT use value_numeric"
 
@@ -144,7 +150,7 @@ async def test_batch_update_field_values_with_typed_columns(
             "field_values": [
                 {"field_id": str(rating_field_id), "value": 5.0}  # Update rating
             ]
-        }
+        },
     )
     assert update_response.status_code == 200
 
@@ -161,10 +167,7 @@ async def test_batch_update_field_values_with_typed_columns(
 
 @pytest.mark.asyncio
 async def test_multi_tag_field_union_in_video_detail(
-    client: AsyncClient,
-    test_db: AsyncSession,
-    test_list: BookmarkList,
-    test_user
+    client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList, test_user
 ):
     """
     Test multi-tag field union in GET /videos/{id} endpoint.
@@ -194,7 +197,7 @@ async def test_multi_tag_field_union_in_video_detail(
         list_id=list_id,
         youtube_id="python_tutorial_001",
         processing_status="completed",
-        title="Python Tutorial: Basics"
+        title="Python Tutorial: Basics",
     )
     test_db.add(video)
     await test_db.commit()
@@ -206,33 +209,26 @@ async def test_multi_tag_field_union_in_video_detail(
         list_id=list_id,
         name="Presentation",
         field_type="select",
-        config={"options": ["bad", "good", "great"]}
+        config={"options": ["bad", "good", "great"]},
     )
     rating_field = CustomField(
-        list_id=list_id,
-        name="Rating",
-        field_type="rating",
-        config={"max_rating": 5}
+        list_id=list_id, name="Rating", field_type="rating", config={"max_rating": 5}
     )
     difficulty_field = CustomField(
         list_id=list_id,
         name="Difficulty",
         field_type="select",
-        config={"options": ["beginner", "intermediate", "advanced"]}
+        config={"options": ["beginner", "intermediate", "advanced"]},
     )
     test_db.add_all([presentation_field, rating_field, difficulty_field])
     await test_db.commit()
 
     # Create 2 schemas
     tutorial_schema = FieldSchema(
-        list_id=list_id,
-        name="Tutorial Schema",
-        description="General tutorial metrics"
+        list_id=list_id, name="Tutorial Schema", description="General tutorial metrics"
     )
     python_schema = FieldSchema(
-        list_id=list_id,
-        name="Python Schema",
-        description="Python-specific metrics"
+        list_id=list_id, name="Python Schema", description="Python-specific metrics"
     )
     test_db.add_all([tutorial_schema, python_schema])
     await test_db.commit()
@@ -242,13 +238,13 @@ async def test_multi_tag_field_union_in_video_detail(
         schema_id=tutorial_schema.id,
         field_id=presentation_field.id,
         display_order=0,
-        show_on_card=True
+        show_on_card=True,
     )
     join2 = SchemaField(
         schema_id=tutorial_schema.id,
         field_id=rating_field.id,
         display_order=1,
-        show_on_card=True
+        show_on_card=True,
     )
 
     # Schema B: Rating (overlap!) + Difficulty
@@ -256,28 +252,20 @@ async def test_multi_tag_field_union_in_video_detail(
         schema_id=python_schema.id,
         field_id=rating_field.id,
         display_order=0,
-        show_on_card=True
+        show_on_card=True,
     )
     join4 = SchemaField(
         schema_id=python_schema.id,
         field_id=difficulty_field.id,
         display_order=1,
-        show_on_card=False
+        show_on_card=False,
     )
     test_db.add_all([join1, join2, join3, join4])
     await test_db.commit()
 
     # Create 2 tags with schemas (tags use user_id, not list_id)
-    tutorial_tag = Tag(
-        user_id=user_id,
-        name="Tutorial",
-        schema_id=tutorial_schema.id
-    )
-    python_tag = Tag(
-        user_id=user_id,
-        name="Python",
-        schema_id=python_schema.id
-    )
+    tutorial_tag = Tag(user_id=user_id, name="Tutorial", schema_id=tutorial_schema.id)
+    python_tag = Tag(user_id=user_id, name="Python", schema_id=python_schema.id)
     test_db.add_all([tutorial_tag, python_tag])
     await test_db.commit()
     await test_db.refresh(tutorial_tag)
@@ -289,14 +277,17 @@ async def test_multi_tag_field_union_in_video_detail(
 
     # Assign both tags to video via direct insert into join table
     # (Avoids detached object issues with relationship lazy loading)
-    from app.models.tag import video_tags
     from sqlalchemy import insert
 
+    from app.models.tag import video_tags
+
     await test_db.execute(
-        insert(video_tags).values([
-            {"video_id": video_id, "tag_id": tutorial_tag_id},
-            {"video_id": video_id, "tag_id": python_tag_id}
-        ])
+        insert(video_tags).values(
+            [
+                {"video_id": video_id, "tag_id": tutorial_tag_id},
+                {"video_id": video_id, "tag_id": python_tag_id},
+            ]
+        )
     )
     await test_db.commit()
 
@@ -306,14 +297,10 @@ async def test_multi_tag_field_union_in_video_detail(
     rating_field_id = rating_field.id
 
     value1 = VideoFieldValue(
-        video_id=video_id,
-        field_id=presentation_field_id,
-        value_text="great"
+        video_id=video_id, field_id=presentation_field_id, value_text="great"
     )
     value2 = VideoFieldValue(
-        video_id=video_id,
-        field_id=rating_field_id,
-        value_numeric=4
+        video_id=video_id, field_id=rating_field_id, value_numeric=4
     )
     # Note: difficulty_field has NO value (should still appear in available_fields)
     test_db.add_all([value1, value2])
@@ -322,42 +309,61 @@ async def test_multi_tag_field_union_in_video_detail(
     # Act: GET video detail (Task #74 endpoint)
     # Debug: Verify video exists
     from sqlalchemy import select
+
     verify_stmt = select(Video).where(Video.id == video_id)
     verify_result = await test_db.execute(verify_stmt)
     verify_video = verify_result.scalar_one_or_none()
     assert verify_video is not None, f"Video {video_id} not found in database!"
-    assert verify_video.list_id == list_id, f"Video list_id mismatch: {verify_video.list_id} != {list_id}"
+    assert verify_video.list_id == list_id, (
+        f"Video list_id mismatch: {verify_video.list_id} != {list_id}"
+    )
 
     response = await client.get(f"/api/videos/{video_id}")
 
     # Assert: Response
-    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    assert response.status_code == 200, (
+        f"Expected 200, got {response.status_code}: {response.text}"
+    )
     video_data = response.json()
 
     # Assert: available_fields is present (detail endpoint only)
-    assert "available_fields" in video_data, "Detail endpoint should include available_fields"
+    assert "available_fields" in video_data, (
+        "Detail endpoint should include available_fields"
+    )
     available_fields = video_data["available_fields"]
 
     # Assert: Field union contains all 3 unique fields
-    assert len(available_fields) == 3, "Should have 3 fields in union (Presentation, Rating, Difficulty)"
+    assert len(available_fields) == 3, (
+        "Should have 3 fields in union (Presentation, Rating, Difficulty)"
+    )
     field_names = {f["field_name"] for f in available_fields}
-    assert field_names == {"Presentation", "Rating", "Difficulty"}, "Field union should deduplicate Rating"
+    assert field_names == {"Presentation", "Rating", "Difficulty"}, (
+        "Field union should deduplicate Rating"
+    )
 
     # Assert: No conflict prefix (same name + same type = no conflict)
     rating_fields = [f for f in available_fields if "Rating" in f["field_name"]]
     assert len(rating_fields) == 1, "Rating should appear once (deduplication)"
-    assert rating_fields[0]["field_name"] == "Rating", "No conflict prefix needed (same type)"
+    assert rating_fields[0]["field_name"] == "Rating", (
+        "No conflict prefix needed (same type)"
+    )
 
     # Assert: field_values contains only filled values
     field_values = video_data["field_values"]
     assert len(field_values) == 2, "Should have 2 filled values (Presentation, Rating)"
 
     filled_field_names = {fv["field_name"] for fv in field_values}
-    assert filled_field_names == {"Presentation", "Rating"}, "Only filled values should be returned"
+    assert filled_field_names == {"Presentation", "Rating"}, (
+        "Only filled values should be returned"
+    )
 
     # Verify values are correct
-    presentation_value = next(fv for fv in field_values if fv["field_name"] == "Presentation")
-    assert presentation_value["value"] == "great", "Presentation value should be 'great'"
+    presentation_value = next(
+        fv for fv in field_values if fv["field_name"] == "Presentation"
+    )
+    assert presentation_value["value"] == "great", (
+        "Presentation value should be 'great'"
+    )
 
     rating_value = next(fv for fv in field_values if fv["field_name"] == "Rating")
     assert rating_value["value"] == 4, "Rating value should be 4"

@@ -4,7 +4,7 @@ Channel service for managing YouTube channels.
 Provides helper functions for channel operations, particularly
 for auto-creating channels when videos are added.
 """
-from typing import Optional
+
 from uuid import UUID
 
 from sqlalchemy import select
@@ -18,8 +18,8 @@ async def get_or_create_channel(
     user_id: UUID,
     youtube_channel_id: str,
     channel_name: str,
-    channel_thumbnail: Optional[str] = None,
-    channel_description: Optional[str] = None
+    channel_thumbnail: str | None = None,
+    channel_description: str | None = None,
 ) -> Channel:
     """
     Find existing channel or create new one.
@@ -42,8 +42,7 @@ async def get_or_create_channel(
     # Try to find existing channel for this user
     result = await db.execute(
         select(Channel).where(
-            Channel.user_id == user_id,
-            Channel.youtube_channel_id == youtube_channel_id
+            Channel.user_id == user_id, Channel.youtube_channel_id == youtube_channel_id
         )
     )
     channel = result.scalar_one_or_none()
@@ -56,7 +55,10 @@ async def get_or_create_channel(
         if channel_thumbnail and channel.thumbnail_url != channel_thumbnail:
             channel.thumbnail_url = channel_thumbnail
         # Update description if provided and different
-        if channel_description is not None and channel.description != channel_description:
+        if (
+            channel_description is not None
+            and channel.description != channel_description
+        ):
             channel.description = channel_description
         await db.flush()
         return channel
@@ -67,7 +69,7 @@ async def get_or_create_channel(
         youtube_channel_id=youtube_channel_id,
         name=channel_name,
         thumbnail_url=channel_thumbnail,
-        description=channel_description
+        description=channel_description,
     )
     db.add(channel)
     await db.flush()  # Get ID

@@ -6,9 +6,10 @@ data from video transcripts using Pydantic schemas for type safety and validatio
 """
 
 import asyncio
-import random
 import logging
-from typing import Dict, Any, Optional, TypeVar, Type
+import random
+from typing import TypeVar
+
 from pydantic import BaseModel
 
 try:
@@ -81,7 +82,7 @@ class GeminiClient:
     async def extract_structured_data(
         self,
         transcript: str,
-        schema_model: Type[T],
+        schema_model: type[T],
         temperature: float = 0.2,
     ) -> T:
         """
@@ -151,9 +152,7 @@ class GeminiClient:
                     raise
 
                 # Exponential backoff with jitter
-                delay = min(
-                    (2**attempt) * self.base_delay + random.uniform(0, 1), 60
-                )
+                delay = min((2**attempt) * self.base_delay + random.uniform(0, 1), 60)
                 await asyncio.sleep(delay)
 
         # Unreachable: loop exits via return (success) or raise (final failure)
@@ -183,7 +182,7 @@ class GeminiClient:
         return result.total_tokens
 
     def _build_extraction_prompt(
-        self, transcript: str, schema_model: Type[BaseModel]
+        self, transcript: str, schema_model: type[BaseModel]
     ) -> str:
         """
         Build optimized extraction prompt for Gemini API.
@@ -222,7 +221,7 @@ class GeminiClient:
 {transcript}
 """
 
-    def _get_schema_description(self, schema_model: Type[BaseModel]) -> str:
+    def _get_schema_description(self, schema_model: type[BaseModel]) -> str:
         """
         Get human-readable schema description from Pydantic model.
 

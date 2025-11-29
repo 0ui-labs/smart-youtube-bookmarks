@@ -1,9 +1,9 @@
-from typing import Optional, Dict, Any
+from typing import Any
 from uuid import UUID as PyUUID
 
-from sqlalchemy import String, Text, ForeignKey, UniqueConstraint, CheckConstraint
+from sqlalchemy import ForeignKey, String
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from .base import BaseModel
 
@@ -55,6 +55,7 @@ class CustomField(BaseModel):
         - ON DELETE CASCADE to video_field_values (values deleted when field deleted)
         - Uses passive_deletes=True for performance (trusts DB CASCADE)
     """
+
     __tablename__ = "custom_fields"
 
     # Columns
@@ -62,40 +63,41 @@ class CustomField(BaseModel):
         UUID(as_uuid=True),
         ForeignKey("bookmarks_lists.id", ondelete="CASCADE"),
         nullable=False,
-        index=True  # Performance: frequent lookups by list_id
+        index=True,  # Performance: frequent lookups by list_id
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     field_type: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
-        comment="One of: 'select', 'rating', 'text', 'boolean'"
+        comment="One of: 'select', 'rating', 'text', 'boolean'",
     )
-    config: Mapped[Dict[str, Any]] = mapped_column(
+    config: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
-        default=dict  # Python-side default for ORM objects
+        default=dict,  # Python-side default for ORM objects
         # Note: server_default='{}' already set in migration
     )
 
     # Relationships
     list: Mapped["BookmarkList"] = relationship(
-        "BookmarkList",
-        back_populates="custom_fields"
+        "BookmarkList", back_populates="custom_fields"
     )
 
     schema_fields: Mapped[list["SchemaField"]] = relationship(
         "SchemaField",
         back_populates="field",
         cascade="all, delete-orphan",  # Deleting field removes from all schemas
-        passive_deletes=True  # Trust DB CASCADE (REF MCP 2025-11-05: also optimal for join tables)
+        passive_deletes=True,  # Trust DB CASCADE (REF MCP 2025-11-05: also optimal for join tables)
     )
 
     video_field_values: Mapped[list["VideoFieldValue"]] = relationship(
         "VideoFieldValue",
         back_populates="field",
         cascade="all, delete",  # Deleting field deletes all video values
-        passive_deletes=True  # Trust DB CASCADE for performance (REF MCP)
+        passive_deletes=True,  # Trust DB CASCADE for performance (REF MCP)
     )
 
     def __repr__(self) -> str:
-        return f"<CustomField(id={self.id}, name={self.name!r}, type={self.field_type!r})>"
+        return (
+            f"<CustomField(id={self.id}, name={self.name!r}, type={self.field_type!r})>"
+        )

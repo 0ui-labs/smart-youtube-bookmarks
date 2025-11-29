@@ -7,7 +7,6 @@ for progress updates from video processing jobs.
 
 import json
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -18,12 +17,11 @@ from app.core.database import AsyncSessionLocal
 from app.core.redis import get_redis_client
 from app.models.user import User
 
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-async def get_default_user() -> Optional[User]:
+async def get_default_user() -> User | None:
     """Get the first user for development mode (no auth)."""
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).limit(1))
@@ -33,7 +31,7 @@ async def get_default_user() -> Optional[User]:
 @router.websocket("/ws/progress")
 async def websocket_progress_endpoint(
     websocket: WebSocket,
-    token: Optional[str] = None,
+    token: str | None = None,
 ):
     """
     WebSocket endpoint for real-time progress updates.
@@ -73,11 +71,9 @@ async def websocket_progress_endpoint(
     logger.info(f"WebSocket connected for user {user.id}")
 
     # Send auth confirmation to frontend
-    await websocket.send_json({
-        "type": "auth_confirmed",
-        "authenticated": True,
-        "user_id": str(user.id)
-    })
+    await websocket.send_json(
+        {"type": "auth_confirmed", "authenticated": True, "user_id": str(user.id)}
+    )
 
     # Setup Redis Pub/Sub
     redis = await get_redis_client()
@@ -94,7 +90,9 @@ async def websocket_progress_endpoint(
                 try:
                     # Check WebSocket state before sending
                     if websocket.client_state.name != "CONNECTED":
-                        logger.info(f"WebSocket no longer connected (state: {websocket.client_state.name}), stopping")
+                        logger.info(
+                            f"WebSocket no longer connected (state: {websocket.client_state.name}), stopping"
+                        )
                         break
 
                     # Parse and forward message to WebSocket client
@@ -107,7 +105,9 @@ async def websocket_progress_endpoint(
                     continue
                 except WebSocketDisconnect:
                     # Non-recoverable: client disconnected, stop processing
-                    logger.info(f"WebSocket disconnected while sending message for user {user.id}")
+                    logger.info(
+                        f"WebSocket disconnected while sending message for user {user.id}"
+                    )
                     break
                 except RuntimeError as e:
                     # Connection closed (Starlette raises RuntimeError)

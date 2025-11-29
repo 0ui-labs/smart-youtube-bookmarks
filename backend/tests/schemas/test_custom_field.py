@@ -14,31 +14,31 @@ Tests cover all validation scenarios specified in Task #64:
 Total: 35 tests covering >95% of validation logic
 """
 
-import pytest
-from uuid import uuid4
 from datetime import datetime
+from uuid import uuid4
+
+import pytest
 from pydantic import ValidationError
 
 from app.schemas import (
-    CustomFieldBase,
     CustomFieldCreate,
-    CustomFieldUpdate,
     CustomFieldResponse,
+    CustomFieldUpdate,
     DuplicateCheckRequest,
     DuplicateCheckResponse,
 )
 
-
 # ============================================================================
 # Test Group 1: Valid Field Creation (5 tests)
 # ============================================================================
+
 
 def test_create_select_field_valid():
     """Test creating a valid select field with options."""
     field = CustomFieldCreate(
         name="Presentation Quality",
         field_type="select",
-        config={"options": ["bad", "good", "great"]}
+        config={"options": ["bad", "good", "great"]},
     )
     assert field.name == "Presentation Quality"
     assert field.field_type == "select"
@@ -48,9 +48,7 @@ def test_create_select_field_valid():
 def test_create_rating_field_valid():
     """Test creating a valid rating field with max_rating."""
     field = CustomFieldCreate(
-        name="Overall Rating",
-        field_type="rating",
-        config={"max_rating": 5}
+        name="Overall Rating", field_type="rating", config={"max_rating": 5}
     )
     assert field.name == "Overall Rating"
     assert field.field_type == "rating"
@@ -60,9 +58,7 @@ def test_create_rating_field_valid():
 def test_create_text_field_valid_with_max_length():
     """Test creating a valid text field with max_length constraint."""
     field = CustomFieldCreate(
-        name="Notes",
-        field_type="text",
-        config={"max_length": 500}
+        name="Notes", field_type="text", config={"max_length": 500}
     )
     assert field.name == "Notes"
     assert field.field_type == "text"
@@ -71,11 +67,7 @@ def test_create_text_field_valid_with_max_length():
 
 def test_create_text_field_valid_without_max_length():
     """Test creating a valid text field without max_length (unlimited)."""
-    field = CustomFieldCreate(
-        name="Description",
-        field_type="text",
-        config={}
-    )
+    field = CustomFieldCreate(name="Description", field_type="text", config={})
     assert field.name == "Description"
     assert field.field_type == "text"
     assert field.config == {}
@@ -83,11 +75,7 @@ def test_create_text_field_valid_without_max_length():
 
 def test_create_boolean_field_valid():
     """Test creating a valid boolean field."""
-    field = CustomFieldCreate(
-        name="Is Recommended",
-        field_type="boolean",
-        config={}
-    )
+    field = CustomFieldCreate(name="Is Recommended", field_type="boolean", config={})
     assert field.name == "Is Recommended"
     assert field.field_type == "boolean"
     assert field.config == {}
@@ -97,25 +85,18 @@ def test_create_boolean_field_valid():
 # Test Group 2: Config Validation (8 tests)
 # ============================================================================
 
+
 def test_select_field_missing_options():
     """Test that select field requires 'options' in config."""
     with pytest.raises(ValidationError) as exc_info:
-        CustomFieldCreate(
-            name="Quality",
-            field_type="select",
-            config={}
-        )
+        CustomFieldCreate(name="Quality", field_type="select", config={})
     assert "'select' field type requires 'options' in config" in str(exc_info.value)
 
 
 def test_select_field_empty_options_list():
     """Test that select field requires at least 1 option."""
     with pytest.raises(ValidationError) as exc_info:
-        CustomFieldCreate(
-            name="Quality",
-            field_type="select",
-            config={"options": []}
-        )
+        CustomFieldCreate(name="Quality", field_type="select", config={"options": []})
     assert "'options' must contain at least 1 item" in str(exc_info.value)
 
 
@@ -123,9 +104,7 @@ def test_select_field_empty_string_in_options():
     """Test that select field options must be non-empty strings."""
     with pytest.raises(ValidationError) as exc_info:
         CustomFieldCreate(
-            name="Quality",
-            field_type="select",
-            config={"options": ["good", "", "bad"]}
+            name="Quality", field_type="select", config={"options": ["good", "", "bad"]}
         )
     assert "All options must be non-empty strings" in str(exc_info.value)
 
@@ -133,44 +112,28 @@ def test_select_field_empty_string_in_options():
 def test_rating_field_missing_max_rating():
     """Test that rating field requires 'max_rating' in config."""
     with pytest.raises(ValidationError) as exc_info:
-        CustomFieldCreate(
-            name="Rating",
-            field_type="rating",
-            config={}
-        )
+        CustomFieldCreate(name="Rating", field_type="rating", config={})
     assert "'rating' field type requires 'max_rating' in config" in str(exc_info.value)
 
 
 def test_rating_field_max_rating_too_low():
     """Test that rating field max_rating must be >= 1."""
     with pytest.raises(ValidationError) as exc_info:
-        CustomFieldCreate(
-            name="Rating",
-            field_type="rating",
-            config={"max_rating": 0}
-        )
+        CustomFieldCreate(name="Rating", field_type="rating", config={"max_rating": 0})
     assert "'max_rating' must be between 1 and 10" in str(exc_info.value)
 
 
 def test_rating_field_max_rating_too_high():
     """Test that rating field max_rating must be <= 10."""
     with pytest.raises(ValidationError) as exc_info:
-        CustomFieldCreate(
-            name="Rating",
-            field_type="rating",
-            config={"max_rating": 11}
-        )
+        CustomFieldCreate(name="Rating", field_type="rating", config={"max_rating": 11})
     assert "'max_rating' must be between 1 and 10" in str(exc_info.value)
 
 
 def test_text_field_invalid_max_length():
     """Test that text field max_length must be >= 1 if specified."""
     with pytest.raises(ValidationError) as exc_info:
-        CustomFieldCreate(
-            name="Notes",
-            field_type="text",
-            config={"max_length": 0}
-        )
+        CustomFieldCreate(name="Notes", field_type="text", config={"max_length": 0})
     assert "'max_length' must be at least 1" in str(exc_info.value)
 
 
@@ -178,9 +141,7 @@ def test_boolean_field_non_empty_config():
     """Test that boolean field should have empty config."""
     with pytest.raises(ValidationError) as exc_info:
         CustomFieldCreate(
-            name="Flag",
-            field_type="boolean",
-            config={"some_key": "some_value"}
+            name="Flag", field_type="boolean", config={"some_key": "some_value"}
         )
     assert "'boolean' field type should have empty config" in str(exc_info.value)
 
@@ -189,12 +150,13 @@ def test_boolean_field_non_empty_config():
 # Test Group 3: Field Name Validation (4 tests)
 # ============================================================================
 
+
 def test_field_name_strips_whitespace():
     """Test that leading/trailing whitespace is removed from field name."""
     field = CustomFieldCreate(
         name="  Presentation Quality  ",
         field_type="select",
-        config={"options": ["good", "bad"]}
+        config={"options": ["good", "bad"]},
     )
     assert field.name == "Presentation Quality"
 
@@ -202,11 +164,7 @@ def test_field_name_strips_whitespace():
 def test_field_name_empty_string():
     """Test that empty field name is rejected."""
     with pytest.raises(ValidationError) as exc_info:
-        CustomFieldCreate(
-            name="",
-            field_type="select",
-            config={"options": ["good"]}
-        )
+        CustomFieldCreate(name="", field_type="select", config={"options": ["good"]})
     # Pydantic's min_length=1 triggers before our validator
     assert "String should have at least 1 character" in str(exc_info.value)
 
@@ -214,11 +172,7 @@ def test_field_name_empty_string():
 def test_field_name_only_whitespace():
     """Test that whitespace-only field name is rejected."""
     with pytest.raises(ValidationError) as exc_info:
-        CustomFieldCreate(
-            name="   ",
-            field_type="select",
-            config={"options": ["good"]}
-        )
+        CustomFieldCreate(name="   ", field_type="select", config={"options": ["good"]})
     assert "Field name cannot be empty or whitespace-only" in str(exc_info.value)
 
 
@@ -226,9 +180,7 @@ def test_field_name_max_length():
     """Test that field name exceeding 255 characters is rejected."""
     with pytest.raises(ValidationError) as exc_info:
         CustomFieldCreate(
-            name="a" * 256,
-            field_type="select",
-            config={"options": ["good"]}
+            name="a" * 256, field_type="select", config={"options": ["good"]}
         )
     assert "String should have at most 255 characters" in str(exc_info.value)
 
@@ -237,20 +189,24 @@ def test_field_name_max_length():
 # Test Group 4: Invalid Field Type (1 test)
 # ============================================================================
 
+
 def test_invalid_field_type():
     """Test that invalid field_type is rejected."""
     with pytest.raises(ValidationError) as exc_info:
         CustomFieldCreate(
             name="Test",
             field_type="invalid_type",  # type: ignore
-            config={}
+            config={},
         )
-    assert "Input should be 'select', 'rating', 'text' or 'boolean'" in str(exc_info.value)
+    assert "Input should be 'select', 'rating', 'text' or 'boolean'" in str(
+        exc_info.value
+    )
 
 
 # ============================================================================
 # Test Group 5: Update Schema (5 tests)
 # ============================================================================
+
 
 def test_update_field_name_only():
     """Test partial update with name only."""
@@ -271,9 +227,7 @@ def test_update_field_config_only():
 def test_update_field_full():
     """Test full update with all fields."""
     update = CustomFieldUpdate(
-        name="Overall Rating",
-        field_type="rating",
-        config={"max_rating": 10}
+        name="Overall Rating", field_type="rating", config={"max_rating": 10}
     )
     assert update.name == "Overall Rating"
     assert update.field_type == "rating"
@@ -285,7 +239,7 @@ def test_update_validates_config_when_both_provided():
     with pytest.raises(ValidationError) as exc_info:
         CustomFieldUpdate(
             field_type="rating",
-            config={"options": ["bad"]}  # Invalid: rating needs max_rating
+            config={"options": ["bad"]},  # Invalid: rating needs max_rating
         )
     assert "'rating' field type requires 'max_rating' in config" in str(exc_info.value)
 
@@ -300,6 +254,7 @@ def test_update_skips_validation_when_only_name():
 # ============================================================================
 # Test Group 6: Response Schema (2 tests)
 # ============================================================================
+
 
 def test_response_schema_from_dict():
     """Test creating CustomFieldResponse from dictionary (simulating ORM object)."""
@@ -327,6 +282,7 @@ def test_response_schema_model_config():
 # ============================================================================
 # Test Group 7: Duplicate Check (4 tests)
 # ============================================================================
+
 
 def test_duplicate_check_request_valid():
     """Test valid duplicate check request."""
@@ -376,21 +332,18 @@ def test_duplicate_check_response_not_exists():
 # Test Group 8: Edge Cases (4 tests)
 # ============================================================================
 
+
 def test_rating_field_boundary_values():
     """Test that rating field accepts boundary values (1 and 10)."""
     # Test min boundary
     field_min = CustomFieldCreate(
-        name="Rating Min",
-        field_type="rating",
-        config={"max_rating": 1}
+        name="Rating Min", field_type="rating", config={"max_rating": 1}
     )
     assert field_min.config["max_rating"] == 1
 
     # Test max boundary
     field_max = CustomFieldCreate(
-        name="Rating Max",
-        field_type="rating",
-        config={"max_rating": 10}
+        name="Rating Max", field_type="rating", config={"max_rating": 10}
     )
     assert field_max.config["max_rating"] == 10
 
@@ -398,9 +351,7 @@ def test_rating_field_boundary_values():
 def test_select_field_single_option():
     """Test that select field accepts single option."""
     field = CustomFieldCreate(
-        name="Single Option",
-        field_type="select",
-        config={"options": ["only"]}
+        name="Single Option", field_type="select", config={"options": ["only"]}
     )
     assert field.config["options"] == ["only"]
 
@@ -408,9 +359,7 @@ def test_select_field_single_option():
 def test_text_field_max_length_boundary():
     """Test that text field accepts max_length=1 (minimum valid value)."""
     field = CustomFieldCreate(
-        name="Short Text",
-        field_type="text",
-        config={"max_length": 1}
+        name="Short Text", field_type="text", config={"max_length": 1}
     )
     assert field.config["max_length"] == 1
 
@@ -419,9 +368,7 @@ def test_field_name_exactly_255_chars():
     """Test that field name with exactly 255 characters is accepted."""
     name_255 = "a" * 255
     field = CustomFieldCreate(
-        name=name_255,
-        field_type="select",
-        config={"options": ["test"]}
+        name=name_255, field_type="select", config={"options": ["test"]}
     )
     assert field.name == name_255
     assert len(field.name) == 255
@@ -431,6 +378,7 @@ def test_field_name_exactly_255_chars():
 # Additional Edge Cases (2 tests)
 # ============================================================================
 
+
 def test_select_field_options_with_whitespace_validation():
     """Test that select field validates options even with whitespace."""
     # Options with only whitespace should fail validation
@@ -438,7 +386,7 @@ def test_select_field_options_with_whitespace_validation():
         CustomFieldCreate(
             name="Quality",
             field_type="select",
-            config={"options": ["good", "   ", "bad"]}
+            config={"options": ["good", "   ", "bad"]},
         )
     assert "All options must be non-empty strings" in str(exc_info.value)
 
@@ -446,9 +394,5 @@ def test_select_field_options_with_whitespace_validation():
 def test_text_field_with_negative_max_length():
     """Test that text field rejects negative max_length."""
     with pytest.raises(ValidationError) as exc_info:
-        CustomFieldCreate(
-            name="Text",
-            field_type="text",
-            config={"max_length": -1}
-        )
+        CustomFieldCreate(name="Text", field_type="text", config={"max_length": -1})
     assert "'max_length' must be at least 1" in str(exc_info.value)

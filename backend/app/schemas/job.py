@@ -1,5 +1,5 @@
 from uuid import UUID
-from typing import Optional
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -18,4 +18,4 @@ class JobStatus(BaseModel):
     processed_count: int
     failed_count: int
     status: str
-    error_message: Optional[str] = None
+    error_message: str | None = None

@@ -13,22 +13,23 @@ Endpoints:
 - DELETE /api/lists/{list_id}/schemas/{schema_id}      - Delete schema (checks tag usage)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 from uuid import UUID
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.core.database import get_db
-from app.models.field_schema import FieldSchema
-from app.models.schema_field import SchemaField
 from app.models.custom_field import CustomField
-from app.models.tag import Tag
+from app.models.field_schema import FieldSchema
 from app.models.list import BookmarkList
+from app.models.schema_field import SchemaField
+from app.models.tag import Tag
 from app.schemas.field_schema import (
     FieldSchemaCreate,
-    FieldSchemaUpdate,
     FieldSchemaResponse,
+    FieldSchemaUpdate,
 )
 
 router = APIRouter()
@@ -37,12 +38,9 @@ router = APIRouter()
 @router.get(
     "/api/lists/{list_id}/schemas",
     response_model=list[FieldSchemaResponse],
-    tags=["schemas"]
+    tags=["schemas"],
 )
-async def list_schemas(
-    list_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
+async def list_schemas(list_id: UUID, db: AsyncSession = Depends(get_db)):
     """
     List all field schemas for a list.
 
@@ -89,7 +87,7 @@ async def list_schemas(
     if not list_result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Query schemas with eager loading of schema_fields and their related fields
@@ -113,12 +111,10 @@ async def list_schemas(
 @router.get(
     "/api/lists/{list_id}/schemas/{schema_id}",
     response_model=FieldSchemaResponse,
-    tags=["schemas"]
+    tags=["schemas"],
 )
 async def get_schema(
-    list_id: UUID,
-    schema_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    list_id: UUID, schema_id: UUID, db: AsyncSession = Depends(get_db)
 ):
     """
     Get a single field schema by ID.
@@ -139,10 +135,7 @@ async def get_schema(
     # Query schema with list verification and eager load relationships
     stmt = (
         select(FieldSchema)
-        .where(
-            FieldSchema.id == schema_id,
-            FieldSchema.list_id == list_id
-        )
+        .where(FieldSchema.id == schema_id, FieldSchema.list_id == list_id)
         .options(
             selectinload(FieldSchema.schema_fields).selectinload(SchemaField.field)
         )
@@ -153,7 +146,7 @@ async def get_schema(
     if not schema:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Schema with id {schema_id} not found in list {list_id}"
+            detail=f"Schema with id {schema_id} not found in list {list_id}",
         )
 
     return schema
@@ -163,12 +156,10 @@ async def get_schema(
     "/api/lists/{list_id}/schemas",
     response_model=FieldSchemaResponse,
     status_code=status.HTTP_201_CREATED,
-    tags=["schemas"]
+    tags=["schemas"],
 )
 async def create_schema(
-    list_id: UUID,
-    schema_data: FieldSchemaCreate,
-    db: AsyncSession = Depends(get_db)
+    list_id: UUID, schema_data: FieldSchemaCreate, db: AsyncSession = Depends(get_db)
 ):
     """
     Create a new field schema.
@@ -208,7 +199,7 @@ async def create_schema(
     if not list_result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # If fields provided, validate all field_ids exist in same list
@@ -220,13 +211,12 @@ async def create_schema(
             duplicates = [fid for fid in field_ids if field_ids.count(fid) > 1]
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Duplicate field_ids in request: {set(duplicates)}"
+                detail=f"Duplicate field_ids in request: {set(duplicates)}",
             )
 
         # Query only field IDs (not full objects) for efficiency
         stmt = select(CustomField.id).where(
-            CustomField.id.in_(field_ids),
-            CustomField.list_id == list_id
+            CustomField.id.in_(field_ids), CustomField.list_id == list_id
         )
         result = await db.execute(stmt)
         existing_field_ids = set(result.scalars().all())
@@ -236,14 +226,12 @@ async def create_schema(
             missing_ids = set(field_ids) - existing_field_ids
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid field_ids: {missing_ids}. Fields must exist in the same list."
+                detail=f"Invalid field_ids: {missing_ids}. Fields must exist in the same list.",
             )
 
     # Create schema
     new_schema = FieldSchema(
-        list_id=list_id,
-        name=schema_data.name,
-        description=schema_data.description
+        list_id=list_id, name=schema_data.name, description=schema_data.description
     )
     db.add(new_schema)
     await db.flush()  # Get schema.id for SchemaField creation
@@ -255,7 +243,7 @@ async def create_schema(
                 schema_id=new_schema.id,
                 field_id=field_input.field_id,
                 display_order=field_input.display_order,
-                show_on_card=field_input.show_on_card
+                show_on_card=field_input.show_on_card,
             )
             db.add(schema_field)
 
@@ -278,13 +266,13 @@ async def create_schema(
 @router.put(
     "/api/lists/{list_id}/schemas/{schema_id}",
     response_model=FieldSchemaResponse,
-    tags=["schemas"]
+    tags=["schemas"],
 )
 async def update_schema(
     list_id: UUID,
     schema_id: UUID,
     schema_update: FieldSchemaUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Update field schema metadata (name and/or description).
@@ -310,10 +298,7 @@ async def update_schema(
     # Query schema with list verification
     stmt = (
         select(FieldSchema)
-        .where(
-            FieldSchema.id == schema_id,
-            FieldSchema.list_id == list_id
-        )
+        .where(FieldSchema.id == schema_id, FieldSchema.list_id == list_id)
         .options(
             selectinload(FieldSchema.schema_fields).selectinload(SchemaField.field)
         )
@@ -324,7 +309,7 @@ async def update_schema(
     if not schema:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Schema with id {schema_id} not found in list {list_id}"
+            detail=f"Schema with id {schema_id} not found in list {list_id}",
         )
 
     # Update fields (only if provided)
@@ -353,12 +338,10 @@ async def update_schema(
 @router.delete(
     "/api/lists/{list_id}/schemas/{schema_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    tags=["schemas"]
+    tags=["schemas"],
 )
 async def delete_schema(
-    list_id: UUID,
-    schema_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    list_id: UUID, schema_id: UUID, db: AsyncSession = Depends(get_db)
 ):
     """
     Delete a field schema.
@@ -390,8 +373,7 @@ async def delete_schema(
     """
     # Query schema with list verification
     stmt = select(FieldSchema).where(
-        FieldSchema.id == schema_id,
-        FieldSchema.list_id == list_id
+        FieldSchema.id == schema_id, FieldSchema.list_id == list_id
     )
     result = await db.execute(stmt)
     schema = result.scalar_one_or_none()
@@ -399,7 +381,7 @@ async def delete_schema(
     if not schema:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Schema with id {schema_id} not found in list {list_id}"
+            detail=f"Schema with id {schema_id} not found in list {list_id}",
         )
 
     # Count tags using this schema
@@ -415,7 +397,7 @@ async def delete_schema(
                 f"Cannot delete schema '{schema.name}': "
                 f"it is currently used by {tag_count} tag(s). "
                 f"Please unbind the schema from all tags before deletion."
-            )
+            ),
         )
 
     # Delete schema (CASCADE to schema_fields handled by DB)

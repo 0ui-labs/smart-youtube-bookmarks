@@ -1,34 +1,34 @@
 from .base import Base, BaseModel
-from .schema import Schema
-from .list import BookmarkList
-from .video import Video
-from .job import ProcessingJob
-from .job_progress import JobProgressEvent
-from .user import User
-from .tag import Tag, video_tags
+from .channel import Channel
 from .custom_field import CustomField
 from .field_schema import FieldSchema
+from .job import ProcessingJob
+from .job_progress import JobProgressEvent
+from .list import BookmarkList
+from .schema import Schema
 from .schema_field import SchemaField
+from .tag import Tag, video_tags
+from .user import User
+from .video import Video
+from .video_enrichment import EnrichmentStatus, VideoEnrichment
 from .video_field_value import VideoFieldValue
-from .channel import Channel
-from .video_enrichment import VideoEnrichment, EnrichmentStatus
 
 __all__ = [
     "Base",
     "BaseModel",
-    "Schema",
     "BookmarkList",
-    "Video",
-    "ProcessingJob",
-    "JobProgressEvent",
-    "User",
-    "Tag",
-    "video_tags",
-    "CustomField",
-    "FieldSchema",
-    "SchemaField",
-    "VideoFieldValue",
     "Channel",
-    "VideoEnrichment",
+    "CustomField",
     "EnrichmentStatus",
+    "FieldSchema",
+    "JobProgressEvent",
+    "ProcessingJob",
+    "Schema",
+    "SchemaField",
+    "Tag",
+    "User",
+    "Video",
+    "VideoEnrichment",
+    "VideoFieldValue",
+    "video_tags",
 ]

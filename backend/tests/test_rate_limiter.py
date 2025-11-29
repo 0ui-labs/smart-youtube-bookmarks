@@ -3,10 +3,11 @@ Tests for AdaptiveRateLimiter.
 
 Tests concurrent request limiting, circuit breaker behavior, and adaptive delays.
 """
-import pytest
+
 import asyncio
-from unittest.mock import AsyncMock, patch
 import time
+
+import pytest
 
 
 @pytest.mark.asyncio
@@ -118,7 +119,9 @@ async def test_backoff_increases_on_rate_limit():
     limiter.on_failure(is_rate_limit=True)
 
     # Delay should have increased
-    assert limiter.current_delay > initial_delay, "Delay should increase after rate limit"
+    assert limiter.current_delay > initial_delay, (
+        "Delay should increase after rate limit"
+    )
 
 
 @pytest.mark.asyncio
@@ -136,5 +139,7 @@ async def test_delay_decreases_on_success():
     limiter.on_success()
 
     # Delay should decrease (but not below base)
-    assert limiter.current_delay < increased_delay, "Delay should decrease after success"
+    assert limiter.current_delay < increased_delay, (
+        "Delay should decrease after success"
+    )
     assert limiter.current_delay >= limiter.base_delay, "Delay should not go below base"

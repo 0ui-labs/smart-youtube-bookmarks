@@ -4,15 +4,14 @@ Groq has a 25MB file size limit, so we:
 1. Download audio at 64kbps (small file size)
 2. Split into 10-minute chunks (~4.8MB each at 64kbps)
 """
+
 import asyncio
-import tempfile
 import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 from pydub import AudioSegment
-
 
 # Constants for audio chunking
 CHUNK_DURATION_MS = 10 * 60 * 1000  # 10 minutes in milliseconds
@@ -23,6 +22,7 @@ MAX_CHUNK_SIZE_BYTES = 20 * 1024 * 1024  # 20MB (safety margin under Groq's 25MB
 @dataclass
 class AudioChunk:
     """Represents a chunk of audio for transcription."""
+
     path: Path  # Path to the chunk file
     start_time: float  # Start time in seconds
     end_time: float  # End time in seconds
@@ -46,7 +46,7 @@ class AudioChunker:
     """
 
     def __init__(self):
-        self._temp_dir: Optional[str] = None
+        self._temp_dir: str | None = None
 
     async def __aenter__(self) -> "AudioChunker":
         return self
@@ -81,7 +81,6 @@ class AudioChunker:
         Returns:
             Path to downloaded MP3 file
         """
-        import yt_dlp
 
         url = f"https://www.youtube.com/watch?v={youtube_id}"
         output_template = str(Path(self._temp_dir) / "audio.%(ext)s")
@@ -89,11 +88,13 @@ class AudioChunker:
         ydl_opts = {
             "format": "bestaudio/best",
             "outtmpl": output_template,
-            "postprocessors": [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": AUDIO_BITRATE.rstrip("k"),
-            }],
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": AUDIO_BITRATE.rstrip("k"),
+                }
+            ],
             "quiet": True,
             "no_warnings": True,
         }
@@ -115,7 +116,7 @@ class AudioChunker:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-    def split_audio(self, audio_path: Path) -> List[AudioChunk]:
+    def split_audio(self, audio_path: Path) -> list[AudioChunk]:
         """Split audio file into chunks.
 
         Args:
@@ -127,7 +128,7 @@ class AudioChunker:
         audio = AudioSegment.from_mp3(str(audio_path))
         total_duration_ms = len(audio)
 
-        chunks: List[AudioChunk] = []
+        chunks: list[AudioChunk] = []
         chunk_index = 0
         start_ms = 0
 
@@ -139,19 +140,17 @@ class AudioChunker:
 
             # Save chunk
             chunk_path = Path(self._temp_dir) / f"chunk_{chunk_index:04d}.mp3"
-            chunk_audio.export(
-                str(chunk_path),
-                format="mp3",
-                bitrate=AUDIO_BITRATE
-            )
+            chunk_audio.export(str(chunk_path), format="mp3", bitrate=AUDIO_BITRATE)
 
             # Create chunk object
-            chunks.append(AudioChunk(
-                path=chunk_path,
-                start_time=start_ms / 1000,
-                end_time=end_ms / 1000,
-                chunk_index=chunk_index
-            ))
+            chunks.append(
+                AudioChunk(
+                    path=chunk_path,
+                    start_time=start_ms / 1000,
+                    end_time=end_ms / 1000,
+                    chunk_index=chunk_index,
+                )
+            )
 
             chunk_index += 1
             start_ms = end_ms

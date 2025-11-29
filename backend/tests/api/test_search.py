@@ -1,15 +1,14 @@
 """Tests for Transcript Search API endpoints."""
-import pytest
-from uuid import uuid4
 
+import pytest
 from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.video import Video
 from app.models.list import BookmarkList
 from app.models.user import User
-from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
+from app.models.video import Video
+from app.models.video_enrichment import EnrichmentStatus, VideoEnrichment
 
 
 class TestTranscriptSearch:
@@ -25,7 +24,7 @@ class TestTranscriptSearch:
             list_id=test_list.id,
             youtube_id="search123",
             title="Python Tutorial",
-            duration=600
+            duration=600,
         )
         test_db.add(video)
         await test_db.flush()
@@ -33,7 +32,7 @@ class TestTranscriptSearch:
         enrichment = VideoEnrichment(
             video_id=video.id,
             status=EnrichmentStatus.completed.value,
-            transcript_text="Learn Python programming basics and advanced concepts"
+            transcript_text="Learn Python programming basics and advanced concepts",
         )
         test_db.add(enrichment)
         await test_db.commit()
@@ -56,7 +55,7 @@ class TestTranscriptSearch:
             list_id=test_list.id,
             youtube_id="nomatch123",
             title="Cooking Show",
-            duration=600
+            duration=600,
         )
         test_db.add(video)
         await test_db.flush()
@@ -64,7 +63,7 @@ class TestTranscriptSearch:
         enrichment = VideoEnrichment(
             video_id=video.id,
             status=EnrichmentStatus.completed.value,
-            transcript_text="How to make delicious pasta from scratch"
+            transcript_text="How to make delicious pasta from scratch",
         )
         test_db.add(enrichment)
         await test_db.commit()
@@ -84,7 +83,11 @@ class TestTranscriptSearch:
 
     @pytest.mark.asyncio
     async def test_search_respects_list_filter(
-        self, client: AsyncClient, test_list: BookmarkList, test_user: User, test_db: AsyncSession
+        self,
+        client: AsyncClient,
+        test_list: BookmarkList,
+        test_user: User,
+        test_db: AsyncSession,
     ):
         """Search can filter results by list_id."""
         # Create two lists
@@ -94,10 +97,7 @@ class TestTranscriptSearch:
 
         # Video in test_list
         video1 = Video(
-            list_id=test_list.id,
-            youtube_id="list1video",
-            title="Video 1",
-            duration=600
+            list_id=test_list.id, youtube_id="list1video", title="Video 1", duration=600
         )
         test_db.add(video1)
         await test_db.flush()
@@ -105,7 +105,7 @@ class TestTranscriptSearch:
         enrichment1 = VideoEnrichment(
             video_id=video1.id,
             status=EnrichmentStatus.completed.value,
-            transcript_text="Machine learning tutorial"
+            transcript_text="Machine learning tutorial",
         )
         test_db.add(enrichment1)
 
@@ -114,7 +114,7 @@ class TestTranscriptSearch:
             list_id=other_list.id,
             youtube_id="list2video",
             title="Video 2",
-            duration=600
+            duration=600,
         )
         test_db.add(video2)
         await test_db.flush()
@@ -122,7 +122,7 @@ class TestTranscriptSearch:
         enrichment2 = VideoEnrichment(
             video_id=video2.id,
             status=EnrichmentStatus.completed.value,
-            transcript_text="Machine learning advanced"
+            transcript_text="Machine learning advanced",
         )
         test_db.add(enrichment2)
         await test_db.commit()
@@ -130,7 +130,7 @@ class TestTranscriptSearch:
         # Search with list filter
         response = await client.get(
             "/api/search",
-            params={"q": "machine learning", "list_id": str(test_list.id)}
+            params={"q": "machine learning", "list_id": str(test_list.id)},
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -149,7 +149,7 @@ class TestTranscriptSearch:
                 list_id=test_list.id,
                 youtube_id=f"page{i}",
                 title=f"Tutorial Part {i}",
-                duration=600
+                duration=600,
             )
             test_db.add(video)
             await test_db.flush()
@@ -157,7 +157,7 @@ class TestTranscriptSearch:
             enrichment = VideoEnrichment(
                 video_id=video.id,
                 status=EnrichmentStatus.completed.value,
-                transcript_text=f"Python tutorial episode {i}"
+                transcript_text=f"Python tutorial episode {i}",
             )
             test_db.add(enrichment)
 
@@ -165,8 +165,7 @@ class TestTranscriptSearch:
 
         # Get first page
         response = await client.get(
-            "/api/search",
-            params={"q": "Python tutorial", "limit": 2, "offset": 0}
+            "/api/search", params={"q": "Python tutorial", "limit": 2, "offset": 0}
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -185,7 +184,7 @@ class TestTranscriptSearch:
             list_id=test_list.id,
             youtube_id="snippet123",
             title="Test Video",
-            duration=600
+            duration=600,
         )
         test_db.add(video)
         await test_db.flush()
@@ -193,7 +192,7 @@ class TestTranscriptSearch:
         enrichment = VideoEnrichment(
             video_id=video.id,
             status=EnrichmentStatus.completed.value,
-            transcript_text="This is a long transcript about Python programming and data science."
+            transcript_text="This is a long transcript about Python programming and data science.",
         )
         test_db.add(enrichment)
         await test_db.commit()
@@ -217,7 +216,7 @@ class TestTranscriptSearch:
             list_id=test_list.id,
             youtube_id="completed123",
             title="Completed Video",
-            duration=600
+            duration=600,
         )
         test_db.add(video1)
         await test_db.flush()
@@ -225,7 +224,7 @@ class TestTranscriptSearch:
         enrichment1 = VideoEnrichment(
             video_id=video1.id,
             status=EnrichmentStatus.completed.value,
-            transcript_text="React hooks tutorial"
+            transcript_text="React hooks tutorial",
         )
         test_db.add(enrichment1)
 
@@ -234,7 +233,7 @@ class TestTranscriptSearch:
             list_id=test_list.id,
             youtube_id="pending123",
             title="Pending Video",
-            duration=600
+            duration=600,
         )
         test_db.add(video2)
         await test_db.flush()
@@ -242,7 +241,7 @@ class TestTranscriptSearch:
         enrichment2 = VideoEnrichment(
             video_id=video2.id,
             status=EnrichmentStatus.pending.value,
-            transcript_text="React hooks advanced"
+            transcript_text="React hooks advanced",
         )
         test_db.add(enrichment2)
         await test_db.commit()

@@ -17,9 +17,9 @@ Usage:
         else:
             # Show user_message to user
 """
+
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -112,7 +112,6 @@ def classify_error(error: Exception) -> ErrorClassification:
         ErrorClassification with user_message, is_retryable, and original_error
     """
     error_str = str(error).lower()
-    error_type = type(error).__name__
 
     # Check for specific exception types first
     if isinstance(error, (TimeoutError, ConnectionError)):

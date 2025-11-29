@@ -10,23 +10,24 @@ Tests cover all validation scenarios for Task #142 Step 2:
 Total: 20+ tests covering comprehensive validation logic
 """
 
-import pytest
+from datetime import UTC, datetime
 from uuid import uuid4
-from datetime import datetime, timezone
+
+import pytest
 from pydantic import ValidationError
 
 from app.schemas.analytics import (
-    MostUsedFieldStat,
-    UnusedSchemaStat,
-    FieldCoverageStat,
-    SchemaEffectivenessStat,
     AnalyticsResponse,
+    FieldCoverageStat,
+    MostUsedFieldStat,
+    SchemaEffectivenessStat,
+    UnusedSchemaStat,
 )
-
 
 # ============================================================================
 # Test Group 1: Valid Creation Tests (5 tests)
 # ============================================================================
+
 
 def test_create_most_used_field_stat_valid():
     """Test creating a valid MostUsedFieldStat."""
@@ -36,7 +37,7 @@ def test_create_most_used_field_stat_valid():
         field_type="rating",
         usage_count=450,
         total_videos=500,
-        usage_percentage=90.0
+        usage_percentage=90.0,
     )
     assert stat.field_name == "Overall Rating"
     assert stat.field_type == "rating"
@@ -48,7 +49,7 @@ def test_create_most_used_field_stat_valid():
 def test_create_unused_schema_stat_valid():
     """Test creating a valid UnusedSchemaStat."""
     schema_id = str(uuid4())
-    last_used_time = datetime.now(timezone.utc)
+    last_used_time = datetime.now(UTC)
 
     stat = UnusedSchemaStat(
         schema_id=schema_id,
@@ -56,7 +57,7 @@ def test_create_unused_schema_stat_valid():
         field_count=5,
         tag_count=0,
         last_used=last_used_time,
-        reason="no_tags"
+        reason="no_tags",
     )
     assert stat.schema_id == schema_id
     assert stat.schema_name == "Old Quality Metrics"
@@ -74,7 +75,7 @@ def test_create_field_coverage_stat_valid():
         field_type="select",
         videos_with_values=50,
         total_videos=500,
-        coverage_percentage=10.0
+        coverage_percentage=10.0,
     )
     assert stat.field_name == "Presentation Quality"
     assert stat.field_type == "select"
@@ -91,7 +92,7 @@ def test_create_schema_effectiveness_stat_valid():
         field_count=3,
         avg_fields_filled=2.8,
         completion_percentage=93.33,
-        video_count=200
+        video_count=200,
     )
     assert stat.schema_name == "Video Quality"
     assert stat.field_count == 3
@@ -113,7 +114,7 @@ def test_create_analytics_response_valid():
                 field_type="rating",
                 usage_count=100,
                 total_videos=100,
-                usage_percentage=100.0
+                usage_percentage=100.0,
             )
         ],
         unused_schemas=[
@@ -123,7 +124,7 @@ def test_create_analytics_response_valid():
                 field_count=3,
                 tag_count=0,
                 last_used=None,
-                reason="no_tags"
+                reason="no_tags",
             )
         ],
         field_coverage=[
@@ -133,7 +134,7 @@ def test_create_analytics_response_valid():
                 field_type="text",
                 videos_with_values=50,
                 total_videos=100,
-                coverage_percentage=50.0
+                coverage_percentage=50.0,
             )
         ],
         schema_effectiveness=[
@@ -143,9 +144,9 @@ def test_create_analytics_response_valid():
                 field_count=5,
                 avg_fields_filled=4.0,
                 completion_percentage=80.0,
-                video_count=50
+                video_count=50,
             )
-        ]
+        ],
     )
     assert len(response.most_used_fields) == 1
     assert len(response.unused_schemas) == 1
@@ -157,6 +158,7 @@ def test_create_analytics_response_valid():
 # Test Group 2: Validator Tests (8 tests)
 # ============================================================================
 
+
 def test_most_used_field_stat_usage_count_exceeds_total():
     """Test that usage_count > total_videos raises ValidationError."""
     with pytest.raises(ValidationError) as exc_info:
@@ -166,7 +168,7 @@ def test_most_used_field_stat_usage_count_exceeds_total():
             field_type="rating",
             usage_count=600,
             total_videos=500,
-            usage_percentage=90.0  # Valid percentage to get past Field validation
+            usage_percentage=90.0,  # Valid percentage to get past Field validation
         )
 
     error_message = str(exc_info.value)
@@ -182,11 +184,14 @@ def test_most_used_field_stat_percentage_mismatch():
             field_type="rating",
             usage_count=450,
             total_videos=500,
-            usage_percentage=95.0  # Should be 90.0
+            usage_percentage=95.0,  # Should be 90.0
         )
 
     error_message = str(exc_info.value)
-    assert "usage_percentage (95.00) does not match calculated value (90.00)" in error_message
+    assert (
+        "usage_percentage (95.00) does not match calculated value (90.00)"
+        in error_message
+    )
 
 
 def test_field_coverage_stat_videos_with_values_exceeds_total():
@@ -198,7 +203,7 @@ def test_field_coverage_stat_videos_with_values_exceeds_total():
             field_type="select",
             videos_with_values=600,
             total_videos=500,
-            coverage_percentage=80.0  # Valid percentage to get past Field validation
+            coverage_percentage=80.0,  # Valid percentage to get past Field validation
         )
 
     error_message = str(exc_info.value)
@@ -214,11 +219,14 @@ def test_field_coverage_stat_percentage_mismatch():
             field_type="text",
             videos_with_values=50,
             total_videos=500,
-            coverage_percentage=20.0  # Should be 10.0
+            coverage_percentage=20.0,  # Should be 10.0
         )
 
     error_message = str(exc_info.value)
-    assert "coverage_percentage (20.00) does not match calculated value (10.00)" in error_message
+    assert (
+        "coverage_percentage (20.00) does not match calculated value (10.00)"
+        in error_message
+    )
 
 
 def test_schema_effectiveness_stat_avg_fields_exceeds_field_count():
@@ -230,7 +238,7 @@ def test_schema_effectiveness_stat_avg_fields_exceeds_field_count():
             field_count=3,
             avg_fields_filled=4.5,
             completion_percentage=90.0,  # Valid percentage to get past Field validation
-            video_count=100
+            video_count=100,
         )
 
     error_message = str(exc_info.value)
@@ -246,11 +254,14 @@ def test_schema_effectiveness_stat_completion_percentage_mismatch():
             field_count=3,
             avg_fields_filled=2.8,
             completion_percentage=90.0,  # Should be ~93.33
-            video_count=100
+            video_count=100,
         )
 
     error_message = str(exc_info.value)
-    assert "completion_percentage (90.00) does not match calculated value (93.33)" in error_message
+    assert (
+        "completion_percentage (90.00) does not match calculated value (93.33)"
+        in error_message
+    )
 
 
 def test_unused_schema_stat_invalid_reason():
@@ -262,7 +273,7 @@ def test_unused_schema_stat_invalid_reason():
             field_count=5,
             tag_count=0,
             last_used=None,
-            reason="invalid_reason"  # Must be "no_tags" or "no_values"
+            reason="invalid_reason",  # Must be "no_tags" or "no_values"
         )
 
     error_message = str(exc_info.value)
@@ -278,7 +289,7 @@ def test_negative_counts_rejected():
             field_type="rating",
             usage_count=-10,
             total_videos=100,
-            usage_percentage=0.0
+            usage_percentage=0.0,
         )
 
     error_message = str(exc_info.value)
@@ -289,6 +300,7 @@ def test_negative_counts_rejected():
 # Test Group 3: Edge Cases (4 tests)
 # ============================================================================
 
+
 def test_most_used_field_stat_zero_total_videos():
     """Test that total_videos=0 requires percentage=0.0."""
     with pytest.raises(ValidationError) as exc_info:
@@ -298,11 +310,13 @@ def test_most_used_field_stat_zero_total_videos():
             field_type="rating",
             usage_count=0,
             total_videos=0,
-            usage_percentage=50.0  # Should be 0.0
+            usage_percentage=50.0,  # Should be 0.0
         )
 
     error_message = str(exc_info.value)
-    assert "usage_percentage must be 0.0 when total_videos is 0, got 50.0" in error_message
+    assert (
+        "usage_percentage must be 0.0 when total_videos is 0, got 50.0" in error_message
+    )
 
 
 def test_field_coverage_stat_zero_total_videos():
@@ -314,11 +328,14 @@ def test_field_coverage_stat_zero_total_videos():
             field_type="text",
             videos_with_values=0,
             total_videos=0,
-            coverage_percentage=25.0  # Should be 0.0
+            coverage_percentage=25.0,  # Should be 0.0
         )
 
     error_message = str(exc_info.value)
-    assert "coverage_percentage must be 0.0 when total_videos is 0, got 25.0" in error_message
+    assert (
+        "coverage_percentage must be 0.0 when total_videos is 0, got 25.0"
+        in error_message
+    )
 
 
 def test_schema_effectiveness_stat_zero_field_count():
@@ -330,11 +347,14 @@ def test_schema_effectiveness_stat_zero_field_count():
             field_count=0,
             avg_fields_filled=0.0,
             completion_percentage=10.0,  # Should be 0.0
-            video_count=50
+            video_count=50,
         )
 
     error_message = str(exc_info.value)
-    assert "completion_percentage must be 0.0 when field_count is 0, got 10.0" in error_message
+    assert (
+        "completion_percentage must be 0.0 when field_count is 0, got 10.0"
+        in error_message
+    )
 
 
 def test_unused_schema_stat_with_none_last_used():
@@ -345,7 +365,7 @@ def test_unused_schema_stat_with_none_last_used():
         field_count=3,
         tag_count=0,
         last_used=None,
-        reason="no_tags"
+        reason="no_tags",
     )
     assert stat.last_used is None
     assert stat.reason == "no_tags"
@@ -355,13 +375,14 @@ def test_unused_schema_stat_with_none_last_used():
 # Test Group 4: Response Serialization (3 tests)
 # ============================================================================
 
+
 def test_analytics_response_with_empty_lists():
     """Test that AnalyticsResponse accepts empty lists for all fields."""
     response = AnalyticsResponse(
         most_used_fields=[],
         unused_schemas=[],
         field_coverage=[],
-        schema_effectiveness=[]
+        schema_effectiveness=[],
     )
     assert response.most_used_fields == []
     assert response.unused_schemas == []
@@ -372,7 +393,7 @@ def test_analytics_response_with_empty_lists():
 def test_analytics_response_serialization_with_datetime():
     """Test that AnalyticsResponse correctly serializes datetime fields."""
     schema_id = str(uuid4())
-    last_used_time = datetime(2025, 11, 14, 12, 0, 0, tzinfo=timezone.utc)
+    last_used_time = datetime(2025, 11, 14, 12, 0, 0, tzinfo=UTC)
 
     response = AnalyticsResponse(
         most_used_fields=[],
@@ -383,11 +404,11 @@ def test_analytics_response_serialization_with_datetime():
                 field_count=5,
                 tag_count=2,
                 last_used=last_used_time,
-                reason="no_values"
+                reason="no_values",
             )
         ],
         field_coverage=[],
-        schema_effectiveness=[]
+        schema_effectiveness=[],
     )
 
     # Test model_dump serialization
@@ -410,11 +431,11 @@ def test_analytics_response_model_dump_excludes_none():
                 field_count=3,
                 tag_count=0,
                 last_used=None,
-                reason="no_tags"
+                reason="no_tags",
             )
         ],
         field_coverage=[],
-        schema_effectiveness=[]
+        schema_effectiveness=[],
     )
 
     # Test with exclude_none=True
@@ -431,6 +452,7 @@ def test_analytics_response_model_dump_excludes_none():
 # Test Group 5: Boundary Value Tests (3 tests)
 # ============================================================================
 
+
 def test_most_used_field_stat_boundary_100_percent():
     """Test MostUsedFieldStat with 100% usage (boundary value)."""
     stat = MostUsedFieldStat(
@@ -439,7 +461,7 @@ def test_most_used_field_stat_boundary_100_percent():
         field_type="rating",
         usage_count=500,
         total_videos=500,
-        usage_percentage=100.0
+        usage_percentage=100.0,
     )
     assert stat.usage_percentage == 100.0
 
@@ -452,7 +474,7 @@ def test_field_coverage_stat_boundary_0_percent():
         field_type="text",
         videos_with_values=0,
         total_videos=500,
-        coverage_percentage=0.0
+        coverage_percentage=0.0,
     )
     assert stat.coverage_percentage == 0.0
 
@@ -465,7 +487,7 @@ def test_schema_effectiveness_stat_boundary_perfect_completion():
         field_count=5,
         avg_fields_filled=5.0,
         completion_percentage=100.0,
-        video_count=100
+        video_count=100,
     )
     assert stat.completion_percentage == 100.0
     assert stat.avg_fields_filled == 5.0
@@ -474,6 +496,7 @@ def test_schema_effectiveness_stat_boundary_perfect_completion():
 # ============================================================================
 # Test Group 6: Percentage Out of Range (2 tests)
 # ============================================================================
+
 
 def test_most_used_field_stat_percentage_above_100():
     """Test that percentage > 100.0 is rejected by Field constraint."""
@@ -484,7 +507,7 @@ def test_most_used_field_stat_percentage_above_100():
             field_type="rating",
             usage_count=500,
             total_videos=500,
-            usage_percentage=101.0
+            usage_percentage=101.0,
         )
 
     error_message = str(exc_info.value)
@@ -500,7 +523,7 @@ def test_field_coverage_stat_percentage_negative():
             field_type="select",
             videos_with_values=0,
             total_videos=100,
-            coverage_percentage=-5.0  # Typo was 'usage_percentage'
+            coverage_percentage=-5.0,  # Typo was 'usage_percentage'
         )
 
     error_message = str(exc_info.value)

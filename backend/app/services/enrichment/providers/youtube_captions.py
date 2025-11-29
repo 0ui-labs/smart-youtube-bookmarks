@@ -1,12 +1,12 @@
 """YouTube caption provider using yt-dlp."""
+
 import asyncio
-import tempfile
 import os
-from typing import Optional, Tuple, Dict, Any, List
+import tempfile
+from typing import Any
 
-from .base import CaptionProvider, CaptionResult
 from ..exceptions import CaptionExtractionError
-
+from .base import CaptionProvider, CaptionResult
 
 # Language preference order
 LANGUAGE_PRIORITY = ["en", "de"]
@@ -25,7 +25,7 @@ class YoutubeCaptionProvider(CaptionProvider):
     def name(self) -> str:
         return "youtube"
 
-    async def fetch(self, youtube_id: str, duration: int) -> Optional[CaptionResult]:
+    async def fetch(self, youtube_id: str, duration: int) -> CaptionResult | None:
         """Fetch captions from YouTube using yt-dlp.
 
         yt-dlp handles both metadata extraction and caption download,
@@ -47,7 +47,7 @@ class YoutubeCaptionProvider(CaptionProvider):
         except Exception as e:
             raise CaptionExtractionError(f"Failed to fetch captions: {e}") from e
 
-    async def _fetch_with_ytdlp(self, youtube_id: str) -> Optional[CaptionResult]:
+    async def _fetch_with_ytdlp(self, youtube_id: str) -> CaptionResult | None:
         """Fetch captions using yt-dlp's built-in subtitle download.
 
         Args:
@@ -58,12 +58,9 @@ class YoutubeCaptionProvider(CaptionProvider):
         """
         # Run in thread pool to avoid blocking
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None,
-            lambda: self._fetch_sync(youtube_id)
-        )
+        return await loop.run_in_executor(None, lambda: self._fetch_sync(youtube_id))
 
-    def _fetch_sync(self, youtube_id: str) -> Optional[CaptionResult]:
+    def _fetch_sync(self, youtube_id: str) -> CaptionResult | None:
         """Synchronous yt-dlp fetch (runs in thread pool)."""
         import yt_dlp
 
@@ -117,13 +114,9 @@ class YoutubeCaptionProvider(CaptionProvider):
 
             source = "youtube_auto" if is_auto else "youtube_manual"
 
-            return CaptionResult(
-                vtt=vtt_content,
-                language=language,
-                source=source
-            )
+            return CaptionResult(vtt=vtt_content, language=language, source=source)
 
-    def _read_vtt_file(self, tmpdir: str, youtube_id: str, language: str) -> Optional[str]:
+    def _read_vtt_file(self, tmpdir: str, youtube_id: str, language: str) -> str | None:
         """Read VTT file from temp directory.
 
         Args:
@@ -138,16 +131,16 @@ class YoutubeCaptionProvider(CaptionProvider):
         for filename in os.listdir(tmpdir):
             if filename.endswith(".vtt"):
                 filepath = os.path.join(tmpdir, filename)
-                with open(filepath, "r", encoding="utf-8") as f:
+                with open(filepath, encoding="utf-8") as f:
                     return f.read()
 
         return None
 
     def _select_best_caption_language(
         self,
-        subtitles: Dict[str, List[Dict[str, Any]]],
-        auto_captions: Dict[str, List[Dict[str, Any]]]
-    ) -> Optional[Tuple[str, bool]]:
+        subtitles: dict[str, list[dict[str, Any]]],
+        auto_captions: dict[str, list[dict[str, Any]]],
+    ) -> tuple[str, bool] | None:
         """Select the best caption language to download.
 
         Preference order:
@@ -174,9 +167,8 @@ class YoutubeCaptionProvider(CaptionProvider):
         return None
 
     def _find_language_in_priority(
-        self,
-        captions: Dict[str, List[Dict[str, Any]]]
-    ) -> Optional[str]:
+        self, captions: dict[str, list[dict[str, Any]]]
+    ) -> str | None:
         """Find caption language by priority.
 
         Args:
@@ -194,7 +186,7 @@ class YoutubeCaptionProvider(CaptionProvider):
                 return lang
 
         # Fall back to first available
-        for lang in captions.keys():
+        for lang in captions:
             return lang
 
         return None

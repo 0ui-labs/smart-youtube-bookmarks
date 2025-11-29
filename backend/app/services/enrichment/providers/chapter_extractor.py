@@ -1,9 +1,9 @@
 """Chapter extraction from YouTube videos."""
+
 import asyncio
 import logging
 import re
 from dataclasses import dataclass
-from typing import List, Optional
 
 import yt_dlp
 from yt_dlp.utils import DownloadError, ExtractorError
@@ -14,9 +14,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Chapter:
     """A chapter in a video."""
+
     title: str
     start: float  # Start time in seconds
-    end: float    # End time in seconds
+    end: float  # End time in seconds
 
     @property
     def duration(self) -> float:
@@ -40,7 +41,7 @@ class ChapterExtractor:
             "extract_flat": False,
         }
 
-    async def fetch_youtube_chapters(self, youtube_id: str) -> Optional[List[Chapter]]:
+    async def fetch_youtube_chapters(self, youtube_id: str) -> list[Chapter] | None:
         """Fetch chapters from YouTube video metadata.
 
         Args:
@@ -61,9 +62,9 @@ class ChapterExtractor:
 
             chapters = [
                 Chapter(
-                    title=ch.get("title", f"Chapter {i+1}"),
+                    title=ch.get("title", f"Chapter {i + 1}"),
                     start=float(ch.get("start_time", 0)),
-                    end=float(ch.get("end_time", 0))
+                    end=float(ch.get("end_time", 0)),
                 )
                 for i, ch in enumerate(chapters_data)
             ]
@@ -83,7 +84,7 @@ class ChapterExtractor:
             # Parsing/data structure errors from chapter extraction
             logger.warning(
                 f"fetch_youtube_chapters: parsing error for youtube_id={youtube_id}: {e}",
-                exc_info=True
+                exc_info=True,
             )
             return None
         except Exception as e:
@@ -93,7 +94,7 @@ class ChapterExtractor:
             )
             return None
 
-    async def _extract_info(self, youtube_id: str) -> Optional[dict]:
+    async def _extract_info(self, youtube_id: str) -> dict | None:
         """Extract video info using yt-dlp.
 
         Args:
@@ -112,10 +113,8 @@ class ChapterExtractor:
         return await asyncio.to_thread(_sync_extract)
 
     def parse_description_chapters(
-        self,
-        description: str,
-        duration: float
-    ) -> Optional[List[Chapter]]:
+        self, description: str, duration: float
+    ) -> list[Chapter] | None:
         """Parse chapters from video description timestamps.
 
         Supports formats:
@@ -133,11 +132,11 @@ class ChapterExtractor:
         """
         # Pattern matches timestamps like 0:00, 00:00, 0:00:00, 00:00:00
         # Dash character class includes: hyphen-minus (-), en dash (–), em dash (—)
-        timestamp_pattern = r'^(\d{1,2}:\d{2}(?::\d{2})?)\s*[\-\u2013\u2014]?\s*(.+)$'
+        timestamp_pattern = r"^(\d{1,2}:\d{2}(?::\d{2})?)\s*[\-\u2013\u2014]?\s*(.+)$"
 
-        chapters: List[tuple] = []
+        chapters: list[tuple] = []
 
-        for line in description.split('\n'):
+        for line in description.split("\n"):
             line = line.strip()
             if not line:
                 continue
@@ -159,7 +158,7 @@ class ChapterExtractor:
         chapters.sort(key=lambda x: x[0])
 
         # Convert to Chapter objects with end times
-        result: List[Chapter] = []
+        result: list[Chapter] = []
         for i, (start, title) in enumerate(chapters):
             if i < len(chapters) - 1:
                 end = chapters[i + 1][0]
@@ -170,7 +169,7 @@ class ChapterExtractor:
 
         return result
 
-    def _parse_timestamp(self, timestamp: str) -> Optional[float]:
+    def _parse_timestamp(self, timestamp: str) -> float | None:
         """Parse timestamp string to seconds.
 
         Args:
@@ -179,7 +178,7 @@ class ChapterExtractor:
         Returns:
             Time in seconds, or None if invalid
         """
-        parts = timestamp.split(':')
+        parts = timestamp.split(":")
 
         try:
             if len(parts) == 2:
@@ -196,7 +195,7 @@ class ChapterExtractor:
         return None
 
 
-def chapters_to_vtt(chapters: List[Chapter]) -> str:
+def chapters_to_vtt(chapters: list[Chapter]) -> str:
     """Convert chapters to VTT format for chapter markers.
 
     Args:
@@ -221,7 +220,7 @@ def chapters_to_vtt(chapters: List[Chapter]) -> str:
     return "\n".join(lines)
 
 
-def chapters_to_json(chapters: List[Chapter]) -> List[dict]:
+def chapters_to_json(chapters: list[Chapter]) -> list[dict]:
     """Convert chapters to JSON-serializable format.
 
     Args:
@@ -231,11 +230,7 @@ def chapters_to_json(chapters: List[Chapter]) -> List[dict]:
         List of chapter dictionaries
     """
     return [
-        {
-            "title": chapter.title,
-            "start": chapter.start,
-            "end": chapter.end
-        }
+        {"title": chapter.title, "start": chapter.start, "end": chapter.end}
         for chapter in chapters
     ]
 

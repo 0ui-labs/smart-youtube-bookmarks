@@ -1,18 +1,21 @@
 """Tests for process_video_list ARQ worker (bulk processing)."""
-import pytest
+
 from unittest.mock import AsyncMock, patch
-from app.models import Video, BookmarkList, ProcessingJob
+
+import pytest
+
+from app.models import BookmarkList, ProcessingJob, Video
 from app.workers.video_processor import process_video_list
 
 
 @pytest.mark.asyncio
-async def test_process_video_list_processes_multiple_videos(arq_context, test_db, test_user):
+async def test_process_video_list_processes_multiple_videos(
+    arq_context, test_db, test_user
+):
     """Test process_video_list processes all videos in batch."""
     # Arrange: Create test list
     bookmark_list = BookmarkList(
-        name="Test List",
-        description="Test description",
-        user_id=test_user.id
+        name="Test List", description="Test description", user_id=test_user.id
     )
     test_db.add(bookmark_list)
     await test_db.commit()
@@ -20,9 +23,7 @@ async def test_process_video_list_processes_multiple_videos(arq_context, test_db
 
     # Arrange: Create processing job
     processing_job = ProcessingJob(
-        list_id=bookmark_list.id,
-        total_videos=3,
-        status="running"
+        list_id=bookmark_list.id, total_videos=3, status="running"
     )
     test_db.add(processing_job)
     await test_db.commit()
@@ -32,17 +33,17 @@ async def test_process_video_list_processes_multiple_videos(arq_context, test_db
     video1 = Video(
         list_id=bookmark_list.id,
         youtube_id="dQw4w9WgXcQ",  # Rick Astley - Never Gonna Give You Up
-        processing_status="pending"
+        processing_status="pending",
     )
     video2 = Video(
         list_id=bookmark_list.id,
         youtube_id="9bZkp7q19f0",  # PSY - Gangnam Style
-        processing_status="pending"
+        processing_status="pending",
     )
     video3 = Video(
         list_id=bookmark_list.id,
         youtube_id="kJQP7kiw5Fk",  # Luis Fonsi - Despacito
-        processing_status="pending"
+        processing_status="pending",
     )
     test_db.add_all([video1, video2, video3])
     await test_db.commit()
@@ -59,10 +60,10 @@ async def test_process_video_list_processes_multiple_videos(arq_context, test_db
         "channel": "Test Channel",
         "published_at": "2024-01-01T00:00:00Z",
         "thumbnail_url": "https://example.com/thumb.jpg",
-        "duration": "PT5M30S"
+        "duration": "PT5M30S",
     }
 
-    with patch('app.workers.video_processor.YouTubeClient') as MockYouTube:
+    with patch("app.workers.video_processor.YouTubeClient") as MockYouTube:
         mock_client = AsyncMock()
         mock_client.get_video_metadata = AsyncMock(return_value=mock_metadata)
         MockYouTube.return_value = mock_client
@@ -73,7 +74,7 @@ async def test_process_video_list_processes_multiple_videos(arq_context, test_db
             str(processing_job.id),
             str(bookmark_list.id),
             video_ids,
-            {}  # schema_fields
+            {},  # schema_fields
         )
 
     # Assert: All videos processed
@@ -93,4 +94,4 @@ async def test_process_video_list_processes_multiple_videos(arq_context, test_db
     assert processing_job.processed_count == 3
     assert processing_job.failed_count == 0
     assert processing_job.status == "completed"
-    assert result['status'] == 'success'
+    assert result["status"] == "success"

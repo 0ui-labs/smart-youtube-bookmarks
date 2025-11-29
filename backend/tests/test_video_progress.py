@@ -4,16 +4,16 @@ Tests for video watch progress endpoint (PATCH /api/videos/{id}/progress).
 Tests the video player integration feature that saves playback position.
 """
 
-import pytest
 from uuid import uuid4
+
+import pytest
 
 
 @pytest.mark.asyncio
 async def test_update_watch_progress_success(client, test_video):
     """Test successful watch progress update."""
     response = await client.patch(
-        f"/api/videos/{test_video.id}/progress",
-        json={"position": 120}
+        f"/api/videos/{test_video.id}/progress", json={"position": 120}
     )
 
     assert response.status_code == 200
@@ -27,8 +27,7 @@ async def test_update_watch_progress_success(client, test_video):
 async def test_update_watch_progress_zero_position(client, test_video):
     """Test watch progress update with position 0 (start of video)."""
     response = await client.patch(
-        f"/api/videos/{test_video.id}/progress",
-        json={"position": 0}
+        f"/api/videos/{test_video.id}/progress", json={"position": 0}
     )
 
     assert response.status_code == 200
@@ -43,8 +42,7 @@ async def test_update_watch_progress_large_position(client, test_video):
     position = 3 * 60 * 60
 
     response = await client.patch(
-        f"/api/videos/{test_video.id}/progress",
-        json={"position": position}
+        f"/api/videos/{test_video.id}/progress", json={"position": position}
     )
 
     assert response.status_code == 200
@@ -58,8 +56,7 @@ async def test_update_watch_progress_video_not_found(client):
     fake_id = uuid4()
 
     response = await client.patch(
-        f"/api/videos/{fake_id}/progress",
-        json={"position": 120}
+        f"/api/videos/{fake_id}/progress", json={"position": 120}
     )
 
     assert response.status_code == 404
@@ -70,8 +67,7 @@ async def test_update_watch_progress_video_not_found(client):
 async def test_update_watch_progress_negative_position_rejected(client, test_video):
     """Test that negative position is rejected with 422."""
     response = await client.patch(
-        f"/api/videos/{test_video.id}/progress",
-        json={"position": -1}
+        f"/api/videos/{test_video.id}/progress", json={"position": -1}
     )
 
     assert response.status_code == 422
@@ -80,10 +76,7 @@ async def test_update_watch_progress_negative_position_rejected(client, test_vid
 @pytest.mark.asyncio
 async def test_update_watch_progress_missing_position(client, test_video):
     """Test that missing position field returns 422."""
-    response = await client.patch(
-        f"/api/videos/{test_video.id}/progress",
-        json={}
-    )
+    response = await client.patch(f"/api/videos/{test_video.id}/progress", json={})
 
     assert response.status_code == 422
 
@@ -92,15 +85,11 @@ async def test_update_watch_progress_missing_position(client, test_video):
 async def test_update_watch_progress_overwrites_previous(client, test_video):
     """Test that new progress overwrites previous position."""
     # Set initial position
-    await client.patch(
-        f"/api/videos/{test_video.id}/progress",
-        json={"position": 100}
-    )
+    await client.patch(f"/api/videos/{test_video.id}/progress", json={"position": 100})
 
     # Update to new position
     response = await client.patch(
-        f"/api/videos/{test_video.id}/progress",
-        json={"position": 200}
+        f"/api/videos/{test_video.id}/progress", json={"position": 200}
     )
 
     assert response.status_code == 200
@@ -112,10 +101,7 @@ async def test_update_watch_progress_overwrites_previous(client, test_video):
 async def test_watch_position_in_video_response(client, test_video):
     """Test that watch_position appears in video detail response."""
     # Set watch position
-    await client.patch(
-        f"/api/videos/{test_video.id}/progress",
-        json={"position": 150}
-    )
+    await client.patch(f"/api/videos/{test_video.id}/progress", json={"position": 150})
 
     # Fetch video detail
     response = await client.get(f"/api/videos/{test_video.id}")

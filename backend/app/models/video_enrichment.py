@@ -1,12 +1,13 @@
 """VideoEnrichment model for storing video captions, chapters, and transcripts."""
+
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID as PyUUID
 
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from .base import BaseModel
 
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 
 class EnrichmentStatus(str, Enum):
     """Status of video enrichment processing."""
+
     pending = "pending"
     processing = "processing"
     completed = "completed"
@@ -31,51 +33,56 @@ class VideoEnrichment(BaseModel):
     extracts captions from YouTube or generates them via Groq Whisper, and
     extracts chapters from YouTube metadata or video description.
     """
+
     __tablename__ = "video_enrichments"
 
     video_id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("videos.id", ondelete="CASCADE"),
         unique=True,
-        nullable=False
+        nullable=False,
     )
 
     # Use String to match existing DB schema (VARCHAR(20))
     status: Mapped[str] = mapped_column(
-        String(20),
-        default=EnrichmentStatus.pending.value,
-        nullable=False
+        String(20), default=EnrichmentStatus.pending.value, nullable=False
     )
 
     # Captions (VTT format)
-    captions_vtt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    captions_language: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    captions_source: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)  # Match existing DB
+    captions_vtt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    captions_language: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    captions_source: Mapped[str | None] = mapped_column(
+        String(30), nullable=True
+    )  # Match existing DB
 
     # Transcript (plain text for search)
-    transcript_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    transcript_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Chapters (VTT + JSON)
-    chapters_vtt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    chapters_json: Mapped[Optional[list[Dict[str, Any]]]] = mapped_column(JSONB, nullable=True)
-    chapters_source: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)  # Match existing DB
+    chapters_vtt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chapters_json: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    chapters_source: Mapped[str | None] = mapped_column(
+        String(30), nullable=True
+    )  # Match existing DB
 
     # Thumbnails (sprite sheet VTT URL)
-    thumbnails_vtt_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Match existing DB
+    thumbnails_vtt_url: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )  # Match existing DB
 
     # Processing state
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    progress_message: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    processed_at: Mapped[Optional[datetime]] = mapped_column(
+    progress_message: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    processed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # Relationship
     video: Mapped["Video"] = relationship(
-        "Video",
-        back_populates="enrichment",
-        lazy="joined"
+        "Video", back_populates="enrichment", lazy="joined"
     )
 
     def __repr__(self) -> str:

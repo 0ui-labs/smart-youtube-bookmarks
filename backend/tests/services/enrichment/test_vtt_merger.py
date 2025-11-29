@@ -1,10 +1,9 @@
 """Tests for VTT merging utilities."""
-import pytest
 
 from app.services.enrichment.utils.vtt_merger import (
-    merge_vtt_files,
-    merge_transcripts,
     TranscriptChunk,
+    merge_transcripts,
+    merge_vtt_files,
 )
 
 
@@ -16,7 +15,7 @@ class TestTranscriptChunk:
         chunk = TranscriptChunk(
             vtt_content="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nHello",
             start_offset=0.0,
-            chunk_index=0
+            chunk_index=0,
         )
 
         assert chunk.vtt_content.startswith("WEBVTT")
@@ -123,12 +122,12 @@ class TestMergeTranscripts:
             TranscriptChunk(
                 vtt_content="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nChunk 1",
                 start_offset=0.0,
-                chunk_index=0
+                chunk_index=0,
             ),
             TranscriptChunk(
                 vtt_content="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nChunk 2",
                 start_offset=600.0,
-                chunk_index=1
+                chunk_index=1,
             ),
         ]
 
@@ -143,12 +142,12 @@ class TestMergeTranscripts:
             TranscriptChunk(
                 vtt_content="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nSecond",
                 start_offset=600.0,
-                chunk_index=1
+                chunk_index=1,
             ),
             TranscriptChunk(
                 vtt_content="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nFirst",
                 start_offset=0.0,
-                chunk_index=0
+                chunk_index=0,
             ),
         ]
 
@@ -170,12 +169,12 @@ class TestMergeTranscripts:
             TranscriptChunk(
                 vtt_content="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nAt start",
                 start_offset=0.0,
-                chunk_index=0
+                chunk_index=0,
             ),
             TranscriptChunk(
                 vtt_content="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nAt 20 min",
                 start_offset=1200.0,  # 20 minutes
-                chunk_index=1
+                chunk_index=1,
             ),
         ]
 

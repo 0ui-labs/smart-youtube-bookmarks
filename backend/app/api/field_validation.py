@@ -25,6 +25,7 @@ Usage:
         # Handle validation error
         print(f"Validation failed: {e}")
 """
+
 from typing import Any
 
 
@@ -38,14 +39,12 @@ class FieldValidationError(ValueError):
     Examples:
         >>> raise FieldValidationError("Rating must be between 0 and 5")
     """
+
     pass
 
 
 def validate_field_value(
-    value: Any,
-    field_type: str,
-    config: dict,
-    field_name: str = "(unnamed)"
+    value: Any, field_type: str, config: dict, field_name: str = "(unnamed)"
 ) -> None:
     """
     Validate field value against field type and configuration.
@@ -81,7 +80,7 @@ def validate_field_value(
     """
     # Validation logic extracted from Task #72 (videos.py:1294-1360)
 
-    if field_type == 'rating':
+    if field_type == "rating":
         # Type check - reject booleans first (bool is subclass of int in Python)
         if isinstance(value, bool):
             raise FieldValidationError(
@@ -93,13 +92,11 @@ def validate_field_value(
             )
 
         # Range check
-        max_rating = config.get('max_rating', 5)
+        max_rating = config.get("max_rating", 5)
         if value < 0 or value > max_rating:
-            raise FieldValidationError(
-                f"Rating must be between 0 and {max_rating}"
-            )
+            raise FieldValidationError(f"Rating must be between 0 and {max_rating}")
 
-    elif field_type == 'select':
+    elif field_type == "select":
         # Type check
         if not isinstance(value, str):
             raise FieldValidationError(
@@ -107,20 +104,20 @@ def validate_field_value(
             )
 
         # Options check
-        options = config.get('options', [])
+        options = config.get("options", [])
         if value not in options:
             raise FieldValidationError(
                 f"Invalid option '{value}'. Valid options: {options}"
             )
 
-    elif field_type == 'boolean':
+    elif field_type == "boolean":
         # Strict bool type check (not truthy/falsy)
         if not isinstance(value, bool):
             raise FieldValidationError(
                 f"Boolean value must be true/false, got {type(value).__name__}"
             )
 
-    elif field_type == 'text':
+    elif field_type == "text":
         # Type check
         if not isinstance(value, str):
             raise FieldValidationError(
@@ -128,7 +125,7 @@ def validate_field_value(
             )
 
         # Length check (optional)
-        max_len = config.get('max_length')
+        max_len = config.get("max_length")
         if max_len is not None and len(value) > max_len:
             raise FieldValidationError(
                 f"Text exceeds max length {max_len} ({len(value)} chars)"

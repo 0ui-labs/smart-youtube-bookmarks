@@ -1,10 +1,10 @@
 """Service for backing up and restoring video field values."""
+
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -25,6 +25,7 @@ BACKUP_DIR = _BACKEND_DIR / "backups" / "field_values"
 @dataclass
 class BackupInfo:
     """Information about a backup file."""
+
     category_id: UUID
     category_name: str
     timestamp: datetime
@@ -37,17 +38,17 @@ def _serialize_field_value(value: VideoFieldValue) -> dict:
         "field_id": str(value.field_id),
         "field_name": value.field.name if value.field else None,
         "field_type": value.field.field_type if value.field else None,
-        "value_numeric": float(value.value_numeric) if value.value_numeric is not None else None,
+        "value_numeric": float(value.value_numeric)
+        if value.value_numeric is not None
+        else None,
         "value_text": value.value_text,
         "value_boolean": value.value_boolean,
     }
 
 
 async def backup_field_values(
-    video_id: UUID,
-    category_id: UUID,
-    db: AsyncSession
-) -> Optional[Path]:
+    video_id: UUID, category_id: UUID, db: AsyncSession
+) -> Path | None:
     """
     Backup field values for video's category.
 
@@ -87,10 +88,14 @@ async def backup_field_values(
     field_ids = [sf.field_id for sf in schema_with_fields.schema_fields]
 
     # Query field values for this video and these fields
-    stmt = select(VideoFieldValue).where(
-        VideoFieldValue.video_id == video_id,
-        VideoFieldValue.field_id.in_(field_ids)
-    ).options(selectinload(VideoFieldValue.field))
+    stmt = (
+        select(VideoFieldValue)
+        .where(
+            VideoFieldValue.video_id == video_id,
+            VideoFieldValue.field_id.in_(field_ids),
+        )
+        .options(selectinload(VideoFieldValue.field))
+    )
 
     result = await db.execute(stmt)
     values = result.scalars().all()
@@ -104,8 +109,8 @@ async def backup_field_values(
         "video_id": str(video_id),
         "category_id": str(category_id),
         "category_name": category.name,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "values": [_serialize_field_value(v) for v in values]
+        "timestamp": datetime.now(UTC).isoformat(),
+        "values": [_serialize_field_value(v) for v in values],
     }
 
     # Write to file
@@ -113,14 +118,14 @@ async def backup_field_values(
     backup_path.parent.mkdir(parents=True, exist_ok=True)
     backup_path.write_text(json.dumps(backup_data, indent=2))
 
-    logger.info(f"Backed up {len(values)} field values for video {video_id}, category {category.name}")
+    logger.info(
+        f"Backed up {len(values)} field values for video {video_id}, category {category.name}"
+    )
     return backup_path
 
 
 async def restore_field_values(
-    video_id: UUID,
-    category_id: UUID,
-    db: AsyncSession
+    video_id: UUID, category_id: UUID, db: AsyncSession
 ) -> int:
     """
     Restore field values from backup.
@@ -170,7 +175,9 @@ async def restore_field_values(
             logger.info(f"Restored {restored_count} field values for video {video_id}")
         except Exception as e:
             await db.rollback()
-            logger.error(f"Failed to commit restored field values for video {video_id}: {e}")
+            logger.error(
+                f"Failed to commit restored field values for video {video_id}: {e}"
+            )
             raise
 
     return restored_count
@@ -194,12 +201,14 @@ def list_backups(video_id: UUID) -> list[BackupInfo]:
     for file in backup_dir.glob("*.json"):
         try:
             data = json.loads(file.read_text())
-            backups.append(BackupInfo(
-                category_id=UUID(data["category_id"]),
-                category_name=data.get("category_name", "Unknown"),
-                timestamp=datetime.fromisoformat(data["timestamp"]),
-                value_count=len(data.get("values", []))
-            ))
+            backups.append(
+                BackupInfo(
+                    category_id=UUID(data["category_id"]),
+                    category_name=data.get("category_name", "Unknown"),
+                    timestamp=datetime.fromisoformat(data["timestamp"]),
+                    value_count=len(data.get("values", [])),
+                )
+            )
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             logger.warning(f"Invalid backup file {file}: {e}")
             continue

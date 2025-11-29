@@ -7,7 +7,6 @@ from video transcripts using Google Gemini API with Pydantic schemas.
 
 import pytest
 import pytest_asyncio
-from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -24,17 +23,16 @@ class TestGeminiClientBasicExtraction:
         - Return parsed Pydantic object with extracted data
         - Handle basic field types (string, list)
         """
+
         # Define schema for extraction
         class VideoMetadata(BaseModel):
             """Schema for video metadata extraction."""
 
-            categories: List[str] = Field(description="Video topic categories")
+            categories: list[str] = Field(description="Video topic categories")
             difficulty_level: str = Field(
                 description="Difficulty: Beginner, Intermediate, or Advanced"
             )
-            summary: str = Field(
-                description="Brief 2-3 sentence summary"
-            )
+            summary: str = Field(description="Brief 2-3 sentence summary")
 
         # Sample transcript
         transcript = """

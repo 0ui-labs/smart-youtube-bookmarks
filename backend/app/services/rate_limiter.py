@@ -4,10 +4,11 @@ Adaptive Rate Limiter with Circuit Breaker.
 Provides concurrent request limiting with adaptive delays based on success/failure rates.
 Includes circuit breaker pattern to prevent cascading failures during rate limiting.
 """
+
 import asyncio
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class AdaptiveRateLimiter:
         backoff_multiplier: float = 2.0,
         recovery_multiplier: float = 0.8,
         failure_threshold: int = 5,
-        circuit_timeout: float = 30.0
+        circuit_timeout: float = 30.0,
     ):
         """
         Initialize rate limiter.
@@ -80,6 +81,7 @@ class AdaptiveRateLimiter:
             return False
 
         import time
+
         if time.time() >= self._circuit_open_until:
             # Circuit timeout expired, close it
             self._circuit_open_until = None
@@ -106,6 +108,7 @@ class AdaptiveRateLimiter:
             # Apply delay since last request
             async with self._lock:
                 import time
+
                 now = time.time()
                 time_since_last = now - self._last_request_time
 
@@ -127,8 +130,7 @@ class AdaptiveRateLimiter:
 
         # Decrease delay (but not below base)
         self._current_delay = max(
-            self.base_delay,
-            self._current_delay * self.recovery_multiplier
+            self.base_delay, self._current_delay * self.recovery_multiplier
         )
 
         logger.debug(f"Rate limiter: success, delay now {self._current_delay:.2f}s")
@@ -145,8 +147,7 @@ class AdaptiveRateLimiter:
         if is_rate_limit:
             # Increase delay on rate limit
             self._current_delay = min(
-                self.max_delay,
-                self._current_delay * self.backoff_multiplier
+                self.max_delay, self._current_delay * self.backoff_multiplier
             )
             logger.warning(
                 f"Rate limiter: rate limit hit, delay now {self._current_delay:.2f}s"
@@ -155,6 +156,7 @@ class AdaptiveRateLimiter:
         # Check if we should open circuit
         if self._consecutive_failures >= self.failure_threshold:
             import time
+
             self._circuit_open_until = time.time() + self.circuit_timeout
             logger.warning(
                 f"Rate limiter: circuit breaker opened after {self._consecutive_failures} failures"

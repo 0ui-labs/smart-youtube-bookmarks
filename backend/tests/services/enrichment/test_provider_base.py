@@ -1,6 +1,8 @@
 """Tests for caption provider base class."""
-import pytest
+
 from abc import ABC
+
+import pytest
 
 from app.services.enrichment.providers.base import (
     CaptionProvider,
@@ -16,7 +18,7 @@ class TestCaptionResult:
         result = CaptionResult(
             vtt="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nHello",
             language="en",
-            source="youtube_manual"
+            source="youtube_manual",
         )
 
         assert result.vtt.startswith("WEBVTT")
@@ -49,6 +51,7 @@ class TestCaptionProvider:
 
     def test_caption_provider_has_name_attribute(self):
         """CaptionProvider requires name class attribute."""
+
         # Create a concrete implementation to test
         class ConcreteProvider(CaptionProvider):
             name = "test_provider"
@@ -61,6 +64,7 @@ class TestCaptionProvider:
 
     def test_caption_provider_fetch_is_abstract(self):
         """CaptionProvider.fetch is abstract method."""
+
         # Cannot instantiate without implementing fetch
         class IncompleteProvider(CaptionProvider):
             name = "incomplete"
@@ -70,15 +74,12 @@ class TestCaptionProvider:
 
     def test_concrete_provider_can_be_instantiated(self):
         """Concrete provider with fetch implemented can be created."""
+
         class WorkingProvider(CaptionProvider):
             name = "working"
 
             async def fetch(self, youtube_id: str, duration: int):
-                return CaptionResult(
-                    vtt="WEBVTT\n",
-                    language="en",
-                    source=self.name
-                )
+                return CaptionResult(vtt="WEBVTT\n", language="en", source=self.name)
 
         provider = WorkingProvider()
         assert provider.name == "working"
@@ -86,6 +87,7 @@ class TestCaptionProvider:
     @pytest.mark.asyncio
     async def test_concrete_provider_fetch_signature(self):
         """Provider fetch method has correct signature."""
+
         class TestProvider(CaptionProvider):
             name = "test"
 
@@ -93,11 +95,7 @@ class TestCaptionProvider:
                 # Verify we receive the expected parameters
                 assert isinstance(youtube_id, str)
                 assert isinstance(duration, int)
-                return CaptionResult(
-                    vtt="WEBVTT\n",
-                    language="en",
-                    source="test"
-                )
+                return CaptionResult(vtt="WEBVTT\n", language="en", source="test")
 
         provider = TestProvider()
         result = await provider.fetch("dQw4w9WgXcQ", 212)
@@ -108,6 +106,7 @@ class TestCaptionProvider:
     @pytest.mark.asyncio
     async def test_provider_can_return_none(self):
         """Provider can return None when no captions available."""
+
         class NoResultProvider(CaptionProvider):
             name = "no_result"
 

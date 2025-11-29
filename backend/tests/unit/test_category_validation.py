@@ -6,13 +6,15 @@ TDD RED Phase: These tests are written BEFORE the implementation.
 Category Rule: A video can only have ONE tag with is_video_type=True (category).
 Labels (is_video_type=False) can be assigned without limit.
 """
-import pytest
-from uuid import uuid4
+
 from unittest.mock import MagicMock
+from uuid import uuid4
+
+import pytest
 
 from app.services.category_validation import (
-    validate_category_assignment,
     CategoryValidationError,
+    validate_category_assignment,
 )
 
 
@@ -110,9 +112,7 @@ class TestValidateCategoryAssignment:
         assert error.existing_category_name == "Existing Category"
         assert error.new_category_name == "New Category"
 
-    def test_allows_same_category_reassignment(
-        self, mock_video_with_category
-    ):
+    def test_allows_same_category_reassignment(self, mock_video_with_category):
         """
         Test that re-assigning the same category is idempotent.
 
@@ -124,9 +124,7 @@ class TestValidateCategoryAssignment:
         # Should not raise when re-assigning same category
         validate_category_assignment(video, [existing_category])
 
-    def test_allows_multiple_labels(
-        self, mock_video_no_category
-    ):
+    def test_allows_multiple_labels(self, mock_video_no_category):
         """
         Test that multiple labels can be assigned at once.
 
@@ -169,4 +167,7 @@ class TestValidateCategoryAssignment:
             validate_category_assignment(mock_video_no_category, [category1, category2])
 
         error = exc_info.value
-        assert "multiple categories" in str(error).lower() or error.new_category_name is not None
+        assert (
+            "multiple categories" in str(error).lower()
+            or error.new_category_name is not None
+        )

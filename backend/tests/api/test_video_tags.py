@@ -1,22 +1,29 @@
 """Tests for video-tag assignment endpoints."""
+
 import pytest
 from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_assign_tags_to_video(client: AsyncClient, test_user, test_list, test_video):
+async def test_assign_tags_to_video(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test assigning tags to a video."""
     # Create two tags with unique names
     import uuid
-    tag1_response = await client.post("/api/tags", json={"name": f"Tutorial-{uuid.uuid4().hex[:8]}"})
-    tag2_response = await client.post("/api/tags", json={"name": f"Python-{uuid.uuid4().hex[:8]}"})
+
+    tag1_response = await client.post(
+        "/api/tags", json={"name": f"Tutorial-{uuid.uuid4().hex[:8]}"}
+    )
+    tag2_response = await client.post(
+        "/api/tags", json={"name": f"Python-{uuid.uuid4().hex[:8]}"}
+    )
     tag1_id = tag1_response.json()["id"]
     tag2_id = tag2_response.json()["id"]
 
     # Assign tags to video
     response = await client.post(
-        f"/api/videos/{test_video.id}/tags",
-        json={"tag_ids": [tag1_id, tag2_id]}
+        f"/api/videos/{test_video.id}/tags", json={"tag_ids": [tag1_id, tag2_id]}
     )
 
     assert response.status_code == 200
@@ -27,17 +34,22 @@ async def test_assign_tags_to_video(client: AsyncClient, test_user, test_list, t
 
 
 @pytest.mark.asyncio
-async def test_assign_duplicate_tag(client: AsyncClient, test_user, test_list, test_video):
+async def test_assign_duplicate_tag(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test assigning the same tag twice is idempotent."""
     # Create tag with unique name
     import uuid
+
     tag_name = f"DuplicateTest_{uuid.uuid4().hex[:8]}"
     tag_response = await client.post("/api/tags", json={"name": tag_name})
     tag_id = tag_response.json()["id"]
 
     # Assign tag twice
     await client.post(f"/api/videos/{test_video.id}/tags", json={"tag_ids": [tag_id]})
-    response = await client.post(f"/api/videos/{test_video.id}/tags", json={"tag_ids": [tag_id]})
+    response = await client.post(
+        f"/api/videos/{test_video.id}/tags", json={"tag_ids": [tag_id]}
+    )
 
     assert response.status_code == 200
     tags = response.json()
@@ -46,10 +58,13 @@ async def test_assign_duplicate_tag(client: AsyncClient, test_user, test_list, t
 
 
 @pytest.mark.asyncio
-async def test_remove_tag_from_video(client: AsyncClient, test_user, test_list, test_video):
+async def test_remove_tag_from_video(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test removing a tag from a video."""
     # Create and assign tag with unique name
     import uuid
+
     tag_name = f"RemoveTest_{uuid.uuid4().hex[:8]}"
     tag_response = await client.post("/api/tags", json={"name": tag_name})
     tag_id = tag_response.json()["id"]
@@ -66,9 +81,12 @@ async def test_remove_tag_from_video(client: AsyncClient, test_user, test_list, 
 
 
 @pytest.mark.asyncio
-async def test_remove_nonexistent_tag(client: AsyncClient, test_user, test_list, test_video):
+async def test_remove_nonexistent_tag(
+    client: AsyncClient, test_user, test_list, test_video
+):
     """Test removing a tag that's not assigned returns 404."""
     import uuid
+
     fake_tag_id = str(uuid.uuid4())
 
     response = await client.delete(f"/api/videos/{test_video.id}/tags/{fake_tag_id}")
@@ -84,7 +102,9 @@ async def test_get_video_tags(client: AsyncClient, test_user, test_list, test_vi
     tag2_response = await client.post("/api/tags", json={"name": "GetTest2"})
     tag1_id = tag1_response.json()["id"]
     tag2_id = tag2_response.json()["id"]
-    await client.post(f"/api/videos/{test_video.id}/tags", json={"tag_ids": [tag1_id, tag2_id]})
+    await client.post(
+        f"/api/videos/{test_video.id}/tags", json={"tag_ids": [tag1_id, tag2_id]}
+    )
 
     # Get video tags
     response = await client.get(f"/api/videos/{test_video.id}/tags")

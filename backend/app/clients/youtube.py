@@ -1,26 +1,27 @@
 """YouTube Data API v3 Client using aiogoogle"""
+
 import asyncio
 import json
-import random
 import logging
-from typing import Optional, TypedDict
+import random
+from typing import TypedDict
+
+import httpx
 from aiogoogle import Aiogoogle
 from aiogoogle.excs import HTTPError
 from redis.asyncio import Redis
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
     NoTranscriptFound,
     TranscriptsDisabled,
-    VideoUnavailable
+    VideoUnavailable,
 )
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-    retry_if_exception
-)
-import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +46,14 @@ def _should_retry(exception: Exception) -> bool:
 
 class ChannelInfo(TypedDict, total=False):
     """Type definition for YouTube channel info"""
+
     thumbnail_url: str | None
     description: str | None
 
 
 class VideoMetadata(TypedDict, total=False):
     """Type definition for YouTube video metadata"""
+
     video_id: str
     title: str
     channel: str
@@ -80,7 +83,7 @@ class VideoMetadata(TypedDict, total=False):
 class YouTubeClient:
     """Async YouTube Data API v3 client with Redis caching"""
 
-    def __init__(self, api_key: str, redis_client: Optional[Redis] = None):
+    def __init__(self, api_key: str, redis_client: Redis | None = None):
         if not api_key or not api_key.strip():
             raise ValueError("YouTube API key is required and cannot be empty")
         self.api_key = api_key
@@ -90,7 +93,7 @@ class YouTubeClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         retry=retry_if_exception(_should_retry),
-        reraise=True
+        reraise=True,
     )
     async def get_video_metadata(self, video_id: str) -> VideoMetadata:
         """
@@ -126,8 +129,7 @@ class YouTubeClient:
                 youtube_v3 = await aiogoogle.discover("youtube", "v3")
 
                 request = youtube_v3.videos.list(
-                    part="snippet,contentDetails,statistics,status",
-                    id=video_id
+                    part="snippet,contentDetails,statistics,status", id=video_id
                 )
 
                 response = await aiogoogle.as_api_key(request)
@@ -146,11 +148,11 @@ class YouTubeClient:
                 # YouTube provides: maxres (1280x720), standard (640x480), high (480x360), medium (320x180), default (120x90)
                 thumbnails = snippet["thumbnails"]
                 thumbnail_url = (
-                    thumbnails.get("maxres", {}).get("url") or
-                    thumbnails.get("standard", {}).get("url") or
-                    thumbnails.get("high", {}).get("url") or
-                    thumbnails.get("medium", {}).get("url") or
-                    thumbnails.get("default", {}).get("url")
+                    thumbnails.get("maxres", {}).get("url")
+                    or thumbnails.get("standard", {}).get("url")
+                    or thumbnails.get("high", {}).get("url")
+                    or thumbnails.get("medium", {}).get("url")
+                    or thumbnails.get("default", {}).get("url")
                 )
 
                 metadata: VideoMetadata = {
@@ -172,9 +174,15 @@ class YouTubeClient:
                     "has_captions": content_details.get("caption") == "true",
                     "region_restriction": content_details.get("regionRestriction"),
                     # Statistics
-                    "view_count": int(statistics.get("viewCount", 0)) if statistics.get("viewCount") else None,
-                    "like_count": int(statistics.get("likeCount", 0)) if statistics.get("likeCount") else None,
-                    "comment_count": int(statistics.get("commentCount", 0)) if statistics.get("commentCount") else None,
+                    "view_count": int(statistics.get("viewCount", 0))
+                    if statistics.get("viewCount")
+                    else None,
+                    "like_count": int(statistics.get("likeCount", 0))
+                    if statistics.get("likeCount")
+                    else None,
+                    "comment_count": int(statistics.get("commentCount", 0))
+                    if statistics.get("commentCount")
+                    else None,
                     # Status
                     "privacy_status": status.get("privacyStatus"),
                     "is_embeddable": status.get("embeddable"),
@@ -183,20 +191,24 @@ class YouTubeClient:
                 # Store in cache with TTL + jitter (7 days)
                 if self.redis:
                     ttl = 7 * 24 * 3600 + random.randint(0, 3600)  # Add jitter
-                    await self.redis.setex(
-                        cache_key,
-                        ttl,
-                        json.dumps(metadata)
-                    )
+                    await self.redis.setex(cache_key, ttl, json.dumps(metadata))
 
                 return metadata
 
         except HTTPError as e:
             if e.res.status_code == 403:
                 # Quota exceeded or forbidden - don't retry
-                error_body = e.res.json if isinstance(e.res.json, dict) else (e.res.json() if callable(e.res.json) else {})
-                reason = error_body.get('error', {}).get('errors', [{}])[0].get('reason', 'unknown')
-                if reason == 'quotaExceeded':
+                error_body = (
+                    e.res.json
+                    if isinstance(e.res.json, dict)
+                    else (e.res.json() if callable(e.res.json) else {})
+                )
+                reason = (
+                    error_body.get("error", {})
+                    .get("errors", [{}])[0]
+                    .get("reason", "unknown")
+                )
+                if reason == "quotaExceeded":
                     raise ValueError(f"YouTube API quota exceeded for video {video_id}")
                 else:
                     raise ValueError(f"YouTube API access forbidden: {reason}")
@@ -209,7 +221,7 @@ class YouTubeClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         retry=retry_if_exception(_should_retry),
-        reraise=True
+        reraise=True,
     )
     async def get_channel_info(self, channel_id: str) -> ChannelInfo:
         """
@@ -248,10 +260,7 @@ class YouTubeClient:
             async with Aiogoogle(api_key=self.api_key) as aiogoogle:
                 youtube_v3 = await aiogoogle.discover("youtube", "v3")
 
-                request = youtube_v3.channels.list(
-                    part="snippet",
-                    id=channel_id
-                )
+                request = youtube_v3.channels.list(part="snippet", id=channel_id)
 
                 response = await aiogoogle.as_api_key(request)
 
@@ -266,9 +275,9 @@ class YouTubeClient:
 
                 # Get highest quality thumbnail available
                 thumbnail_url = (
-                    thumbnails.get("high", {}).get("url") or
-                    thumbnails.get("medium", {}).get("url") or
-                    thumbnails.get("default", {}).get("url")
+                    thumbnails.get("high", {}).get("url")
+                    or thumbnails.get("medium", {}).get("url")
+                    or thumbnails.get("default", {}).get("url")
                 )
 
                 # Get channel description
@@ -276,7 +285,7 @@ class YouTubeClient:
 
                 channel_info: ChannelInfo = {
                     "thumbnail_url": thumbnail_url,
-                    "description": description
+                    "description": description,
                 }
 
                 # Store in cache with TTL (30 days - channel info rarely changes)
@@ -291,7 +300,7 @@ class YouTubeClient:
             return {"thumbnail_url": None, "description": None}
 
     # Backward compatibility alias
-    async def get_channel_thumbnail(self, channel_id: str) -> Optional[str]:
+    async def get_channel_thumbnail(self, channel_id: str) -> str | None:
         """Backward compatibility wrapper for get_channel_info."""
         info = await self.get_channel_info(channel_id)
         return info.get("thumbnail_url")
@@ -300,9 +309,9 @@ class YouTubeClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         retry=retry_if_exception(_should_retry),
-        reraise=True
+        reraise=True,
     )
-    async def get_video_transcript(self, video_id: str) -> Optional[str]:
+    async def get_video_transcript(self, video_id: str) -> str | None:
         """
         Fetch video transcript (captions) with caching (30-day TTL)
 
@@ -322,15 +331,13 @@ class YouTubeClient:
             logger.debug(f"Cache MISS for transcript: {video_id}")
 
         # Try multiple languages with fallback
-        languages_to_try = ['en', 'de', 'es', 'fr', 'it', 'pt', 'ja', 'ko']
+        languages_to_try = ["en", "de", "es", "fr", "it", "pt", "ja", "ko"]
 
         for language in languages_to_try:
             try:
                 # Use asyncio.to_thread for sync API
                 transcript_list = await asyncio.to_thread(
-                    YouTubeTranscriptApi.get_transcript,
-                    video_id,
-                    languages=[language]
+                    YouTubeTranscriptApi.get_transcript, video_id, languages=[language]
                 )
 
                 # Concatenate text segments
@@ -349,7 +356,9 @@ class YouTubeClient:
                 continue  # Try next language
             except (TranscriptsDisabled, VideoUnavailable) as e:
                 # Permanent failures - don't try other languages
-                logger.debug(f"Transcript unavailable for {video_id}: {type(e).__name__}")
+                logger.debug(
+                    f"Transcript unavailable for {video_id}: {type(e).__name__}"
+                )
                 break  # Exit loop and return None
 
         # No transcript in any language - cache the miss
@@ -358,10 +367,7 @@ class YouTubeClient:
 
         return None
 
-    async def get_batch_metadata(
-        self,
-        video_ids: list[str]
-    ) -> list[dict]:
+    async def get_batch_metadata(self, video_ids: list[str]) -> list[dict]:
         """
         Fetch metadata for multiple videos in one API call.
 
@@ -389,7 +395,7 @@ class YouTubeClient:
 
         # Process in batches of 50
         for i in range(0, len(video_ids), BATCH_SIZE):
-            batch = video_ids[i:i + BATCH_SIZE]
+            batch = video_ids[i : i + BATCH_SIZE]
 
             # Check Redis cache for each video
             cached_results = []
@@ -449,18 +455,20 @@ class YouTubeClient:
                         # Get highest quality thumbnail available (same as get_video_metadata)
                         thumbnails = snippet.get("thumbnails", {})
                         thumbnail_url = (
-                            thumbnails.get("maxres", {}).get("url") or
-                            thumbnails.get("standard", {}).get("url") or
-                            thumbnails.get("high", {}).get("url") or
-                            thumbnails.get("medium", {}).get("url") or
-                            thumbnails.get("default", {}).get("url", "")
+                            thumbnails.get("maxres", {}).get("url")
+                            or thumbnails.get("standard", {}).get("url")
+                            or thumbnails.get("high", {}).get("url")
+                            or thumbnails.get("medium", {}).get("url")
+                            or thumbnails.get("default", {}).get("url", "")
                         )
 
                         metadata = {
                             "youtube_id": video_id,
                             "title": snippet.get("title", "Unknown Title"),
                             "channel": snippet.get("channelTitle", "Unknown Channel"),
-                            "channel_id": snippet.get("channelId"),  # YouTube channel ID
+                            "channel_id": snippet.get(
+                                "channelId"
+                            ),  # YouTube channel ID
                             "published_at": snippet.get("publishedAt"),
                             "duration": content_details.get("duration", "PT0S"),
                             "thumbnail_url": thumbnail_url,
@@ -473,11 +481,19 @@ class YouTubeClient:
                             "dimension": content_details.get("dimension"),
                             "definition": content_details.get("definition"),
                             "has_captions": content_details.get("caption") == "true",
-                            "region_restriction": content_details.get("regionRestriction"),
+                            "region_restriction": content_details.get(
+                                "regionRestriction"
+                            ),
                             # Statistics
-                            "view_count": int(statistics.get("viewCount", 0)) if statistics.get("viewCount") else None,
-                            "like_count": int(statistics.get("likeCount", 0)) if statistics.get("likeCount") else None,
-                            "comment_count": int(statistics.get("commentCount", 0)) if statistics.get("commentCount") else None,
+                            "view_count": int(statistics.get("viewCount", 0))
+                            if statistics.get("viewCount")
+                            else None,
+                            "like_count": int(statistics.get("likeCount", 0))
+                            if statistics.get("likeCount")
+                            else None,
+                            "comment_count": int(statistics.get("commentCount", 0))
+                            if statistics.get("commentCount")
+                            else None,
                             # Status
                             "privacy_status": status.get("privacyStatus"),
                             "is_embeddable": status.get("embeddable"),
@@ -490,9 +506,7 @@ class YouTubeClient:
                             # Store with old format key for compatibility
                             cache_data = {**metadata, "video_id": video_id}
                             await self.redis.setex(
-                                cache_key,
-                                ttl,
-                                json.dumps(cache_data)
+                                cache_key, ttl, json.dumps(cache_data)
                             )
 
                         all_results.append(metadata)

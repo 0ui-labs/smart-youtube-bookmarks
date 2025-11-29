@@ -1,15 +1,14 @@
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from uuid import UUID as PyUUID
 
-from sqlalchemy import String, Text, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseModel
 
 if TYPE_CHECKING:
     from .list import BookmarkList
-    from .schema_field import SchemaField
     from .tag import Tag
 
 
@@ -62,6 +61,7 @@ class FieldSchema(BaseModel):
         Tags with schema_id=NULL are valid and common - not all tags need
         custom fields. The relationship is optional to maintain flexibility.
     """
+
     __tablename__ = "field_schemas"
 
     # Columns
@@ -69,24 +69,26 @@ class FieldSchema(BaseModel):
         UUID(as_uuid=True),
         ForeignKey("bookmarks_lists.id", ondelete="CASCADE"),
         nullable=False,
-        index=True  # Performance: frequent lookups by list_id
+        index=True,  # Performance: frequent lookups by list_id
     )
     name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
-        comment="Human-readable schema name (e.g., 'Video Quality', 'Tutorial Metrics')"
+        comment="Human-readable schema name (e.g., 'Video Quality', 'Tutorial Metrics')",
     )
-    description: Mapped[Optional[str]] = mapped_column(
+    description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
-        comment="Optional explanation of what this schema evaluates"
+        comment="Optional explanation of what this schema evaluates",
     )
 
     # Relationships
     list: Mapped["BookmarkList"] = relationship(
         "BookmarkList",
         back_populates="field_schemas",
-        foreign_keys=[list_id]  # Explicit FK - disambiguate from BookmarkList.default_schema_id
+        foreign_keys=[
+            list_id
+        ],  # Explicit FK - disambiguate from BookmarkList.default_schema_id
     )
 
     schema_fields = relationship(
@@ -100,7 +102,7 @@ class FieldSchema(BaseModel):
         back_populates="schema",
         cascade="all, delete-orphan",  # Deleting schema removes from join table
         passive_deletes=True,  # Trust DB CASCADE for performance (REF MCP 2025-11-05)
-        order_by="SchemaField.display_order"  # Ensure consistent ordering by display_order
+        order_by="SchemaField.display_order",  # Ensure consistent ordering by display_order
     )
 
     tags: Mapped[list["Tag"]] = relationship(
@@ -113,4 +115,6 @@ class FieldSchema(BaseModel):
     )
 
     def __repr__(self) -> str:
-        return f"<FieldSchema(id={self.id}, name={self.name!r}, list_id={self.list_id})>"
+        return (
+            f"<FieldSchema(id={self.id}, name={self.name!r}, list_id={self.list_id})>"
+        )

@@ -13,26 +13,28 @@ Related:
 - Task #74: Multi-Tag Field Union Query implementation
 - Task #71: Video Field Values CRUD endpoints
 """
-import pytest
+
 from uuid import uuid4
+
+import pytest
+from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.helpers.field_union import (
     compute_field_union_with_conflicts,
+    get_available_fields_for_video,
     get_available_fields_for_videos,
-    get_available_fields_for_video
 )
 from app.models.custom_field import CustomField
 from app.models.field_schema import FieldSchema
 from app.models.schema_field import SchemaField
-from app.models.video import Video
 from app.models.tag import Tag, video_tags
-from sqlalchemy import insert
-
+from app.models.video import Video
 
 # ============================================================================
 # Test Group 1: compute_field_union_with_conflicts() - Pure Logic
 # ============================================================================
+
 
 class TestComputeFieldUnionWithConflicts:
     """Tests for pure conflict resolution algorithm (no database)."""
@@ -41,39 +43,25 @@ class TestComputeFieldUnionWithConflicts:
         """Test single schema with all unique fields."""
         # Setup test data
         field1 = CustomField(
-            id=uuid4(),
-            name="Rating",
-            field_type="rating",
-            config={"max_rating": 5}
+            id=uuid4(), name="Rating", field_type="rating", config={"max_rating": 5}
         )
-        field2 = CustomField(
-            id=uuid4(),
-            name="Notes",
-            field_type="text",
-            config={}
-        )
+        field2 = CustomField(id=uuid4(), name="Notes", field_type="text", config={})
 
         schema_id = uuid4()
         schema_field1 = SchemaField(
-            schema_id=schema_id,
-            field_id=field1.id,
-            display_order=1,
-            show_on_card=True
+            schema_id=schema_id, field_id=field1.id, display_order=1, show_on_card=True
         )
         schema_field1.field = field1
 
         schema_field2 = SchemaField(
-            schema_id=schema_id,
-            field_id=field2.id,
-            display_order=2,
-            show_on_card=False
+            schema_id=schema_id, field_id=field2.id, display_order=2, show_on_card=False
         )
         schema_field2.field = field2
 
         fields_by_schema = {
             schema_id: [
                 (schema_field1, "Video Quality"),
-                (schema_field2, "Video Quality")
+                (schema_field2, "Video Quality"),
             ]
         }
 
@@ -96,45 +84,38 @@ class TestComputeFieldUnionWithConflicts:
         """Test same field name + same type → show once (deduplicate)."""
         # Schema A has "Rating" (rating type)
         field_a = CustomField(
-            id=uuid4(),
-            name="Rating",
-            field_type="rating",
-            config={"max_rating": 5}
+            id=uuid4(), name="Rating", field_type="rating", config={"max_rating": 5}
         )
         schema_a_id = uuid4()
         schema_field_a = SchemaField(
             schema_id=schema_a_id,
             field_id=field_a.id,
             display_order=1,
-            show_on_card=True
+            show_on_card=True,
         )
         schema_field_a.field = field_a
 
         # Schema B has "Rating" (same type!)
         field_b = CustomField(
-            id=uuid4(),
-            name="Rating",
-            field_type="rating",
-            config={"max_rating": 5}
+            id=uuid4(), name="Rating", field_type="rating", config={"max_rating": 5}
         )
         schema_b_id = uuid4()
         schema_field_b = SchemaField(
             schema_id=schema_b_id,
             field_id=field_b.id,
             display_order=1,
-            show_on_card=False
+            show_on_card=False,
         )
         schema_field_b.field = field_b
 
         fields_by_schema = {
             schema_a_id: [(schema_field_a, "Schema A")],
-            schema_b_id: [(schema_field_b, "Schema B")]
+            schema_b_id: [(schema_field_b, "Schema B")],
         }
 
         # Execute
         result = compute_field_union_with_conflicts(
-            [schema_a_id, schema_b_id],
-            fields_by_schema
+            [schema_a_id, schema_b_id], fields_by_schema
         )
 
         # Verify: Only one "Rating" field (first wins)
@@ -146,45 +127,36 @@ class TestComputeFieldUnionWithConflicts:
         """Test same field name + different type → both with schema prefix."""
         # Schema A has "Rating" (rating type)
         field_a = CustomField(
-            id=uuid4(),
-            name="Rating",
-            field_type="rating",
-            config={"max_rating": 5}
+            id=uuid4(), name="Rating", field_type="rating", config={"max_rating": 5}
         )
         schema_a_id = uuid4()
         schema_field_a = SchemaField(
             schema_id=schema_a_id,
             field_id=field_a.id,
             display_order=1,
-            show_on_card=True
+            show_on_card=True,
         )
         schema_field_a.field = field_a
 
         # Schema B has "Rating" (text type - CONFLICT!)
-        field_b = CustomField(
-            id=uuid4(),
-            name="Rating",
-            field_type="text",
-            config={}
-        )
+        field_b = CustomField(id=uuid4(), name="Rating", field_type="text", config={})
         schema_b_id = uuid4()
         schema_field_b = SchemaField(
             schema_id=schema_b_id,
             field_id=field_b.id,
             display_order=2,
-            show_on_card=False
+            show_on_card=False,
         )
         schema_field_b.field = field_b
 
         fields_by_schema = {
             schema_a_id: [(schema_field_a, "Schema A")],
-            schema_b_id: [(schema_field_b, "Schema B")]
+            schema_b_id: [(schema_field_b, "Schema B")],
         }
 
         # Execute
         result = compute_field_union_with_conflicts(
-            [schema_a_id, schema_b_id],
-            fields_by_schema
+            [schema_a_id, schema_b_id], fields_by_schema
         )
 
         # Verify: Both fields present with prefixes
@@ -204,46 +176,25 @@ class TestComputeFieldUnionWithConflicts:
         """Test complex scenario with some conflicts and some unique fields."""
         # Schema A: "Rating" (rating), "Notes" (text)
         field_a1 = CustomField(
-            id=uuid4(),
-            name="Rating",
-            field_type="rating",
-            config={"max_rating": 5}
+            id=uuid4(), name="Rating", field_type="rating", config={"max_rating": 5}
         )
-        field_a2 = CustomField(
-            id=uuid4(),
-            name="Notes",
-            field_type="text",
-            config={}
-        )
+        field_a2 = CustomField(id=uuid4(), name="Notes", field_type="text", config={})
         schema_a_id = uuid4()
 
         # Schema B: "Rating" (text - CONFLICT!), "Quality" (select)
-        field_b1 = CustomField(
-            id=uuid4(),
-            name="Rating",
-            field_type="text",
-            config={}
-        )
+        field_b1 = CustomField(id=uuid4(), name="Rating", field_type="text", config={})
         field_b2 = CustomField(
             id=uuid4(),
             name="Quality",
             field_type="select",
-            config={"options": ["low", "high"]}
+            config={"options": ["low", "high"]},
         )
         schema_b_id = uuid4()
 
         # Schema C: "Notes" (text - same type, dedupe), "Duration" (rating)
-        field_c1 = CustomField(
-            id=uuid4(),
-            name="Notes",
-            field_type="text",
-            config={}
-        )
+        field_c1 = CustomField(id=uuid4(), name="Notes", field_type="text", config={})
         field_c2 = CustomField(
-            id=uuid4(),
-            name="Duration",
-            field_type="rating",
-            config={"max_rating": 10}
+            id=uuid4(), name="Duration", field_type="rating", config={"max_rating": 10}
         )
         schema_c_id = uuid4()
 
@@ -252,7 +203,7 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_a_id,
             field_id=field_a1.id,
             display_order=1,
-            show_on_card=True
+            show_on_card=True,
         )
         schema_field_a1.field = field_a1
 
@@ -260,7 +211,7 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_a_id,
             field_id=field_a2.id,
             display_order=2,
-            show_on_card=False
+            show_on_card=False,
         )
         schema_field_a2.field = field_a2
 
@@ -268,7 +219,7 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_b_id,
             field_id=field_b1.id,
             display_order=3,
-            show_on_card=True
+            show_on_card=True,
         )
         schema_field_b1.field = field_b1
 
@@ -276,7 +227,7 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_b_id,
             field_id=field_b2.id,
             display_order=4,
-            show_on_card=False
+            show_on_card=False,
         )
         schema_field_b2.field = field_b2
 
@@ -284,7 +235,7 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_c_id,
             field_id=field_c1.id,
             display_order=5,
-            show_on_card=True
+            show_on_card=True,
         )
         schema_field_c1.field = field_c1
 
@@ -292,29 +243,19 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_c_id,
             field_id=field_c2.id,
             display_order=6,
-            show_on_card=False
+            show_on_card=False,
         )
         schema_field_c2.field = field_c2
 
         fields_by_schema = {
-            schema_a_id: [
-                (schema_field_a1, "Schema A"),
-                (schema_field_a2, "Schema A")
-            ],
-            schema_b_id: [
-                (schema_field_b1, "Schema B"),
-                (schema_field_b2, "Schema B")
-            ],
-            schema_c_id: [
-                (schema_field_c1, "Schema C"),
-                (schema_field_c2, "Schema C")
-            ]
+            schema_a_id: [(schema_field_a1, "Schema A"), (schema_field_a2, "Schema A")],
+            schema_b_id: [(schema_field_b1, "Schema B"), (schema_field_b2, "Schema B")],
+            schema_c_id: [(schema_field_c1, "Schema C"), (schema_field_c2, "Schema C")],
         }
 
         # Execute
         result = compute_field_union_with_conflicts(
-            [schema_a_id, schema_b_id, schema_c_id],
-            fields_by_schema
+            [schema_a_id, schema_b_id, schema_c_id], fields_by_schema
         )
 
         # Verify: Should have 5 fields total
@@ -352,17 +293,14 @@ class TestComputeFieldUnionWithConflicts:
         """Test "Rating" vs "rating" treated as same field (case-insensitive)."""
         # Schema A has "Rating" (rating type)
         field_a = CustomField(
-            id=uuid4(),
-            name="Rating",
-            field_type="rating",
-            config={"max_rating": 5}
+            id=uuid4(), name="Rating", field_type="rating", config={"max_rating": 5}
         )
         schema_a_id = uuid4()
         schema_field_a = SchemaField(
             schema_id=schema_a_id,
             field_id=field_a.id,
             display_order=1,
-            show_on_card=True
+            show_on_card=True,
         )
         schema_field_a.field = field_a
 
@@ -371,26 +309,25 @@ class TestComputeFieldUnionWithConflicts:
             id=uuid4(),
             name="rating",  # lowercase
             field_type="text",
-            config={}
+            config={},
         )
         schema_b_id = uuid4()
         schema_field_b = SchemaField(
             schema_id=schema_b_id,
             field_id=field_b.id,
             display_order=2,
-            show_on_card=False
+            show_on_card=False,
         )
         schema_field_b.field = field_b
 
         fields_by_schema = {
             schema_a_id: [(schema_field_a, "Schema A")],
-            schema_b_id: [(schema_field_b, "Schema B")]
+            schema_b_id: [(schema_field_b, "Schema B")],
         }
 
         # Execute
         result = compute_field_union_with_conflicts(
-            [schema_a_id, schema_b_id],
-            fields_by_schema
+            [schema_a_id, schema_b_id], fields_by_schema
         )
 
         # Verify: Conflict detected despite case difference
@@ -400,24 +337,9 @@ class TestComputeFieldUnionWithConflicts:
 
     def test_display_order_preserved(self):
         """Test fields are sorted by display_order."""
-        field1 = CustomField(
-            id=uuid4(),
-            name="Field C",
-            field_type="text",
-            config={}
-        )
-        field2 = CustomField(
-            id=uuid4(),
-            name="Field A",
-            field_type="text",
-            config={}
-        )
-        field3 = CustomField(
-            id=uuid4(),
-            name="Field B",
-            field_type="text",
-            config={}
-        )
+        field1 = CustomField(id=uuid4(), name="Field C", field_type="text", config={})
+        field2 = CustomField(id=uuid4(), name="Field A", field_type="text", config={})
+        field3 = CustomField(id=uuid4(), name="Field B", field_type="text", config={})
 
         schema_id = uuid4()
 
@@ -426,7 +348,7 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_id,
             field_id=field1.id,
             display_order=3,  # C is third
-            show_on_card=True
+            show_on_card=True,
         )
         schema_field1.field = field1
 
@@ -434,7 +356,7 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_id,
             field_id=field2.id,
             display_order=1,  # A is first
-            show_on_card=True
+            show_on_card=True,
         )
         schema_field2.field = field2
 
@@ -442,7 +364,7 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_id,
             field_id=field3.id,
             display_order=2,  # B is second
-            show_on_card=True
+            show_on_card=True,
         )
         schema_field3.field = field3
 
@@ -450,7 +372,7 @@ class TestComputeFieldUnionWithConflicts:
             schema_id: [
                 (schema_field1, "Schema"),
                 (schema_field2, "Schema"),
-                (schema_field3, "Schema")
+                (schema_field3, "Schema"),
             ]
         }
 
@@ -465,18 +387,8 @@ class TestComputeFieldUnionWithConflicts:
 
     def test_show_on_card_preserved(self):
         """Test show_on_card flag is correctly passed through."""
-        field1 = CustomField(
-            id=uuid4(),
-            name="Visible",
-            field_type="text",
-            config={}
-        )
-        field2 = CustomField(
-            id=uuid4(),
-            name="Hidden",
-            field_type="text",
-            config={}
-        )
+        field1 = CustomField(id=uuid4(), name="Visible", field_type="text", config={})
+        field2 = CustomField(id=uuid4(), name="Hidden", field_type="text", config={})
 
         schema_id = uuid4()
 
@@ -484,7 +396,7 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_id,
             field_id=field1.id,
             display_order=1,
-            show_on_card=True  # Visible on card
+            show_on_card=True,  # Visible on card
         )
         schema_field1.field = field1
 
@@ -492,15 +404,12 @@ class TestComputeFieldUnionWithConflicts:
             schema_id=schema_id,
             field_id=field2.id,
             display_order=2,
-            show_on_card=False  # Not visible on card
+            show_on_card=False,  # Not visible on card
         )
         schema_field2.field = field2
 
         fields_by_schema = {
-            schema_id: [
-                (schema_field1, "Schema"),
-                (schema_field2, "Schema")
-            ]
+            schema_id: [(schema_field1, "Schema"), (schema_field2, "Schema")]
         }
 
         # Execute
@@ -515,23 +424,24 @@ class TestComputeFieldUnionWithConflicts:
 # Test Group 2: get_available_fields_for_videos() - Batch DB Loader
 # ============================================================================
 
+
 class TestGetAvailableFieldsForVideos:
     """Tests for batch loading with real database."""
 
-    @pytest.mark.skip(reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field")
+    @pytest.mark.skip(
+        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
+    )
     @pytest.mark.asyncio
-    async def test_batch_load_multiple_videos(self, test_db: AsyncSession, test_list, test_user):
+    async def test_batch_load_multiple_videos(
+        self, test_db: AsyncSession, test_list, test_user
+    ):
         """Test batch loading for 3 videos with different tags and schemas."""
         # Create schemas
         schema_a = FieldSchema(
-            list_id=test_list.id,
-            name="Schema A",
-            description="First schema"
+            list_id=test_list.id, name="Schema A", description="First schema"
         )
         schema_b = FieldSchema(
-            list_id=test_list.id,
-            name="Schema B",
-            description="Second schema"
+            list_id=test_list.id, name="Schema B", description="Second schema"
         )
         test_db.add_all([schema_a, schema_b])
         await test_db.flush()
@@ -541,13 +451,10 @@ class TestGetAvailableFieldsForVideos:
             list_id=test_list.id,
             name="Rating",
             field_type="rating",
-            config={"max_rating": 5}
+            config={"max_rating": 5},
         )
         field2 = CustomField(
-            list_id=test_list.id,
-            name="Notes",
-            field_type="text",
-            config={}
+            list_id=test_list.id, name="Notes", field_type="text", config={}
         )
         test_db.add_all([field1, field2])
         await test_db.flush()
@@ -557,58 +464,46 @@ class TestGetAvailableFieldsForVideos:
             schema_id=schema_a.id,
             field_id=field1.id,
             display_order=1,
-            show_on_card=True
+            show_on_card=True,
         )
         schema_field2 = SchemaField(
             schema_id=schema_b.id,
             field_id=field2.id,
             display_order=1,
-            show_on_card=False
+            show_on_card=False,
         )
         test_db.add_all([schema_field1, schema_field2])
         await test_db.flush()
 
         # Create tags
-        tag_a = Tag(
-            name="Tag A",
-            user_id=test_user.id,
-            schema_id=schema_a.id
-        )
-        tag_b = Tag(
-            name="Tag B",
-            user_id=test_user.id,
-            schema_id=schema_b.id
-        )
+        tag_a = Tag(name="Tag A", user_id=test_user.id, schema_id=schema_a.id)
+        tag_b = Tag(name="Tag B", user_id=test_user.id, schema_id=schema_b.id)
         test_db.add_all([tag_a, tag_b])
         await test_db.flush()
 
         # Create videos
         video1 = Video(
-            list_id=test_list.id,
-            youtube_id="vid1",
-            processing_status="pending"
+            list_id=test_list.id, youtube_id="vid1", processing_status="pending"
         )
         video2 = Video(
-            list_id=test_list.id,
-            youtube_id="vid2",
-            processing_status="pending"
+            list_id=test_list.id, youtube_id="vid2", processing_status="pending"
         )
         video3 = Video(
-            list_id=test_list.id,
-            youtube_id="vid3",
-            processing_status="pending"
+            list_id=test_list.id, youtube_id="vid3", processing_status="pending"
         )
         test_db.add_all([video1, video2, video3])
         await test_db.commit()
 
         # Assign tags using direct SQL insert to avoid lazy loading issues
         await test_db.execute(
-            insert(video_tags).values([
-                {"video_id": video1.id, "tag_id": tag_a.id},
-                {"video_id": video2.id, "tag_id": tag_b.id},
-                {"video_id": video3.id, "tag_id": tag_a.id},
-                {"video_id": video3.id, "tag_id": tag_b.id},
-            ])
+            insert(video_tags).values(
+                [
+                    {"video_id": video1.id, "tag_id": tag_a.id},
+                    {"video_id": video2.id, "tag_id": tag_b.id},
+                    {"video_id": video3.id, "tag_id": tag_a.id},
+                    {"video_id": video3.id, "tag_id": tag_b.id},
+                ]
+            )
         )
         await test_db.commit()
 
@@ -642,20 +537,18 @@ class TestGetAvailableFieldsForVideos:
         video3_fields = fields_by_video[video3.id]
         assert len(video3_fields) == 2
 
-    @pytest.mark.skip(reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field")
+    @pytest.mark.skip(
+        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
+    )
     @pytest.mark.asyncio
     async def test_batch_load_videos_no_tags(self, test_db: AsyncSession, test_list):
         """Test videos without tags return empty fields list."""
         # Create videos without tags
         video1 = Video(
-            list_id=test_list.id,
-            youtube_id="no_tags_1",
-            processing_status="pending"
+            list_id=test_list.id, youtube_id="no_tags_1", processing_status="pending"
         )
         video2 = Video(
-            list_id=test_list.id,
-            youtube_id="no_tags_2",
-            processing_status="pending"
+            list_id=test_list.id, youtube_id="no_tags_2", processing_status="pending"
         )
         test_db.add_all([video1, video2])
         await test_db.commit()
@@ -674,24 +567,26 @@ class TestGetAvailableFieldsForVideos:
         assert fields_by_video[video1.id] == []
         assert fields_by_video[video2.id] == []
 
-    @pytest.mark.skip(reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field")
+    @pytest.mark.skip(
+        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
+    )
     @pytest.mark.asyncio
-    async def test_batch_load_videos_no_schema(self, test_db: AsyncSession, test_list, test_user):
+    async def test_batch_load_videos_no_schema(
+        self, test_db: AsyncSession, test_list, test_user
+    ):
         """Test videos with tags but no schema return empty fields."""
         # Create tag WITHOUT schema
         tag = Tag(
             name="No Schema Tag",
             user_id=test_user.id,
-            schema_id=None  # No schema!
+            schema_id=None,  # No schema!
         )
         test_db.add(tag)
         await test_db.flush()
 
         # Create video with tag
         video = Video(
-            list_id=test_list.id,
-            youtube_id="no_schema",
-            processing_status="pending"
+            list_id=test_list.id, youtube_id="no_schema", processing_status="pending"
         )
         test_db.add(video)
         await test_db.commit()
@@ -713,42 +608,34 @@ class TestGetAvailableFieldsForVideos:
         # Verify: Empty fields (tag has no schema)
         assert fields_by_video[video.id] == []
 
-    @pytest.mark.skip(reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field")
+    @pytest.mark.skip(
+        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
+    )
     @pytest.mark.asyncio
-    async def test_batch_load_single_query(self, test_db: AsyncSession, test_list, test_user):
+    async def test_batch_load_single_query(
+        self, test_db: AsyncSession, test_list, test_user
+    ):
         """Test batch load uses minimal queries (not N+1)."""
         # Create schema and field
         schema = FieldSchema(
-            list_id=test_list.id,
-            name="Query Test Schema",
-            description="Test"
+            list_id=test_list.id, name="Query Test Schema", description="Test"
         )
         test_db.add(schema)
         await test_db.flush()
 
         field = CustomField(
-            list_id=test_list.id,
-            name="Test Field",
-            field_type="text",
-            config={}
+            list_id=test_list.id, name="Test Field", field_type="text", config={}
         )
         test_db.add(field)
         await test_db.flush()
 
         schema_field = SchemaField(
-            schema_id=schema.id,
-            field_id=field.id,
-            display_order=1,
-            show_on_card=True
+            schema_id=schema.id, field_id=field.id, display_order=1, show_on_card=True
         )
         test_db.add(schema_field)
         await test_db.flush()
 
-        tag = Tag(
-            name="Query Test Tag",
-            user_id=test_user.id,
-            schema_id=schema.id
-        )
+        tag = Tag(name="Query Test Tag", user_id=test_user.id, schema_id=schema.id)
         test_db.add(tag)
         await test_db.flush()
 
@@ -758,7 +645,7 @@ class TestGetAvailableFieldsForVideos:
             video = Video(
                 list_id=test_list.id,
                 youtube_id=f"query_test_{i}",
-                processing_status="pending"
+                processing_status="pending",
             )
             test_db.add(video)
             videos.append(video)
@@ -766,7 +653,9 @@ class TestGetAvailableFieldsForVideos:
         await test_db.commit()
 
         # Assign tags using direct SQL insert
-        video_tag_values = [{"video_id": video.id, "tag_id": tag.id} for video in videos]
+        video_tag_values = [
+            {"video_id": video.id, "tag_id": tag.id} for video in videos
+        ]
         await test_db.execute(insert(video_tags).values(video_tag_values))
         await test_db.commit()
 
@@ -794,18 +683,21 @@ class TestGetAvailableFieldsForVideos:
 # Test Group 3: get_available_fields_for_video() - Single-Video Wrapper
 # ============================================================================
 
+
 class TestGetAvailableFieldsForVideo:
     """Tests for single-video wrapper function."""
 
-    @pytest.mark.skip(reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field")
+    @pytest.mark.skip(
+        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
+    )
     @pytest.mark.asyncio
-    async def test_single_video_wrapper(self, test_db: AsyncSession, test_list, test_user):
+    async def test_single_video_wrapper(
+        self, test_db: AsyncSession, test_list, test_user
+    ):
         """Test wrapper calls batch function and returns correct result."""
         # Create schema and field
         schema = FieldSchema(
-            list_id=test_list.id,
-            name="Single Video Schema",
-            description="Test"
+            list_id=test_list.id, name="Single Video Schema", description="Test"
         )
         test_db.add(schema)
         await test_db.flush()
@@ -814,32 +706,23 @@ class TestGetAvailableFieldsForVideo:
             list_id=test_list.id,
             name="Single Field",
             field_type="rating",
-            config={"max_rating": 5}
+            config={"max_rating": 5},
         )
         test_db.add(field)
         await test_db.flush()
 
         schema_field = SchemaField(
-            schema_id=schema.id,
-            field_id=field.id,
-            display_order=1,
-            show_on_card=True
+            schema_id=schema.id, field_id=field.id, display_order=1, show_on_card=True
         )
         test_db.add(schema_field)
         await test_db.flush()
 
-        tag = Tag(
-            name="Single Tag",
-            user_id=test_user.id,
-            schema_id=schema.id
-        )
+        tag = Tag(name="Single Tag", user_id=test_user.id, schema_id=schema.id)
         test_db.add(tag)
         await test_db.flush()
 
         video = Video(
-            list_id=test_list.id,
-            youtube_id="single_video",
-            processing_status="pending"
+            list_id=test_list.id, youtube_id="single_video", processing_status="pending"
         )
         test_db.add(video)
         await test_db.commit()
@@ -863,14 +746,16 @@ class TestGetAvailableFieldsForVideo:
         assert available_fields[0][2] == 1  # display_order
         assert available_fields[0][3] is True  # show_on_card
 
-    @pytest.mark.skip(reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field")
+    @pytest.mark.skip(
+        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
+    )
     @pytest.mark.asyncio
     async def test_single_video_no_fields(self, test_db: AsyncSession, test_list):
         """Test single video with no tags returns empty list."""
         video = Video(
             list_id=test_list.id,
             youtube_id="no_tags_single",
-            processing_status="pending"
+            processing_status="pending",
         )
         test_db.add(video)
         await test_db.commit()
@@ -884,49 +769,39 @@ class TestGetAvailableFieldsForVideo:
         # Verify: Empty list
         assert available_fields == []
 
-    @pytest.mark.skip(reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field")
+    @pytest.mark.skip(
+        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
+    )
     @pytest.mark.asyncio
-    async def test_single_video_calls_batch(self, test_db: AsyncSession, test_list, test_user):
+    async def test_single_video_calls_batch(
+        self, test_db: AsyncSession, test_list, test_user
+    ):
         """Test wrapper actually uses batch function internally."""
         # Create minimal data
         schema = FieldSchema(
-            list_id=test_list.id,
-            name="Batch Call Test",
-            description="Test"
+            list_id=test_list.id, name="Batch Call Test", description="Test"
         )
         test_db.add(schema)
         await test_db.flush()
 
         field = CustomField(
-            list_id=test_list.id,
-            name="Batch Field",
-            field_type="boolean",
-            config={}
+            list_id=test_list.id, name="Batch Field", field_type="boolean", config={}
         )
         test_db.add(field)
         await test_db.flush()
 
         schema_field = SchemaField(
-            schema_id=schema.id,
-            field_id=field.id,
-            display_order=1,
-            show_on_card=False
+            schema_id=schema.id, field_id=field.id, display_order=1, show_on_card=False
         )
         test_db.add(schema_field)
         await test_db.flush()
 
-        tag = Tag(
-            name="Batch Tag",
-            user_id=test_user.id,
-            schema_id=schema.id
-        )
+        tag = Tag(name="Batch Tag", user_id=test_user.id, schema_id=schema.id)
         test_db.add(tag)
         await test_db.flush()
 
         video = Video(
-            list_id=test_list.id,
-            youtube_id="batch_call",
-            processing_status="pending"
+            list_id=test_list.id, youtube_id="batch_call", processing_status="pending"
         )
         test_db.add(video)
         await test_db.commit()

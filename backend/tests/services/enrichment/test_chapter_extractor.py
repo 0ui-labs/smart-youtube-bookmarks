@@ -1,12 +1,14 @@
 """Tests for chapter extraction functionality."""
+
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from app.services.enrichment.providers.chapter_extractor import (
-    ChapterExtractor,
     Chapter,
-    chapters_to_vtt,
+    ChapterExtractor,
     chapters_to_json,
+    chapters_to_vtt,
 )
 
 
@@ -15,11 +17,7 @@ class TestChapter:
 
     def test_chapter_creation(self):
         """Chapter can be created with required fields."""
-        chapter = Chapter(
-            title="Introduction",
-            start=0.0,
-            end=120.0
-        )
+        chapter = Chapter(title="Introduction", start=0.0, end=120.0)
 
         assert chapter.title == "Introduction"
         assert chapter.start == 0.0
@@ -56,7 +54,9 @@ class TestYouTubeChapterExtraction:
             ]
         }
 
-        with patch.object(extractor, '_extract_info', new_callable=AsyncMock) as mock_extract:
+        with patch.object(
+            extractor, "_extract_info", new_callable=AsyncMock
+        ) as mock_extract:
             mock_extract.return_value = mock_info
 
             chapters = await extractor.fetch_youtube_chapters("dQw4w9WgXcQ")
@@ -74,7 +74,9 @@ class TestYouTubeChapterExtraction:
 
         mock_info = {"chapters": None}
 
-        with patch.object(extractor, '_extract_info', new_callable=AsyncMock) as mock_extract:
+        with patch.object(
+            extractor, "_extract_info", new_callable=AsyncMock
+        ) as mock_extract:
             mock_extract.return_value = mock_info
 
             chapters = await extractor.fetch_youtube_chapters("dQw4w9WgXcQ")
@@ -88,7 +90,9 @@ class TestYouTubeChapterExtraction:
 
         mock_info = {"chapters": []}
 
-        with patch.object(extractor, '_extract_info', new_callable=AsyncMock) as mock_extract:
+        with patch.object(
+            extractor, "_extract_info", new_callable=AsyncMock
+        ) as mock_extract:
             mock_extract.return_value = mock_info
 
             chapters = await extractor.fetch_youtube_chapters("dQw4w9WgXcQ")
@@ -100,7 +104,9 @@ class TestYouTubeChapterExtraction:
         """Return None on extraction error."""
         extractor = ChapterExtractor()
 
-        with patch.object(extractor, '_extract_info', new_callable=AsyncMock) as mock_extract:
+        with patch.object(
+            extractor, "_extract_info", new_callable=AsyncMock
+        ) as mock_extract:
             mock_extract.side_effect = Exception("yt-dlp failed")
 
             chapters = await extractor.fetch_youtube_chapters("invalid")

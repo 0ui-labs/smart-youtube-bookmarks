@@ -6,8 +6,7 @@ from httpx import AsyncClient
 async def test_create_tag(client: AsyncClient, test_user):
     """Test creating a new tag."""
     response = await client.post(
-        "/api/tags",
-        json={"name": "Python", "color": "#3B82F6"}
+        "/api/tags", json={"name": "Python", "color": "#3B82F6"}
     )
 
     assert response.status_code == 201
@@ -70,6 +69,7 @@ async def test_get_tag(client: AsyncClient, test_user):
 async def test_get_tag_not_found(client: AsyncClient, test_user):
     """Test getting a non-existent tag returns 404."""
     import uuid
+
     fake_id = str(uuid.uuid4())
 
     response = await client.get(f"/api/tags/{fake_id}")
@@ -86,8 +86,7 @@ async def test_update_tag(client: AsyncClient, test_user):
 
     # Update tag
     response = await client.put(
-        f"/api/tags/{tag_id}",
-        json={"name": "NewName", "color": "#FF5733"}
+        f"/api/tags/{tag_id}", json={"name": "NewName", "color": "#FF5733"}
     )
 
     assert response.status_code == 200
@@ -105,10 +104,7 @@ async def test_update_tag_duplicate_name(client: AsyncClient, test_user):
     tag_id = create_response.json()["id"]
 
     # Try to rename second tag to match first tag
-    response = await client.put(
-        f"/api/tags/{tag_id}",
-        json={"name": "ExistingTag"}
-    )
+    response = await client.put(f"/api/tags/{tag_id}", json={"name": "ExistingTag"})
 
     assert response.status_code == 400
     assert "already exists" in response.json()["detail"]
@@ -118,7 +114,6 @@ async def test_update_tag_duplicate_name(client: AsyncClient, test_user):
 async def test_update_tag_updates_timestamp(client: AsyncClient, test_user):
     """Test that updating a tag automatically updates the updated_at timestamp."""
     import asyncio
-    from datetime import datetime
 
     # Create tag
     create_response = await client.post("/api/tags", json={"name": "TimestampTest"})
@@ -130,8 +125,7 @@ async def test_update_tag_updates_timestamp(client: AsyncClient, test_user):
 
     # Update tag
     update_response = await client.put(
-        f"/api/tags/{tag_id}",
-        json={"name": "TimestampTestUpdated"}
+        f"/api/tags/{tag_id}", json={"name": "TimestampTestUpdated"}
     )
 
     assert update_response.status_code == 200
@@ -163,8 +157,11 @@ async def test_delete_tag(client: AsyncClient, test_user):
 # Schema Integration Tests (Task #70)
 # ============================================================================
 
+
 @pytest.mark.asyncio
-async def test_create_tag_with_schema(client: AsyncClient, test_db, test_user, test_schema):
+async def test_create_tag_with_schema(
+    client: AsyncClient, test_db, test_user, test_schema
+):
     """
     REGRESSION TEST for Bug #002: Test creating a tag WITH schema_id preserves schema_id.
 
@@ -185,36 +182,43 @@ async def test_create_tag_with_schema(client: AsyncClient, test_db, test_user, t
         json={
             "name": "TagWithSchema",
             "color": "#FF5733",
-            "schema_id": str(test_schema.id)
-        }
+            "schema_id": str(test_schema.id),
+        },
     )
 
     # Verify API response
     assert response.status_code == 201
     data = response.json()
     assert data["name"] == "TagWithSchema"
-    assert data["schema_id"] == str(test_schema.id), "schema_id must be preserved in API response!"
+    assert data["schema_id"] == str(test_schema.id), (
+        "schema_id must be preserved in API response!"
+    )
 
     # CRITICAL: Verify in database (not just response)
     # This catches cases where response looks correct but DB is corrupted
     tag_id = data["id"]
     from sqlalchemy import select
+
     stmt = select(Tag).where(Tag.id == tag_id)
     result = await test_db.execute(stmt)
     tag_in_db = result.scalar_one()
 
     assert tag_in_db.schema_id is not None, "BUG: schema_id was cleared in database!"
-    assert str(tag_in_db.schema_id) == str(test_schema.id), "schema_id mismatch between response and DB"
+    assert str(tag_in_db.schema_id) == str(test_schema.id), (
+        "schema_id mismatch between response and DB"
+    )
 
 
 @pytest.mark.asyncio
-async def test_update_tag_bind_schema(client: AsyncClient, test_db, test_user, test_list, test_schema):
+async def test_update_tag_bind_schema(
+    client: AsyncClient, test_db, test_user, test_list, test_schema
+):
     """Test binding a schema to a tag."""
     # Create tag via API
     create_response = await client.post(
         "/api/tags",
         params={"user_id": str(test_user.id)},
-        json={"name": "TestBindSchema", "color": "#FF0000"}
+        json={"name": "TestBindSchema", "color": "#FF0000"},
     )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
@@ -223,7 +227,7 @@ async def test_update_tag_bind_schema(client: AsyncClient, test_db, test_user, t
     response = await client.put(
         f"/api/tags/{tag_id}",
         params={"user_id": str(test_user.id)},
-        json={"schema_id": str(test_schema.id)}
+        json={"schema_id": str(test_schema.id)},
     )
 
     assert response.status_code == 200
@@ -235,7 +239,9 @@ async def test_update_tag_bind_schema(client: AsyncClient, test_db, test_user, t
 
 
 @pytest.mark.asyncio
-async def test_update_tag_change_schema(client: AsyncClient, test_db, test_user, test_list, test_schema):
+async def test_update_tag_change_schema(
+    client: AsyncClient, test_db, test_user, test_list, test_schema
+):
     """Test changing from schema A to schema B."""
     from app.models.field_schema import FieldSchema
 
@@ -249,7 +255,7 @@ async def test_update_tag_change_schema(client: AsyncClient, test_db, test_user,
     create_response = await client.post(
         "/api/tags",
         params={"user_id": str(test_user.id)},
-        json={"name": "TestChangeSchema"}
+        json={"name": "TestChangeSchema"},
     )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
@@ -258,7 +264,7 @@ async def test_update_tag_change_schema(client: AsyncClient, test_db, test_user,
     bind_response = await client.put(
         f"/api/tags/{tag_id}",
         params={"user_id": str(test_user.id)},
-        json={"schema_id": str(test_schema.id)}
+        json={"schema_id": str(test_schema.id)},
     )
     assert bind_response.status_code == 200
 
@@ -266,7 +272,7 @@ async def test_update_tag_change_schema(client: AsyncClient, test_db, test_user,
     response = await client.put(
         f"/api/tags/{tag_id}",
         params={"user_id": str(test_user.id)},
-        json={"schema_id": str(schema_b.id)}
+        json={"schema_id": str(schema_b.id)},
     )
 
     assert response.status_code == 200
@@ -276,13 +282,15 @@ async def test_update_tag_change_schema(client: AsyncClient, test_db, test_user,
 
 
 @pytest.mark.asyncio
-async def test_update_tag_unbind_schema(client: AsyncClient, test_db, test_user, test_schema):
+async def test_update_tag_unbind_schema(
+    client: AsyncClient, test_db, test_user, test_schema
+):
     """Test unbinding schema with null."""
     # Create tag via API
     create_response = await client.post(
         "/api/tags",
         params={"user_id": str(test_user.id)},
-        json={"name": "TestUnbindSchema"}
+        json={"name": "TestUnbindSchema"},
     )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
@@ -291,14 +299,14 @@ async def test_update_tag_unbind_schema(client: AsyncClient, test_db, test_user,
     await client.put(
         f"/api/tags/{tag_id}",
         params={"user_id": str(test_user.id)},
-        json={"schema_id": str(test_schema.id)}
+        json={"schema_id": str(test_schema.id)},
     )
 
     # Unbind schema
     response = await client.put(
         f"/api/tags/{tag_id}",
         params={"user_id": str(test_user.id)},
-        json={"schema_id": None}
+        json={"schema_id": None},
     )
 
     assert response.status_code == 200
@@ -316,7 +324,7 @@ async def test_update_tag_invalid_schema_id(client: AsyncClient, test_db, test_u
     create_response = await client.post(
         "/api/tags",
         params={"user_id": str(test_user.id)},
-        json={"name": "TestInvalidSchema"}
+        json={"name": "TestInvalidSchema"},
     )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
@@ -325,7 +333,7 @@ async def test_update_tag_invalid_schema_id(client: AsyncClient, test_db, test_u
     response = await client.put(
         f"/api/tags/{tag_id}",
         params={"user_id": str(test_user.id)},
-        json={"schema_id": str(fake_schema_id)}
+        json={"schema_id": str(fake_schema_id)},
     )
 
     assert response.status_code == 404
@@ -333,19 +341,22 @@ async def test_update_tag_invalid_schema_id(client: AsyncClient, test_db, test_u
 
 
 @pytest.mark.asyncio
-async def test_update_tag_schema_from_different_list(client: AsyncClient, test_db, test_user):
+async def test_update_tag_schema_from_different_list(
+    client: AsyncClient, test_db, test_user
+):
     """Test binding schema from another user's list returns 404."""
-    from app.models.user import User
-    from app.models.list import BookmarkList
-    from app.models.field_schema import FieldSchema
     from uuid import uuid4
+
+    from app.models.field_schema import FieldSchema
+    from app.models.list import BookmarkList
+    from app.models.user import User
 
     # Create another user with separate list
     other_user = User(
         id=uuid4(),
         email=f"other-{uuid4()}@example.com",
         hashed_password="$2b$12$placeholder_hash",
-        is_active=True
+        is_active=True,
     )
     test_db.add(other_user)
     await test_db.commit()
@@ -365,7 +376,7 @@ async def test_update_tag_schema_from_different_list(client: AsyncClient, test_d
     create_response = await client.post(
         "/api/tags",
         params={"user_id": str(test_user.id)},
-        json={"name": "TestDifferentList"}
+        json={"name": "TestDifferentList"},
     )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
@@ -374,21 +385,26 @@ async def test_update_tag_schema_from_different_list(client: AsyncClient, test_d
     response = await client.put(
         f"/api/tags/{tag_id}",
         params={"user_id": str(test_user.id)},
-        json={"schema_id": str(other_schema.id)}
+        json={"schema_id": str(other_schema.id)},
     )
 
     assert response.status_code == 404
-    assert "nicht gefunden oder gehört zu anderer liste" in response.json()["detail"].lower()
+    assert (
+        "nicht gefunden oder gehört zu anderer liste"
+        in response.json()["detail"].lower()
+    )
 
 
 @pytest.mark.asyncio
-async def test_update_tag_name_only_preserves_schema(client: AsyncClient, test_db, test_user, test_schema):
+async def test_update_tag_name_only_preserves_schema(
+    client: AsyncClient, test_db, test_user, test_schema
+):
     """Test updating only name doesn't change schema_id."""
     # Create tag via API
     create_response = await client.post(
         "/api/tags",
         params={"user_id": str(test_user.id)},
-        json={"name": "TestPreserveSchema"}
+        json={"name": "TestPreserveSchema"},
     )
     assert create_response.status_code == 201
     tag_id = create_response.json()["id"]
@@ -397,7 +413,7 @@ async def test_update_tag_name_only_preserves_schema(client: AsyncClient, test_d
     bind_response = await client.put(
         f"/api/tags/{tag_id}",
         params={"user_id": str(test_user.id)},
-        json={"schema_id": str(test_schema.id)}
+        json={"schema_id": str(test_schema.id)},
     )
     assert bind_response.status_code == 200
     assert bind_response.json()["schema_id"] == str(test_schema.id)
@@ -406,7 +422,7 @@ async def test_update_tag_name_only_preserves_schema(client: AsyncClient, test_d
     response = await client.put(
         f"/api/tags/{tag_id}",
         params={"user_id": str(test_user.id)},
-        json={"name": "NewNamePreserve"}
+        json={"name": "NewNamePreserve"},
     )
 
     assert response.status_code == 200

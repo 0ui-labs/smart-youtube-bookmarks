@@ -9,15 +9,14 @@ Config validation uses discriminated unions to ensure type-specific constraints
 are enforced (e.g., rating fields must have max_rating between 1-10).
 """
 
-from typing import Literal, Annotated, Any, Dict, List
-from uuid import UUID
 from datetime import datetime
+from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 # Field type definitions (using Literal for better Pydantic integration)
-FieldType = Literal['select', 'rating', 'text', 'boolean']
+FieldType = Literal["select", "rating", "text", "boolean"]
 
 
 # Type-specific config schemas
@@ -28,13 +27,12 @@ class SelectConfig(BaseModel):
     Select fields provide a dropdown with predefined options.
     Example: {"options": ["bad", "good", "great"]}
     """
+
     options: list[str] = Field(
-        ...,
-        min_length=1,
-        description="List of selectable options (minimum 1 required)"
+        ..., min_length=1, description="List of selectable options (minimum 1 required)"
     )
 
-    @field_validator('options')
+    @field_validator("options")
     @classmethod
     def validate_and_strip_options(cls, options: list[str]) -> list[str]:
         """Strip whitespace and validate all options are non-empty strings."""
@@ -51,12 +49,8 @@ class RatingConfig(BaseModel):
     Rating fields provide numeric scales (e.g., 1-5 stars).
     Example: {"max_rating": 5}
     """
-    max_rating: int = Field(
-        ...,
-        ge=1,
-        le=10,
-        description="Maximum rating value (1-10)"
-    )
+
+    max_rating: int = Field(..., ge=1, le=10, description="Maximum rating value (1-10)")
 
 
 class TextConfig(BaseModel):
@@ -66,10 +60,9 @@ class TextConfig(BaseModel):
     Text fields allow free-form text input with optional length limits.
     Example: {"max_length": 500} or {}
     """
+
     max_length: int | None = Field(
-        None,
-        ge=1,
-        description="Optional maximum text length (must be ≥1 if specified)"
+        None, ge=1, description="Optional maximum text length (must be ≥1 if specified)"
     )
 
 
@@ -80,15 +73,16 @@ class BooleanConfig(BaseModel):
     Boolean fields provide yes/no checkboxes. No config needed.
     Example: {}
     """
+
     pass  # No configuration needed for boolean fields
 
 
 # Union type for all possible configs
-FieldConfig = SelectConfig | RatingConfig | TextConfig | BooleanConfig | Dict[str, Any]
+FieldConfig = SelectConfig | RatingConfig | TextConfig | BooleanConfig | dict[str, Any]
 
 
 # Shared validation helper function (DRY principle)
-def _validate_config_for_type(field_type: str, config: Dict[str, Any]) -> None:
+def _validate_config_for_type(field_type: str, config: dict[str, Any]) -> None:
     """
     Validate that config structure matches the field_type.
 
@@ -109,12 +103,12 @@ def _validate_config_for_type(field_type: str, config: Dict[str, Any]) -> None:
         >>> _validate_config_for_type('rating', {'max_rating': 5})  # OK
         >>> _validate_config_for_type('rating', {'max_rating': 20})  # Raises ValueError
     """
-    if field_type == 'select':
+    if field_type == "select":
         # Validate SelectConfig
-        if 'options' not in config:
+        if "options" not in config:
             raise ValueError("'select' field type requires 'options' in config")
 
-        options = config.get('options')
+        options = config.get("options")
         if not isinstance(options, list):
             raise ValueError("'options' must be a list")
         if len(options) < 1:
@@ -122,27 +116,27 @@ def _validate_config_for_type(field_type: str, config: Dict[str, Any]) -> None:
         if not all(isinstance(opt, str) and opt.strip() for opt in options):
             raise ValueError("All options must be non-empty strings")
 
-    elif field_type == 'rating':
+    elif field_type == "rating":
         # Validate RatingConfig
-        if 'max_rating' not in config:
+        if "max_rating" not in config:
             raise ValueError("'rating' field type requires 'max_rating' in config")
 
-        max_rating = config.get('max_rating')
+        max_rating = config.get("max_rating")
         if not isinstance(max_rating, int):
             raise ValueError("'max_rating' must be an integer")
         if max_rating < 1 or max_rating > 10:
             raise ValueError("'max_rating' must be between 1 and 10")
 
-    elif field_type == 'text':
+    elif field_type == "text":
         # Validate TextConfig (max_length is optional)
-        if 'max_length' in config:
-            max_length = config.get('max_length')
+        if "max_length" in config:
+            max_length = config.get("max_length")
             if not isinstance(max_length, int):
                 raise ValueError("'max_length' must be an integer")
             if max_length < 1:
                 raise ValueError("'max_length' must be at least 1")
 
-    elif field_type == 'boolean':
+    elif field_type == "boolean":
         # Boolean fields should have empty config or only empty dict
         if config and config != {}:
             raise ValueError("'boolean' field type should have empty config")
@@ -155,22 +149,18 @@ class CustomFieldBase(BaseModel):
     Validates that field name, type, and config are consistent and meet
     business requirements (e.g., rating config must have max_rating 1-10).
     """
+
     name: str = Field(
-        ...,
-        min_length=1,
-        max_length=255,
-        description="Field name (1-255 characters)"
+        ..., min_length=1, max_length=255, description="Field name (1-255 characters)"
     )
     field_type: FieldType = Field(
-        ...,
-        description="Field type: 'select', 'rating', 'text', or 'boolean'"
+        ..., description="Field type: 'select', 'rating', 'text', or 'boolean'"
     )
-    config: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Type-specific configuration (JSON object)"
+    config: dict[str, Any] = Field(
+        default_factory=dict, description="Type-specific configuration (JSON object)"
     )
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
     def strip_name(cls, name: str) -> str:
         """Strip leading/trailing whitespace from field name."""
@@ -179,8 +169,8 @@ class CustomFieldBase(BaseModel):
             raise ValueError("Field name cannot be empty or whitespace-only")
         return stripped
 
-    @model_validator(mode='after')
-    def validate_config_matches_type(self) -> 'CustomFieldBase':
+    @model_validator(mode="after")
+    def validate_config_matches_type(self) -> "CustomFieldBase":
         """
         Validate that config structure matches the field_type.
 
@@ -213,6 +203,7 @@ class CustomFieldCreate(CustomFieldBase):
             }
         }
     """
+
     pass  # All validation inherited from CustomFieldBase
 
 
@@ -239,22 +230,18 @@ class CustomFieldUpdate(BaseModel):
     Note: Changing field_type on existing fields with values should be
     handled carefully by the API layer (may require confirmation).
     """
+
     name: str | None = Field(
-        None,
-        min_length=1,
-        max_length=255,
-        description="Field name (1-255 characters)"
+        None, min_length=1, max_length=255, description="Field name (1-255 characters)"
     )
     field_type: FieldType | None = Field(
-        None,
-        description="Field type: 'select', 'rating', 'text', or 'boolean'"
+        None, description="Field type: 'select', 'rating', 'text', or 'boolean'"
     )
-    config: Dict[str, Any] | None = Field(
-        None,
-        description="Type-specific configuration (JSON object)"
+    config: dict[str, Any] | None = Field(
+        None, description="Type-specific configuration (JSON object)"
     )
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
     def strip_name(cls, name: str | None) -> str | None:
         """Strip leading/trailing whitespace if name is provided."""
@@ -265,8 +252,8 @@ class CustomFieldUpdate(BaseModel):
             raise ValueError("Field name cannot be empty or whitespace-only")
         return stripped
 
-    @model_validator(mode='after')
-    def validate_config_matches_type(self) -> 'CustomFieldUpdate':
+    @model_validator(mode="after")
+    def validate_config_matches_type(self) -> "CustomFieldUpdate":
         """
         Validate config matches field_type if both are provided.
 
@@ -306,6 +293,7 @@ class CustomFieldResponse(CustomFieldBase):
             "updated_at": "2025-11-06T10:30:00Z"
         }
     """
+
     id: UUID = Field(..., description="Unique field identifier")
     list_id: UUID = Field(..., description="Parent list identifier")
     created_at: datetime = Field(..., description="Creation timestamp")
@@ -333,14 +321,15 @@ class DuplicateCheckRequest(BaseModel):
     Response will indicate if a field with this name (case-insensitive)
     already exists in the list.
     """
+
     name: str = Field(
         ...,
         min_length=1,
         max_length=255,
-        description="Field name to check for duplicates"
+        description="Field name to check for duplicates",
     )
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
     def strip_name(cls, name: str) -> str:
         """
@@ -382,13 +371,12 @@ class DuplicateCheckResponse(BaseModel):
             "field": null
         }
     """
+
     exists: bool = Field(
-        ...,
-        description="True if a field with this name already exists"
+        ..., description="True if a field with this name already exists"
     )
     field: CustomFieldResponse | None = Field(
-        None,
-        description="Existing field details (if exists=true)"
+        None, description="Existing field details (if exists=true)"
     )
 
 
@@ -399,23 +387,19 @@ class SmartSuggestion(BaseModel):
     Includes the similar field, similarity score, and explanation
     for why it was suggested.
     """
-    field: CustomFieldResponse = Field(
-        ...,
-        description="The similar existing field"
-    )
+
+    field: CustomFieldResponse = Field(..., description="The similar existing field")
     score: float = Field(
         ...,
         ge=0.0,
         le=1.0,
-        description="Similarity score (0.0-1.0, higher = more similar)"
+        description="Similarity score (0.0-1.0, higher = more similar)",
     )
     similarity_type: Literal["exact", "levenshtein", "semantic"] = Field(
-        ...,
-        description="Type of similarity detected"
+        ..., description="Type of similarity detected"
     )
     explanation: str = Field(
-        ...,
-        description="Human-readable explanation of why this field was suggested"
+        ..., description="Human-readable explanation of why this field was suggested"
     )
 
 
@@ -453,15 +437,14 @@ class SmartDuplicateCheckResponse(BaseModel):
             "mode": "smart"
         }
     """
+
     exists: bool = Field(
-        ...,
-        description="True if any similar fields found (score >= 0.60)"
+        ..., description="True if any similar fields found (score >= 0.60)"
     )
-    suggestions: List[SmartSuggestion] = Field(
+    suggestions: list[SmartSuggestion] = Field(
         default_factory=list,
-        description="List of similar fields ranked by score (highest first)"
+        description="List of similar fields ranked by score (highest first)",
     )
     mode: Literal["basic", "smart"] = Field(
-        default="basic",
-        description="Detection mode used"
+        default="basic", description="Detection mode used"
     )

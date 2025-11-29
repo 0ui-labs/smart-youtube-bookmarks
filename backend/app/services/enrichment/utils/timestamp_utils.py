@@ -1,8 +1,8 @@
 """Timestamp utility functions for enrichment service."""
-import re
-from typing import Optional
 
-from .vtt_parser import parse_vtt, generate_vtt, VTTSegment
+import re
+
+from .vtt_parser import VTTSegment, generate_vtt, parse_vtt
 
 
 def seconds_to_vtt_time(seconds: float) -> str:
@@ -33,7 +33,7 @@ def vtt_time_to_seconds(timestamp: str) -> float:
     Returns:
         Time in seconds
     """
-    parts = timestamp.replace(',', '.').split(':')
+    parts = timestamp.replace(",", ".").split(":")
 
     if len(parts) == 3:
         # HH:MM:SS.mmm
@@ -79,12 +79,10 @@ def offset_timestamps(vtt_content: str, offset_seconds: float) -> str:
 
 
 # Pattern for description timestamps: "0:00", "2:30", "1:30:00", etc.
-DESCRIPTION_TIMESTAMP_PATTERN = re.compile(
-    r'^(\d{1,2}):(\d{2})(?::(\d{2}))?'
-)
+DESCRIPTION_TIMESTAMP_PATTERN = re.compile(r"^(\d{1,2}):(\d{2})(?::(\d{2}))?")
 
 
-def parse_description_timestamp(text: str) -> Optional[float]:
+def parse_description_timestamp(text: str) -> float | None:
     """Parse a timestamp from video description text.
 
     Handles formats like:

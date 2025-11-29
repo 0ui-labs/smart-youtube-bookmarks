@@ -1,11 +1,12 @@
 """Tests for enrichment worker."""
-import pytest
-from uuid import uuid4
-from unittest.mock import AsyncMock, MagicMock, patch
 
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
+
+from app.models.video_enrichment import EnrichmentStatus
 from app.workers.enrichment_worker import enrich_video
-from app.models.video import Video
-from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
 
 
 class TestEnrichVideoWorker:
@@ -14,7 +15,7 @@ class TestEnrichVideoWorker:
     @pytest.mark.asyncio
     async def test_enrich_video_success(self, arq_context, test_video):
         """Worker enriches video successfully."""
-        with patch('app.workers.enrichment_worker.EnrichmentService') as MockService:
+        with patch("app.workers.enrichment_worker.EnrichmentService") as MockService:
             mock_service = MockService.return_value
             mock_enrichment = MagicMock()
             mock_enrichment.status = EnrichmentStatus.completed.value
@@ -38,7 +39,7 @@ class TestEnrichVideoWorker:
     @pytest.mark.asyncio
     async def test_enrich_video_partial(self, arq_context, test_video):
         """Worker handles partial enrichment."""
-        with patch('app.workers.enrichment_worker.EnrichmentService') as MockService:
+        with patch("app.workers.enrichment_worker.EnrichmentService") as MockService:
             mock_service = MockService.return_value
             mock_enrichment = MagicMock()
             mock_enrichment.status = EnrichmentStatus.partial.value
@@ -51,7 +52,7 @@ class TestEnrichVideoWorker:
     @pytest.mark.asyncio
     async def test_enrich_video_failed(self, arq_context, test_video):
         """Worker handles failed enrichment."""
-        with patch('app.workers.enrichment_worker.EnrichmentService') as MockService:
+        with patch("app.workers.enrichment_worker.EnrichmentService") as MockService:
             mock_service = MockService.return_value
             mock_enrichment = MagicMock()
             mock_enrichment.status = EnrichmentStatus.failed.value
@@ -65,9 +66,11 @@ class TestEnrichVideoWorker:
     @pytest.mark.asyncio
     async def test_enrich_video_handles_exception(self, arq_context, test_video):
         """Worker handles unexpected exceptions."""
-        with patch('app.workers.enrichment_worker.EnrichmentService') as MockService:
+        with patch("app.workers.enrichment_worker.EnrichmentService") as MockService:
             mock_service = MockService.return_value
-            mock_service.enrich_video = AsyncMock(side_effect=Exception("Unexpected error"))
+            mock_service.enrich_video = AsyncMock(
+                side_effect=Exception("Unexpected error")
+            )
 
             result = await enrich_video(arq_context, str(test_video.id))
 

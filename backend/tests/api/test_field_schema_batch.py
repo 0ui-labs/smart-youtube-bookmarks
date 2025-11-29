@@ -5,23 +5,22 @@ Tests the PUT /api/lists/{list_id}/schemas/{schema_id}/fields/batch endpoint
 with comprehensive validation scenarios.
 """
 
+from uuid import uuid4
+
 import pytest
 from httpx import AsyncClient
-from uuid import uuid4
 
 from app.models.list import BookmarkList
 
 
 @pytest.mark.asyncio
 async def test_batch_update_success_all_fields(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test successful batch update of all fields in schema."""
     # Create schema
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
@@ -30,11 +29,7 @@ async def test_batch_update_success_all_fields(
     for name in ["Field A", "Field B", "Field C"]:
         field_response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields",
-            json={
-                "name": name,
-                "field_type": "rating",
-                "config": {"max_rating": 5}
-            }
+            json={"name": name, "field_type": "rating", "config": {"max_rating": 5}},
         )
         field_ids.append(field_response.json()["id"])
 
@@ -42,11 +37,7 @@ async def test_batch_update_success_all_fields(
     for idx, field_id in enumerate(field_ids):
         await client.post(
             f"/api/lists/{test_list.id}/schemas/{schema_id}/fields",
-            json={
-                "field_id": field_id,
-                "display_order": idx,
-                "show_on_card": True
-            }
+            json={"field_id": field_id, "display_order": idx, "show_on_card": True},
         )
 
     # Batch update: reverse order and toggle show_on_card
@@ -56,9 +47,9 @@ async def test_batch_update_success_all_fields(
             "fields": [
                 {"field_id": field_ids[2], "display_order": 0, "show_on_card": True},
                 {"field_id": field_ids[1], "display_order": 1, "show_on_card": False},
-                {"field_id": field_ids[0], "display_order": 2, "show_on_card": True}
+                {"field_id": field_ids[0], "display_order": 2, "show_on_card": True},
             ]
-        }
+        },
     )
 
     assert batch_response.status_code == 200
@@ -79,14 +70,12 @@ async def test_batch_update_success_all_fields(
 
 @pytest.mark.asyncio
 async def test_batch_update_partial_fields(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test batch update of only some fields in schema."""
     # Create schema with 4 fields
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
@@ -94,11 +83,7 @@ async def test_batch_update_partial_fields(
     for name in ["Field A", "Field B", "Field C", "Field D"]:
         field_response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields",
-            json={
-                "name": name,
-                "field_type": "text",
-                "config": {}
-            }
+            json={"name": name, "field_type": "text", "config": {}},
         )
         field_ids.append(field_response.json()["id"])
 
@@ -106,11 +91,7 @@ async def test_batch_update_partial_fields(
     for idx, field_id in enumerate(field_ids):
         await client.post(
             f"/api/lists/{test_list.id}/schemas/{schema_id}/fields",
-            json={
-                "field_id": field_id,
-                "display_order": idx,
-                "show_on_card": idx < 2
-            }
+            json={"field_id": field_id, "display_order": idx, "show_on_card": idx < 2},
         )
 
     # Batch update only first 2 fields
@@ -119,9 +100,9 @@ async def test_batch_update_partial_fields(
         json={
             "fields": [
                 {"field_id": field_ids[1], "display_order": 0, "show_on_card": False},
-                {"field_id": field_ids[0], "display_order": 1, "show_on_card": True}
+                {"field_id": field_ids[0], "display_order": 1, "show_on_card": True},
             ]
-        }
+        },
     )
 
     assert batch_response.status_code == 200
@@ -134,14 +115,12 @@ async def test_batch_update_partial_fields(
 
 @pytest.mark.asyncio
 async def test_batch_update_toggle_show_on_card(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test toggling show_on_card flags in batch update."""
     # Create schema with 3 fields
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
@@ -149,11 +128,7 @@ async def test_batch_update_toggle_show_on_card(
     for name in ["Field A", "Field B", "Field C"]:
         field_response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields",
-            json={
-                "name": name,
-                "field_type": "boolean",
-                "config": {}
-            }
+            json={"name": name, "field_type": "boolean", "config": {}},
         )
         field_ids.append(field_response.json()["id"])
 
@@ -161,11 +136,7 @@ async def test_batch_update_toggle_show_on_card(
     for idx, field_id in enumerate(field_ids):
         await client.post(
             f"/api/lists/{test_list.id}/schemas/{schema_id}/fields",
-            json={
-                "field_id": field_id,
-                "display_order": idx,
-                "show_on_card": False
-            }
+            json={"field_id": field_id, "display_order": idx, "show_on_card": False},
         )
 
     # Batch update: turn on first 2
@@ -175,9 +146,9 @@ async def test_batch_update_toggle_show_on_card(
             "fields": [
                 {"field_id": field_ids[0], "display_order": 0, "show_on_card": True},
                 {"field_id": field_ids[1], "display_order": 1, "show_on_card": True},
-                {"field_id": field_ids[2], "display_order": 2, "show_on_card": False}
+                {"field_id": field_ids[2], "display_order": 2, "show_on_card": False},
             ]
-        }
+        },
     )
 
     assert batch_response.status_code == 200
@@ -190,14 +161,12 @@ async def test_batch_update_toggle_show_on_card(
 
 @pytest.mark.asyncio
 async def test_batch_update_reorder_display_order(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test reordering fields via batch update."""
     # Create schema with 5 fields
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
@@ -208,8 +177,8 @@ async def test_batch_update_reorder_display_order(
             json={
                 "name": f"Field {i}",
                 "field_type": "rating",
-                "config": {"max_rating": 5}
-            }
+                "config": {"max_rating": 5},
+            },
         )
         field_ids.append(field_response.json()["id"])
 
@@ -217,11 +186,7 @@ async def test_batch_update_reorder_display_order(
     for idx, field_id in enumerate(field_ids):
         await client.post(
             f"/api/lists/{test_list.id}/schemas/{schema_id}/fields",
-            json={
-                "field_id": field_id,
-                "display_order": idx,
-                "show_on_card": idx < 3
-            }
+            json={"field_id": field_id, "display_order": idx, "show_on_card": idx < 3},
         )
 
     # Batch update: completely reverse order
@@ -233,9 +198,9 @@ async def test_batch_update_reorder_display_order(
                 {"field_id": field_ids[3], "display_order": 1, "show_on_card": True},
                 {"field_id": field_ids[2], "display_order": 2, "show_on_card": True},
                 {"field_id": field_ids[1], "display_order": 3, "show_on_card": False},
-                {"field_id": field_ids[0], "display_order": 4, "show_on_card": False}
+                {"field_id": field_ids[0], "display_order": 4, "show_on_card": False},
             ]
-        }
+        },
     )
 
     assert batch_response.status_code == 200
@@ -249,14 +214,12 @@ async def test_batch_update_reorder_display_order(
 
 @pytest.mark.asyncio
 async def test_batch_update_max_3_show_on_card_enforcement(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test that max 3 show_on_card constraint is enforced."""
     # Create schema with 4 fields
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
@@ -264,11 +227,7 @@ async def test_batch_update_max_3_show_on_card_enforcement(
     for i in range(4):
         field_response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields",
-            json={
-                "name": f"Field {i}",
-                "field_type": "text",
-                "config": {}
-            }
+            json={"name": f"Field {i}", "field_type": "text", "config": {}},
         )
         field_ids.append(field_response.json()["id"])
 
@@ -276,11 +235,7 @@ async def test_batch_update_max_3_show_on_card_enforcement(
     for idx, field_id in enumerate(field_ids):
         await client.post(
             f"/api/lists/{test_list.id}/schemas/{schema_id}/fields",
-            json={
-                "field_id": field_id,
-                "display_order": idx,
-                "show_on_card": False
-            }
+            json={"field_id": field_id, "display_order": idx, "show_on_card": False},
         )
 
     # Try batch update with 4 show_on_card=true (should fail)
@@ -291,9 +246,9 @@ async def test_batch_update_max_3_show_on_card_enforcement(
                 {"field_id": field_ids[0], "display_order": 0, "show_on_card": True},
                 {"field_id": field_ids[1], "display_order": 1, "show_on_card": True},
                 {"field_id": field_ids[2], "display_order": 2, "show_on_card": True},
-                {"field_id": field_ids[3], "display_order": 3, "show_on_card": True}
+                {"field_id": field_ids[3], "display_order": 3, "show_on_card": True},
             ]
-        }
+        },
     )
 
     assert batch_response.status_code == 422
@@ -302,14 +257,12 @@ async def test_batch_update_max_3_show_on_card_enforcement(
 
 @pytest.mark.asyncio
 async def test_batch_update_duplicate_display_order_error(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test that duplicate display_order values are rejected."""
     # Create schema with 3 fields
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
@@ -320,8 +273,8 @@ async def test_batch_update_duplicate_display_order_error(
             json={
                 "name": f"Field {i}",
                 "field_type": "rating",
-                "config": {"max_rating": 5}
-            }
+                "config": {"max_rating": 5},
+            },
         )
         field_ids.append(field_response.json()["id"])
 
@@ -329,11 +282,7 @@ async def test_batch_update_duplicate_display_order_error(
     for idx, field_id in enumerate(field_ids):
         await client.post(
             f"/api/lists/{test_list.id}/schemas/{schema_id}/fields",
-            json={
-                "field_id": field_id,
-                "display_order": idx,
-                "show_on_card": True
-            }
+            json={"field_id": field_id, "display_order": idx, "show_on_card": True},
         )
 
     # Try batch update with duplicate display_order (should fail)
@@ -342,10 +291,14 @@ async def test_batch_update_duplicate_display_order_error(
         json={
             "fields": [
                 {"field_id": field_ids[0], "display_order": 0, "show_on_card": True},
-                {"field_id": field_ids[1], "display_order": 0, "show_on_card": True},  # Duplicate!
-                {"field_id": field_ids[2], "display_order": 2, "show_on_card": True}
+                {
+                    "field_id": field_ids[1],
+                    "display_order": 0,
+                    "show_on_card": True,
+                },  # Duplicate!
+                {"field_id": field_ids[2], "display_order": 2, "show_on_card": True},
             ]
-        }
+        },
     )
 
     assert batch_response.status_code == 422
@@ -354,14 +307,12 @@ async def test_batch_update_duplicate_display_order_error(
 
 @pytest.mark.asyncio
 async def test_batch_update_invalid_field_id_error(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test that invalid field_id is rejected."""
     # Create schema
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
@@ -373,7 +324,7 @@ async def test_batch_update_invalid_field_id_error(
             "fields": [
                 {"field_id": fake_field_id, "display_order": 0, "show_on_card": True}
             ]
-        }
+        },
     )
 
     assert batch_response.status_code == 404
@@ -382,32 +333,23 @@ async def test_batch_update_invalid_field_id_error(
 
 @pytest.mark.asyncio
 async def test_batch_update_field_from_different_list_error(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test that field from different list is rejected (security check)."""
     # Create 2 lists
-    list2_response = await client.post(
-        "/api/lists",
-        json={"name": "List 2"}
-    )
+    list2_response = await client.post("/api/lists", json={"name": "List 2"})
     list2_id = list2_response.json()["id"]
 
     # Create schema in list1
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
     # Create field in list2
     field_response = await client.post(
         f"/api/lists/{list2_id}/custom-fields",
-        json={
-            "name": "Field from List 2",
-            "field_type": "text",
-            "config": {}
-        }
+        json={"name": "Field from List 2", "field_type": "text", "config": {}},
     )
     field_id = field_response.json()["id"]
 
@@ -415,10 +357,8 @@ async def test_batch_update_field_from_different_list_error(
     batch_response = await client.put(
         f"/api/lists/{test_list.id}/schemas/{schema_id}/fields/batch",
         json={
-            "fields": [
-                {"field_id": field_id, "display_order": 0, "show_on_card": True}
-            ]
-        }
+            "fields": [{"field_id": field_id, "display_order": 0, "show_on_card": True}]
+        },
     )
 
     assert batch_response.status_code == 404
@@ -427,8 +367,7 @@ async def test_batch_update_field_from_different_list_error(
 
 @pytest.mark.asyncio
 async def test_batch_update_schema_not_found_error(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test that non-existent schema returns 404."""
     fake_schema_id = str(uuid4())
@@ -440,7 +379,7 @@ async def test_batch_update_schema_not_found_error(
             "fields": [
                 {"field_id": fake_field_id, "display_order": 0, "show_on_card": True}
             ]
-        }
+        },
     )
 
     assert batch_response.status_code == 404
@@ -449,21 +388,19 @@ async def test_batch_update_schema_not_found_error(
 
 @pytest.mark.asyncio
 async def test_batch_update_empty_list_error(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test that empty fields list is rejected (min_length=1)."""
     # Create schema
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
     # Try batch update with empty list (should fail)
     batch_response = await client.put(
         f"/api/lists/{test_list.id}/schemas/{schema_id}/fields/batch",
-        json={"fields": []}
+        json={"fields": []},
     )
 
     assert batch_response.status_code == 422
@@ -471,14 +408,12 @@ async def test_batch_update_empty_list_error(
 
 @pytest.mark.asyncio
 async def test_batch_update_batch_size_limit_50(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test that batch size limit of 50 is enforced."""
     # Create schema
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
@@ -490,7 +425,7 @@ async def test_batch_update_batch_size_limit_50(
 
     batch_response = await client.put(
         f"/api/lists/{test_list.id}/schemas/{schema_id}/fields/batch",
-        json={"fields": fake_fields}
+        json={"fields": fake_fields},
     )
 
     assert batch_response.status_code == 422
@@ -498,14 +433,12 @@ async def test_batch_update_batch_size_limit_50(
 
 @pytest.mark.asyncio
 async def test_batch_update_upsert_creates_missing_associations(
-    client: AsyncClient,
-    test_list: BookmarkList
+    client: AsyncClient, test_list: BookmarkList
 ):
     """Test that UPSERT creates missing schema_field associations."""
     # Create schema
     schema_response = await client.post(
-        f"/api/lists/{test_list.id}/schemas",
-        json={"name": "Test Schema"}
+        f"/api/lists/{test_list.id}/schemas", json={"name": "Test Schema"}
     )
     schema_id = schema_response.json()["id"]
 
@@ -517,19 +450,15 @@ async def test_batch_update_upsert_creates_missing_associations(
             json={
                 "name": name,
                 "field_type": "select",
-                "config": {"options": ["good", "bad"]}
-            }
+                "config": {"options": ["good", "bad"]},
+            },
         )
         field_ids.append(field_response.json()["id"])
 
     # Add only first field to schema
     await client.post(
         f"/api/lists/{test_list.id}/schemas/{schema_id}/fields",
-        json={
-            "field_id": field_ids[0],
-            "display_order": 0,
-            "show_on_card": True
-        }
+        json={"field_id": field_ids[0], "display_order": 0, "show_on_card": True},
     )
 
     # Batch update with both fields (should UPSERT second field)
@@ -538,9 +467,13 @@ async def test_batch_update_upsert_creates_missing_associations(
         json={
             "fields": [
                 {"field_id": field_ids[0], "display_order": 0, "show_on_card": True},
-                {"field_id": field_ids[1], "display_order": 1, "show_on_card": True}  # NEW!
+                {
+                    "field_id": field_ids[1],
+                    "display_order": 1,
+                    "show_on_card": True,
+                },  # NEW!
             ]
-        }
+        },
     )
 
     assert batch_response.status_code == 200

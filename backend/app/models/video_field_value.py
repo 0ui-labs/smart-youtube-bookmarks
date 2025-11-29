@@ -1,8 +1,17 @@
-from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Numeric, Boolean, ForeignKey, Text, UniqueConstraint, CheckConstraint, Index
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
+from typing import TYPE_CHECKING
 from uuid import UUID as PyUUID
+
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Numeric,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseModel
 
@@ -70,6 +79,7 @@ class VideoFieldValue(BaseModel):
         - UNIQUE constraint index enables fast upsert: (video_id, field_id)
         - passive_deletes=True avoids SELECT before CASCADE DELETE (REF MCP Task #59)
     """
+
     __tablename__ = "video_field_values"
 
     # Override: Exclude created_at from BaseModel (migration omits this column)
@@ -77,45 +87,41 @@ class VideoFieldValue(BaseModel):
 
     # Foreign Key Columns
     video_id: Mapped[PyUUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("videos.id", ondelete="CASCADE"),
-        nullable=False
+        UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False
     )
     field_id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("custom_fields.id", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
     )
 
     # Typed Value Columns (only one populated based on field_type)
-    value_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    value_numeric: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
-    value_boolean: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_numeric: Mapped[float | None] = mapped_column(Numeric, nullable=True)
+    value_boolean: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     # Relationships
-    video: Mapped["Video"] = relationship(
-        "Video",
-        back_populates="field_values"
-    )
+    video: Mapped["Video"] = relationship("Video", back_populates="field_values")
     field: Mapped["CustomField"] = relationship(
-        "CustomField",
-        back_populates="video_field_values"
+        "CustomField", back_populates="video_field_values"
     )
 
     # Constraints and Indexes
     __table_args__ = (
-        UniqueConstraint('video_id', 'field_id', name='uq_video_field_values_video_field'),
+        UniqueConstraint(
+            "video_id", "field_id", name="uq_video_field_values_video_field"
+        ),
         CheckConstraint(
             "((value_text IS NOT NULL)::int + (value_numeric IS NOT NULL)::int + (value_boolean IS NOT NULL)::int) = 1",
-            name="ck_video_field_values_exactly_one_value"
+            name="ck_video_field_values_exactly_one_value",
         ),
         # Performance indexes from migration 1a6e18578c31 (lines 93-99)
         # Index 1: Filter by field + numeric value (e.g., "Rating >= 4")
-        Index('idx_video_field_values_field_numeric', 'field_id', 'value_numeric'),
+        Index("idx_video_field_values_field_numeric", "field_id", "value_numeric"),
         # Index 2: Filter by field + text value (e.g., "Presentation = 'great'")
-        Index('idx_video_field_values_field_text', 'field_id', 'value_text'),
+        Index("idx_video_field_values_field_text", "field_id", "value_text"),
         # Index 3: Lookup all field values for a video (most common query)
-        Index('idx_video_field_values_video_field', 'video_id', 'field_id'),
+        Index("idx_video_field_values_video_field", "video_id", "field_id"),
     )
 
     def __repr__(self) -> str:

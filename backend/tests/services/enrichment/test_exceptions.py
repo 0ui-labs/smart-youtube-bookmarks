@@ -1,14 +1,15 @@
 """Tests for enrichment exception classes."""
+
 import pytest
 
 from app.services.enrichment.exceptions import (
+    CaptionExtractionError,
     EnrichmentError,
-    TemporaryError,
     PermanentError,
     RateLimitError,
-    VideoNotFoundError,
+    TemporaryError,
     TranscriptionError,
-    CaptionExtractionError,
+    VideoNotFoundError,
 )
 
 

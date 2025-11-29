@@ -14,50 +14,63 @@ Includes:
 - Proper database commit after operations
 """
 
-from uuid import UUID
-import re
-from typing import List, Sequence, Optional, Annotated, Dict, Tuple, Set, Literal
 import csv
 import io
-from datetime import datetime, timezone
-from app.api.field_validation import validate_field_value, FieldValidationError
-from app.api.helpers.field_union import compute_field_union_with_conflicts, get_available_fields_for_videos, get_available_fields_for_video
 import logging
+import re
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Annotated, Literal
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, or_, and_, desc, asc
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import selectinload, joinedload, aliased
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from isodate import parse_duration
 from httpx import HTTPError, TimeoutException
-from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
+from isodate import parse_duration
+from pydantic import BaseModel
+from redis.exceptions import ConnectionError as RedisConnectionError, RedisError
+from sqlalchemy import and_, asc, desc, func, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased, selectinload
 
+from app.api.field_validation import FieldValidationError, validate_field_value
+from app.api.helpers.field_union import (
+    get_available_fields_for_video,
+    get_available_fields_for_videos,
+)
+from app.clients.youtube import YouTubeClient
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.redis import get_arq_pool, get_redis_client
-from app.core.config import settings
-from app.clients.youtube import YouTubeClient
-from app.models.list import BookmarkList
-from app.models.video import Video
-from app.models.job import ProcessingJob
-from app.models.tag import Tag, video_tags
-from app.models.schema_field import SchemaField
-from app.models.field_schema import FieldSchema
+from app.models.channel import Channel
 from app.models.custom_field import CustomField
+from app.models.job import ProcessingJob
+from app.models.list import BookmarkList
+from app.models.tag import Tag, video_tags
+from app.models.video import Video
+from app.models.video_enrichment import EnrichmentStatus, VideoEnrichment
 from app.models.video_field_value import VideoFieldValue
-from app.schemas.video import VideoAdd, VideoResponse, BulkUploadResponse, BulkUploadFailure, VideoFieldValueResponse, AvailableFieldResponse, VideoFilterRequest, FieldFilterOperator, UpdateWatchProgressRequest, UpdateWatchProgressResponse
+from app.schemas.custom_field import CustomFieldResponse
+from app.schemas.tag import TagResponse
+from app.schemas.video import (
+    AvailableFieldResponse,
+    BulkUploadFailure,
+    BulkUploadResponse,
+    FieldFilterOperator,
+    UpdateWatchProgressRequest,
+    UpdateWatchProgressResponse,
+    VideoAdd,
+    VideoFieldValueResponse,
+    VideoFilterRequest,
+    VideoResponse,
+)
 from app.schemas.video_field_value import (
     BatchUpdateFieldValuesRequest,
     BatchUpdateFieldValuesResponse,
 )
-from app.schemas.tag import TagResponse
-from app.schemas.custom_field import CustomFieldResponse
 from app.services.channel_service import get_or_create_channel
-from app.models.video_enrichment import VideoEnrichment, EnrichmentStatus
-from app.models.channel import Channel
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +91,9 @@ async def _load_channel_thumbnails(videos: Sequence[Video], db: AsyncSession) ->
     channel_ids = list(set(v.channel_id for v in videos if v.channel_id))
 
     # Get all unique channel names for videos without channel_id
-    channel_names = list(set(v.channel for v in videos if not v.channel_id and v.channel))
+    channel_names = list(
+        set(v.channel for v in videos if not v.channel_id and v.channel)
+    )
 
     channels_by_id: dict = {}
     channels_by_name: dict = {}
@@ -98,11 +113,15 @@ async def _load_channel_thumbnails(videos: Sequence[Video], db: AsyncSession) ->
     # Assign thumbnail_url to each video
     for video in videos:
         if video.channel_id and video.channel_id in channels_by_id:
-            video.__dict__['channel_thumbnail_url'] = channels_by_id[video.channel_id].thumbnail_url
+            video.__dict__["channel_thumbnail_url"] = channels_by_id[
+                video.channel_id
+            ].thumbnail_url
         elif video.channel and video.channel in channels_by_name:
-            video.__dict__['channel_thumbnail_url'] = channels_by_name[video.channel].thumbnail_url
+            video.__dict__["channel_thumbnail_url"] = channels_by_name[
+                video.channel
+            ].thumbnail_url
         else:
-            video.__dict__['channel_thumbnail_url'] = None
+            video.__dict__["channel_thumbnail_url"] = None
 
 
 async def _enqueue_enrichment(video_id: UUID, db: AsyncSession) -> None:
@@ -117,8 +136,7 @@ async def _enqueue_enrichment(video_id: UUID, db: AsyncSession) -> None:
 
     # Create pending enrichment record (not yet flushed)
     enrichment = VideoEnrichment(
-        video_id=video_id,
-        status=EnrichmentStatus.pending.value
+        video_id=video_id, status=EnrichmentStatus.pending.value
     )
     db.add(enrichment)
 
@@ -156,7 +174,7 @@ def parse_youtube_timestamp(timestamp: str | None) -> datetime | None:
     if not timestamp:
         return None
     try:
-        return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
     except (ValueError, AttributeError) as e:
         logger.debug(f"Invalid timestamp format '{timestamp}': {e}")
         return None
@@ -166,10 +184,8 @@ router = APIRouter(prefix="/api", tags=["videos"])
 
 
 async def _enqueue_video_processing(
-    db: AsyncSession,
-    list_id: int,
-    total_videos: int
-) -> Optional[ProcessingJob]:
+    db: AsyncSession, list_id: int, total_videos: int
+) -> ProcessingJob | None:
     """
     Helper to create ProcessingJob and enqueue ARQ task.
 
@@ -179,9 +195,7 @@ async def _enqueue_video_processing(
         return None
 
     # Fetch list with schema (eager load)
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
+    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     bookmark_list = result.scalar_one_or_none()
 
     if not bookmark_list:
@@ -191,6 +205,7 @@ async def _enqueue_video_processing(
     schema_fields = None
     if bookmark_list.schema_id:
         from app.models.schema import Schema
+
         result = await db.execute(
             select(Schema).where(Schema.id == bookmark_list.schema_id)
         )
@@ -199,11 +214,7 @@ async def _enqueue_video_processing(
             schema_fields = schema.fields  # JSONB dict
 
     # Create processing job
-    job = ProcessingJob(
-        list_id=list_id,
-        total_videos=total_videos,
-        status="running"
-    )
+    job = ProcessingJob(list_id=list_id, total_videos=total_videos, status="running")
     db.add(job)
     await db.commit()
     await db.refresh(job)
@@ -211,8 +222,7 @@ async def _enqueue_video_processing(
     # Query pending video IDs
     result = await db.execute(
         select(Video.id).where(
-            Video.list_id == list_id,
-            Video.processing_status == "pending"
+            Video.list_id == list_id, Video.processing_status == "pending"
         )
     )
     video_ids = [str(vid) for vid in result.scalars().all()]
@@ -224,7 +234,7 @@ async def _enqueue_video_processing(
         str(job.id),
         str(list_id),
         video_ids,
-        schema_fields  # CRITICAL: Pass schema to worker
+        schema_fields,  # CRITICAL: Pass schema to worker
     )
 
     return job
@@ -250,9 +260,9 @@ def extract_youtube_id(url: str) -> str:
         ValueError: If video ID cannot be extracted
     """
     patterns = [
-        r'(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})',
-        r'youtube\.com\/embed\/([a-zA-Z0-9_-]{11})',
-        r'm\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})',
+        r"(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})",
+        r"youtube\.com\/embed\/([a-zA-Z0-9_-]{11})",
+        r"m\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})",
     ]
 
     for pattern in patterns:
@@ -263,12 +273,7 @@ def extract_youtube_id(url: str) -> str:
     raise ValueError("Could not extract YouTube video ID from URL")
 
 
-async def _apply_sorting(
-    stmt,
-    sort_by: Optional[str],
-    sort_order: str,
-    db: AsyncSession
-):
+async def _apply_sorting(stmt, sort_by: str | None, sort_order: str, db: AsyncSession):
     """
     Apply sorting to a video query statement.
 
@@ -299,7 +304,7 @@ async def _apply_sorting(
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid field_id in sort_by parameter"
+                detail="Invalid field_id in sort_by parameter",
             )
 
         # Validate field exists
@@ -309,8 +314,7 @@ async def _apply_sorting(
         field = field_result.scalar_one_or_none()
         if not field:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Custom field not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Custom field not found"
             )
 
         # LEFT JOIN to video_field_values and sort by typed column
@@ -318,8 +322,8 @@ async def _apply_sorting(
             VideoFieldValue,
             and_(
                 VideoFieldValue.video_id == Video.id,
-                VideoFieldValue.field_id == field_id
-            )
+                VideoFieldValue.field_id == field_id,
+            ),
         )
 
         # Determine sort column based on field type
@@ -332,7 +336,7 @@ async def _apply_sorting(
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported field type: {field.field_type}"
+                detail=f"Unsupported field type: {field.field_type}",
             )
 
         # Apply ORDER BY with explicit NULL handling
@@ -349,13 +353,13 @@ async def _apply_sorting(
             "title": Video.title,
             "duration": Video.duration,
             "created_at": Video.created_at,
-            "channel": Video.channel
+            "channel": Video.channel,
         }
 
         if sort_by not in valid_columns:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid sort_by column: {sort_by}. Valid options: {', '.join(valid_columns.keys())}"
+                detail=f"Invalid sort_by column: {sort_by}. Valid options: {', '.join(valid_columns.keys())}",
             )
 
         sort_column = valid_columns[sort_by]
@@ -371,12 +375,10 @@ async def _apply_sorting(
 @router.post(
     "/lists/{list_id}/videos",
     response_model=VideoResponse,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
 )
 async def add_video_to_list(
-    list_id: UUID,
-    video_data: VideoAdd,
-    db: AsyncSession = Depends(get_db)
+    list_id: UUID, video_data: VideoAdd, db: AsyncSession = Depends(get_db)
 ) -> Video:
     """
     Add a video to a bookmark list with ARQ background processing (Option B).
@@ -403,15 +405,13 @@ async def add_video_to_list(
         HTTPException 422: Invalid YouTube URL
     """
     # Validate list exists
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
+    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     bookmark_list = result.scalar_one_or_none()
 
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Extract YouTube ID
@@ -419,17 +419,13 @@ async def add_video_to_list(
         youtube_id = extract_youtube_id(video_data.url)
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e)
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
         )
 
     # HYBRID APPROACH: Fetch metadata SYNCHRONOUSLY for single videos (fast!)
     # For bulk uploads, we'll use ARQ workers instead
     redis = await get_redis_client()
-    youtube_client = YouTubeClient(
-        api_key=settings.youtube_api_key,
-        redis_client=redis
-    )
+    youtube_client = YouTubeClient(api_key=settings.youtube_api_key, redis_client=redis)
 
     try:
         # Fetch YouTube metadata immediately (200-500ms)
@@ -453,7 +449,7 @@ async def add_video_to_list(
                 youtube_channel_id=youtube_channel_id,
                 channel_name=channel_name,
                 channel_thumbnail=channel_info.get("thumbnail_url"),
-                channel_description=channel_info.get("description")
+                channel_description=channel_info.get("description"),
             )
             channel_db_id = channel.id
 
@@ -470,7 +466,7 @@ async def add_video_to_list(
             processing_status="completed",  # Already have all data!
             # Two-phase import: metadata stage complete, ready for enrichment
             import_stage="metadata",
-            import_progress=25
+            import_progress=25,
         )
 
     except (HTTPError, TimeoutException, ValueError, KeyError, OSError) as e:
@@ -487,10 +483,10 @@ async def add_video_to_list(
             # Two-phase import: Set thumbnail immediately from YouTube ID pattern
             thumbnail_url=f"https://img.youtube.com/vi/{youtube_id}/mqdefault.jpg",
             processing_status="pending",
-            error_message=f"Could not fetch video metadata: {str(e)}",
+            error_message=f"Could not fetch video metadata: {e!s}",
             # Initial import state
             import_stage="created",
-            import_progress=0
+            import_progress=0,
         )
 
     # Save to database
@@ -503,7 +499,7 @@ async def add_video_to_list(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Video already exists in this list"
+            detail="Video already exists in this list",
         )
 
     # Trigger enrichment if video was successfully created with metadata
@@ -513,22 +509,27 @@ async def add_video_to_list(
 
     # Set tags to empty list to avoid async relationship loading issues
     # (newly created video has no tags assigned yet)
-    new_video.__dict__['tags'] = []
+    new_video.__dict__["tags"] = []
 
     # Set field_values to empty list (no tags → no applicable fields)
-    new_video.__dict__['field_values'] = []
+    new_video.__dict__["field_values"] = []
 
     return new_video
 
 
-@router.get("/lists/{list_id}/videos", response_model=List[VideoResponse])
+@router.get("/lists/{list_id}/videos", response_model=list[VideoResponse])
 async def get_videos_in_list(
     list_id: UUID,
-    tags: Annotated[Optional[List[str]], Query(max_length=10)] = None,
-    sort_by: Optional[str] = Query(None, description="Sort column: 'title', 'duration', 'created_at', 'channel', or 'field:<field_id>'"),
-    sort_order: Optional[Literal["asc", "desc"]] = Query("asc", description="Sort direction"),
-    db: AsyncSession = Depends(get_db)
-) -> List[Video]:
+    tags: Annotated[list[str] | None, Query(max_length=10)] = None,
+    sort_by: str | None = Query(
+        None,
+        description="Sort column: 'title', 'duration', 'created_at', 'channel', or 'field:<field_id>'",
+    ),
+    sort_order: Literal["asc", "desc"] | None = Query(
+        "asc", description="Sort direction"
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> list[Video]:
     """
     Get all videos in a bookmark list with optional tag filtering and sorting.
 
@@ -553,15 +554,13 @@ async def get_videos_in_list(
         - /api/lists/{id}/videos?sort_by=field:uuid-rating-field&sort_order=desc - Videos sorted by rating field
     """
     # Validate list exists
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
+    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     bookmark_list = result.scalar_one_or_none()
 
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Build query for videos in list
@@ -605,7 +604,9 @@ async def get_videos_in_list(
     if tag_ids:
         tags_stmt = (
             select(Tag)
-            .options(selectinload(Tag.schema))  # Eager load schema for FieldSchema relationship
+            .options(
+                selectinload(Tag.schema)
+            )  # Eager load schema for FieldSchema relationship
             .where(Tag.id.in_(tag_ids))
         )
         tags_result = await db.execute(tags_stmt)
@@ -625,7 +626,7 @@ async def get_videos_in_list(
 
     # Assign tags to videos
     for video in videos:
-        video.__dict__['tags'] = tags_by_video.get(video.id, [])
+        video.__dict__["tags"] = tags_by_video.get(video.id, [])
 
     # Load parent list once (for Two-Layer Field System: workspace fields from list.default_schema_id)
     # All videos in this endpoint share the same list_id
@@ -635,7 +636,7 @@ async def get_videos_in_list(
 
     # Assign list to all videos
     for video in videos:
-        video.__dict__['list'] = parent_list
+        video.__dict__["list"] = parent_list
 
     # === NEW: Batch-load applicable fields for ALL videos ===
     # ✅ REF #1: Single query for all videos
@@ -655,7 +656,7 @@ async def get_videos_in_list(
         all_field_values = field_values_result.scalars().all()
 
         # Group field values by video_id
-        field_values_by_video: Dict[UUID, List[VideoFieldValue]] = {}
+        field_values_by_video: dict[UUID, list[VideoFieldValue]] = {}
         for fv in all_field_values:
             if fv.video_id not in field_values_by_video:
                 field_values_by_video[fv.video_id] = []
@@ -682,33 +683,35 @@ async def get_videos_in_list(
                 if field_value:
                     # ✅ REF #3: Extract value based on field type (float not int)
                     value = None
-                    if field.field_type == 'rating':
+                    if field.field_type == "rating":
                         value = field_value.value_numeric  # Can be float
-                    elif field.field_type in ('select', 'text'):
+                    elif field.field_type in ("select", "text"):
                         value = field_value.value_text
-                    elif field.field_type == 'boolean':
+                    elif field.field_type == "boolean":
                         value = field_value.value_boolean
 
                     # Create response dict (Pydantic will serialize)
-                    field_values_response.append({
-                        'id': field_value.id,  # No longer needs conditional - field_value is guaranteed to exist
-                        'video_id': video.id,
-                        'field_id': field.id,
-                        'field_name': field.name,
-                        'field': field,  # CustomField ORM object
-                        'value': value,
-                        'schema_name': schema_name,
-                        'show_on_card': show_on_card,
-                        'display_order': display_order,
-                        'updated_at': field_value.updated_at  # No longer needs conditional
-                    })
+                    field_values_response.append(
+                        {
+                            "id": field_value.id,  # No longer needs conditional - field_value is guaranteed to exist
+                            "video_id": video.id,
+                            "field_id": field.id,
+                            "field_name": field.name,
+                            "field": field,  # CustomField ORM object
+                            "value": value,
+                            "schema_name": schema_name,
+                            "show_on_card": show_on_card,
+                            "display_order": display_order,
+                            "updated_at": field_value.updated_at,  # No longer needs conditional
+                        }
+                    )
 
             # Assign to video (FastAPI will serialize via VideoResponse schema)
-            video.__dict__['field_values'] = field_values_response
+            video.__dict__["field_values"] = field_values_response
     else:
         # No videos → no field values needed
         for video in videos:
-            video.__dict__['field_values'] = []
+            video.__dict__["field_values"] = []
 
     # Load channel thumbnails for all videos
     await _load_channel_thumbnails(videos, db)
@@ -720,7 +723,7 @@ async def get_videos_in_list(
 async def filter_videos_in_list(
     list_id: UUID,
     filter_request: VideoFilterRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> list[Video]:
     """
     Filter videos in a bookmark list by tags and/or custom field values.
@@ -753,15 +756,13 @@ async def filter_videos_in_list(
         HTTPException 404: List not found
     """
     # Step 1: Validate list exists
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
+    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     bookmark_list = result.scalar_one_or_none()
 
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Step 2: Build base query
@@ -770,7 +771,9 @@ async def filter_videos_in_list(
     # Step 3: Apply tag filtering (OR logic) - case-insensitive exact match
     if filter_request.tags and len(filter_request.tags) > 0:
         # Normalize tag names: strip whitespace and lowercase
-        normalized_tags = [tag.strip().lower() for tag in filter_request.tags if tag and tag.strip()]
+        normalized_tags = [
+            tag.strip().lower() for tag in filter_request.tags if tag and tag.strip()
+        ]
 
         if normalized_tags:
             # Join to tags and filter by exact case-insensitive match using func.lower
@@ -788,7 +791,7 @@ async def filter_videos_in_list(
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid channel_id format: {filter_request.channel_id}"
+                detail=f"Invalid channel_id format: {filter_request.channel_id}",
             ) from err
 
     # Step 4: Apply field filtering (AND logic)
@@ -803,8 +806,8 @@ async def filter_videos_in_list(
                 vfv_alias,
                 and_(
                     vfv_alias.video_id == Video.id,
-                    vfv_alias.field_id == field_filter.field_id
-                )
+                    vfv_alias.field_id == field_filter.field_id,
+                ),
             )
 
             # Apply operator-specific filtering
@@ -835,7 +838,7 @@ async def filter_videos_in_list(
                 stmt = stmt.where(
                     and_(
                         vfv_alias.value_numeric >= field_filter.value_min,
-                        vfv_alias.value_numeric <= field_filter.value_max
+                        vfv_alias.value_numeric <= field_filter.value_max,
                     )
                 )
 
@@ -844,9 +847,9 @@ async def filter_videos_in_list(
                 # Escape special ILIKE characters (%, _, \) to prevent SQL injection
                 escaped_value = (
                     str(field_filter.value)
-                    .replace('\\', '\\\\')
-                    .replace('%', '\\%')
-                    .replace('_', '\\_')
+                    .replace("\\", "\\\\")
+                    .replace("%", "\\%")
+                    .replace("_", "\\_")
                 )
                 stmt = stmt.where(vfv_alias.value_text.ilike(f"%{escaped_value}%"))
 
@@ -860,10 +863,10 @@ async def filter_videos_in_list(
                 if not isinstance(field_filter.value, str):
                     raise HTTPException(
                         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail="IN operator requires comma-separated string value"
+                        detail="IN operator requires comma-separated string value",
                     )
                 # Parse comma-separated string into list
-                values = [v.strip() for v in field_filter.value.split(',') if v.strip()]
+                values = [v.strip() for v in field_filter.value.split(",") if v.strip()]
                 stmt = stmt.where(vfv_alias.value_text.in_(values))
 
             elif operator == FieldFilterOperator.IS:
@@ -875,10 +878,7 @@ async def filter_videos_in_list(
 
     # Step 5: Apply sorting
     stmt = await _apply_sorting(
-        stmt,
-        filter_request.sort_by,
-        filter_request.sort_order or "asc",
-        db
+        stmt, filter_request.sort_by, filter_request.sort_order or "asc", db
     )
 
     # Step 6: Execute query
@@ -902,9 +902,7 @@ async def filter_videos_in_list(
     # Load all tags with schema relationship eagerly loaded
     if tag_ids:
         tags_stmt = (
-            select(Tag)
-            .options(selectinload(Tag.schema))
-            .where(Tag.id.in_(tag_ids))
+            select(Tag).options(selectinload(Tag.schema)).where(Tag.id.in_(tag_ids))
         )
         tags_result = await db.execute(tags_stmt)
         tags_by_id = {tag.id: tag for tag in tags_result.scalars().all()}
@@ -923,7 +921,7 @@ async def filter_videos_in_list(
 
     # Assign tags to videos
     for video in videos:
-        video.__dict__['tags'] = tags_by_video.get(video.id, [])
+        video.__dict__["tags"] = tags_by_video.get(video.id, [])
 
     # Step 8: Batch-load applicable fields for ALL videos
     applicable_fields_by_video = await get_available_fields_for_videos(videos, db)
@@ -942,7 +940,7 @@ async def filter_videos_in_list(
         all_field_values = field_values_result.scalars().all()
 
         # Group field values by video_id
-        field_values_by_video: Dict[UUID, List[VideoFieldValue]] = {}
+        field_values_by_video: dict[UUID, list[VideoFieldValue]] = {}
         for fv in all_field_values:
             if fv.video_id not in field_values_by_video:
                 field_values_by_video[fv.video_id] = []
@@ -968,33 +966,35 @@ async def filter_videos_in_list(
                 if field_value:
                     # Extract value based on field type
                     value = None
-                    if field.field_type == 'rating':
+                    if field.field_type == "rating":
                         value = field_value.value_numeric  # Can be float
-                    elif field.field_type in ('select', 'text'):
+                    elif field.field_type in ("select", "text"):
                         value = field_value.value_text
-                    elif field.field_type == 'boolean':
+                    elif field.field_type == "boolean":
                         value = field_value.value_boolean
 
                     # Create response dict (Pydantic will serialize)
-                    field_values_response.append({
-                        'id': field_value.id,  # Always valid UUID
-                        'video_id': video.id,
-                        'field_id': field.id,
-                        'field_name': field.name,
-                        'field': field,  # CustomField ORM object
-                        'value': value,
-                        'schema_name': schema_name,
-                        'show_on_card': show_on_card,
-                        'display_order': display_order,
-                        'updated_at': field_value.updated_at  # Always valid datetime
-                    })
+                    field_values_response.append(
+                        {
+                            "id": field_value.id,  # Always valid UUID
+                            "video_id": video.id,
+                            "field_id": field.id,
+                            "field_name": field.name,
+                            "field": field,  # CustomField ORM object
+                            "value": value,
+                            "schema_name": schema_name,
+                            "show_on_card": show_on_card,
+                            "display_order": display_order,
+                            "updated_at": field_value.updated_at,  # Always valid datetime
+                        }
+                    )
 
             # Assign to video (FastAPI will serialize via VideoResponse schema)
-            video.__dict__['field_values'] = field_values_response
+            video.__dict__["field_values"] = field_values_response
     else:
         # No videos -> no field values needed
         for video in videos:
-            video.__dict__['field_values'] = []
+            video.__dict__["field_values"] = []
 
     # Load channel thumbnails for all videos
     await _load_channel_thumbnails(videos, db)
@@ -1003,10 +1003,7 @@ async def filter_videos_in_list(
 
 
 @router.get("/videos/{video_id}", response_model=VideoResponse)
-async def get_video_by_id(
-    video_id: UUID,
-    db: AsyncSession = Depends(get_db)
-) -> Video:
+async def get_video_by_id(video_id: UUID, db: AsyncSession = Depends(get_db)) -> Video:
     """
     Get single video with complete field information (detail view).
 
@@ -1032,7 +1029,7 @@ async def get_video_by_id(
     # BUG #004 FIX: SQLAlchemy sometimes returns a single VideoFieldValue object instead of a list
     # Loading field_values explicitly with eager loading ensures we always get a proper list
     from app.models.video_field_value import VideoFieldValue
-    from app.models.custom_field import CustomField
+
     field_values_stmt = (
         select(VideoFieldValue)
         .where(VideoFieldValue.video_id == video_id)
@@ -1040,12 +1037,13 @@ async def get_video_by_id(
     )
     field_values_result = await db.execute(field_values_stmt)
     field_values_list = list(field_values_result.scalars().all())
-    video.__dict__['field_values'] = field_values_list
+    video.__dict__["field_values"] = field_values_list
 
     # Step 2B: Load tags manually (workaround for SQLAlchemy many-to-many loading issue)
     # SQLAlchemy sometimes returns a single Tag object instead of a list for many-to-many relationships
     # Loading tags explicitly ensures we always get a proper list
     from app.models.tag import Tag, video_tags as video_tags_table
+
     tags_stmt = (
         select(Tag)
         .join(video_tags_table, Tag.id == video_tags_table.c.tag_id)
@@ -1053,13 +1051,13 @@ async def get_video_by_id(
     )
     tags_result = await db.execute(tags_stmt)
     tags_list = list(tags_result.scalars().all())
-    video.__dict__['tags'] = tags_list
+    video.__dict__["tags"] = tags_list
 
     # Step 2C: Load parent list (for Two-Layer Field System: workspace fields from list.default_schema_id)
     list_stmt = select(BookmarkList).where(BookmarkList.id == video.list_id)
     list_result = await db.execute(list_stmt)
     parent_list = list_result.scalar_one_or_none()
-    video.__dict__['list'] = parent_list
+    video.__dict__["list"] = parent_list
 
     # Step 3: Get available fields using helper module
     available_fields_tuples = await get_available_fields_for_video(video, db)
@@ -1073,7 +1071,7 @@ async def get_video_by_id(
             schema_name=schema_name,
             display_order=display_order,
             show_on_card=show_on_card,
-            config=field.config or {}
+            config=field.config or {},
         )
         for field, schema_name, display_order, show_on_card in available_fields_tuples
     ]
@@ -1093,38 +1091,40 @@ async def get_video_by_id(
         if field_value:
             # Extract value based on field type
             value = None
-            if field.field_type == 'rating':
+            if field.field_type == "rating":
                 value = field_value.value_numeric
-            elif field.field_type in ('select', 'text'):
+            elif field.field_type in ("select", "text"):
                 value = field_value.value_text
-            elif field.field_type == 'boolean':
+            elif field.field_type == "boolean":
                 value = field_value.value_boolean
 
-            field_values_response.append({
-                'id': field_value.id,  # No longer needs conditional - field_value is guaranteed to exist
-                'video_id': video.id,
-                'field_id': field.id,
-                'field_name': field.name,
-                'field': field,
-                'value': value,
-                'schema_name': schema_name,
-                'show_on_card': show_on_card,
-                'display_order': display_order,
-                'updated_at': field_value.updated_at  # No longer needs conditional
-            })
+            field_values_response.append(
+                {
+                    "id": field_value.id,  # No longer needs conditional - field_value is guaranteed to exist
+                    "video_id": video.id,
+                    "field_id": field.id,
+                    "field_name": field.name,
+                    "field": field,
+                    "value": value,
+                    "schema_name": schema_name,
+                    "show_on_card": show_on_card,
+                    "display_order": display_order,
+                    "updated_at": field_value.updated_at,  # No longer needs conditional
+                }
+            )
 
     # Step 6: Manually construct response dict (workaround for Pydantic ORM serialization)
     # Returning the Video ORM object directly causes ResponseValidationError during serialization
     # Constructing a dict manually with properly serialized tags avoids this issue
     tags_dicts = [
         {
-            'id': tag.id,
-            'name': tag.name,
-            'color': tag.color,
-            'user_id': tag.user_id,
-            'schema_id': tag.schema_id,
-            'created_at': tag.created_at,
-            'updated_at': tag.updated_at
+            "id": tag.id,
+            "name": tag.name,
+            "color": tag.color,
+            "user_id": tag.user_id,
+            "schema_id": tag.schema_id,
+            "created_at": tag.created_at,
+            "updated_at": tag.updated_at,
         }
         for tag in tags_list
     ]
@@ -1146,25 +1146,25 @@ async def get_video_by_id(
             channel_thumbnail_url = channel.thumbnail_url
 
     return {
-        'id': video.id,
-        'list_id': video.list_id,
-        'youtube_id': video.youtube_id,
-        'title': video.title,
-        'channel': video.channel,
-        'channel_thumbnail_url': channel_thumbnail_url,
-        'duration': video.duration,
-        'published_at': video.published_at,
-        'thumbnail_url': video.thumbnail_url,
-        'extracted_data': video.extracted_data,
-        'processing_status': video.processing_status,
-        'error_message': video.error_message,
-        'created_at': video.created_at,
-        'updated_at': video.updated_at,
-        'watch_position': video.watch_position,
-        'watch_position_updated_at': video.watch_position_updated_at,
-        'tags': tags_dicts,
-        'available_fields': available_fields,
-        'field_values': field_values_response
+        "id": video.id,
+        "list_id": video.list_id,
+        "youtube_id": video.youtube_id,
+        "title": video.title,
+        "channel": video.channel,
+        "channel_thumbnail_url": channel_thumbnail_url,
+        "duration": video.duration,
+        "published_at": video.published_at,
+        "thumbnail_url": video.thumbnail_url,
+        "extracted_data": video.extracted_data,
+        "processing_status": video.processing_status,
+        "error_message": video.error_message,
+        "created_at": video.created_at,
+        "updated_at": video.updated_at,
+        "watch_position": video.watch_position,
+        "watch_position_updated_at": video.watch_position_updated_at,
+        "tags": tags_dicts,
+        "available_fields": available_fields,
+        "field_values": field_values_response,
     }
 
 
@@ -1172,7 +1172,7 @@ async def get_video_by_id(
 async def update_watch_progress(
     video_id: UUID,
     request: UpdateWatchProgressRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> UpdateWatchProgressResponse:
     """
     Update watch progress for a video (video player integration).
@@ -1192,20 +1192,18 @@ async def update_watch_progress(
         HTTPException 404: Video not found
     """
     # Fetch video
-    result = await db.execute(
-        select(Video).where(Video.id == video_id)
-    )
+    result = await db.execute(select(Video).where(Video.id == video_id))
     video = result.scalar_one_or_none()
 
     if not video:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Video with id {video_id} not found"
+            detail=f"Video with id {video_id} not found",
         )
 
     # Update watch position
     video.watch_position = request.position
-    video.watch_position_updated_at = datetime.now(timezone.utc)
+    video.watch_position_updated_at = datetime.now(UTC)
 
     await db.commit()
     await db.refresh(video)
@@ -1213,16 +1211,16 @@ async def update_watch_progress(
     return UpdateWatchProgressResponse(
         video_id=video.id,
         watch_position=video.watch_position,
-        updated_at=video.watch_position_updated_at
+        updated_at=video.watch_position_updated_at,
     )
 
 
-@router.get("/videos", response_model=List[VideoResponse])
+@router.get("/videos", response_model=list[VideoResponse])
 async def list_all_videos(
-    tags: Annotated[Optional[List[str]], Query(max_length=10)] = None,
-    tags_all: Annotated[Optional[List[str]], Query(max_length=10)] = None,
-    db: AsyncSession = Depends(get_db)
-) -> List[Video]:
+    tags: Annotated[list[str] | None, Query(max_length=10)] = None,
+    tags_all: Annotated[list[str] | None, Query(max_length=10)] = None,
+    db: AsyncSession = Depends(get_db),
+) -> list[Video]:
     """
     List all videos with optional tag filtering.
 
@@ -1274,7 +1272,9 @@ async def list_all_videos(
     tags_stmt = (
         select(video_tags.c.video_id, Tag)
         .join(Tag, video_tags.c.tag_id == Tag.id)
-        .options(selectinload(Tag.schema))  # Eager load schema to prevent lazy='raise' error
+        .options(
+            selectinload(Tag.schema)
+        )  # Eager load schema to prevent lazy='raise' error
         .where(video_tags.c.video_id.in_(video_ids))
     )
     tags_result = await db.execute(tags_stmt)
@@ -1288,12 +1288,12 @@ async def list_all_videos(
 
     # Assign tags to videos
     for video in videos:
-        video.__dict__['tags'] = tags_by_video.get(video.id, [])
+        video.__dict__["tags"] = tags_by_video.get(video.id, [])
 
     # Assign empty field_values to all videos (this endpoint doesn't support field filtering)
     # This prevents MissingGreenlet error when VideoResponse tries to access field_values
     for video in videos:
-        video.__dict__['field_values'] = []
+        video.__dict__["field_values"] = []
 
     # Load channel thumbnails for all videos
     await _load_channel_thumbnails(videos, db)
@@ -1302,10 +1302,7 @@ async def list_all_videos(
 
 
 @router.delete("/videos/{video_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_video(
-    video_id: UUID,
-    db: AsyncSession = Depends(get_db)
-) -> None:
+async def delete_video(video_id: UUID, db: AsyncSession = Depends(get_db)) -> None:
     """
     Delete a video from a bookmark list.
 
@@ -1322,15 +1319,13 @@ async def delete_video(
     from app.models.channel import Channel
 
     # Get video
-    result = await db.execute(
-        select(Video).where(Video.id == video_id)
-    )
+    result = await db.execute(select(Video).where(Video.id == video_id))
     video = result.scalar_one_or_none()
 
     if not video:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Video with id {video_id} not found"
+            detail=f"Video with id {video_id} not found",
         )
 
     # Store channel_id before deletion for cleanup check
@@ -1368,7 +1363,7 @@ async def _process_field_values(
     created_videos: list[Video],
     csv_rows_map: dict[str, dict],
     field_columns: dict,
-    failures: list[BulkUploadFailure]
+    failures: list[BulkUploadFailure],
 ) -> None:
     """
     Process and apply field values from CSV rows to created videos.
@@ -1394,7 +1389,7 @@ async def _process_field_values(
         field_updates = []
 
         for column_name, field_data in field_columns.items():
-            raw_value = row_data.get(column_name, '').strip()
+            raw_value = row_data.get(column_name, "").strip()
 
             # Skip empty values (not an error, just unset)
             if not raw_value:
@@ -1402,52 +1397,68 @@ async def _process_field_values(
 
             # Parse value based on field type
             try:
-                field_type = field_data['field_type']
-                field_config = field_data['config']
-                field_id = field_data['id']
-                field_name = field_data['name']
+                field_type = field_data["field_type"]
+                field_config = field_data["config"]
+                field_id = field_data["id"]
+                field_name = field_data["name"]
 
-                if field_type == 'rating':
+                if field_type == "rating":
                     # Parse as float to support decimal ratings
                     parsed_value = float(raw_value)
                     validate_field_value(parsed_value, field_type, field_config)
-                    field_updates.append(FieldValueUpdate(field_id=field_id, value=parsed_value))
+                    field_updates.append(
+                        FieldValueUpdate(field_id=field_id, value=parsed_value)
+                    )
 
-                elif field_type == 'select':
+                elif field_type == "select":
                     # Validate against options list (case-sensitive in validation)
                     validate_field_value(raw_value, field_type, field_config)
-                    field_updates.append(FieldValueUpdate(field_id=field_id, value=raw_value))
+                    field_updates.append(
+                        FieldValueUpdate(field_id=field_id, value=raw_value)
+                    )
 
-                elif field_type == 'text':
+                elif field_type == "text":
                     # Validate max_length if configured
                     validate_field_value(raw_value, field_type, field_config)
-                    field_updates.append(FieldValueUpdate(field_id=field_id, value=raw_value))
+                    field_updates.append(
+                        FieldValueUpdate(field_id=field_id, value=raw_value)
+                    )
 
-                elif field_type == 'boolean':
+                elif field_type == "boolean":
                     # Parse "true"/"false"/"1"/"0" (case-insensitive)
                     lower_value = raw_value.lower()
-                    if lower_value in ('true', '1', 'yes'):
+                    if lower_value in ("true", "1", "yes"):
                         parsed_value = True
-                    elif lower_value in ('false', '0', 'no', ''):
+                    elif lower_value in ("false", "0", "no", ""):
                         parsed_value = False
                     else:
-                        raise ValueError(f"Invalid boolean value: '{raw_value}'. Use 'true'/'false' or '1'/'0'.")
-                    field_updates.append(FieldValueUpdate(field_id=field_id, value=parsed_value))
+                        raise ValueError(
+                            f"Invalid boolean value: '{raw_value}'. Use 'true'/'false' or '1'/'0'."
+                        )
+                    field_updates.append(
+                        FieldValueUpdate(field_id=field_id, value=parsed_value)
+                    )
 
             except (ValueError, FieldValidationError) as e:
                 # Log validation error but continue processing
-                logger.warning(f"Field validation error for video {video.youtube_id}, field '{field_name}': {e}")
+                logger.warning(
+                    f"Field validation error for video {video.youtube_id}, field '{field_name}': {e}"
+                )
 
         # Apply field updates via batch update helper
         if field_updates:
             try:
                 # Create batch update request
-                update_request = BatchUpdateFieldValuesRequest(field_values=field_updates)
+                update_request = BatchUpdateFieldValuesRequest(
+                    field_values=field_updates
+                )
 
                 # Call batch update logic directly (avoid HTTP overhead)
                 await _apply_field_values_batch(db, video.id, update_request)
 
-                logger.info(f"Applied {len(field_updates)} field values for video {video.youtube_id}")
+                logger.info(
+                    f"Applied {len(field_updates)} field values for video {video.youtube_id}"
+                )
 
             except (ValueError, KeyError, FieldValidationError, SQLAlchemyError) as e:
                 # ValueError: Invalid data/parsing errors
@@ -1456,18 +1467,20 @@ async def _process_field_values(
                 # SQLAlchemyError: Database errors (includes IntegrityError)
 
                 # Log error with stack trace but don't fail video creation
-                logger.exception(f"Failed to apply field values for video {video.youtube_id}")
-                failures.append(BulkUploadFailure(
-                    row=0,  # Row number not easily tracked here
-                    url=f"https://youtube.com/watch?v={video.youtube_id}",
-                    error=f"Video created, but field values failed: {str(e)}"
-                ))
+                logger.exception(
+                    f"Failed to apply field values for video {video.youtube_id}"
+                )
+                failures.append(
+                    BulkUploadFailure(
+                        row=0,  # Row number not easily tracked here
+                        url=f"https://youtube.com/watch?v={video.youtube_id}",
+                        error=f"Video created, but field values failed: {e!s}",
+                    )
+                )
 
 
 async def _apply_field_values_batch(
-    db: AsyncSession,
-    video_id: UUID,
-    request: BatchUpdateFieldValuesRequest
+    db: AsyncSession, video_id: UUID, request: BatchUpdateFieldValuesRequest
 ) -> None:
     """
     Apply batch field value updates to a video (helper for CSV import).
@@ -1495,7 +1508,7 @@ async def _apply_field_values_batch(
     if invalid_field_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid field_id(s): {invalid_field_ids}"
+            detail=f"Invalid field_id(s): {invalid_field_ids}",
         )
 
     # Step 2: Validate values against field types
@@ -1512,31 +1525,33 @@ async def _apply_field_values_batch(
         value_numeric = None
         value_boolean = None
 
-        if field.field_type == 'rating':
+        if field.field_type == "rating":
             value_numeric = update.value
-        elif field.field_type in ('select', 'text'):
+        elif field.field_type in ("select", "text"):
             value_text = update.value
-        elif field.field_type == 'boolean':
+        elif field.field_type == "boolean":
             value_boolean = update.value
 
-        upsert_data.append({
-            'video_id': video_id,
-            'field_id': update.field_id,
-            'value_text': value_text,
-            'value_numeric': value_numeric,
-            'value_boolean': value_boolean
-        })
+        upsert_data.append(
+            {
+                "video_id": video_id,
+                "field_id": update.field_id,
+                "value_text": value_text,
+                "value_numeric": value_numeric,
+                "value_boolean": value_boolean,
+            }
+        )
 
     # Step 4: Execute PostgreSQL UPSERT
     stmt = pg_insert(VideoFieldValue).values(upsert_data)
     stmt = stmt.on_conflict_do_update(
-        constraint='uq_video_field_values_video_field',
+        constraint="uq_video_field_values_video_field",
         set_={
-            'value_text': stmt.excluded.value_text,
-            'value_numeric': stmt.excluded.value_numeric,
-            'value_boolean': stmt.excluded.value_boolean,
-            'updated_at': func.now()
-        }
+            "value_text": stmt.excluded.value_text,
+            "value_numeric": stmt.excluded.value_numeric,
+            "value_boolean": stmt.excluded.value_boolean,
+            "updated_at": func.now(),
+        },
     )
 
     await db.execute(stmt)
@@ -1546,12 +1561,10 @@ async def _apply_field_values_batch(
 @router.post(
     "/lists/{list_id}/videos/bulk",
     response_model=BulkUploadResponse,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
 )
 async def bulk_upload_videos(
-    list_id: UUID,
-    file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    list_id: UUID, file: UploadFile = File(...), db: AsyncSession = Depends(get_db)
 ) -> BulkUploadResponse:
     """
     Bulk upload videos from CSV file with optional custom field values.
@@ -1587,62 +1600,70 @@ async def bulk_upload_videos(
         HTTPException 422: Invalid CSV header or file format
     """
     # Validate list exists
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
+    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     bookmark_list = result.scalar_one_or_none()
 
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # Read and parse CSV
     try:
         content = await file.read()
-        csv_string = content.decode('utf-8')
+        csv_string = content.decode("utf-8")
 
         # Skip comment lines (starting with #) for import compatibility with exported CSVs
-        csv_lines = [line for line in csv_string.split('\n') if not line.startswith('#')]
-        clean_csv_string = '\n'.join(csv_lines)
+        csv_lines = [
+            line for line in csv_string.split("\n") if not line.startswith("#")
+        ]
+        clean_csv_string = "\n".join(csv_lines)
 
         csv_file = io.StringIO(clean_csv_string)
         reader = csv.DictReader(csv_file)
 
         # Validate header
-        if reader.fieldnames is None or 'url' not in reader.fieldnames:
+        if reader.fieldnames is None or "url" not in reader.fieldnames:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="CSV must have 'url' header column"
+                detail="CSV must have 'url' header column",
             )
 
         # === NEW: Detect field columns in CSV header ===
         # Step 1: Get all custom fields for this list
         fields_stmt = select(CustomField).where(CustomField.list_id == list_id)
         fields_result = await db.execute(fields_stmt)
-        all_fields = {field.name.lower(): field for field in fields_result.scalars().all()}
+        all_fields = {
+            field.name.lower(): field for field in fields_result.scalars().all()
+        }
 
         # Step 2: Detect field columns in CSV header
         field_columns = {}  # column_name -> dict with field data
         for column_name in reader.fieldnames:
-            if column_name.lower().startswith('field_'):
+            if column_name.lower().startswith("field_"):
                 # Extract field name (remove "field_" prefix)
-                field_name = column_name[6:].strip().lower()  # "field_Overall_Rating" -> "overall_rating"
+                field_name = (
+                    column_name[6:].strip().lower()
+                )  # "field_Overall_Rating" -> "overall_rating"
 
                 # Try to match to existing field (case-insensitive)
                 if field_name in all_fields:
                     field_obj = all_fields[field_name]
                     # Cache field attributes to avoid detached object issues after commit
                     field_columns[column_name] = {
-                        'id': field_obj.id,
-                        'name': field_obj.name,
-                        'field_type': field_obj.field_type,
-                        'config': field_obj.config
+                        "id": field_obj.id,
+                        "name": field_obj.name,
+                        "field_type": field_obj.field_type,
+                        "config": field_obj.config,
                     }
-                    logger.info(f"Detected field column: {column_name} -> {field_obj.name}")
+                    logger.info(
+                        f"Detected field column: {column_name} -> {field_obj.name}"
+                    )
                 else:
-                    logger.warning(f"Unknown field column '{column_name}' (no matching custom field), will be ignored")
+                    logger.warning(
+                        f"Unknown field column '{column_name}' (no matching custom field), will be ignored"
+                    )
 
         videos_to_create = []
         csv_rows_map = {}  # Store raw CSV rows by youtube_id for field value processing
@@ -1651,14 +1672,12 @@ async def bulk_upload_videos(
 
         for row in reader:
             row_num += 1
-            url = row.get('url', '').strip()
+            url = row.get("url", "").strip()
 
             if not url:
-                failures.append(BulkUploadFailure(
-                    row=row_num,
-                    url=url,
-                    error="Empty URL"
-                ))
+                failures.append(
+                    BulkUploadFailure(row=row_num, url=url, error="Empty URL")
+                )
                 continue
 
             # Extract YouTube ID
@@ -1667,27 +1686,25 @@ async def bulk_upload_videos(
 
                 # Check for duplicates in this batch
                 if any(v["youtube_id"] == youtube_id for v in videos_to_create):
-                    failures.append(BulkUploadFailure(
-                        row=row_num,
-                        url=url,
-                        error="Duplicate video in CSV"
-                    ))
+                    failures.append(
+                        BulkUploadFailure(
+                            row=row_num, url=url, error="Duplicate video in CSV"
+                        )
+                    )
                     continue
 
                 # Store YouTube ID and row for later metadata fetch
-                videos_to_create.append({
-                    "youtube_id": youtube_id,
-                    "row": row_num,
-                })
+                videos_to_create.append(
+                    {
+                        "youtube_id": youtube_id,
+                        "row": row_num,
+                    }
+                )
                 # Store raw CSV row by youtube_id for field value processing
                 csv_rows_map[youtube_id] = row
 
             except ValueError as e:
-                failures.append(BulkUploadFailure(
-                    row=row_num,
-                    url=url,
-                    error=str(e)
-                ))
+                failures.append(BulkUploadFailure(row=row_num, url=url, error=str(e)))
 
         # Create videos - HYBRID APPROACH:
         # - Small batches (≤5): Fetch metadata synchronously for instant UI feedback
@@ -1700,11 +1717,12 @@ async def bulk_upload_videos(
 
             if use_sync_fetch:
                 # SYNC PATH: Fetch metadata immediately for small batches
-                logger.info(f"Small batch ({len(videos_to_create)} videos) - fetching metadata synchronously")
+                logger.info(
+                    f"Small batch ({len(videos_to_create)} videos) - fetching metadata synchronously"
+                )
                 redis = await get_redis_client()
                 youtube_client = YouTubeClient(
-                    api_key=settings.youtube_api_key,
-                    redis_client=redis
+                    api_key=settings.youtube_api_key, redis_client=redis
                 )
 
                 for video_data in videos_to_create:
@@ -1714,22 +1732,28 @@ async def bulk_upload_videos(
                         metadata = await youtube_client.get_video_metadata(youtube_id)
 
                         # Parse duration and timestamp
-                        duration_seconds = parse_youtube_duration(metadata.get("duration"))
-                        published_at = parse_youtube_timestamp(metadata.get("published_at"))
+                        duration_seconds = parse_youtube_duration(
+                            metadata.get("duration")
+                        )
+                        published_at = parse_youtube_timestamp(
+                            metadata.get("published_at")
+                        )
 
                         # YouTube Channels: Create or get channel
                         channel_db_id = None
                         youtube_channel_id = metadata.get("channel_id")
                         channel_name = metadata.get("channel")
                         if youtube_channel_id and channel_name:
-                            channel_info = await youtube_client.get_channel_info(youtube_channel_id)
+                            channel_info = await youtube_client.get_channel_info(
+                                youtube_channel_id
+                            )
                             channel = await get_or_create_channel(
                                 db=db,
                                 user_id=bookmark_list.user_id,
                                 youtube_channel_id=youtube_channel_id,
                                 channel_name=channel_name,
                                 channel_thumbnail=channel_info.get("thumbnail_url"),
-                                channel_description=channel_info.get("description")
+                                channel_description=channel_info.get("description"),
                             )
                             channel_db_id = channel.id
 
@@ -1743,22 +1767,32 @@ async def bulk_upload_videos(
                             thumbnail_url=metadata.get("thumbnail_url"),
                             duration=duration_seconds,
                             published_at=published_at,
-                            processing_status="completed"
+                            processing_status="completed",
                         )
-                    except (HTTPError, TimeoutException, ValueError, KeyError, OSError) as e:
-                        logger.warning(f"Failed to fetch metadata for {youtube_id}: {e}, falling back to pending")
+                    except (
+                        HTTPError,
+                        TimeoutException,
+                        ValueError,
+                        KeyError,
+                        OSError,
+                    ) as e:
+                        logger.warning(
+                            f"Failed to fetch metadata for {youtube_id}: {e}, falling back to pending"
+                        )
                         video = Video(
                             list_id=list_id,
                             youtube_id=youtube_id,
                             processing_status="pending",
-                            error_message=f"Could not fetch video metadata: {str(e)}"
+                            error_message=f"Could not fetch video metadata: {e!s}",
                         )
                     video_objects.append(video)
             else:
                 # ASYNC PATH: Create with pending status, ARQ worker fetches metadata
                 # Two-phase import: Set thumbnail immediately from YouTube ID pattern
                 # This ensures instant visual feedback while enrichment runs in background
-                logger.info(f"Large batch ({len(videos_to_create)} videos) - queueing for background processing")
+                logger.info(
+                    f"Large batch ({len(videos_to_create)} videos) - queueing for background processing"
+                )
                 for video_data in videos_to_create:
                     youtube_id = video_data["youtube_id"]
                     video = Video(
@@ -1769,7 +1803,7 @@ async def bulk_upload_videos(
                         # Initial import state for progress tracking
                         import_stage="created",
                         import_progress=0,
-                        processing_status="pending"
+                        processing_status="pending",
                     )
                     video_objects.append(video)
 
@@ -1802,35 +1836,43 @@ async def bulk_upload_videos(
                         # Load existing video for field value update
                         existing_stmt = select(Video).where(
                             Video.list_id == list_id,
-                            Video.youtube_id == video.youtube_id
+                            Video.youtube_id == video.youtube_id,
                         )
                         existing_result = await db.execute(existing_stmt)
                         existing_video = existing_result.scalar_one_or_none()
                         if existing_video:
                             existing_videos.append(existing_video)
-                            logger.info(f"Video {video.youtube_id} already exists, will update field values")
+                            logger.info(
+                                f"Video {video.youtube_id} already exists, will update field values"
+                            )
                 await db.commit()
 
                 # Refresh all video objects to prevent detached object issues
                 for video in created_videos:
                     await db.refresh(video)
-                if 'existing_videos' in locals():
+                if "existing_videos" in locals():
                     for video in existing_videos:
                         await db.refresh(video)
 
             # Separate videos by status for different handling
-            pending_videos = [v for v in created_videos if v.processing_status == "pending"]
-            completed_videos = [v for v in created_videos if v.processing_status == "completed"]
+            pending_videos = [
+                v for v in created_videos if v.processing_status == "pending"
+            ]
+            completed_videos = [
+                v for v in created_videos if v.processing_status == "completed"
+            ]
 
             # === Apply field values to ALL videos (new + existing) (SINGLE LOCATION) ===
-            all_videos = created_videos + (existing_videos if 'existing_videos' in locals() else [])
+            all_videos = created_videos + (
+                existing_videos if "existing_videos" in locals() else []
+            )
             if field_columns and all_videos:
                 await _process_field_values(
                     db=db,
                     created_videos=all_videos,
                     csv_rows_map=csv_rows_map,
                     field_columns=field_columns,
-                    failures=failures
+                    failures=failures,
                 )
                 await db.commit()
 
@@ -1848,25 +1890,24 @@ async def bulk_upload_videos(
             created_count=len(created_videos),
             failed_count=len(failures),
             failures=failures,
-            created_video_ids=[str(v.id) for v in created_videos]
+            created_video_ids=[str(v.id) for v in created_videos],
         )
 
     except UnicodeDecodeError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="File must be UTF-8 encoded"
+            detail="File must be UTF-8 encoded",
         )
     except csv.Error as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid CSV format: {str(e)}"
+            detail=f"Invalid CSV format: {e!s}",
         )
 
 
 @router.get("/lists/{list_id}/export/csv")
 async def export_videos_csv(
-    list_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    list_id: UUID, db: AsyncSession = Depends(get_db)
 ) -> StreamingResponse:
     """
     Export all videos in a list to CSV format with custom field values.
@@ -1901,15 +1942,13 @@ async def export_videos_csv(
         HTTPException 404: List not found
     """
     # === STEP 1: Validate list exists ===
-    result = await db.execute(
-        select(BookmarkList).where(BookmarkList.id == list_id)
-    )
+    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     bookmark_list = result.scalar_one_or_none()
 
     if not bookmark_list:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found"
+            detail=f"List with id {list_id} not found",
         )
 
     # === STEP 2: Get all custom fields for this list (for header generation) ===
@@ -1934,9 +1973,8 @@ async def export_videos_csv(
     # === STEP 3.5: Load all field values for all videos in one query (performance optimization) ===
     if videos:
         video_ids = [v.id for v in videos]
-        field_values_stmt = (
-            select(VideoFieldValue)
-            .where(VideoFieldValue.video_id.in_(video_ids))
+        field_values_stmt = select(VideoFieldValue).where(
+            VideoFieldValue.video_id.in_(video_ids)
         )
         field_values_result = await db.execute(field_values_stmt)
         all_field_values = field_values_result.scalars().all()
@@ -1956,18 +1994,26 @@ async def export_videos_csv(
 
     # Generate metadata comment line (optional, for human reference)
     if custom_fields:
-        field_metadata = ', '.join(
-            f"{field.name} ({field.field_type}" +
-            (f", {field.config.get('max_rating')}" if field.field_type == 'rating' else "") +
-            (f": {'|'.join(field.config.get('options', []))}" if field.field_type == 'select' else "") +
-            ")"
+        field_metadata = ", ".join(
+            f"{field.name} ({field.field_type}"
+            + (
+                f", {field.config.get('max_rating')}"
+                if field.field_type == "rating"
+                else ""
+            )
+            + (
+                f": {'|'.join(field.config.get('options', []))}"
+                if field.field_type == "select"
+                else ""
+            )
+            + ")"
             for field in custom_fields
         )
         output.write(f"# Custom Fields: {field_metadata}\n")
 
     # Write header row
     # Use 'url' instead of 'youtube_id' for import compatibility
-    header = ['url', 'status', 'created_at']
+    header = ["url", "status", "created_at"]
     # Add field columns: field_<field_name>
     field_columns = [f"field_{field.name}" for field in custom_fields]
     header.extend(field_columns)
@@ -1978,17 +2024,11 @@ async def export_videos_csv(
         # Standard columns
         # Convert youtube_id to full URL for import compatibility
         video_url = f"https://www.youtube.com/watch?v={video.youtube_id}"
-        row = [
-            video_url,
-            video.processing_status,
-            video.created_at.isoformat()
-        ]
+        row = [video_url, video.processing_status, video.created_at.isoformat()]
 
         # Build field values lookup from pre-loaded map
         video_field_values = video_field_values_map.get(video.id, [])
-        field_values_map = {
-            fv.field_id: fv for fv in video_field_values
-        }
+        field_values_map = {fv.field_id: fv for fv in video_field_values}
 
         # Add field value columns (match order of header)
         for field in custom_fields:
@@ -1996,20 +2036,22 @@ async def export_videos_csv(
 
             if field_value is None:
                 # No value set → empty string
-                row.append('')
+                row.append("")
             else:
                 # Extract value based on field type
-                if field.field_type == 'rating':
+                if field.field_type == "rating":
                     value = field_value.value_numeric
                     # Preserve float precision (e.g., 4.5) - do not cast to int
-                    row.append(str(value) if value is not None else '')
-                elif field.field_type in ('select', 'text'):
+                    row.append(str(value) if value is not None else "")
+                elif field.field_type in ("select", "text"):
                     value = field_value.value_text
-                    row.append(value if value is not None else '')
-                elif field.field_type == 'boolean':
+                    row.append(value if value is not None else "")
+                elif field.field_type == "boolean":
                     value = field_value.value_boolean
                     # Export as "true"/"false" for CSV readability
-                    row.append('true' if value is True else 'false' if value is False else '')
+                    row.append(
+                        "true" if value is True else "false" if value is False else ""
+                    )
 
         writer.writerow(row)
 
@@ -2019,13 +2061,12 @@ async def export_videos_csv(
     return StreamingResponse(
         iter([csv_content]),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=videos_{list_id}.csv"
-        }
+        headers={"Content-Disposition": f"attachment; filename=videos_{list_id}.csv"},
     )
 
 
 # Video-Tag Assignment Endpoints
+
 
 class AssignTagsRequest(BaseModel):
     tag_ids: list[UUID]
@@ -2039,10 +2080,10 @@ class BulkAssignTagsRequest(BaseModel):
 # IMPORTANT: Bulk endpoint must be registered BEFORE parameterized endpoints
 # to avoid path matching conflicts (/videos/bulk/tags vs /videos/{video_id}/tags)
 
+
 @router.post("/videos/bulk/tags", response_model=dict)
 async def bulk_assign_tags_to_videos(
-    request: BulkAssignTagsRequest,
-    db: AsyncSession = Depends(get_db)
+    request: BulkAssignTagsRequest, db: AsyncSession = Depends(get_db)
 ):
     """
     Bulk assign tags to multiple videos (cartesian product).
@@ -2065,40 +2106,26 @@ async def bulk_assign_tags_to_videos(
     """
     # Handle empty arrays
     if not request.video_ids or not request.tag_ids:
-        return {
-            "assigned": 0,
-            "total_requested": 0
-        }
+        return {"assigned": 0, "total_requested": 0}
 
     # Batch size limit
     total = len(request.video_ids) * len(request.tag_ids)
     if total > 10000:
-        raise HTTPException(
-            status_code=400,
-            detail="Batch exceeds 10,000 assignments"
-        )
+        raise HTTPException(status_code=400, detail="Batch exceeds 10,000 assignments")
 
     # Pre-validate videos exist
     video_count = await db.scalar(
-        select(func.count()).select_from(Video)
-        .where(Video.id.in_(request.video_ids))
+        select(func.count()).select_from(Video).where(Video.id.in_(request.video_ids))
     )
     if video_count != len(request.video_ids):
-        raise HTTPException(
-            status_code=404,
-            detail="Some videos not found"
-        )
+        raise HTTPException(status_code=404, detail="Some videos not found")
 
     # Pre-validate tags exist
     tag_count = await db.scalar(
-        select(func.count()).select_from(Tag)
-        .where(Tag.id.in_(request.tag_ids))
+        select(func.count()).select_from(Tag).where(Tag.id.in_(request.tag_ids))
     )
     if tag_count != len(request.tag_ids):
-        raise HTTPException(
-            status_code=404,
-            detail="Some tags not found"
-        )
+        raise HTTPException(status_code=404, detail="Some tags not found")
 
     # Cartesian product
     assignments = [
@@ -2110,29 +2137,22 @@ async def bulk_assign_tags_to_videos(
     # Bulk insert with ON CONFLICT DO NOTHING
     # Use constraint_name instead of index_elements for named constraints
     stmt = pg_insert(video_tags).values(assignments)
-    stmt = stmt.on_conflict_do_nothing(
-        constraint="uq_video_tags_video_tag"
-    )
+    stmt = stmt.on_conflict_do_nothing(constraint="uq_video_tags_video_tag")
 
     result = await db.execute(stmt)
     await db.commit()
 
-    return {
-        "assigned": result.rowcount,
-        "total_requested": len(assignments)
-    }
+    return {"assigned": result.rowcount, "total_requested": len(assignments)}
 
 
 @router.post("/videos/{video_id}/tags", response_model=list[TagResponse])
 async def assign_tags_to_video(
-    video_id: UUID,
-    request: AssignTagsRequest,
-    db: AsyncSession = Depends(get_db)
+    video_id: UUID, request: AssignTagsRequest, db: AsyncSession = Depends(get_db)
 ):
     """Assign tags to a video (many-to-many). Returns the updated list of tags."""
     from app.services.category_validation import (
-        validate_category_assignment,
         CategoryValidationError,
+        validate_category_assignment,
     )
 
     # Verify video exists
@@ -2153,12 +2173,10 @@ async def assign_tags_to_video(
 
     # Load video's existing tags for category validation
     existing_tags_stmt = (
-        select(Tag)
-        .join(video_tags)
-        .where(video_tags.c.video_id == video_id)
+        select(Tag).join(video_tags).where(video_tags.c.video_id == video_id)
     )
     existing_tags_result = await db.execute(existing_tags_stmt)
-    video.__dict__['tags'] = list(existing_tags_result.scalars().all())
+    video.__dict__["tags"] = list(existing_tags_result.scalars().all())
 
     # Validate category assignment (only one category per video)
     try:
@@ -2168,10 +2186,12 @@ async def assign_tags_to_video(
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "message": str(e),
-                "existing_category_id": str(e.existing_category_id) if e.existing_category_id else None,
+                "existing_category_id": str(e.existing_category_id)
+                if e.existing_category_id
+                else None,
                 "existing_category_name": e.existing_category_name,
                 "new_category_name": e.new_category_name,
-            }
+            },
         ) from e
 
     # Get existing tag associations for this video
@@ -2191,7 +2211,9 @@ async def assign_tags_to_video(
     # Return all tags for this video
     final_tags_stmt = (
         select(Tag)
-        .options(selectinload(Tag.schema))  # Eager load schema to prevent lazy='raise' error
+        .options(
+            selectinload(Tag.schema)
+        )  # Eager load schema to prevent lazy='raise' error
         .join(video_tags)
         .where(video_tags.c.video_id == video_id)
     )
@@ -2199,11 +2221,11 @@ async def assign_tags_to_video(
     return list(final_tags_result.scalars().all())
 
 
-@router.delete("/videos/{video_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/videos/{video_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def remove_tag_from_video(
-    video_id: UUID,
-    tag_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    video_id: UUID, tag_id: UUID, db: AsyncSession = Depends(get_db)
 ):
     """Remove a tag from a video."""
     # Verify video exists
@@ -2216,8 +2238,7 @@ async def remove_tag_from_video(
 
     # Check if tag is assigned to video
     check_stmt = select(video_tags).where(
-        video_tags.c.video_id == video_id,
-        video_tags.c.tag_id == tag_id
+        video_tags.c.video_id == video_id, video_tags.c.tag_id == tag_id
     )
     check_result = await db.execute(check_stmt)
     association = check_result.first()
@@ -2227,8 +2248,7 @@ async def remove_tag_from_video(
 
     # Delete association
     delete_stmt = video_tags.delete().where(
-        video_tags.c.video_id == video_id,
-        video_tags.c.tag_id == tag_id
+        video_tags.c.video_id == video_id, video_tags.c.tag_id == tag_id
     )
     await db.execute(delete_stmt)
     await db.commit()
@@ -2249,7 +2269,9 @@ async def get_video_tags(video_id: UUID, db: AsyncSession = Depends(get_db)):
     # Get tags via junction table
     tags_stmt = (
         select(Tag)
-        .options(selectinload(Tag.schema))  # Eager load schema to prevent lazy='raise' error
+        .options(
+            selectinload(Tag.schema)
+        )  # Eager load schema to prevent lazy='raise' error
         .join(video_tags)
         .where(video_tags.c.video_id == video_id)
     )
@@ -2262,11 +2284,13 @@ async def get_video_tags(video_id: UUID, db: AsyncSession = Depends(get_db)):
 
 class SetCategoryRequest(BaseModel):
     """Request to set/change a video's category."""
-    category_id: Optional[UUID] = None
+
+    category_id: UUID | None = None
 
 
 class SetCategoryResponse(BaseModel):
     """Response from setting a video's category."""
+
     backup_created: bool
     backup_available: bool
     restored_count: int = 0
@@ -2276,8 +2300,10 @@ class SetCategoryResponse(BaseModel):
 async def set_video_category(
     video_id: UUID,
     request: SetCategoryRequest,
-    restore_backup: bool = Query(False, description="Restore backup if available for new category"),
-    db: AsyncSession = Depends(get_db)
+    restore_backup: bool = Query(
+        False, description="Restore backup if available for new category"
+    ),
+    db: AsyncSession = Depends(get_db),
 ) -> SetCategoryResponse:
     """
     Set video's category (replaces existing).
@@ -2301,29 +2327,24 @@ async def set_video_category(
     """
     from app.services.field_value_backup import (
         backup_field_values,
-        restore_field_values,
         list_backups,
+        restore_field_values,
     )
 
     # Step 2.18: Get video with tags
-    video_stmt = (
-        select(Video)
-        .where(Video.id == video_id)
-    )
+    video_stmt = select(Video).where(Video.id == video_id)
     video_result = await db.execute(video_stmt)
     video = video_result.scalar_one_or_none()
 
     if not video:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Video with id {video_id} not found"
+            detail=f"Video with id {video_id} not found",
         )
 
     # Load video's existing tags to find current category
     existing_tags_stmt = (
-        select(Tag)
-        .join(video_tags)
-        .where(video_tags.c.video_id == video_id)
+        select(Tag).join(video_tags).where(video_tags.c.video_id == video_id)
     )
     existing_tags_result = await db.execute(existing_tags_stmt)
     existing_tags = list(existing_tags_result.scalars().all())
@@ -2341,22 +2362,20 @@ async def set_video_category(
         if not new_category:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Tag with id {request.category_id} not found"
+                detail=f"Tag with id {request.category_id} not found",
             )
 
         if not new_category.is_video_type:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Tag '{new_category.name}' is not a category (is_video_type=false). "
-                       f"Use POST /videos/{video_id}/tags for labels."
+                f"Use POST /videos/{video_id}/tags for labels.",
             )
 
     # Early exit if same category (no-op)
     if current_category and new_category and current_category.id == new_category.id:
         return SetCategoryResponse(
-            backup_created=False,
-            backup_available=False,
-            restored_count=0
+            backup_created=False, backup_available=False, restored_count=0
         )
 
     # Step 2.19: Create backup if removing category with values
@@ -2368,7 +2387,7 @@ async def set_video_category(
         # Remove old category
         delete_stmt = video_tags.delete().where(
             video_tags.c.video_id == video_id,
-            video_tags.c.tag_id == current_category.id
+            video_tags.c.tag_id == current_category.id,
         )
         await db.execute(delete_stmt)
 
@@ -2383,8 +2402,7 @@ async def set_video_category(
 
         # Add new category association
         insert_stmt = video_tags.insert().values(
-            video_id=video_id,
-            tag_id=new_category.id
+            video_id=video_id, tag_id=new_category.id
         )
         await db.execute(insert_stmt)
 
@@ -2397,7 +2415,7 @@ async def set_video_category(
     return SetCategoryResponse(
         backup_created=backup_created,
         backup_available=backup_available,
-        restored_count=restored_count
+        restored_count=restored_count,
     )
 
 
@@ -2405,7 +2423,7 @@ async def set_video_category(
 async def batch_update_video_field_values(
     video_id: UUID,
     request: BatchUpdateFieldValuesRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> BatchUpdateFieldValuesResponse:
     """
     Batch update custom field values for a video.
@@ -2483,7 +2501,7 @@ async def batch_update_video_field_values(
     if not video:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Video with id {video_id} not found"
+            detail=f"Video with id {video_id} not found",
         )
 
     # === STEP 2: Fetch all CustomFields for validation ===
@@ -2491,20 +2509,17 @@ async def batch_update_video_field_values(
     field_ids = [update.field_id for update in request.field_values]
 
     # Query all fields in single query (performance optimization)
-    fields_stmt = (
-        select(CustomField)
-        .where(CustomField.id.in_(field_ids))
-    )
+    fields_stmt = select(CustomField).where(CustomField.id.in_(field_ids))
     fields_result = await db.execute(fields_stmt)
     fields = {field.id: field for field in fields_result.scalars().all()}
 
     # Validate all field_ids exist
     invalid_field_ids = [fid for fid in field_ids if fid not in fields]
     if invalid_field_ids:
-        invalid_str = ', '.join(str(fid) for fid in invalid_field_ids)
+        invalid_str = ", ".join(str(fid) for fid in invalid_field_ids)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid field_id(s): {invalid_str}. These fields do not exist."
+            detail=f"Invalid field_id(s): {invalid_str}. These fields do not exist.",
         )
 
     # === STEP 3: Validate values against field types (MODULE) ===
@@ -2517,21 +2532,25 @@ async def batch_update_video_field_values(
                 value=update.value,
                 field_type=field.field_type,
                 config=field.config,
-                field_name=field.name
+                field_name=field.name,
             )
         except FieldValidationError as e:
-            validation_errors.append({
-                "field_id": str(update.field_id),
-                "field_name": field.name,
-                "error": str(e)
-            })
+            validation_errors.append(
+                {
+                    "field_id": str(update.field_id),
+                    "field_name": field.name,
+                    "error": str(e),
+                }
+            )
         except ValueError as e:
             # Unknown field_type
-            validation_errors.append({
-                "field_id": str(update.field_id),
-                "field_name": field.name,
-                "error": str(e)
-            })
+            validation_errors.append(
+                {
+                    "field_id": str(update.field_id),
+                    "field_name": field.name,
+                    "error": str(e),
+                }
+            )
 
     # If any validation failed, abort before database changes
     if validation_errors:
@@ -2539,8 +2558,8 @@ async def batch_update_video_field_values(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
                 "message": "Field value validation failed",
-                "errors": validation_errors
-            }
+                "errors": validation_errors,
+            },
         )
 
     # === STEP 4: Prepare upsert data ===
@@ -2554,33 +2573,35 @@ async def batch_update_video_field_values(
         value_numeric = None
         value_boolean = None
 
-        if field.field_type == 'rating':
+        if field.field_type == "rating":
             value_numeric = update.value
-        elif field.field_type in ('select', 'text'):
+        elif field.field_type in ("select", "text"):
             value_text = update.value
-        elif field.field_type == 'boolean':
+        elif field.field_type == "boolean":
             value_boolean = update.value
 
-        upsert_data.append({
-            'video_id': video_id,
-            'field_id': update.field_id,
-            'value_text': value_text,
-            'value_numeric': value_numeric,
-            'value_boolean': value_boolean
-        })
+        upsert_data.append(
+            {
+                "video_id": video_id,
+                "field_id": update.field_id,
+                "value_text": value_text,
+                "value_numeric": value_numeric,
+                "value_boolean": value_boolean,
+            }
+        )
 
     # === STEP 5: Execute PostgreSQL UPSERT ===
     # Use ON CONFLICT DO UPDATE for idempotent upsert
     # Constraint name from migration: uq_video_field_values_video_field
     stmt = pg_insert(VideoFieldValue).values(upsert_data)
     stmt = stmt.on_conflict_do_update(
-        constraint='uq_video_field_values_video_field',  # From Task #62 migration
+        constraint="uq_video_field_values_video_field",  # From Task #62 migration
         set_={
-            'value_text': stmt.excluded.value_text,
-            'value_numeric': stmt.excluded.value_numeric,
-            'value_boolean': stmt.excluded.value_boolean,
-            'updated_at': func.now()
-        }
+            "value_text": stmt.excluded.value_text,
+            "value_numeric": stmt.excluded.value_numeric,
+            "value_boolean": stmt.excluded.value_boolean,
+            "updated_at": func.now(),
+        },
     )
 
     await db.execute(stmt)
@@ -2595,7 +2616,7 @@ async def batch_update_video_field_values(
         select(VideoFieldValue)
         .where(
             VideoFieldValue.video_id == video_id,
-            VideoFieldValue.field_id.in_(field_ids)
+            VideoFieldValue.field_id.in_(field_ids),
         )
         .options(selectinload(VideoFieldValue.field))  # Eager load CustomField
     )
@@ -2607,11 +2628,11 @@ async def batch_update_video_field_values(
     field_values_response = []
     for fv in updated_values_raw:
         # Determine value based on field type
-        if fv.field.field_type == 'rating':
+        if fv.field.field_type == "rating":
             value = fv.value_numeric
-        elif fv.field.field_type in ('select', 'text'):
+        elif fv.field.field_type in ("select", "text"):
             value = fv.value_text
-        elif fv.field.field_type == 'boolean':
+        elif fv.field.field_type == "boolean":
             value = fv.value_boolean
         else:
             value = None
@@ -2627,12 +2648,11 @@ async def batch_update_video_field_values(
                 schema_name=None,  # Not applicable for direct update
                 show_on_card=False,  # Not applicable for direct update
                 display_order=0,  # Not applicable for direct update
-                updated_at=fv.updated_at
+                updated_at=fv.updated_at,
             )
         )
 
     # Build response
     return BatchUpdateFieldValuesResponse(
-        updated_count=len(field_values_response),
-        field_values=field_values_response
+        updated_count=len(field_values_response), field_values=field_values_response
     )

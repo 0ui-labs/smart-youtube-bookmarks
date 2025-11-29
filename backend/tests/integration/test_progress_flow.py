@@ -5,18 +5,18 @@ Tests end-to-end flow: Worker processing → Database events → History API
 Focus on backend integration, not WebSocket message delivery.
 """
 
-import pytest
 import json
-from uuid import uuid4
+from datetime import UTC
+
+import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from unittest.mock import AsyncMock, patch
 
-from app.models.list import BookmarkList
-from app.models.video import Video
 from app.models.job import ProcessingJob
 from app.models.job_progress import JobProgressEvent
+from app.models.list import BookmarkList
 from app.models.user import User
+from app.models.video import Video
 
 
 async def wait_for_condition(condition_func, timeout_seconds=5, poll_interval=0.1):
@@ -34,6 +34,7 @@ async def wait_for_condition(condition_func, timeout_seconds=5, poll_interval=0.
         TimeoutError: If condition not met within timeout
     """
     import asyncio
+
     elapsed = 0
     while elapsed < timeout_seconds:
         if await condition_func():
@@ -44,7 +45,9 @@ async def wait_for_condition(condition_func, timeout_seconds=5, poll_interval=0.
 
 
 @pytest.mark.asyncio
-async def test_end_to_end_progress_flow(test_db: AsyncSession, test_user: User, mock_redis, arq_context):
+async def test_end_to_end_progress_flow(
+    test_db: AsyncSession, test_user: User, mock_redis, arq_context
+):
     """
     E2E test: Worker processes → Progress events in DB → History API returns events
 
@@ -54,20 +57,14 @@ async def test_end_to_end_progress_flow(test_db: AsyncSession, test_user: User, 
 
     # 1. Create test list
     bookmark_list = BookmarkList(
-        name="E2E Test List",
-        description="Integration test",
-        user_id=test_user.id
+        name="E2E Test List", description="Integration test", user_id=test_user.id
     )
     test_db.add(bookmark_list)
     await test_db.commit()
     list_id = bookmark_list.id
 
     # 2. Create processing job
-    job = ProcessingJob(
-        list_id=list_id,
-        total_videos=3,
-        status="running"
-    )
+    job = ProcessingJob(list_id=list_id, total_videos=3, status="running")
     test_db.add(job)
     await test_db.commit()
     job_id = job.id
@@ -83,7 +80,9 @@ async def test_end_to_end_progress_flow(test_db: AsyncSession, test_user: User, 
 
     # 4. Process videos (simulates worker execution)
     ctx = {"redis": mock_redis, "db": arq_context["db"]}
-    result = await process_video_list(ctx, str(job_id), str(list_id), video_ids, schema={})
+    result = await process_video_list(
+        ctx, str(job_id), str(list_id), video_ids, schema={}
+    )
 
     assert result["processed"] == 3, "All 3 videos should be processed"
 
@@ -98,9 +97,11 @@ async def test_end_to_end_progress_flow(test_db: AsyncSession, test_user: User, 
     await wait_for_condition(events_exist, timeout_seconds=2)
 
     # 6. Verify progress events were created in DB
-    stmt = select(JobProgressEvent).where(
-        JobProgressEvent.job_id == job_id
-    ).order_by(JobProgressEvent.created_at)
+    stmt = (
+        select(JobProgressEvent)
+        .where(JobProgressEvent.job_id == job_id)
+        .order_by(JobProgressEvent.created_at)
+    )
 
     result = await test_db.execute(stmt)
     events = result.scalars().all()
@@ -113,16 +114,22 @@ async def test_end_to_end_progress_flow(test_db: AsyncSession, test_user: User, 
     last_event = events[-1]
 
     assert first_event.progress_data["progress"] == 0, "First event should be 0%"
-    assert last_event.progress_data["status"] == "completed", "Last event should be completed"
+    assert last_event.progress_data["status"] == "completed", (
+        "Last event should be completed"
+    )
     assert last_event.progress_data["progress"] == 100, "Last event should be 100%"
 
     # Verify events are chronologically ordered
     for i in range(len(events) - 1):
-        assert events[i].created_at <= events[i + 1].created_at, "Events should be chronologically ordered"
+        assert events[i].created_at <= events[i + 1].created_at, (
+            "Events should be chronologically ordered"
+        )
 
 
 @pytest.mark.asyncio
-async def test_dual_write_verification(test_db: AsyncSession, test_user: User, mock_redis, arq_context):
+async def test_dual_write_verification(
+    test_db: AsyncSession, test_user: User, mock_redis, arq_context
+):
     """
     Test that worker writes progress to BOTH Redis pubsub AND database.
 
@@ -134,18 +141,14 @@ async def test_dual_write_verification(test_db: AsyncSession, test_user: User, m
     bookmark_list = BookmarkList(
         name="Dual-Write Test List",
         description="Testing dual-write",
-        user_id=test_user.id
+        user_id=test_user.id,
     )
     test_db.add(bookmark_list)
     await test_db.commit()
     list_id = bookmark_list.id
 
     # Arrange: Create processing job
-    job = ProcessingJob(
-        list_id=list_id,
-        total_videos=3,
-        status="running"
-    )
+    job = ProcessingJob(list_id=list_id, total_videos=3, status="running")
     test_db.add(job)
     await test_db.commit()
     job_id = job.id
@@ -161,7 +164,9 @@ async def test_dual_write_verification(test_db: AsyncSession, test_user: User, m
 
     # Act: Process videos with mocked Redis
     ctx = {"redis": mock_redis, "db": arq_context["db"]}
-    result = await process_video_list(ctx, str(job_id), str(list_id), video_ids, schema={})
+    result = await process_video_list(
+        ctx, str(job_id), str(list_id), video_ids, schema={}
+    )
 
     # Assert: Processing completed
     assert result["processed"] == 3, "All 3 videos should be processed"
@@ -169,7 +174,9 @@ async def test_dual_write_verification(test_db: AsyncSession, test_user: User, m
     # Assert: Redis pubsub was called (verifies Redis write path)
     assert mock_redis.publish.called, "Redis publish should be called"
     redis_call_count = mock_redis.publish.call_count
-    assert redis_call_count >= 2, f"Expected at least 2 Redis calls, got {redis_call_count}"
+    assert redis_call_count >= 2, (
+        f"Expected at least 2 Redis calls, got {redis_call_count}"
+    )
 
     # Assert: Database events were created (verifies DB write path)
     stmt = select(JobProgressEvent).where(JobProgressEvent.job_id == job_id)
@@ -196,8 +203,9 @@ async def test_dual_write_verification(test_db: AsyncSession, test_user: User, m
 
     # Find intersection - should have at least one matching progress value
     matching_values = redis_progress_values & db_progress_values
-    assert len(matching_values) > 0, \
+    assert len(matching_values) > 0, (
         f"Redis and DB should have matching progress values. Redis: {redis_progress_values}, DB: {db_progress_values}"
+    )
 
     # Verify both channels captured start (0%) and end (100%)
     assert 0 in db_progress_values, "DB should have 0% progress event"
@@ -205,7 +213,9 @@ async def test_dual_write_verification(test_db: AsyncSession, test_user: User, m
 
 
 @pytest.mark.asyncio
-async def test_user_isolation_in_progress_updates(test_db: AsyncSession, user_factory, mock_redis, arq_context):
+async def test_user_isolation_in_progress_updates(
+    test_db: AsyncSession, user_factory, mock_redis, arq_context
+):
     """
     Test that users only receive their own progress updates.
 
@@ -242,7 +252,9 @@ async def test_user_isolation_in_progress_updates(test_db: AsyncSession, user_fa
 
     # Create videos for User A
     videos_a = [
-        Video(list_id=list_a.id, youtube_id=f"usera_video{i}", processing_status="pending")
+        Video(
+            list_id=list_a.id, youtube_id=f"usera_video{i}", processing_status="pending"
+        )
         for i in range(2)
     ]
     test_db.add_all(videos_a)
@@ -251,7 +263,9 @@ async def test_user_isolation_in_progress_updates(test_db: AsyncSession, user_fa
 
     # Process User A's videos
     ctx_a = {"redis": mock_redis, "db": arq_context["db"]}
-    await process_video_list(ctx_a, str(job_a_id), str(list_a.id), video_ids_a, schema={})
+    await process_video_list(
+        ctx_a, str(job_a_id), str(list_a.id), video_ids_a, schema={}
+    )
 
     # Verify Redis channel includes user_id for isolation
     assert mock_redis.publish.called, "Redis publish should be called"
@@ -264,8 +278,9 @@ async def test_user_isolation_in_progress_updates(test_db: AsyncSession, user_fa
             if f":{user_a.id}" in channel or f"user_{user_a.id}" in channel:
                 user_specific_channels.append(channel)
 
-    assert len(user_specific_channels) > 0, \
+    assert len(user_specific_channels) > 0, (
         f"Redis channel should include user_id for isolation. Found channels: {[c[0][0] for c in mock_redis.publish.call_args_list if len(c[0]) >= 1]}"
+    )
 
     # Verify DB events are tied to specific job_id (which ties to user via list)
     stmt_a = select(JobProgressEvent).where(JobProgressEvent.job_id == job_a_id)
@@ -283,8 +298,12 @@ async def test_user_isolation_in_progress_updates(test_db: AsyncSession, user_fa
 
     # Verify job_id isolation: User A's events only reference job_a_id
     for event in events_a:
-        assert event.job_id == job_a_id, f"User A's event should only have job_a_id, got {event.job_id}"
-        assert event.job_id != job_b_id, "User A's events should never reference User B's job"
+        assert event.job_id == job_a_id, (
+            f"User A's event should only have job_a_id, got {event.job_id}"
+        )
+        assert event.job_id != job_b_id, (
+            "User A's events should never reference User B's job"
+        )
 
 
 @pytest.mark.asyncio
@@ -295,34 +314,28 @@ async def test_history_api_pagination(test_db: AsyncSession, test_user: User, cl
     Verifies that history API can filter events by timestamp.
     """
     # Arrange: Create test list
-    bookmark_list = BookmarkList(
-        name="Pagination Test List",
-        user_id=test_user.id
-    )
+    bookmark_list = BookmarkList(name="Pagination Test List", user_id=test_user.id)
     test_db.add(bookmark_list)
     await test_db.commit()
     list_id = bookmark_list.id
 
     # Arrange: Create processing job
-    job = ProcessingJob(
-        list_id=list_id,
-        total_videos=10,
-        status="running"
-    )
+    job = ProcessingJob(list_id=list_id, total_videos=10, status="running")
     test_db.add(job)
     await test_db.commit()
     job_id = job.id
 
     # Arrange: Create multiple progress events
-    from datetime import datetime, timedelta, timezone
-    base_time = datetime.now(timezone.utc)
+    from datetime import datetime, timedelta
+
+    base_time = datetime.now(UTC)
 
     events = []
     for i in range(10):
         event = JobProgressEvent(
             job_id=job_id,
             progress_data={"progress": i * 10, "status": "processing"},
-            created_at=base_time + timedelta(seconds=i)
+            created_at=base_time + timedelta(seconds=i),
         )
         events.append(event)
 
@@ -331,8 +344,7 @@ async def test_history_api_pagination(test_db: AsyncSession, test_user: User, cl
 
     # Act: Get full history (include user_id query param)
     response_all = await client.get(
-        f"/api/jobs/{job_id}/progress-history",
-        params={"user_id": str(test_user.id)}
+        f"/api/jobs/{job_id}/progress-history", params={"user_id": str(test_user.id)}
     )
     assert response_all.status_code == 200
     history_all = response_all.json()
@@ -342,14 +354,16 @@ async def test_history_api_pagination(test_db: AsyncSession, test_user: User, cl
     midpoint_time = (base_time + timedelta(seconds=5)).isoformat()
     response_since = await client.get(
         f"/api/jobs/{job_id}/progress-history",
-        params={"user_id": str(test_user.id), "since": midpoint_time}
+        params={"user_id": str(test_user.id), "since": midpoint_time},
     )
 
     assert response_since.status_code == 200
     history_since = response_since.json()
 
     # Should return events created after midpoint (events 6-9 = 4 events)
-    assert len(history_since) <= 5, f"Should return at most 5 events after midpoint, got {len(history_since)}"
+    assert len(history_since) <= 5, (
+        f"Should return at most 5 events after midpoint, got {len(history_since)}"
+    )
     assert len(history_since) > 0, "Should return some events"
 
     # Verify all returned events are after the since timestamp
@@ -360,7 +374,9 @@ async def test_history_api_pagination(test_db: AsyncSession, test_user: User, cl
 
 
 @pytest.mark.asyncio
-async def test_unauthorized_access_to_progress_history(test_db: AsyncSession, user_factory, client):
+async def test_unauthorized_access_to_progress_history(
+    test_db: AsyncSession, user_factory, client
+):
     """
     Test that users cannot access other users' progress history.
 
@@ -382,40 +398,41 @@ async def test_unauthorized_access_to_progress_history(test_db: AsyncSession, us
 
     # Create progress event for User A's job
     event = JobProgressEvent(
-        job_id=job_a_id,
-        progress_data={"progress": 50, "status": "processing"}
+        job_id=job_a_id, progress_data={"progress": 50, "status": "processing"}
     )
     test_db.add(event)
     await test_db.commit()
 
     # User A can access their own job history (baseline check)
     response_authorized = await client.get(
-        f"/api/jobs/{job_a_id}/progress-history",
-        params={"user_id": str(user_a.id)}
+        f"/api/jobs/{job_a_id}/progress-history", params={"user_id": str(user_a.id)}
     )
     assert response_authorized.status_code == 200, "User A should access their own job"
 
     # User B tries to access User A's job history (should be forbidden)
     response_unauthorized = await client.get(
-        f"/api/jobs/{job_a_id}/progress-history",
-        params={"user_id": str(user_b.id)}
+        f"/api/jobs/{job_a_id}/progress-history", params={"user_id": str(user_b.id)}
     )
 
     # Assert: Should return 403 Forbidden
-    assert response_unauthorized.status_code == 403, \
+    assert response_unauthorized.status_code == 403, (
         f"Expected 403 Forbidden, got {response_unauthorized.status_code}"
+    )
 
     # Assert: Error message should indicate authorization failure
     error_detail = response_unauthorized.json()
     assert "detail" in error_detail, "Response should contain error detail"
-    assert "not authorized" in error_detail["detail"].lower() or \
-           "forbidden" in error_detail["detail"].lower() or \
-           "access denied" in error_detail["detail"].lower(), \
-        f"Error message should indicate authorization failure: {error_detail['detail']}"
+    assert (
+        "not authorized" in error_detail["detail"].lower()
+        or "forbidden" in error_detail["detail"].lower()
+        or "access denied" in error_detail["detail"].lower()
+    ), f"Error message should indicate authorization failure: {error_detail['detail']}"
 
 
 @pytest.mark.asyncio
-async def test_throttling_verification(test_db: AsyncSession, test_user: User, mock_redis, arq_context):
+async def test_throttling_verification(
+    test_db: AsyncSession, test_user: User, mock_redis, arq_context
+):
     """
     Test that worker throttles progress updates for large batches.
 
@@ -424,20 +441,13 @@ async def test_throttling_verification(test_db: AsyncSession, test_user: User, m
     from app.workers.video_processor import process_video_list
 
     # Arrange: Create test list
-    bookmark_list = BookmarkList(
-        name="Throttling Test List",
-        user_id=test_user.id
-    )
+    bookmark_list = BookmarkList(name="Throttling Test List", user_id=test_user.id)
     test_db.add(bookmark_list)
     await test_db.commit()
     list_id = bookmark_list.id
 
     # Arrange: Create processing job with 100 videos
-    job = ProcessingJob(
-        list_id=list_id,
-        total_videos=100,
-        status="running"
-    )
+    job = ProcessingJob(list_id=list_id, total_videos=100, status="running")
     test_db.add(job)
     await test_db.commit()
     job_id = job.id
@@ -453,7 +463,9 @@ async def test_throttling_verification(test_db: AsyncSession, test_user: User, m
 
     # Act: Process videos
     ctx = {"redis": mock_redis, "db": arq_context["db"]}
-    result = await process_video_list(ctx, str(job_id), str(list_id), video_ids, schema={})
+    result = await process_video_list(
+        ctx, str(job_id), str(list_id), video_ids, schema={}
+    )
 
     # Assert: Processing completed
     assert result["processed"] == 100, "All 100 videos should be processed"
@@ -465,18 +477,21 @@ async def test_throttling_verification(test_db: AsyncSession, test_user: User, m
     # Allow some tolerance for implementation details
     expected_max_calls = 30  # Should be significantly less than 100
 
-    assert redis_call_count < expected_max_calls, \
+    assert redis_call_count < expected_max_calls, (
         f"Expected < {expected_max_calls} Redis calls for 100 videos (throttling), got {redis_call_count}"
+    )
 
     # Assert: DB events were also throttled
     stmt = select(JobProgressEvent).where(JobProgressEvent.job_id == job_id)
     db_result = await test_db.execute(stmt)
     db_events = db_result.scalars().all()
 
-    assert len(db_events) < expected_max_calls, \
+    assert len(db_events) < expected_max_calls, (
         f"Expected < {expected_max_calls} DB events for 100 videos (throttling), got {len(db_events)}"
+    )
 
     # Verify throttling ratio
     throttle_ratio = redis_call_count / 100
-    assert throttle_ratio < 0.3, \
+    assert throttle_ratio < 0.3, (
         f"Throttle ratio should be < 30% (got {throttle_ratio:.1%}), indicating effective throttling"
+    )

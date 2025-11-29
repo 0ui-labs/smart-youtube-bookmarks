@@ -1,11 +1,10 @@
 """Tests for VTT parsing utilities."""
-import pytest
 
 from app.services.enrichment.utils.vtt_parser import (
-    parse_vtt,
-    generate_vtt,
-    vtt_to_text,
     VTTSegment,
+    generate_vtt,
+    parse_vtt,
+    vtt_to_text,
 )
 
 
@@ -175,7 +174,7 @@ class TestGenerateVtt:
         parsed_segments = parse_vtt(vtt)
 
         assert len(parsed_segments) == len(original_segments)
-        for orig, parsed in zip(original_segments, parsed_segments):
+        for orig, parsed in zip(original_segments, parsed_segments, strict=False):
             assert orig.start == parsed.start
             assert orig.end == parsed.end
             assert orig.text == parsed.text

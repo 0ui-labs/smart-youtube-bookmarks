@@ -1,6 +1,6 @@
-import pytest
 import time
-from uuid import uuid4
+
+import pytest
 from httpx import AsyncClient
 
 from app.models.custom_field import CustomField
@@ -13,10 +13,7 @@ class TestDuplicateDetectionPerformance:
     """Performance benchmarks for duplicate detection."""
 
     async def test_basic_mode_performance_1000_fields(
-        self,
-        client: AsyncClient,
-        test_db,
-        test_list: BookmarkList
+        self, client: AsyncClient, test_db, test_list: BookmarkList
     ):
         """Basic mode should handle 1000 fields in < 100ms."""
         # Create 1000 fields
@@ -26,7 +23,7 @@ class TestDuplicateDetectionPerformance:
                 list_id=test_list.id,
                 name=f"Test Field {i:04d}",
                 field_type="text",
-                config={}
+                config={},
             )
             fields.append(field)
 
@@ -37,19 +34,16 @@ class TestDuplicateDetectionPerformance:
         start = time.time()
         response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
-            json={"name": "Test Field 0500"}
+            json={"name": "Test Field 0500"},
         )
         elapsed = time.time() - start
 
         assert response.status_code == 200
         assert elapsed < 0.1  # 100ms
-        print(f"Basic mode with 1000 fields: {elapsed*1000:.2f}ms")
+        print(f"Basic mode with 1000 fields: {elapsed * 1000:.2f}ms")
 
     async def test_smart_mode_performance_100_fields(
-        self,
-        client: AsyncClient,
-        test_db,
-        test_list: BookmarkList
+        self, client: AsyncClient, test_db, test_list: BookmarkList
     ):
         """Smart mode should handle 100 fields in < 500ms."""
         # Create 100 fields
@@ -59,7 +53,7 @@ class TestDuplicateDetectionPerformance:
                 list_id=test_list.id,
                 name=f"Test Field {i:03d}",
                 field_type="text",
-                config={}
+                config={},
             )
             fields.append(field)
 
@@ -70,13 +64,13 @@ class TestDuplicateDetectionPerformance:
         start = time.time()
         response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields/check-duplicate?mode=smart",
-            json={"name": "Test Field X"}
+            json={"name": "Test Field X"},
         )
         elapsed = time.time() - start
 
         assert response.status_code == 200
         assert elapsed < 0.5  # 500ms
-        print(f"Smart mode with 100 fields: {elapsed*1000:.2f}ms")
+        print(f"Smart mode with 100 fields: {elapsed * 1000:.2f}ms")
 
     async def test_levenshtein_calculation_speed(self):
         """Levenshtein calculation should be very fast."""
@@ -92,4 +86,6 @@ class TestDuplicateDetectionPerformance:
 
         # Should complete in < 1 second
         assert elapsed < 1.0
-        print(f"10000 Levenshtein calculations: {elapsed*1000:.2f}ms ({10000/elapsed:.0f} ops/sec)")
+        print(
+            f"10000 Levenshtein calculations: {elapsed * 1000:.2f}ms ({10000 / elapsed:.0f} ops/sec)"
+        )

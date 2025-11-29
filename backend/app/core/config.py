@@ -41,10 +41,7 @@ class Settings(BaseSettings):
     db_max_overflow: int = 5
     db_pool_pre_ping: bool = True
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @field_validator("secret_key")
     @classmethod
@@ -87,6 +84,7 @@ class Settings(BaseSettings):
         # In development, just warn if using default
         if is_default and env == "development":
             import logging
+
             logging.warning(
                 "Using default secret_key in development. "
                 "This is insecure for production use."

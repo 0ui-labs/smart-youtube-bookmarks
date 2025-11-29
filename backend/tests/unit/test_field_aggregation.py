@@ -4,9 +4,11 @@ Unit tests for field aggregation service.
 TDD RED Phase: These tests are written BEFORE the implementation.
 They should fail until the field aggregation service is implemented.
 """
-import pytest
+
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
-from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.field_aggregation import get_available_fields
 
@@ -123,10 +125,12 @@ class TestGetAvailableFields:
 
         # Mock db.get to return different values based on call
         # First call: BookmarkList, Second call: FieldSchema
-        mock_db.get = AsyncMock(side_effect=[
-            mock_list_with_default_schema,  # First call returns list
-            mock_list_with_default_schema.default_schema,  # Second call returns schema
-        ])
+        mock_db.get = AsyncMock(
+            side_effect=[
+                mock_list_with_default_schema,  # First call returns list
+                mock_list_with_default_schema.default_schema,  # Second call returns schema
+            ]
+        )
 
         fields = await get_available_fields(mock_video, mock_db)
 
@@ -157,10 +161,12 @@ class TestGetAvailableFields:
         mock_video.tags = [mock_category_with_schema]
 
         # Mock db.get: First BookmarkList, then FieldSchema
-        mock_db.get = AsyncMock(side_effect=[
-            mock_list_with_default_schema,
-            mock_list_with_default_schema.default_schema,
-        ])
+        mock_db.get = AsyncMock(
+            side_effect=[
+                mock_list_with_default_schema,
+                mock_list_with_default_schema.default_schema,
+            ]
+        )
 
         fields = await get_available_fields(mock_video, mock_db)
 
@@ -173,9 +179,7 @@ class TestGetAvailableFields:
         assert "Cooking Time" in field_names  # category
 
     @pytest.mark.asyncio
-    async def test_deduplicates_shared_fields(
-        self, mock_db, mock_video, mock_list_id
-    ):
+    async def test_deduplicates_shared_fields(self, mock_db, mock_video, mock_list_id):
         """
         Test that shared fields are deduplicated.
 
@@ -223,10 +227,12 @@ class TestGetAvailableFields:
         mock_video.tags = [category]
 
         # Mock db.get: First BookmarkList, then FieldSchema
-        mock_db.get = AsyncMock(side_effect=[
-            bookmark_list,
-            ws_schema,
-        ])
+        mock_db.get = AsyncMock(
+            side_effect=[
+                bookmark_list,
+                ws_schema,
+            ]
+        )
 
         fields = await get_available_fields(mock_video, mock_db)
 

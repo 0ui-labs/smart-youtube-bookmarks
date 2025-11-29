@@ -3,23 +3,25 @@
 Provides session-per-job isolation using SQLAlchemy's async_scoped_session
 with ContextVar for job-level scoping.
 """
+
+import logging
 from contextvars import ContextVar
+
 from sqlalchemy.ext.asyncio import (
-    create_async_engine,
     AsyncEngine,
     AsyncSession,
-    async_sessionmaker,
     async_scoped_session,
+    async_sessionmaker,
+    create_async_engine,
 )
+
 from app.core.config import settings
-import logging
 
 logger = logging.getLogger(__name__)
 
 # Context variable for job-scoped sessions
 db_session_context: ContextVar[str | None] = ContextVar(
-    "db_session_context",
-    default=None
+    "db_session_context", default=None
 )
 
 
@@ -73,7 +75,9 @@ class DatabaseConnectionManager:
     def get_session(self) -> AsyncSession:
         """Get session for current job context."""
         if not self.scoped_session:
-            raise RuntimeError("DatabaseConnectionManager not initialized. Call connect() first.")
+            raise RuntimeError(
+                "DatabaseConnectionManager not initialized. Call connect() first."
+            )
         return self.scoped_session()
 
 

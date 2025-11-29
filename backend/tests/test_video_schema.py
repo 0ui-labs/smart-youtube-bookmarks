@@ -1,9 +1,9 @@
 """
 Test for VideoResponse schema import fields.
 """
-import pytest
+
+from datetime import UTC, datetime
 from uuid import uuid4
-from datetime import datetime, timezone
 
 
 def test_video_response_has_import_fields():
@@ -16,10 +16,10 @@ def test_video_response_has_import_fields():
         list_id=uuid4(),
         youtube_id="test123abc",
         processing_status="pending",
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         import_progress=25,
-        import_stage="metadata"
+        import_stage="metadata",
     )
 
     assert response.import_progress == 25
@@ -36,9 +36,11 @@ def test_video_response_import_field_defaults():
         list_id=uuid4(),
         youtube_id="test123abc",
         processing_status="pending",
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
     assert response.import_progress == 0, "Default import_progress should be 0"
-    assert response.import_stage == "created", "Default import_stage should be 'created'"
+    assert response.import_stage == "created", (
+        "Default import_stage should be 'created'"
+    )

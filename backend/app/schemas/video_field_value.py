@@ -3,10 +3,10 @@ Pydantic schemas for VideoFieldValue API requests/responses.
 
 These schemas handle batch updates of custom field values for videos.
 """
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 from uuid import UUID
-from typing import Any
-from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Import existing schema from Task #71 (DRY principle)
 from app.schemas.video import VideoFieldValueResponse
@@ -24,23 +24,17 @@ class FieldValueUpdate(BaseModel):
 
     Validation happens at endpoint level (inline) to avoid Task #73 dependency.
     """
+
     field_id: UUID = Field(..., description="UUID of the custom field")
     value: int | str | bool | float | None = Field(
-        ...,
-        description="Field value (type must match field's field_type)"
+        ..., description="Field value (type must match field's field_type)"
     )
 
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
-                {
-                    "field_id": "550e8400-e29b-41d4-a716-446655440000",
-                    "value": 5
-                },
-                {
-                    "field_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-                    "value": "great"
-                }
+                {"field_id": "550e8400-e29b-41d4-a716-446655440000", "value": 5},
+                {"field_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "value": "great"},
             ]
         }
     )
@@ -61,16 +55,19 @@ class BatchUpdateFieldValuesRequest(BaseModel):
             ]
         }
     """
+
     field_values: list[FieldValueUpdate] = Field(
         ...,
         min_length=1,
         max_length=50,
-        description="List of field value updates (1-50 items)"
+        description="List of field value updates (1-50 items)",
     )
 
-    @field_validator('field_values')
+    @field_validator("field_values")
     @classmethod
-    def validate_unique_field_ids(cls, v: list[FieldValueUpdate]) -> list[FieldValueUpdate]:
+    def validate_unique_field_ids(
+        cls, v: list[FieldValueUpdate]
+    ) -> list[FieldValueUpdate]:
         """
         Ensure no duplicate field_id in request.
 
@@ -111,16 +108,16 @@ class BatchUpdateFieldValuesRequest(BaseModel):
                     "field_values": [
                         {
                             "field_id": "550e8400-e29b-41d4-a716-446655440000",
-                            "value": 5
+                            "value": 5,
                         },
                         {
                             "field_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-                            "value": "great"
+                            "value": "great",
                         },
                         {
                             "field_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-                            "value": True
-                        }
+                            "value": True,
+                        },
                     ]
                 }
             ]
@@ -135,10 +132,10 @@ class BatchUpdateFieldValuesResponse(BaseModel):
     Returns all updated field values with full field metadata.
     Reuses VideoFieldValueResponse from Task #71 for consistency.
     """
+
     updated_count: int = Field(..., description="Number of fields updated")
     field_values: list[VideoFieldValueResponse] = Field(
-        ...,
-        description="Updated field values with field definitions"
+        ..., description="Updated field values with field definitions"
     )
 
     model_config = ConfigDict(
@@ -160,10 +157,10 @@ class BatchUpdateFieldValuesResponse(BaseModel):
                                 "config": {"max_rating": 5},
                                 "list_id": "list-uuid",
                                 "created_at": "2025-11-09T10:00:00Z",
-                                "updated_at": "2025-11-09T10:00:00Z"
-                            }
+                                "updated_at": "2025-11-09T10:00:00Z",
+                            },
                         }
-                    ]
+                    ],
                 }
             ]
         }

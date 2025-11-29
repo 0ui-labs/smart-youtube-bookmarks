@@ -18,17 +18,18 @@ Test Pattern:
 3. Verify index usage via output inspection
 4. Benchmark query performance with pytest-benchmark
 """
-import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select
-from sqlalchemy.orm import selectinload
+
 from uuid import uuid4
 
-from app.models.list import BookmarkList
-from app.models.video import Video
+import pytest
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.custom_field import CustomField
-from app.models.video_field_value import VideoFieldValue
+from app.models.list import BookmarkList
 from app.models.user import User
+from app.models.video import Video
+from app.models.video_field_value import VideoFieldValue
 
 
 # REF MCP Improvement #3: Cache reset fixture (DISCARD TEMP removed)
@@ -61,7 +62,7 @@ async def test_data(test_db: AsyncSession):
     user = User(
         email=f"perf-test-{uuid4()}@example.com",
         hashed_password="$2b$12$placeholder_hash",
-        is_active=True
+        is_active=True,
     )
     test_db.add(user)
     await test_db.flush()
@@ -70,7 +71,7 @@ async def test_data(test_db: AsyncSession):
     test_list = BookmarkList(
         name="Performance Test List",
         description="List for index performance testing",
-        user_id=user.id
+        user_id=user.id,
     )
     test_db.add(test_list)
     await test_db.flush()
@@ -80,19 +81,16 @@ async def test_data(test_db: AsyncSession):
         list_id=test_list.id,
         name="Rating",
         field_type="rating",
-        config={"max_rating": 5}
+        config={"max_rating": 5},
     )
     text_field = CustomField(
         list_id=test_list.id,
         name="Quality",
         field_type="select",
-        config={"options": [f"option_{i}" for i in range(10)]}
+        config={"options": [f"option_{i}" for i in range(10)]},
     )
     boolean_field = CustomField(
-        list_id=test_list.id,
-        name="Recommended",
-        field_type="boolean",
-        config={}
+        list_id=test_list.id, name="Recommended", field_type="boolean", config={}
     )
     test_db.add_all([rating_field, text_field, boolean_field])
     await test_db.flush()
@@ -106,7 +104,7 @@ async def test_data(test_db: AsyncSession):
             list_id=test_list.id,
             youtube_id=f"test_video_{i:04d}",
             processing_status="completed",
-            title=f"Test Video {i}"
+            title=f"Test Video {i}",
         )
         videos.append(video)
         test_db.add(video)
@@ -117,23 +115,17 @@ async def test_data(test_db: AsyncSession):
     for i, video in enumerate(videos):
         # Rating: 1-5 (distributed evenly)
         rating_value = VideoFieldValue(
-            video_id=video.id,
-            field_id=rating_field.id,
-            value_numeric=(i % 5) + 1
+            video_id=video.id, field_id=rating_field.id, value_numeric=(i % 5) + 1
         )
 
         # Text: 10 options (distributed evenly)
         text_value = VideoFieldValue(
-            video_id=video.id,
-            field_id=text_field.id,
-            value_text=f"option_{i % 10}"
+            video_id=video.id, field_id=text_field.id, value_text=f"option_{i % 10}"
         )
 
         # Boolean: True/False (distributed evenly)
         boolean_value = VideoFieldValue(
-            video_id=video.id,
-            field_id=boolean_field.id,
-            value_boolean=i % 2 == 0
+            video_id=video.id, field_id=boolean_field.id, value_boolean=i % 2 == 0
         )
 
         field_values.extend([rating_value, text_value, boolean_value])
@@ -152,7 +144,7 @@ async def test_data(test_db: AsyncSession):
         "rating_field_id": rating_field.id,
         "text_field_id": text_field.id,
         "boolean_field_id": boolean_field.id,
-        "video_ids": [v.id for v in videos]
+        "video_ids": [v.id for v in videos],
     }
 
 
@@ -194,7 +186,7 @@ async def test_explain_analyze_queries(test_db: AsyncSession, test_data: dict):
     print("Index available: idx_video_field_values_field_numeric")
     print("=" * 80)
 
-    query1 = text(f"""
+    query1 = text("""
         EXPLAIN ANALYZE
         SELECT * FROM video_field_values
         WHERE field_id = :field_id AND value_numeric >= 4
@@ -209,22 +201,26 @@ async def test_explain_analyze_queries(test_db: AsyncSession, test_data: dict):
     print("Index available: idx_video_field_values_field_text")
     print("=" * 80)
 
-    query2 = text(f"""
+    query2 = text("""
         EXPLAIN ANALYZE
         SELECT * FROM video_field_values
         WHERE field_id = :field_id AND value_text = :value
     """)
-    result2 = await test_db.execute(query2, {"field_id": text_field_id, "value": "option_5"})
+    result2 = await test_db.execute(
+        query2, {"field_id": text_field_id, "value": "option_5"}
+    )
     explain_output_2 = "\n".join([row[0] for row in result2.fetchall()])
     print(explain_output_2)
 
     # Query 3: Fetch all values for a video
     print("\n" + "=" * 80)
     print("Query 3: Fetch All Values for Video")
-    print("Index available: idx_video_field_values_video_field (covers UNIQUE constraint)")
+    print(
+        "Index available: idx_video_field_values_video_field (covers UNIQUE constraint)"
+    )
     print("=" * 80)
 
-    query3 = text(f"""
+    query3 = text("""
         EXPLAIN ANALYZE
         SELECT * FROM video_field_values
         WHERE video_id = :video_id
@@ -239,7 +235,7 @@ async def test_explain_analyze_queries(test_db: AsyncSession, test_data: dict):
     print("Index available: NONE (performance gap)")
     print("=" * 80)
 
-    query4 = text(f"""
+    query4 = text("""
         EXPLAIN ANALYZE
         SELECT * FROM video_field_values
         WHERE field_id = :field_id AND value_boolean = true
@@ -254,10 +250,18 @@ async def test_explain_analyze_queries(test_db: AsyncSession, test_data: dict):
     print("=" * 80)
 
     scan_analysis = {
-        "Query 1 (Rating filter)": "Index Scan" if "Index Scan" in explain_output_1 else "Seq Scan",
-        "Query 2 (Text filter)": "Index Scan" if "Index Scan" in explain_output_2 else "Seq Scan",
-        "Query 3 (Video lookup)": "Index Scan" if "Index Scan" in explain_output_3 else "Seq Scan",
-        "Query 4 (Boolean filter)": "Index Scan" if "Index Scan" in explain_output_4 else "Seq Scan"
+        "Query 1 (Rating filter)": "Index Scan"
+        if "Index Scan" in explain_output_1
+        else "Seq Scan",
+        "Query 2 (Text filter)": "Index Scan"
+        if "Index Scan" in explain_output_2
+        else "Seq Scan",
+        "Query 3 (Video lookup)": "Index Scan"
+        if "Index Scan" in explain_output_3
+        else "Seq Scan",
+        "Query 4 (Boolean filter)": "Index Scan"
+        if "Index Scan" in explain_output_4
+        else "Seq Scan",
     }
 
     for query_name, scan_type in scan_analysis.items():
@@ -283,9 +287,9 @@ async def test_explain_analyze_queries(test_db: AsyncSession, test_data: dict):
 
     # Verify critical indexes exist
     required_indexes = [
-        'idx_video_field_values_field_numeric',
-        'idx_video_field_values_field_text',
-        'idx_video_field_values_video_field'
+        "idx_video_field_values_field_numeric",
+        "idx_video_field_values_field_text",
+        "idx_video_field_values_video_field",
     ]
 
     for idx in required_indexes:
@@ -294,16 +298,20 @@ async def test_explain_analyze_queries(test_db: AsyncSession, test_data: dict):
     print("\n✅ All 3 expected indexes exist in database")
 
     # Check if boolean index exists (should NOT exist - this is the gap)
-    if 'idx_video_field_values_field_boolean' not in indexes:
+    if "idx_video_field_values_field_boolean" not in indexes:
         print("⚠️  PERFORMANCE GAP: No index for (field_id, value_boolean)")
-        print("    Recommendation: Consider adding index if boolean filtering is common")
+        print(
+            "    Recommendation: Consider adding index if boolean filtering is common"
+        )
 
     print("\n" + "=" * 80)
     print("EXPLAIN ANALYZE Test Complete")
     print("=" * 80 + "\n")
 
 
-async def test_benchmark_rating_filter(test_db: AsyncSession, test_data: dict, benchmark):
+async def test_benchmark_rating_filter(
+    test_db: AsyncSession, test_data: dict, benchmark
+):
     """
     Benchmark: Filter videos by rating >= 4.
 
@@ -329,7 +337,9 @@ async def test_benchmark_rating_filter(test_db: AsyncSession, test_data: dict, b
     assert len(rows) == 400, f"Expected 400 results, got {len(rows)}"
 
 
-async def test_benchmark_boolean_filter(test_db: AsyncSession, test_data: dict, benchmark):
+async def test_benchmark_boolean_filter(
+    test_db: AsyncSession, test_data: dict, benchmark
+):
     """
     Benchmark: Filter videos by boolean = true.
 
@@ -354,7 +364,9 @@ async def test_benchmark_boolean_filter(test_db: AsyncSession, test_data: dict, 
     assert len(rows) == 500, f"Expected 500 results, got {len(rows)}"
 
 
-async def test_benchmark_video_lookup(test_db: AsyncSession, test_data: dict, benchmark):
+async def test_benchmark_video_lookup(
+    test_db: AsyncSession, test_data: dict, benchmark
+):
     """
     Benchmark: Fetch all field values for a single video.
 

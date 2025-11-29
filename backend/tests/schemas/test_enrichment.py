@@ -1,13 +1,13 @@
 """Tests for Enrichment schemas."""
-import pytest
-from uuid import uuid4
+
 from datetime import datetime
+from uuid import uuid4
 
 from app.schemas.enrichment import (
-    EnrichmentStatus,
     ChapterSchema,
     EnrichmentResponse,
     EnrichmentRetryResponse,
+    EnrichmentStatus,
 )
 
 
@@ -28,11 +28,7 @@ class TestChapterSchema:
 
     def test_chapter_creation(self):
         """ChapterSchema can be created with all fields."""
-        chapter = ChapterSchema(
-            title="Introduction",
-            start=0.0,
-            end=60.0
-        )
+        chapter = ChapterSchema(title="Introduction", start=0.0, end=60.0)
 
         assert chapter.title == "Introduction"
         assert chapter.start == 0.0
@@ -45,9 +41,7 @@ class TestEnrichmentResponse:
     def test_response_minimal(self):
         """Response can be created with minimal fields."""
         response = EnrichmentResponse(
-            id=uuid4(),
-            video_id=uuid4(),
-            status=EnrichmentStatus.pending
+            id=uuid4(), video_id=uuid4(), status=EnrichmentStatus.pending
         )
 
         assert response.status == EnrichmentStatus.pending
@@ -62,7 +56,7 @@ class TestEnrichmentResponse:
             status=EnrichmentStatus.completed,
             captions_vtt="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nHello",
             captions_language="en",
-            captions_source="youtube_manual"
+            captions_source="youtube_manual",
         )
 
         assert response.captions_vtt is not None
@@ -81,7 +75,7 @@ class TestEnrichmentResponse:
             video_id=uuid4(),
             status=EnrichmentStatus.completed,
             chapters=chapters,
-            chapters_source="youtube"
+            chapters_source="youtube",
         )
 
         assert response.chapters is not None
@@ -95,7 +89,7 @@ class TestEnrichmentResponse:
             video_id=uuid4(),
             status=EnrichmentStatus.failed,
             error_message="No captions found",
-            retry_count=2
+            retry_count=2,
         )
 
         assert response.status == EnrichmentStatus.failed
@@ -111,7 +105,7 @@ class TestEnrichmentResponse:
             status=EnrichmentStatus.completed,
             created_at=now,
             updated_at=now,
-            processed_at=now
+            processed_at=now,
         )
 
         assert response.created_at == now
@@ -124,14 +118,11 @@ class TestEnrichmentRetryResponse:
     def test_retry_response(self):
         """Retry response includes message and enrichment."""
         enrichment = EnrichmentResponse(
-            id=uuid4(),
-            video_id=uuid4(),
-            status=EnrichmentStatus.pending
+            id=uuid4(), video_id=uuid4(), status=EnrichmentStatus.pending
         )
 
         response = EnrichmentRetryResponse(
-            message="Enrichment retry started",
-            enrichment=enrichment
+            message="Enrichment retry started", enrichment=enrichment
         )
 
         assert response.message == "Enrichment retry started"

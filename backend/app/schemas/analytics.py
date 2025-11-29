@@ -4,9 +4,11 @@ Analytics Pydantic schemas for custom fields usage statistics.
 Provides typed response models for the /api/lists/{list_id}/analytics endpoint.
 Validates aggregated data from PostgreSQL queries before API serialization.
 """
-from typing import Optional, Literal
-from pydantic import BaseModel, Field, model_validator
+
 from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class MostUsedFieldStat(BaseModel):
@@ -16,6 +18,7 @@ class MostUsedFieldStat(BaseModel):
     Used in "Most-Used Fields" chart to show which fields
     are most actively filled in by users.
     """
+
     field_id: str = Field(description="UUID of the custom field")
     field_name: str = Field(description="Display name of the field")
     field_type: str = Field(description="Field type: select, rating, text, boolean")
@@ -24,11 +27,11 @@ class MostUsedFieldStat(BaseModel):
     usage_percentage: float = Field(
         ge=0.0,
         le=100.0,
-        description="Percentage of videos with this field set (usage_count / total_videos * 100)"
+        description="Percentage of videos with this field set (usage_count / total_videos * 100)",
     )
 
-    @model_validator(mode='after')
-    def validate_usage_count_and_percentage(self) -> 'MostUsedFieldStat':
+    @model_validator(mode="after")
+    def validate_usage_count_and_percentage(self) -> "MostUsedFieldStat":
         """Ensure usage_count <= total_videos and percentage matches ratio."""
         if self.usage_count > self.total_videos:
             raise ValueError(
@@ -61,13 +64,14 @@ class UnusedSchemaStat(BaseModel):
     - It has 0 tags assigned (not bound to any tag), OR
     - It has tags but 0 field values set (tags exist but never filled in)
     """
+
     schema_id: str = Field(description="UUID of the field schema")
     schema_name: str = Field(description="Display name of the schema")
     field_count: int = Field(ge=0, description="Number of fields in this schema")
     tag_count: int = Field(ge=0, description="Number of tags using this schema")
-    last_used: Optional[datetime] = Field(
+    last_used: datetime | None = Field(
         None,
-        description="Last time a field value was set for this schema (NULL if never used)"
+        description="Last time a field value was set for this schema (NULL if never used)",
     )
     reason: Literal["no_tags", "no_values"] = Field(
         description="Why schema is unused: 'no_tags' or 'no_values'"
@@ -81,6 +85,7 @@ class FieldCoverageStat(BaseModel):
     Shows how many videos have values set for this field,
     helping identify fields that are rarely used.
     """
+
     field_id: str = Field(description="UUID of the custom field")
     field_name: str = Field(description="Display name of the field")
     field_type: str = Field(description="Field type: select, rating, text, boolean")
@@ -89,11 +94,11 @@ class FieldCoverageStat(BaseModel):
     coverage_percentage: float = Field(
         ge=0.0,
         le=100.0,
-        description="Percentage coverage (videos_with_values / total_videos * 100)"
+        description="Percentage coverage (videos_with_values / total_videos * 100)",
     )
 
-    @model_validator(mode='after')
-    def validate_coverage_count_and_percentage(self) -> 'FieldCoverageStat':
+    @model_validator(mode="after")
+    def validate_coverage_count_and_percentage(self) -> "FieldCoverageStat":
         """Ensure videos_with_values <= total_videos and percentage matches ratio."""
         if self.videos_with_values > self.total_videos:
             raise ValueError(
@@ -126,25 +131,25 @@ class SchemaEffectivenessStat(BaseModel):
     High effectiveness = users fill most fields in the schema.
     Low effectiveness = users skip many fields.
     """
+
     schema_id: str = Field(description="UUID of the field schema")
     schema_name: str = Field(description="Display name of the schema")
     field_count: int = Field(ge=0, description="Number of fields in schema")
     avg_fields_filled: float = Field(
         ge=0.0,
-        description="Average number of fields filled per video (across all videos with this schema's tags)"
+        description="Average number of fields filled per video (across all videos with this schema's tags)",
     )
     completion_percentage: float = Field(
         ge=0.0,
         le=100.0,
-        description="Percentage completion (avg_fields_filled / field_count * 100)"
+        description="Percentage completion (avg_fields_filled / field_count * 100)",
     )
     video_count: int = Field(
-        ge=0,
-        description="Number of videos with tags bound to this schema"
+        ge=0, description="Number of videos with tags bound to this schema"
     )
 
-    @model_validator(mode='after')
-    def validate_effectiveness_and_percentage(self) -> 'SchemaEffectivenessStat':
+    @model_validator(mode="after")
+    def validate_effectiveness_and_percentage(self) -> "SchemaEffectivenessStat":
         """Ensure avg_fields_filled <= field_count and percentage matches ratio."""
         if self.avg_fields_filled > self.field_count:
             raise ValueError(
@@ -176,6 +181,7 @@ class AnalyticsResponse(BaseModel):
     Aggregates all custom field usage statistics in a single endpoint.
     Designed for efficient rendering in AnalyticsView component.
     """
+
     most_used_fields: list[MostUsedFieldStat] = Field(
         description="Top 10 fields by usage count (sorted descending)"
     )
@@ -199,7 +205,7 @@ class AnalyticsResponse(BaseModel):
                         "field_type": "rating",
                         "usage_count": 450,
                         "total_videos": 500,
-                        "usage_percentage": 90.0
+                        "usage_percentage": 90.0,
                     }
                 ],
                 "unused_schemas": [
@@ -209,7 +215,7 @@ class AnalyticsResponse(BaseModel):
                         "field_count": 5,
                         "tag_count": 0,
                         "last_used": None,
-                        "reason": "no_tags"
+                        "reason": "no_tags",
                     }
                 ],
                 "field_coverage": [
@@ -219,7 +225,7 @@ class AnalyticsResponse(BaseModel):
                         "field_type": "select",
                         "videos_with_values": 50,
                         "total_videos": 500,
-                        "coverage_percentage": 10.0
+                        "coverage_percentage": 10.0,
                     }
                 ],
                 "schema_effectiveness": [
@@ -229,8 +235,8 @@ class AnalyticsResponse(BaseModel):
                         "field_count": 3,
                         "avg_fields_filled": 2.8,
                         "completion_percentage": 93.3,
-                        "video_count": 200
+                        "video_count": 200,
                     }
-                ]
+                ],
             }
         }

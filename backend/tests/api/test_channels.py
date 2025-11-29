@@ -1,4 +1,5 @@
 """Tests for Channels API endpoints."""
+
 import pytest
 from sqlalchemy import select
 
@@ -6,10 +7,7 @@ from sqlalchemy import select
 @pytest.mark.asyncio
 async def test_get_channels_empty(client, test_user):
     """Test GET /api/channels returns empty list when no channels exist."""
-    response = await client.get(
-        "/api/channels",
-        params={"user_id": str(test_user.id)}
-    )
+    response = await client.get("/api/channels", params={"user_id": str(test_user.id)})
     assert response.status_code == 200
     data = response.json()
     assert data == []
@@ -24,40 +22,24 @@ async def test_get_channels_with_data(client, test_db, test_user):
 
     # Create a channel
     channel = Channel(
-        user_id=test_user.id,
-        youtube_channel_id="UCtest123",
-        name="Test Channel"
+        user_id=test_user.id, youtube_channel_id="UCtest123", name="Test Channel"
     )
     test_db.add(channel)
     await test_db.commit()
     await test_db.refresh(channel)
 
     # Create a list and videos for this channel
-    bookmark_list = BookmarkList(
-        user_id=test_user.id,
-        name="Test List"
-    )
+    bookmark_list = BookmarkList(user_id=test_user.id, name="Test List")
     test_db.add(bookmark_list)
     await test_db.commit()
     await test_db.refresh(bookmark_list)
 
-    video1 = Video(
-        list_id=bookmark_list.id,
-        youtube_id="vid1",
-        channel_id=channel.id
-    )
-    video2 = Video(
-        list_id=bookmark_list.id,
-        youtube_id="vid2",
-        channel_id=channel.id
-    )
+    video1 = Video(list_id=bookmark_list.id, youtube_id="vid1", channel_id=channel.id)
+    video2 = Video(list_id=bookmark_list.id, youtube_id="vid2", channel_id=channel.id)
     test_db.add_all([video1, video2])
     await test_db.commit()
 
-    response = await client.get(
-        "/api/channels",
-        params={"user_id": str(test_user.id)}
-    )
+    response = await client.get("/api/channels", params={"user_id": str(test_user.id)})
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
@@ -76,22 +58,19 @@ async def test_get_channels_excludes_hidden(client, test_db, test_user):
         user_id=test_user.id,
         youtube_channel_id="UCvisible",
         name="Visible Channel",
-        is_hidden=False
+        is_hidden=False,
     )
     hidden = Channel(
         user_id=test_user.id,
         youtube_channel_id="UChidden",
         name="Hidden Channel",
-        is_hidden=True
+        is_hidden=True,
     )
     test_db.add_all([visible, hidden])
     await test_db.commit()
 
     # Default: exclude hidden
-    response = await client.get(
-        "/api/channels",
-        params={"user_id": str(test_user.id)}
-    )
+    response = await client.get("/api/channels", params={"user_id": str(test_user.id)})
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
@@ -99,8 +78,7 @@ async def test_get_channels_excludes_hidden(client, test_db, test_user):
 
     # Include hidden
     response = await client.get(
-        "/api/channels",
-        params={"user_id": str(test_user.id), "include_hidden": "true"}
+        "/api/channels", params={"user_id": str(test_user.id), "include_hidden": "true"}
     )
     assert response.status_code == 200
     data = response.json()
@@ -116,7 +94,7 @@ async def test_patch_channel_hide(client, test_db, test_user):
         user_id=test_user.id,
         youtube_channel_id="UCtohide",
         name="Channel to Hide",
-        is_hidden=False
+        is_hidden=False,
     )
     test_db.add(channel)
     await test_db.commit()
@@ -125,7 +103,7 @@ async def test_patch_channel_hide(client, test_db, test_user):
     response = await client.patch(
         f"/api/channels/{channel.id}",
         params={"user_id": str(test_user.id)},
-        json={"is_hidden": True}
+        json={"is_hidden": True},
     )
     assert response.status_code == 200
     data = response.json()
@@ -144,7 +122,7 @@ async def test_patch_channel_not_found(client, test_user):
     response = await client.patch(
         f"/api/channels/{uuid4()}",
         params={"user_id": str(test_user.id)},
-        json={"is_hidden": True}
+        json={"is_hidden": True},
     )
     assert response.status_code == 404
 
@@ -158,27 +136,20 @@ async def test_delete_channel(client, test_db, test_user):
 
     # Create channel with videos
     channel = Channel(
-        user_id=test_user.id,
-        youtube_channel_id="UCtodelete",
-        name="Channel to Delete"
+        user_id=test_user.id, youtube_channel_id="UCtodelete", name="Channel to Delete"
     )
     test_db.add(channel)
     await test_db.commit()
     await test_db.refresh(channel)
     channel_id = channel.id
 
-    bookmark_list = BookmarkList(
-        user_id=test_user.id,
-        name="Test List"
-    )
+    bookmark_list = BookmarkList(user_id=test_user.id, name="Test List")
     test_db.add(bookmark_list)
     await test_db.commit()
     await test_db.refresh(bookmark_list)
 
     video = Video(
-        list_id=bookmark_list.id,
-        youtube_id="vid_delete",
-        channel_id=channel.id
+        list_id=bookmark_list.id, youtube_id="vid_delete", channel_id=channel.id
     )
     test_db.add(video)
     await test_db.commit()
@@ -186,15 +157,12 @@ async def test_delete_channel(client, test_db, test_user):
 
     # Delete channel
     response = await client.delete(
-        f"/api/channels/{channel_id}",
-        params={"user_id": str(test_user.id)}
+        f"/api/channels/{channel_id}", params={"user_id": str(test_user.id)}
     )
     assert response.status_code == 204
 
     # Verify channel deleted
-    result = await test_db.execute(
-        select(Channel).where(Channel.id == channel_id)
-    )
+    result = await test_db.execute(select(Channel).where(Channel.id == channel_id))
     assert result.scalar_one_or_none() is None
 
     # Verify video.channel_id is null (SET NULL on delete)

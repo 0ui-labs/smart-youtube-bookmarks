@@ -1,20 +1,20 @@
-from uuid import UUID
 from datetime import datetime
-from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ListCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(None, max_length=1000)
-    schema_id: Optional[UUID] = None
-    user_id: Optional[UUID] = None  # Will be set from authenticated user
+    description: str | None = Field(None, max_length=1000)
+    schema_id: UUID | None = None
+    user_id: UUID | None = None  # Will be set from authenticated user
 
 
 class ListUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    default_schema_id: Optional[UUID] = None  # Workspace-wide schema for all videos
+    name: str | None = Field(None, min_length=1, max_length=255)
+    description: str | None = None
+    default_schema_id: UUID | None = None  # Workspace-wide schema for all videos
 
 
 class ListResponse(BaseModel):
@@ -22,10 +22,10 @@ class ListResponse(BaseModel):
 
     id: UUID
     name: str
-    description: Optional[str]
+    description: str | None
     user_id: UUID
-    schema_id: Optional[UUID]
-    default_schema_id: Optional[UUID] = None  # Workspace-wide schema for all videos
+    schema_id: UUID | None
+    default_schema_id: UUID | None = None  # Workspace-wide schema for all videos
     video_count: int
     created_at: datetime
     updated_at: datetime

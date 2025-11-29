@@ -1,10 +1,12 @@
 """Tests for YouTube caption provider."""
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
-from app.services.enrichment.providers.youtube_captions import YoutubeCaptionProvider
-from app.services.enrichment.providers.base import CaptionResult, CaptionProvider
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from app.services.enrichment.exceptions import CaptionExtractionError
+from app.services.enrichment.providers.base import CaptionProvider, CaptionResult
+from app.services.enrichment.providers.youtube_captions import YoutubeCaptionProvider
 
 
 class TestYoutubeCaptionProvider:
@@ -30,12 +32,12 @@ class TestYoutubeCaptionProvider:
 Hello world"""
 
         mock_result = CaptionResult(
-            vtt=mock_vtt_content,
-            language="en",
-            source="youtube_manual"
+            vtt=mock_vtt_content, language="en", source="youtube_manual"
         )
 
-        with patch.object(provider, '_fetch_with_ytdlp', new_callable=AsyncMock) as mock_fetch:
+        with patch.object(
+            provider, "_fetch_with_ytdlp", new_callable=AsyncMock
+        ) as mock_fetch:
             mock_fetch.return_value = mock_result
 
             result = await provider.fetch("dQw4w9WgXcQ", 212)
@@ -57,12 +59,12 @@ Hello world"""
 Auto generated"""
 
         mock_result = CaptionResult(
-            vtt=mock_vtt_content,
-            language="en",
-            source="youtube_auto"
+            vtt=mock_vtt_content, language="en", source="youtube_auto"
         )
 
-        with patch.object(provider, '_fetch_with_ytdlp', new_callable=AsyncMock) as mock_fetch:
+        with patch.object(
+            provider, "_fetch_with_ytdlp", new_callable=AsyncMock
+        ) as mock_fetch:
             mock_fetch.return_value = mock_result
 
             result = await provider.fetch("dQw4w9WgXcQ", 212)
@@ -76,7 +78,9 @@ Auto generated"""
         """Fetch returns None when no captions available."""
         provider = YoutubeCaptionProvider()
 
-        with patch.object(provider, '_fetch_with_ytdlp', new_callable=AsyncMock) as mock_fetch:
+        with patch.object(
+            provider, "_fetch_with_ytdlp", new_callable=AsyncMock
+        ) as mock_fetch:
             mock_fetch.return_value = None
 
             result = await provider.fetch("dQw4w9WgXcQ", 212)
@@ -91,10 +95,12 @@ Auto generated"""
         mock_result = CaptionResult(
             vtt="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nTest",
             language="en",
-            source="youtube_manual"
+            source="youtube_manual",
         )
 
-        with patch.object(provider, '_fetch_with_ytdlp', new_callable=AsyncMock) as mock_fetch:
+        with patch.object(
+            provider, "_fetch_with_ytdlp", new_callable=AsyncMock
+        ) as mock_fetch:
             mock_fetch.return_value = mock_result
 
             result = await provider.fetch("dQw4w9WgXcQ", 212)
@@ -109,10 +115,12 @@ Auto generated"""
         mock_result = CaptionResult(
             vtt="WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nTest",
             language="de",
-            source="youtube_manual"
+            source="youtube_manual",
         )
 
-        with patch.object(provider, '_fetch_with_ytdlp', new_callable=AsyncMock) as mock_fetch:
+        with patch.object(
+            provider, "_fetch_with_ytdlp", new_callable=AsyncMock
+        ) as mock_fetch:
             mock_fetch.return_value = mock_result
 
             result = await provider.fetch("dQw4w9WgXcQ", 212)
@@ -124,7 +132,9 @@ Auto generated"""
         """Fetch raises CaptionExtractionError on yt-dlp failure."""
         provider = YoutubeCaptionProvider()
 
-        with patch.object(provider, '_fetch_with_ytdlp', new_callable=AsyncMock) as mock_fetch:
+        with patch.object(
+            provider, "_fetch_with_ytdlp", new_callable=AsyncMock
+        ) as mock_fetch:
             mock_fetch.side_effect = Exception("yt-dlp failed")
 
             with pytest.raises(CaptionExtractionError):
@@ -135,7 +145,9 @@ Auto generated"""
         """Fetch raises CaptionExtractionError on VTT download failure."""
         provider = YoutubeCaptionProvider()
 
-        with patch.object(provider, '_fetch_with_ytdlp', new_callable=AsyncMock) as mock_fetch:
+        with patch.object(
+            provider, "_fetch_with_ytdlp", new_callable=AsyncMock
+        ) as mock_fetch:
             mock_fetch.side_effect = Exception("Download failed")
 
             with pytest.raises(CaptionExtractionError):
@@ -186,22 +198,28 @@ class TestYoutubeCaptionProviderLanguageSelection:
 
         # Only French available
         result = provider._select_best_caption_language(
-            {"fr": [{"ext": "vtt", "url": "url"}]},
-            {}
+            {"fr": [{"ext": "vtt", "url": "url"}]}, {}
         )
         assert result[0] == "fr"
 
         # German available (preferred over French)
         result = provider._select_best_caption_language(
-            {"fr": [{"ext": "vtt", "url": "url"}], "de": [{"ext": "vtt", "url": "url"}]},
-            {}
+            {
+                "fr": [{"ext": "vtt", "url": "url"}],
+                "de": [{"ext": "vtt", "url": "url"}],
+            },
+            {},
         )
         assert result[0] == "de"
 
         # English available (preferred over all)
         result = provider._select_best_caption_language(
-            {"fr": [{"ext": "vtt", "url": "url"}], "de": [{"ext": "vtt", "url": "url"}], "en": [{"ext": "vtt", "url": "url"}]},
-            {}
+            {
+                "fr": [{"ext": "vtt", "url": "url"}],
+                "de": [{"ext": "vtt", "url": "url"}],
+                "en": [{"ext": "vtt", "url": "url"}],
+            },
+            {},
         )
         assert result[0] == "en"
 

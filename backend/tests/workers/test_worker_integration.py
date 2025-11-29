@@ -1,5 +1,7 @@
 """Integration tests for ARQ worker."""
+
 import pytest
+
 from app.workers.settings import WorkerSettings
 
 
@@ -22,7 +24,7 @@ def test_worker_has_lifecycle_hooks():
 def test_worker_has_registered_functions():
     """Test worker has process_video function registered."""
     assert len(WorkerSettings.functions) > 0
-    assert WorkerSettings.functions[0].__name__ == 'process_video'
+    assert WorkerSettings.functions[0].__name__ == "process_video"
 
 
 @pytest.mark.asyncio

@@ -5,14 +5,14 @@ This module tests the end-to-end flow of extracting structured data
 from video transcripts using Gemini API within the ARQ worker.
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from app.workers.video_processor import process_video
+
 from app.models import Video
 from app.models.list import BookmarkList
 from app.models.schema import Schema
-from uuid import uuid4
-from unittest.mock import AsyncMock, patch, MagicMock
-import json
+from app.workers.video_processor import process_video
 
 
 @pytest.fixture
@@ -33,7 +33,9 @@ def mock_youtube_client():
         yield mock_client_class
 
 
-@pytest.mark.skip(reason="Gemini integration not yet implemented in video_processor (TODO at line 103)")
+@pytest.mark.skip(
+    reason="Gemini integration not yet implemented in video_processor (TODO at line 103)"
+)
 @pytest.mark.asyncio
 async def test_process_video_with_gemini_extraction(
     test_db, test_user, arq_context, mock_youtube_client
@@ -127,7 +129,10 @@ async def test_process_video_with_gemini_extraction(
     # Mock token counting for cost tracking
     mock_gemini_instance.count_tokens.return_value = 1500  # Mock token count
 
-    with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
+    with patch(
+        "app.workers.video_processor.get_gemini_client",
+        return_value=mock_gemini_instance,
+    ):
         # Act: Process video
         ctx = {"job_try": 1, "max_tries": 5, "db": arq_context["db"]}
         result = await process_video(
@@ -203,7 +208,11 @@ async def test_process_video_graceful_degradation_without_schema(
     # Act: Process video
     ctx = {"job_try": 1, "max_tries": 5, "db": arq_context["db"]}
     result = await process_video(
-        ctx, video_id=str(video.id), list_id=str(bookmark_list.id), schema={}, job_id=None
+        ctx,
+        video_id=str(video.id),
+        list_id=str(bookmark_list.id),
+        schema={},
+        job_id=None,
     )
 
     # Assert: Video processed successfully WITHOUT Gemini extraction
@@ -215,7 +224,9 @@ async def test_process_video_graceful_degradation_without_schema(
     assert video.extracted_data is None  # No extraction without schema
 
 
-@pytest.mark.skip(reason="Gemini integration not yet implemented in video_processor (TODO at line 103)")
+@pytest.mark.skip(
+    reason="Gemini integration not yet implemented in video_processor (TODO at line 103)"
+)
 @pytest.mark.asyncio
 async def test_process_video_handles_gemini_errors_gracefully(
     test_db, test_user, arq_context, mock_youtube_client
@@ -276,11 +287,17 @@ async def test_process_video_handles_gemini_errors_gracefully(
     # Mock token counting for cost tracking (called before exception)
     mock_gemini_instance.count_tokens.return_value = 1500
 
-    with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
+    with patch(
+        "app.workers.video_processor.get_gemini_client",
+        return_value=mock_gemini_instance,
+    ):
         # Act: Process video
         ctx = {"job_try": 1, "max_tries": 5, "db": arq_context["db"]}
         result = await process_video(
-            ctx, video_id=str(video.id), list_id=str(bookmark_list.id), schema=schema.fields
+            ctx,
+            video_id=str(video.id),
+            list_id=str(bookmark_list.id),
+            schema=schema.fields,
         )
 
     # Assert: Video marked as completed with metadata, extraction error noted
@@ -293,7 +310,9 @@ async def test_process_video_handles_gemini_errors_gracefully(
     # (Implementation can decide: store error in extracted_data or leave None)
 
 
-@pytest.mark.skip(reason="Gemini integration not yet implemented in video_processor (TODO at line 103)")
+@pytest.mark.skip(
+    reason="Gemini integration not yet implemented in video_processor (TODO at line 103)"
+)
 @pytest.mark.asyncio
 async def test_process_video_list_propagates_schema_to_extraction(
     test_db, test_user, arq_context, mock_youtube_client
@@ -314,8 +333,8 @@ async def test_process_video_list_propagates_schema_to_extraction(
     RED PHASE: This test will FAIL until we fix process_video_list signature
     and update the call at line 359.
     """
-    from app.workers.video_processor import process_video_list
     from app.models.job import ProcessingJob
+    from app.workers.video_processor import process_video_list
 
     # Arrange: Create schema
     schema = Schema(
@@ -348,11 +367,7 @@ async def test_process_video_list_propagates_schema_to_extraction(
     await test_db.refresh(bookmark_list)
 
     # Arrange: Create processing job
-    job = ProcessingJob(
-        list_id=bookmark_list.id,
-        total_videos=2,
-        status="running"
-    )
+    job = ProcessingJob(list_id=bookmark_list.id, total_videos=2, status="running")
     test_db.add(job)
     await test_db.commit()
     await test_db.refresh(job)
@@ -402,7 +417,10 @@ async def test_process_video_list_propagates_schema_to_extraction(
     mock_redis = AsyncMock()
     mock_redis.publish = AsyncMock(return_value=1)
 
-    with patch("app.workers.video_processor.get_gemini_client", return_value=mock_gemini_instance):
+    with patch(
+        "app.workers.video_processor.get_gemini_client",
+        return_value=mock_gemini_instance,
+    ):
         # Act: Process videos with schema (NEW PARAMETER)
         ctx = {"redis": mock_redis, "db": arq_context["db"]}
         result = await process_video_list(
@@ -410,7 +428,7 @@ async def test_process_video_list_propagates_schema_to_extraction(
             job_id=str(job.id),
             list_id=str(bookmark_list.id),
             video_ids=[str(video1.id), str(video2.id)],
-            schema=schema.fields  # CRITICAL: Pass schema to worker
+            schema=schema.fields,  # CRITICAL: Pass schema to worker
         )
 
     # Assert: Videos were processed successfully

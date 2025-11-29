@@ -1,12 +1,12 @@
-import pytest
-from uuid import uuid4
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
+
 import numpy as np
+import pytest
 from httpx import AsyncClient
 
+from app.core.config import settings
 from app.models.custom_field import CustomField
 from app.models.list import BookmarkList
-from app.core.config import settings
 
 
 @pytest.mark.asyncio
@@ -14,10 +14,7 @@ class TestSmartDuplicateDetectionIntegration:
     """Integration tests for smart duplicate detection endpoint."""
 
     async def test_basic_mode_backward_compatible(
-        self,
-        client: AsyncClient,
-        test_db,
-        test_list: BookmarkList
+        self, client: AsyncClient, test_db, test_list: BookmarkList
     ):
         """Basic mode should work as before (backward compatible)."""
         # Create field
@@ -25,7 +22,7 @@ class TestSmartDuplicateDetectionIntegration:
             list_id=test_list.id,
             name="Presentation Quality",
             field_type="select",
-            config={"options": ["bad", "good", "great"]}
+            config={"options": ["bad", "good", "great"]},
         )
         test_db.add(field)
         await test_db.commit()
@@ -33,7 +30,7 @@ class TestSmartDuplicateDetectionIntegration:
         # Check with basic mode (default)
         response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields/check-duplicate",
-            json={"name": "presentation quality"}
+            json={"name": "presentation quality"},
         )
 
         assert response.status_code == 200
@@ -46,14 +43,10 @@ class TestSmartDuplicateDetectionIntegration:
         assert data["field"]["name"] == "Presentation Quality"
 
     @pytest.mark.skipif(
-        not settings.gemini_api_key,
-        reason="Gemini API key not configured"
+        not settings.gemini_api_key, reason="Gemini API key not configured"
     )
     async def test_smart_mode_typo_detection(
-        self,
-        client: AsyncClient,
-        test_db,
-        test_list: BookmarkList
+        self, client: AsyncClient, test_db, test_list: BookmarkList
     ):
         """Smart mode should detect typos."""
         # Create field (use simple name without extra words for Levenshtein to work)
@@ -61,7 +54,7 @@ class TestSmartDuplicateDetectionIntegration:
             list_id=test_list.id,
             name="Presentation",
             field_type="select",
-            config={"options": ["bad", "good", "great"]}
+            config={"options": ["bad", "good", "great"]},
         )
         test_db.add(field)
         await test_db.commit()
@@ -69,7 +62,7 @@ class TestSmartDuplicateDetectionIntegration:
         # Check with smart mode + typo
         response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields/check-duplicate?mode=smart",
-            json={"name": "Presentaton"}  # Missing 'i'
+            json={"name": "Presentaton"},  # Missing 'i'
         )
 
         assert response.status_code == 200
@@ -87,22 +80,21 @@ class TestSmartDuplicateDetectionIntegration:
         assert "character difference" in suggestion["explanation"]
 
     @pytest.mark.skipif(
-        not settings.gemini_api_key,
-        reason="Gemini API key not configured"
+        not settings.gemini_api_key, reason="Gemini API key not configured"
     )
-    @patch('app.services.duplicate_detection.DuplicateDetector._call_gemini_embedding_api')
+    @patch(
+        "app.services.duplicate_detection.DuplicateDetector._call_gemini_embedding_api"
+    )
     async def test_smart_mode_semantic_similarity(
-        self,
-        mock_embedding,
-        client: AsyncClient,
-        test_db,
-        test_list: BookmarkList
+        self, mock_embedding, client: AsyncClient, test_db, test_list: BookmarkList
     ):
         """Smart mode should detect semantic similarity."""
         # Mock embeddings for "Video Rating" and "Overall Score"
         # Make them similar (cosine similarity ~0.85)
         embedding_video_rating = np.random.rand(768).astype(np.float32)
-        embedding_overall_score = embedding_video_rating + np.random.rand(768).astype(np.float32) * 0.2
+        embedding_overall_score = (
+            embedding_video_rating + np.random.rand(768).astype(np.float32) * 0.2
+        )
 
         # Normalize
         embedding_video_rating /= np.linalg.norm(embedding_video_rating)
@@ -124,7 +116,7 @@ class TestSmartDuplicateDetectionIntegration:
             list_id=test_list.id,
             name="Video Rating",
             field_type="rating",
-            config={"max_rating": 5}
+            config={"max_rating": 5},
         )
         test_db.add(field)
         await test_db.commit()
@@ -132,7 +124,7 @@ class TestSmartDuplicateDetectionIntegration:
         # Check "Overall Score" (semantically similar)
         response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields/check-duplicate?mode=smart",
-            json={"name": "Overall Score"}
+            json={"name": "Overall Score"},
         )
 
         assert response.status_code == 200
@@ -144,8 +136,7 @@ class TestSmartDuplicateDetectionIntegration:
 
         # Find semantic suggestion
         semantic_suggestions = [
-            s for s in data["suggestions"]
-            if s["similarity_type"] == "semantic"
+            s for s in data["suggestions"] if s["similarity_type"] == "semantic"
         ]
 
         assert len(semantic_suggestions) >= 1
@@ -155,16 +146,13 @@ class TestSmartDuplicateDetectionIntegration:
         assert "semantically similar" in suggestion["explanation"].lower()
 
     @pytest.mark.skipif(
-        not settings.gemini_api_key,
-        reason="Gemini API key not configured"
+        not settings.gemini_api_key, reason="Gemini API key not configured"
     )
-    @patch('app.services.duplicate_detection.DuplicateDetector._call_gemini_embedding_api')
+    @patch(
+        "app.services.duplicate_detection.DuplicateDetector._call_gemini_embedding_api"
+    )
     async def test_smart_mode_multiple_suggestions_ranked(
-        self,
-        mock_embedding,
-        client: AsyncClient,
-        test_db,
-        test_list: BookmarkList
+        self, mock_embedding, client: AsyncClient, test_db, test_list: BookmarkList
     ):
         """Smart mode should return multiple suggestions ranked by score."""
         # Mock embeddings to ensure Audio Quality is NOT similar to Rating
@@ -205,20 +193,20 @@ class TestSmartDuplicateDetectionIntegration:
                 list_id=test_list.id,
                 name="Rating",
                 field_type="rating",
-                config={"max_rating": 5}
+                config={"max_rating": 5},
             ),
             CustomField(
                 list_id=test_list.id,
                 name="Ratng",  # Closer typo
                 field_type="rating",
-                config={"max_rating": 5}
+                config={"max_rating": 5},
             ),
             CustomField(
                 list_id=test_list.id,
                 name="Audio Quality",  # Different
                 field_type="select",
-                config={"options": ["bad", "good"]}
-            )
+                config={"options": ["bad", "good"]},
+            ),
         ]
         for field in fields:
             test_db.add(field)
@@ -227,7 +215,7 @@ class TestSmartDuplicateDetectionIntegration:
         # Check with query that matches first two
         response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields/check-duplicate?mode=smart",
-            json={"name": "Rating"}
+            json={"name": "Rating"},
         )
 
         assert response.status_code == 200
@@ -240,7 +228,9 @@ class TestSmartDuplicateDetectionIntegration:
 
         # Should be ranked by score (highest first)
         for i in range(len(data["suggestions"]) - 1):
-            assert data["suggestions"][i]["score"] >= data["suggestions"][i+1]["score"]
+            assert (
+                data["suggestions"][i]["score"] >= data["suggestions"][i + 1]["score"]
+            )
 
         # Exact match should be first (highest score)
         assert data["suggestions"][0]["field"]["name"] == "Rating"  # Exact match first
@@ -251,16 +241,13 @@ class TestSmartDuplicateDetectionIntegration:
         assert "Ratng" in suggestion_names
 
     @pytest.mark.skipif(
-        not settings.gemini_api_key,
-        reason="Gemini API key not configured"
+        not settings.gemini_api_key, reason="Gemini API key not configured"
     )
-    @patch('app.services.duplicate_detection.DuplicateDetector._call_gemini_embedding_api')
+    @patch(
+        "app.services.duplicate_detection.DuplicateDetector._call_gemini_embedding_api"
+    )
     async def test_smart_mode_no_suggestions_below_threshold(
-        self,
-        mock_embedding,
-        client: AsyncClient,
-        test_db,
-        test_list: BookmarkList
+        self, mock_embedding, client: AsyncClient, test_db, test_list: BookmarkList
     ):
         """Smart mode should not suggest if all scores < 0.60."""
         # Mock embeddings to ensure fields are NOT similar (low cosine similarity)
@@ -269,12 +256,16 @@ class TestSmartDuplicateDetectionIntegration:
         # Video Length - first 100 dimensions
         embedding_video_length = np.zeros(768, dtype=np.float32)
         embedding_video_length[0:100] = 1.0
-        embedding_video_length = embedding_video_length / np.linalg.norm(embedding_video_length)
+        embedding_video_length = embedding_video_length / np.linalg.norm(
+            embedding_video_length
+        )
 
         # Audio Quality - different 100 dimensions (no overlap)
         embedding_audio_quality = np.zeros(768, dtype=np.float32)
         embedding_audio_quality[400:500] = 1.0
-        embedding_audio_quality = embedding_audio_quality / np.linalg.norm(embedding_audio_quality)
+        embedding_audio_quality = embedding_audio_quality / np.linalg.norm(
+            embedding_audio_quality
+        )
 
         async def mock_embedding_func(text):
             text_lower = text.lower()
@@ -289,10 +280,7 @@ class TestSmartDuplicateDetectionIntegration:
 
         # Create completely different field
         field = CustomField(
-            list_id=test_list.id,
-            name="Video Length",
-            field_type="text",
-            config={}
+            list_id=test_list.id, name="Video Length", field_type="text", config={}
         )
         test_db.add(field)
         await test_db.commit()
@@ -300,7 +288,7 @@ class TestSmartDuplicateDetectionIntegration:
         # Check with very different name
         response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields/check-duplicate?mode=smart",
-            json={"name": "Audio Quality"}
+            json={"name": "Audio Quality"},
         )
 
         assert response.status_code == 200
@@ -311,25 +299,24 @@ class TestSmartDuplicateDetectionIntegration:
         if data["exists"]:
             # If any suggestions exist, they should all be below 0.70 (weak similarity)
             for suggestion in data["suggestions"]:
-                assert suggestion["score"] < 0.70, f"Unexpected high similarity: {suggestion}"
+                assert suggestion["score"] < 0.70, (
+                    f"Unexpected high similarity: {suggestion}"
+                )
         else:
             assert data["suggestions"] == []
 
     async def test_smart_mode_fallback_without_gemini(
-        self,
-        client: AsyncClient,
-        test_db,
-        test_list: BookmarkList
+        self, client: AsyncClient, test_db, test_list: BookmarkList
     ):
         """Smart mode should work without Gemini (Levenshtein only)."""
         # Temporarily disable Gemini by setting API key to None
-        with patch('app.core.config.settings.gemini_api_key', None):
+        with patch("app.core.config.settings.gemini_api_key", None):
             # Create field
             field = CustomField(
                 list_id=test_list.id,
                 name="Rating",
                 field_type="select",
-                config={"options": ["bad", "good", "great"]}
+                config={"options": ["bad", "good", "great"]},
             )
             test_db.add(field)
             await test_db.commit()
@@ -337,7 +324,7 @@ class TestSmartDuplicateDetectionIntegration:
             # Check with typo (distance = 1, within threshold of 3)
             response = await client.post(
                 f"/api/lists/{test_list.id}/custom-fields/check-duplicate?mode=smart",
-                json={"name": "Ratng"}
+                json={"name": "Ratng"},
             )
 
             assert response.status_code == 200
@@ -348,23 +335,22 @@ class TestSmartDuplicateDetectionIntegration:
             assert data["suggestions"][0]["similarity_type"] == "levenshtein"
 
     @pytest.mark.skipif(
-        not settings.gemini_api_key,
-        reason="Gemini API key not configured"
+        not settings.gemini_api_key, reason="Gemini API key not configured"
     )
-    @patch('app.services.duplicate_detection.DuplicateDetector._call_gemini_embedding_api')
+    @patch(
+        "app.services.duplicate_detection.DuplicateDetector._call_gemini_embedding_api"
+    )
     async def test_smart_mode_response_time_under_500ms(
-        self,
-        mock_embedding,
-        client: AsyncClient,
-        test_db,
-        test_list: BookmarkList
+        self, mock_embedding, client: AsyncClient, test_db, test_list: BookmarkList
     ):
         """Smart mode should respond in < 500ms (mocked API for performance testing)."""
         import time
 
         # Mock fast embeddings
         async def mock_embedding_func(text):
-            return np.random.rand(768).astype(np.float32) / np.linalg.norm(np.random.rand(768).astype(np.float32))
+            return np.random.rand(768).astype(np.float32) / np.linalg.norm(
+                np.random.rand(768).astype(np.float32)
+            )
 
         mock_embedding.side_effect = mock_embedding_func
 
@@ -374,7 +360,7 @@ class TestSmartDuplicateDetectionIntegration:
                 list_id=test_list.id,
                 name=f"Test Field {i}",
                 field_type="text",
-                config={}
+                config={},
             )
             test_db.add(field)
         await test_db.commit()
@@ -383,7 +369,7 @@ class TestSmartDuplicateDetectionIntegration:
         start = time.time()
         response = await client.post(
             f"/api/lists/{test_list.id}/custom-fields/check-duplicate?mode=smart",
-            json={"name": "Test Field X"}
+            json={"name": "Test Field X"},
         )
         elapsed = time.time() - start
 

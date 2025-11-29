@@ -1,10 +1,11 @@
 """Service for validating category assignments to videos."""
+
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from app.models.video import Video
     from app.models.tag import Tag
+    from app.models.video import Video
 
 
 class CategoryValidationError(Exception):
@@ -43,10 +44,7 @@ def validate_category_assignment(
         CategoryValidationError: If assignment would violate rules
     """
     # Get existing category (if any)
-    existing_category = next(
-        (t for t in video.tags if t.is_video_type),
-        None
-    )
+    existing_category = next((t for t in video.tags if t.is_video_type), None)
     existing_category_id = existing_category.id if existing_category else None
 
     # Get categories from tags being assigned
@@ -56,7 +54,7 @@ def validate_category_assignment(
     if len(new_categories) > 1:
         raise CategoryValidationError(
             message=f"Cannot assign multiple categories at once. "
-                    f"Tried to assign: {', '.join(c.name for c in new_categories)}",
+            f"Tried to assign: {', '.join(c.name for c in new_categories)}",
             new_category_name=new_categories[0].name,
         )
 
@@ -70,8 +68,8 @@ def validate_category_assignment(
 
         raise CategoryValidationError(
             message=f"Video already has category '{existing_category.name}'. "
-                    f"Cannot assign '{new_category.name}'. "
-                    f"Remove existing category first or use replace endpoint.",
+            f"Cannot assign '{new_category.name}'. "
+            f"Remove existing category first or use replace endpoint.",
             existing_category_id=existing_category.id,
             existing_category_name=existing_category.name,
             new_category_name=new_category.name,

@@ -1,30 +1,30 @@
 """ARQ worker for processing YouTube videos."""
+
 import asyncio
+import logging
+from datetime import datetime
 from uuid import UUID
+
 from arq import Retry
-from sqlalchemy.ext.asyncio import AsyncSession
+from isodate import parse_duration
 from sqlalchemy import select
-from app.models import Video, ProcessingJob
-from app.models.list import BookmarkList
-from app.models.job_progress import JobProgressEvent
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.clients.youtube import YouTubeClient
-from app.services.channel_service import get_or_create_channel
-from app.services.rate_limiter import AdaptiveRateLimiter
 from app.core.config import settings
 from app.core.redis import get_redis_client
-from datetime import datetime
-from isodate import parse_duration
-import logging
+from app.models import ProcessingJob, Video
+from app.models.job_progress import JobProgressEvent
+from app.models.list import BookmarkList
+from app.services.channel_service import get_or_create_channel
+from app.services.rate_limiter import AdaptiveRateLimiter
 
 logger = logging.getLogger(__name__)
 
 # Module-level rate limiter for enrichment requests
 # Limits concurrent YouTube API calls to prevent 429 errors
 _enrichment_rate_limiter = AdaptiveRateLimiter(
-    max_concurrent=3,
-    base_delay=2.0,
-    max_delay=60.0,
-    failure_threshold=5
+    max_concurrent=3, base_delay=2.0, max_delay=60.0, failure_threshold=5
 )
 
 
@@ -45,18 +45,14 @@ def _parse_timestamp(timestamp: str | None) -> datetime | None:
     if not timestamp:
         return None
     try:
-        return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
     except (ValueError, AttributeError) as e:
         logger.debug(f"Invalid timestamp format '{timestamp}': {e}")
         return None
 
 
 async def fetch_with_retry(
-    func,
-    *args,
-    max_retries: int = 3,
-    base_delay: float = 1.0,
-    **kwargs
+    func, *args, max_retries: int = 3, base_delay: float = 1.0, **kwargs
 ):
     """
     Execute async function with exponential backoff retry.
@@ -87,17 +83,17 @@ async def fetch_with_retry(
                 raise
 
             # Exponential backoff
-            delay = base_delay * (2 ** attempt)
-            logger.warning(
-                f"Retry {attempt + 1}/{max_retries} after {delay:.2f}s: {e}"
-            )
+            delay = base_delay * (2**attempt)
+            logger.warning(f"Retry {attempt + 1}/{max_retries} after {delay:.2f}s: {e}")
             await asyncio.sleep(delay)
 
     # Should not reach here, but just in case
     raise last_exception
 
 
-async def update_stage(db: AsyncSession, video: Video, stage: str, progress: int) -> None:
+async def update_stage(
+    db: AsyncSession, video: Video, stage: str, progress: int
+) -> None:
     """
     Update video import stage and progress.
 
@@ -112,7 +108,9 @@ async def update_stage(db: AsyncSession, video: Video, stage: str, progress: int
     await db.flush()
 
 
-async def publish_progress(redis, user_id: str, video_id: str, progress: int, stage: str) -> None:
+async def publish_progress(
+    redis, user_id: str, video_id: str, progress: int, stage: str
+) -> None:
     """
     Publish import progress update via Redis Pub/Sub.
 
@@ -129,12 +127,14 @@ async def publish_progress(redis, user_id: str, video_id: str, progress: int, st
         "type": "import_progress",
         "video_id": video_id,
         "progress": progress,
-        "stage": stage
+        "stage": stage,
     }
 
     channel = f"progress:user:{user_id}"
     await redis.publish(channel, json.dumps(message))
-    logger.debug(f"Published progress update for video {video_id}: {progress}% ({stage})")
+    logger.debug(
+        f"Published progress update for video {video_id}: {progress}% ({stage})"
+    )
 
 
 async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
@@ -159,15 +159,19 @@ async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
     """
     from app.services.enrichment.enrichment_service import EnrichmentService
 
-    db: AsyncSession = ctx['db']
-    redis = ctx.get('redis')
+    db: AsyncSession = ctx["db"]
+    redis = ctx.get("redis")
 
     try:
         # Fetch video
         video = await db.get(Video, UUID(video_id))
         if not video:
             logger.error(f"Video {video_id} not found for staged enrichment")
-            return {"status": "error", "message": "Video not found", "video_id": video_id}
+            return {
+                "status": "error",
+                "message": "Video not found",
+                "video_id": video_id,
+            }
 
         # Get user_id for progress publishing
         list_result = await db.execute(
@@ -209,9 +213,11 @@ async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
         )
 
         return {
-            "status": enrichment.status.value if hasattr(enrichment.status, 'value') else str(enrichment.status),
+            "status": enrichment.status.value
+            if hasattr(enrichment.status, "value")
+            else str(enrichment.status),
             "video_id": video_id,
-            "enrichment_id": str(enrichment.id) if enrichment.id else None
+            "enrichment_id": str(enrichment.id) if enrichment.id else None,
         }
 
     except Exception as e:
@@ -226,19 +232,11 @@ async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
         except Exception:
             pass
 
-        return {
-            "status": "error",
-            "message": str(e),
-            "video_id": video_id
-        }
+        return {"status": "error", "message": str(e), "video_id": video_id}
 
 
 async def process_video(
-    ctx: dict,
-    video_id: str,
-    list_id: str,
-    schema: dict,
-    job_id: str
+    ctx: dict, video_id: str, list_id: str, schema: dict, job_id: str
 ) -> dict:
     """
     Process a single video:
@@ -258,7 +256,7 @@ async def process_video(
     Returns:
         dict: Processing result with status
     """
-    db: AsyncSession = ctx['db']
+    db: AsyncSession = ctx["db"]
 
     video = None
     try:
@@ -266,7 +264,11 @@ async def process_video(
         video = await db.get(Video, UUID(video_id))
         if not video:
             logger.error(f"Video {video_id} not found")
-            return {"status": "error", "message": "Video not found", "video_id": video_id}
+            return {
+                "status": "error",
+                "message": "Video not found",
+                "video_id": video_id,
+            }
 
         # Idempotency check - skip if already completed
         if video.processing_status == "completed":
@@ -279,10 +281,9 @@ async def process_video(
 
         # Fetch YouTube metadata
         # Use redis from context if available (for testing), otherwise get singleton
-        redis_client = ctx.get('redis') or await get_redis_client()
+        redis_client = ctx.get("redis") or await get_redis_client()
         youtube_client = YouTubeClient(
-            api_key=settings.youtube_api_key,
-            redis_client=redis_client
+            api_key=settings.youtube_api_key, redis_client=redis_client
         )
 
         try:
@@ -327,7 +328,9 @@ async def process_video(
 
                 if user_id:
                     # Fetch channel info (thumbnail + description, cached for 30 days)
-                    channel_info = await youtube_client.get_channel_info(youtube_channel_id)
+                    channel_info = await youtube_client.get_channel_info(
+                        youtube_channel_id
+                    )
 
                     channel = await get_or_create_channel(
                         db=db,
@@ -335,7 +338,7 @@ async def process_video(
                         youtube_channel_id=youtube_channel_id,
                         channel_name=metadata.get("channel", "Unknown Channel"),
                         channel_thumbnail=channel_info.get("thumbnail_url"),
-                        channel_description=channel_info.get("description")
+                        channel_description=channel_info.get("description"),
                     )
                     video.channel_id = channel.id
 
@@ -364,7 +367,7 @@ async def process_video(
             if settings.enrichment_enabled and settings.enrichment_auto_trigger:
                 try:
                     # Use the worker's existing Redis connection from ctx
-                    arq_redis = ctx['redis']
+                    arq_redis = ctx["redis"]
                     job = await arq_redis.enqueue_job("enrich_video", str(video.id))
 
                     # Retry once if enqueue failed (handles transient Redis issues)
@@ -381,14 +384,16 @@ async def process_video(
                             f"job may already exist in queue"
                         )
                 except Exception as e:
-                    logger.warning(f"Failed to enqueue enrichment for video {video_id}: {e}")
+                    logger.warning(
+                        f"Failed to enqueue enrichment for video {video_id}: {e}"
+                    )
 
             # Publish WebSocket update for instant UI refresh
             # Skip for large batches to avoid overwhelming Redis (rely on progress updates instead)
             # Note: job_id can be used to determine if this is a batch job
             # For now, we'll rely on progress updates for batch jobs
 
-        except Exception as e:
+        except Exception:
             logger.exception(f"Failed to fetch YouTube metadata for video {video_id}")
             raise
 
@@ -409,11 +414,7 @@ async def process_video(
 
 
 async def process_video_list(
-    ctx: dict,
-    job_id: str,
-    list_id: str,
-    video_ids: list[str],
-    schema: dict
+    ctx: dict, job_id: str, list_id: str, video_ids: list[str], schema: dict
 ) -> dict:
     """
     Process a list of videos in batch (for CSV bulk upload).
@@ -431,7 +432,7 @@ async def process_video_list(
     Returns:
         dict: Processing result with status and counts
     """
-    db: AsyncSession = ctx['db']
+    db: AsyncSession = ctx["db"]
 
     logger.info(f"Processing video list job {job_id} with {len(video_ids)} videos")
 
@@ -443,8 +444,8 @@ async def process_video_list(
             "processed": 0,
             "failed": 0,
             "total": len(video_ids),
-            "status": "started"
-        }
+            "status": "started",
+        },
     )
     db.add(initial_event)
     await db.flush()
@@ -455,32 +456,34 @@ async def process_video_list(
     for video_id in video_ids:
         try:
             # Process each video individually
-            result = await process_video(
-                ctx,
-                video_id,
-                list_id,
-                schema,
-                job_id
-            )
+            result = await process_video(ctx, video_id, list_id, schema, job_id)
 
             # Track success/failure and update job progress
-            redis_client = ctx.get('redis')
-            if result['status'] in ('success', 'already_completed'):
+            redis_client = ctx.get("redis")
+            if result["status"] in ("success", "already_completed"):
                 processed_count += 1
-                await _update_job_progress(db, job_id, success=True, redis_client=redis_client)
-            elif result['status'] == 'error':
+                await _update_job_progress(
+                    db, job_id, success=True, redis_client=redis_client
+                )
+            elif result["status"] == "error":
                 failed_count += 1
-                await _update_job_progress(db, job_id, success=False, redis_client=redis_client)
+                await _update_job_progress(
+                    db, job_id, success=False, redis_client=redis_client
+                )
             else:
                 failed_count += 1
-                await _update_job_progress(db, job_id, success=False, redis_client=redis_client)
+                await _update_job_progress(
+                    db, job_id, success=False, redis_client=redis_client
+                )
 
-        except Exception as e:
+        except Exception:
             logger.exception(f"Failed to process video {video_id} in batch")
             failed_count += 1
             # Update progress for failed video (process_video might not have run)
-            redis_client = ctx.get('redis')
-            await _update_job_progress(db, job_id, success=False, redis_client=redis_client)
+            redis_client = ctx.get("redis")
+            await _update_job_progress(
+                db, job_id, success=False, redis_client=redis_client
+            )
             # Continue processing other videos
 
     logger.info(
@@ -492,7 +495,7 @@ async def process_video_list(
         "status": "success",
         "processed": processed_count,
         "failed": failed_count,
-        "total": len(video_ids)
+        "total": len(video_ids),
     }
 
 
@@ -519,7 +522,7 @@ async def _publish_video_update(redis_client, video, job_id: str, user_id: str) 
             "title": video.title,
             "channel": video.channel,
             "thumbnail_url": video.thumbnail_url,
-            "message": f"Video '{video.title}' processed successfully"
+            "message": f"Video '{video.title}' processed successfully",
         }
 
         # Publish to user-specific channel
@@ -527,12 +530,14 @@ async def _publish_video_update(redis_client, video, job_id: str, user_id: str) 
         await redis_client.publish(channel, json.dumps(update_message))
         logger.info(f"Published WebSocket update for video {video.id} to {channel}")
 
-    except Exception as e:
+    except Exception:
         # Don't fail processing if WebSocket publish fails
         logger.exception("Failed to publish WebSocket update")
 
 
-async def _update_job_progress(db: AsyncSession, job_id: str, success: bool, redis_client=None) -> None:
+async def _update_job_progress(
+    db: AsyncSession, job_id: str, success: bool, redis_client=None
+) -> None:
     """
     Update parent ProcessingJob progress counters and create progress event.
 
@@ -560,7 +565,11 @@ async def _update_job_progress(db: AsyncSession, job_id: str, success: bool, red
 
         # Calculate progress percentage
         total_processed = parent_job.processed_count + parent_job.failed_count
-        progress_percentage = int((total_processed / parent_job.total_videos) * 100) if parent_job.total_videos > 0 else 0
+        progress_percentage = (
+            int((total_processed / parent_job.total_videos) * 100)
+            if parent_job.total_videos > 0
+            else 0
+        )
 
         # Determine status
         if total_processed >= parent_job.total_videos:
@@ -578,9 +587,9 @@ async def _update_job_progress(db: AsyncSession, job_id: str, success: bool, red
             should_create_event = True  # Every update for small batches
         else:
             should_create_event = (
-                progress_percentage == 0 or  # Initial
-                progress_percentage == 100 or  # Final
-                progress_percentage % 5 == 0  # Every 5%
+                progress_percentage == 0  # Initial
+                or progress_percentage == 100  # Final
+                or progress_percentage % 5 == 0  # Every 5%
             )
 
         # Create progress event (with error handling to not block Redis publish)
@@ -593,8 +602,8 @@ async def _update_job_progress(db: AsyncSession, job_id: str, success: bool, red
                         "processed": parent_job.processed_count,
                         "failed": parent_job.failed_count,
                         "total": parent_job.total_videos,
-                        "status": event_status
-                    }
+                        "status": event_status,
+                    },
                 )
                 db.add(progress_event)
             except Exception as e:
@@ -608,19 +617,22 @@ async def _update_job_progress(db: AsyncSession, job_id: str, success: bool, red
             should_publish = True
         else:
             should_publish = (
-                progress_percentage == 0 or  # Initial
-                progress_percentage == 100 or  # Final
-                progress_percentage % 5 == 0  # Every 5%
+                progress_percentage == 0  # Initial
+                or progress_percentage == 100  # Final
+                or progress_percentage % 5 == 0  # Every 5%
             )
 
         if should_publish and redis_client:
             try:
                 import json
+
                 from app.models.list import BookmarkList
 
                 # Get user_id for channel routing
                 list_result = await db.execute(
-                    select(BookmarkList.user_id).where(BookmarkList.id == parent_job.list_id)
+                    select(BookmarkList.user_id).where(
+                        BookmarkList.id == parent_job.list_id
+                    )
                 )
                 user_id = list_result.scalar_one_or_none()
 
@@ -631,7 +643,7 @@ async def _update_job_progress(db: AsyncSession, job_id: str, success: bool, red
                         "processed": parent_job.processed_count,
                         "failed": parent_job.failed_count,
                         "total": parent_job.total_videos,
-                        "status": event_status
+                        "status": event_status,
                     }
                     channel = f"progress:user:{user_id}"
                     await redis_client.publish(channel, json.dumps(progress_message))

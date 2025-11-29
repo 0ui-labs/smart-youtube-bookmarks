@@ -1,6 +1,9 @@
 """Tests for YouTube Data API v3 client"""
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+
 from app.clients.youtube import YouTubeClient
 
 
@@ -20,23 +23,21 @@ async def test_get_video_metadata_success():
 
     # Mock aiogoogle response
     mock_response = {
-        "items": [{
-            "id": "dQw4w9WgXcQ",
-            "snippet": {
-                "title": "Test Video",
-                "channelTitle": "Test Channel",
-                "publishedAt": "2009-10-25T06:57:33Z",
-                "thumbnails": {
-                    "default": {"url": "https://example.com/thumb.jpg"}
-                }
-            },
-            "contentDetails": {
-                "duration": "PT3M33S"
+        "items": [
+            {
+                "id": "dQw4w9WgXcQ",
+                "snippet": {
+                    "title": "Test Video",
+                    "channelTitle": "Test Channel",
+                    "publishedAt": "2009-10-25T06:57:33Z",
+                    "thumbnails": {"default": {"url": "https://example.com/thumb.jpg"}},
+                },
+                "contentDetails": {"duration": "PT3M33S"},
             }
-        }]
+        ]
     }
 
-    with patch('app.clients.youtube.Aiogoogle') as mock_aiogoogle:
+    with patch("app.clients.youtube.Aiogoogle") as mock_aiogoogle:
         # Setup mock
         mock_instance = AsyncMock()
         mock_aiogoogle.return_value.__aenter__.return_value = mock_instance
@@ -57,7 +58,7 @@ async def test_get_video_metadata_not_found():
     """Test video not found (404) handling"""
     client = YouTubeClient(api_key="test-key")
 
-    with patch('app.clients.youtube.Aiogoogle') as mock_aiogoogle:
+    with patch("app.clients.youtube.Aiogoogle") as mock_aiogoogle:
         mock_instance = AsyncMock()
         mock_aiogoogle.return_value.__aenter__.return_value = mock_instance
         mock_instance.discover.return_value = AsyncMock()
@@ -75,10 +76,10 @@ async def test_get_video_transcript_success():
 
     mock_transcript = [
         {"text": "Hello", "start": 0.0, "duration": 1.5},
-        {"text": "World", "start": 1.5, "duration": 1.5}
+        {"text": "World", "start": 1.5, "duration": 1.5},
     ]
 
-    with patch('app.clients.youtube.YouTubeTranscriptApi') as mock_api:
+    with patch("app.clients.youtube.YouTubeTranscriptApi") as mock_api:
         mock_api.get_transcript.return_value = mock_transcript
 
         transcript = await client.get_video_transcript("dQw4w9WgXcQ")
@@ -93,7 +94,7 @@ async def test_get_video_transcript_not_found():
 
     client = YouTubeClient(api_key="test-key")
 
-    with patch('app.clients.youtube.YouTubeTranscriptApi') as mock_api:
+    with patch("app.clients.youtube.YouTubeTranscriptApi") as mock_api:
         mock_api.get_transcript.side_effect = NoTranscriptFound("id", [], "msg")
 
         transcript = await client.get_video_transcript("dQw4w9WgXcQ")
@@ -116,19 +117,21 @@ async def test_get_video_metadata_uses_cache():
 
     # Mock API response
     mock_response = {
-        "items": [{
-            "id": "test123",
-            "snippet": {
-                "title": "Cached Video",
-                "channelTitle": "Cache Channel",
-                "publishedAt": "2025-01-01T00:00:00Z",
-                "thumbnails": {"default": {"url": "https://example.com/thumb.jpg"}}
-            },
-            "contentDetails": {"duration": "PT5M00S"}
-        }]
+        "items": [
+            {
+                "id": "test123",
+                "snippet": {
+                    "title": "Cached Video",
+                    "channelTitle": "Cache Channel",
+                    "publishedAt": "2025-01-01T00:00:00Z",
+                    "thumbnails": {"default": {"url": "https://example.com/thumb.jpg"}},
+                },
+                "contentDetails": {"duration": "PT5M00S"},
+            }
+        ]
     }
 
-    with patch('app.clients.youtube.Aiogoogle') as mock_aiogoogle:
+    with patch("app.clients.youtube.Aiogoogle") as mock_aiogoogle:
         mock_instance = AsyncMock()
         mock_aiogoogle.return_value.__aenter__.return_value = mock_instance
         mock_instance.discover.return_value = AsyncMock()
@@ -143,6 +146,7 @@ async def test_get_video_metadata_uses_cache():
 
         # Second call - mock cache hit
         import json
+
         redis_client.get.return_value = json.dumps(metadata1)
         metadata2 = await client.get_video_metadata("test123")
 
@@ -165,10 +169,10 @@ async def test_get_video_transcript_uses_cache():
 
     mock_transcript = [
         {"text": "Cached", "start": 0.0, "duration": 1.5},
-        {"text": "Transcript", "start": 1.5, "duration": 1.5}
+        {"text": "Transcript", "start": 1.5, "duration": 1.5},
     ]
 
-    with patch('app.clients.youtube.YouTubeTranscriptApi') as mock_api:
+    with patch("app.clients.youtube.YouTubeTranscriptApi") as mock_api:
         mock_api.get_transcript.return_value = mock_transcript
 
         # First call - should hit API
@@ -191,17 +195,17 @@ async def test_get_video_metadata_quota_exceeded():
     # Mock 403 response
     mock_response = MagicMock()
     mock_response.status_code = 403
-    mock_response.json = {'error': {'errors': [{'reason': 'quotaExceeded'}]}}
+    mock_response.json = {"error": {"errors": [{"reason": "quotaExceeded"}]}}
 
-    with patch('app.clients.youtube.Aiogoogle') as mock_aiogoogle:
+    with patch("app.clients.youtube.Aiogoogle") as mock_aiogoogle:
         mock_instance = AsyncMock()
         mock_aiogoogle.return_value.__aenter__.return_value = mock_instance
         mock_instance.discover = AsyncMock(return_value=AsyncMock())
-        mock_instance.as_api_key = AsyncMock(side_effect=HTTPError(
-            msg="Quota exceeded",
-            req=MagicMock(),
-            res=mock_response
-        ))
+        mock_instance.as_api_key = AsyncMock(
+            side_effect=HTTPError(
+                msg="Quota exceeded", req=MagicMock(), res=mock_response
+            )
+        )
 
         with pytest.raises(ValueError, match="quota exceeded"):
             await client.get_video_metadata("test123")
@@ -217,15 +221,15 @@ async def test_get_video_metadata_rate_limited():
     mock_response = MagicMock()
     mock_response.status_code = 429
 
-    with patch('app.clients.youtube.Aiogoogle') as mock_aiogoogle:
+    with patch("app.clients.youtube.Aiogoogle") as mock_aiogoogle:
         mock_instance = AsyncMock()
         mock_aiogoogle.return_value.__aenter__.return_value = mock_instance
         mock_instance.discover = AsyncMock(return_value=AsyncMock())
-        mock_instance.as_api_key = AsyncMock(side_effect=HTTPError(
-            msg="Rate limited",
-            req=MagicMock(),
-            res=mock_response
-        ))
+        mock_instance.as_api_key = AsyncMock(
+            side_effect=HTTPError(
+                msg="Rate limited", req=MagicMock(), res=mock_response
+            )
+        )
 
         # Rate limit (429) should be re-raised for tenacity to handle
         with pytest.raises(HTTPError):
@@ -260,11 +264,9 @@ async def test_get_batch_metadata_success():
                         "high": {
                             "url": "https://i.ytimg.com/vi/VIDEO_ID_1/hqdefault.jpg"
                         }
-                    }
+                    },
                 },
-                "contentDetails": {
-                    "duration": "PT15M30S"
-                }
+                "contentDetails": {"duration": "PT15M30S"},
             },
             {
                 "id": "VIDEO_ID_2",
@@ -277,11 +279,9 @@ async def test_get_batch_metadata_success():
                         "high": {
                             "url": "https://i.ytimg.com/vi/VIDEO_ID_2/hqdefault.jpg"
                         }
-                    }
+                    },
                 },
-                "contentDetails": {
-                    "duration": "PT25M45S"
-                }
+                "contentDetails": {"duration": "PT25M45S"},
             },
             {
                 "id": "VIDEO_ID_3",
@@ -294,17 +294,15 @@ async def test_get_batch_metadata_success():
                         "high": {
                             "url": "https://i.ytimg.com/vi/VIDEO_ID_3/hqdefault.jpg"
                         }
-                    }
+                    },
                 },
-                "contentDetails": {
-                    "duration": "PT30M00S"
-                }
-            }
+                "contentDetails": {"duration": "PT30M00S"},
+            },
         ]
     }
 
     # Mock httpx.AsyncClient
-    with patch('httpx.AsyncClient') as mock_client_class:
+    with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
         mock_response = MagicMock()  # Not AsyncMock - response.json() is sync
         mock_response.raise_for_status = MagicMock()
@@ -360,19 +358,15 @@ async def test_get_batch_metadata_partial_failure():
                     "description": "Test",
                     "publishedAt": "2024-01-01T00:00:00Z",
                     "thumbnails": {
-                        "high": {
-                            "url": "https://i.ytimg.com/vi/VALID_ID/hqdefault.jpg"
-                        }
-                    }
+                        "high": {"url": "https://i.ytimg.com/vi/VALID_ID/hqdefault.jpg"}
+                    },
                 },
-                "contentDetails": {
-                    "duration": "PT5M00S"
-                }
+                "contentDetails": {"duration": "PT5M00S"},
             }
         ]
     }
 
-    with patch('httpx.AsyncClient') as mock_client_class:
+    with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
         mock_response = MagicMock()  # Not AsyncMock - response.json() is sync
         mock_response.raise_for_status = MagicMock()
@@ -393,30 +387,29 @@ async def test_get_batch_metadata_partial_failure():
 # Channel ID extraction tests (for YouTube Channels feature)
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_get_video_metadata_includes_channel_id():
     """Test that get_video_metadata returns channel_id from YouTube API."""
     client = YouTubeClient(api_key="test-key")
 
     mock_response = {
-        "items": [{
-            "id": "dQw4w9WgXcQ",
-            "snippet": {
-                "title": "Test Video",
-                "channelTitle": "Test Channel",
-                "channelId": "UCuAXFkgsw1L7xaCfnd5JJOw",  # YouTube channel ID
-                "publishedAt": "2009-10-25T06:57:33Z",
-                "thumbnails": {
-                    "default": {"url": "https://example.com/thumb.jpg"}
-                }
-            },
-            "contentDetails": {
-                "duration": "PT3M33S"
+        "items": [
+            {
+                "id": "dQw4w9WgXcQ",
+                "snippet": {
+                    "title": "Test Video",
+                    "channelTitle": "Test Channel",
+                    "channelId": "UCuAXFkgsw1L7xaCfnd5JJOw",  # YouTube channel ID
+                    "publishedAt": "2009-10-25T06:57:33Z",
+                    "thumbnails": {"default": {"url": "https://example.com/thumb.jpg"}},
+                },
+                "contentDetails": {"duration": "PT3M33S"},
             }
-        }]
+        ]
     }
 
-    with patch('app.clients.youtube.Aiogoogle') as mock_aiogoogle:
+    with patch("app.clients.youtube.Aiogoogle") as mock_aiogoogle:
         mock_instance = AsyncMock()
         mock_aiogoogle.return_value.__aenter__.return_value = mock_instance
         mock_instance.discover.return_value = AsyncMock()
@@ -450,10 +443,12 @@ async def test_get_batch_metadata_includes_channel_id():
                     "description": "Learn Python",
                     "publishedAt": "2024-01-15T10:00:00Z",
                     "thumbnails": {
-                        "high": {"url": "https://i.ytimg.com/vi/VIDEO_ID_1/hqdefault.jpg"}
-                    }
+                        "high": {
+                            "url": "https://i.ytimg.com/vi/VIDEO_ID_1/hqdefault.jpg"
+                        }
+                    },
                 },
-                "contentDetails": {"duration": "PT15M30S"}
+                "contentDetails": {"duration": "PT15M30S"},
             },
             {
                 "id": "VIDEO_ID_2",
@@ -464,15 +459,17 @@ async def test_get_batch_metadata_includes_channel_id():
                     "description": "Build APIs",
                     "publishedAt": "2024-02-20T14:30:00Z",
                     "thumbnails": {
-                        "high": {"url": "https://i.ytimg.com/vi/VIDEO_ID_2/hqdefault.jpg"}
-                    }
+                        "high": {
+                            "url": "https://i.ytimg.com/vi/VIDEO_ID_2/hqdefault.jpg"
+                        }
+                    },
                 },
-                "contentDetails": {"duration": "PT25M45S"}
-            }
+                "contentDetails": {"duration": "PT25M45S"},
+            },
         ]
     }
 
-    with patch('httpx.AsyncClient') as mock_client_class:
+    with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()

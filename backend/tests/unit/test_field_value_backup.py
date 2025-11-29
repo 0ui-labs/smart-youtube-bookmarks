@@ -4,19 +4,19 @@ Unit tests for field value backup service.
 TDD RED Phase: These tests are written BEFORE the implementation.
 They should fail until the backup service is implemented.
 """
-import pytest
+
 import json
-from pathlib import Path
-from uuid import uuid4
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
 
 from app.services.field_value_backup import (
-    backup_field_values,
-    restore_field_values,
-    list_backups,
     BackupInfo,
-    BACKUP_DIR,
+    backup_field_values,
+    list_backups,
+    restore_field_values,
 )
 
 
@@ -141,9 +141,7 @@ class TestBackupFieldValues:
 
         mock_db.execute = AsyncMock(side_effect=get_mock_result)
 
-        with patch(
-            "app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir
-        ):
+        with patch("app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir):
             backup_path = await backup_field_values(
                 video_id=mock_video_id,
                 category_id=category.id,
@@ -188,9 +186,7 @@ class TestBackupFieldValues:
         mock_result.scalars.return_value.all.return_value = []
         mock_db.execute = AsyncMock(return_value=mock_result)
 
-        with patch(
-            "app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir
-        ):
+        with patch("app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir):
             backup_path = await backup_field_values(
                 video_id=mock_video_id,
                 category_id=category.id,
@@ -231,7 +227,7 @@ class TestRestoreFieldValues:
             "video_id": str(video_id),
             "category_id": str(category_id),
             "category_name": "Test Category",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "values": [
                 {
                     "field_id": str(field1_id),
@@ -273,9 +269,7 @@ class TestRestoreFieldValues:
         """
         backup_path, video_id, category_id, backup_data = sample_backup_file
 
-        with patch(
-            "app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir
-        ):
+        with patch("app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir):
             restored_count = await restore_field_values(
                 video_id=video_id,
                 category_id=category_id,
@@ -289,9 +283,7 @@ class TestRestoreFieldValues:
         assert mock_db.add.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_restore_handles_corrupted_file(
-        self, tmp_backup_dir, mock_db
-    ):
+    async def test_restore_handles_corrupted_file(self, tmp_backup_dir, mock_db):
         """
         Test that restore handles corrupted backup files gracefully.
 
@@ -308,9 +300,7 @@ class TestRestoreFieldValues:
         backup_path = video_dir / f"{category_id}.json"
         backup_path.write_text("{ invalid json content }")
 
-        with patch(
-            "app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir
-        ):
+        with patch("app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir):
             restored_count = await restore_field_values(
                 video_id=video_id,
                 category_id=category_id,
@@ -366,9 +356,7 @@ class TestListBackups:
         (video_dir / f"{category1_id}.json").write_text(json.dumps(backup1_data))
         (video_dir / f"{category2_id}.json").write_text(json.dumps(backup2_data))
 
-        with patch(
-            "app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir
-        ):
+        with patch("app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir):
             backups = list_backups(video_id)
 
         # Assert both backups are returned
@@ -390,9 +378,7 @@ class TestListBackups:
         """
         video_id = uuid4()  # No backups for this video
 
-        with patch(
-            "app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir
-        ):
+        with patch("app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir):
             backups = list_backups(video_id)
 
         assert backups == []

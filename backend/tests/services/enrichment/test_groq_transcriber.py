@@ -1,20 +1,20 @@
 """Tests for Groq Whisper transcription."""
-import pytest
+
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
-from dataclasses import dataclass
 
 import groq
+import pytest
 
-from app.services.enrichment.providers.groq_transcriber import (
-    GroqTranscriber,
-    TranscriptionSegment,
-    TranscriptionResult,
-    MAX_CONCURRENT,
-    DELAY_BETWEEN_REQUESTS,
-)
+from app.services.enrichment.exceptions import RateLimitError, TranscriptionError
 from app.services.enrichment.providers.audio_chunker import AudioChunk
-from app.services.enrichment.exceptions import TranscriptionError, RateLimitError
+from app.services.enrichment.providers.groq_transcriber import (
+    DELAY_BETWEEN_REQUESTS,
+    MAX_CONCURRENT,
+    GroqTranscriber,
+    TranscriptionResult,
+    TranscriptionSegment,
+)
 
 
 class TestTranscriptionDataclasses:
@@ -22,11 +22,7 @@ class TestTranscriptionDataclasses:
 
     def test_transcription_segment_creation(self):
         """TranscriptionSegment can be created."""
-        segment = TranscriptionSegment(
-            start=0.0,
-            end=5.0,
-            text="Hello world"
-        )
+        segment = TranscriptionSegment(start=0.0, end=5.0, text="Hello world")
 
         assert segment.start == 0.0
         assert segment.end == 5.0
@@ -40,10 +36,7 @@ class TestTranscriptionDataclasses:
         ]
 
         result = TranscriptionResult(
-            text="Hello World",
-            segments=segments,
-            language="en",
-            chunk_index=0
+            text="Hello World", segments=segments, language="en", chunk_index=0
         )
 
         assert result.text == "Hello World"
@@ -74,13 +67,13 @@ class TestGroqTranscriberInit:
 
     def test_init_without_api_key_raises(self):
         """Transcriber raises if no API key provided."""
-        with patch.dict('os.environ', {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(ValueError, match="API key"):
                 GroqTranscriber(api_key=None)
 
     def test_init_from_environment(self):
         """Transcriber can get API key from environment."""
-        with patch.dict('os.environ', {'GROQ_API_KEY': 'env-key'}):
+        with patch.dict("os.environ", {"GROQ_API_KEY": "env-key"}):
             transcriber = GroqTranscriber()
             assert transcriber._api_key == "env-key"
 
@@ -94,10 +87,7 @@ class TestGroqTranscriberSingle:
         transcriber = GroqTranscriber(api_key="test-key")
 
         chunk = AudioChunk(
-            path=Path("/tmp/chunk.mp3"),
-            start_time=0.0,
-            end_time=600.0,
-            chunk_index=0
+            path=Path("/tmp/chunk.mp3"), start_time=0.0, end_time=600.0, chunk_index=0
         )
 
         # Mock Groq API response
@@ -109,7 +99,9 @@ class TestGroqTranscriberSingle:
         ]
         mock_response.language = "en"
 
-        with patch.object(transcriber, '_call_groq_api', new_callable=AsyncMock) as mock_api:
+        with patch.object(
+            transcriber, "_call_groq_api", new_callable=AsyncMock
+        ) as mock_api:
             mock_api.return_value = mock_response
 
             result = await transcriber._transcribe_single(chunk)
@@ -125,13 +117,12 @@ class TestGroqTranscriberSingle:
         transcriber = GroqTranscriber(api_key="test-key")
 
         chunk = AudioChunk(
-            path=Path("/tmp/chunk.mp3"),
-            start_time=0.0,
-            end_time=600.0,
-            chunk_index=0
+            path=Path("/tmp/chunk.mp3"), start_time=0.0, end_time=600.0, chunk_index=0
         )
 
-        with patch.object(transcriber, '_call_groq_api', new_callable=AsyncMock) as mock_api:
+        with patch.object(
+            transcriber, "_call_groq_api", new_callable=AsyncMock
+        ) as mock_api:
             mock_api.side_effect = Exception("API error")
 
             with pytest.raises(TranscriptionError):
@@ -143,10 +134,7 @@ class TestGroqTranscriberSingle:
         transcriber = GroqTranscriber(api_key="test-key")
 
         chunk = AudioChunk(
-            path=Path("/tmp/chunk.mp3"),
-            start_time=0.0,
-            end_time=600.0,
-            chunk_index=0
+            path=Path("/tmp/chunk.mp3"), start_time=0.0, end_time=600.0, chunk_index=0
         )
 
         # Create mock response for RateLimitError
@@ -154,11 +142,11 @@ class TestGroqTranscriberSingle:
         mock_response.status_code = 429
         mock_response.headers = {}
 
-        with patch.object(transcriber, '_call_groq_api', new_callable=AsyncMock) as mock_api:
+        with patch.object(
+            transcriber, "_call_groq_api", new_callable=AsyncMock
+        ) as mock_api:
             mock_api.side_effect = groq.RateLimitError(
-                "Rate limit exceeded",
-                response=mock_response,
-                body=None
+                "Rate limit exceeded", response=mock_response, body=None
             )
 
             with pytest.raises(RateLimitError):
@@ -174,7 +162,12 @@ class TestGroqTranscriberParallel:
         transcriber = GroqTranscriber(api_key="test-key")
 
         chunks = [
-            AudioChunk(path=Path(f"/tmp/chunk_{i}.mp3"), start_time=i*600.0, end_time=(i+1)*600.0, chunk_index=i)
+            AudioChunk(
+                path=Path(f"/tmp/chunk_{i}.mp3"),
+                start_time=i * 600.0,
+                end_time=(i + 1) * 600.0,
+                chunk_index=i,
+            )
             for i in range(3)
         ]
 
@@ -183,7 +176,9 @@ class TestGroqTranscriberParallel:
         mock_response.segments = [MagicMock(start=0.0, end=5.0, text="Test")]
         mock_response.language = "en"
 
-        with patch.object(transcriber, '_call_groq_api', new_callable=AsyncMock) as mock_api:
+        with patch.object(
+            transcriber, "_call_groq_api", new_callable=AsyncMock
+        ) as mock_api:
             mock_api.return_value = mock_response
 
             results = await transcriber.transcribe_chunks(chunks)
@@ -199,7 +194,12 @@ class TestGroqTranscriberParallel:
 
         # Create more chunks than MAX_CONCURRENT
         chunks = [
-            AudioChunk(path=Path(f"/tmp/chunk_{i}.mp3"), start_time=i*600.0, end_time=(i+1)*600.0, chunk_index=i)
+            AudioChunk(
+                path=Path(f"/tmp/chunk_{i}.mp3"),
+                start_time=i * 600.0,
+                end_time=(i + 1) * 600.0,
+                chunk_index=i,
+            )
             for i in range(5)
         ]
 
@@ -208,18 +208,21 @@ class TestGroqTranscriberParallel:
         async def mock_transcribe(chunk):
             import asyncio
             import time
+
             call_times.append(time.time())
             await asyncio.sleep(0.01)  # Small delay
             return TranscriptionResult(
-                text="Test",
-                segments=[],
-                language="en",
-                chunk_index=chunk.chunk_index
+                text="Test", segments=[], language="en", chunk_index=chunk.chunk_index
             )
 
-        with patch.object(transcriber, '_transcribe_single', side_effect=mock_transcribe):
+        with patch.object(
+            transcriber, "_transcribe_single", side_effect=mock_transcribe
+        ):
             # Patch delay to speed up test
-            with patch('app.services.enrichment.providers.groq_transcriber.DELAY_BETWEEN_REQUESTS', 0.01):
+            with patch(
+                "app.services.enrichment.providers.groq_transcriber.DELAY_BETWEEN_REQUESTS",
+                0.01,
+            ):
                 results = await transcriber.transcribe_chunks(chunks)
 
         assert len(results) == 5
@@ -239,10 +242,7 @@ class TestGroqTranscriberParallel:
         transcriber = GroqTranscriber(api_key="test-key")
 
         chunk = AudioChunk(
-            path=Path("/tmp/chunk.mp3"),
-            start_time=0.0,
-            end_time=600.0,
-            chunk_index=0
+            path=Path("/tmp/chunk.mp3"), start_time=0.0, end_time=600.0, chunk_index=0
         )
 
         mock_response = MagicMock()
@@ -250,7 +250,9 @@ class TestGroqTranscriberParallel:
         mock_response.segments = []
         mock_response.language = "en"
 
-        with patch.object(transcriber, '_call_groq_api', new_callable=AsyncMock) as mock_api:
+        with patch.object(
+            transcriber, "_call_groq_api", new_callable=AsyncMock
+        ) as mock_api:
             mock_api.return_value = mock_response
 
             results = await transcriber.transcribe_chunks([chunk])
@@ -274,7 +276,7 @@ class TestGroqTranscriberVTTGeneration:
                     TranscriptionSegment(start=5.0, end=10.0, text="World"),
                 ],
                 language="en",
-                chunk_index=0
+                chunk_index=0,
             ),
             TranscriptionResult(
                 text="Second chunk",
@@ -282,7 +284,7 @@ class TestGroqTranscriberVTTGeneration:
                     TranscriptionSegment(start=0.0, end=5.0, text="Second"),
                 ],
                 language="en",
-                chunk_index=1
+                chunk_index=1,
             ),
         ]
 

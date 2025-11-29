@@ -3,8 +3,8 @@ Tests for error classifier service.
 
 TDD RED phase - Tests written BEFORE implementation.
 """
-import pytest
-from app.services.error_classifier import classify_error, ErrorClassification
+
+from app.services.error_classifier import classify_error
 
 
 class TestErrorClassifier:
@@ -17,7 +17,10 @@ class TestErrorClassifier:
 
         assert result.is_retryable is True
         assert result.user_message is not None
-        assert "später" in result.user_message.lower() or "rate" in result.user_message.lower()
+        assert (
+            "später" in result.user_message.lower()
+            or "rate" in result.user_message.lower()
+        )
 
     def test_network_timeout_is_retryable(self):
         """Network timeouts should be retryable."""
@@ -33,7 +36,10 @@ class TestErrorClassifier:
         result = classify_error(error)
 
         assert result.is_retryable is False
-        assert "nicht gefunden" in result.user_message.lower() or "unavailable" in result.user_message.lower()
+        assert (
+            "nicht gefunden" in result.user_message.lower()
+            or "unavailable" in result.user_message.lower()
+        )
 
     def test_private_video_is_not_retryable(self):
         """Private video errors should not be retryable."""
@@ -49,7 +55,10 @@ class TestErrorClassifier:
         result = classify_error(error)
 
         assert result.is_retryable is False
-        assert "alter" in result.user_message.lower() or "age" in result.user_message.lower()
+        assert (
+            "alter" in result.user_message.lower()
+            or "age" in result.user_message.lower()
+        )
 
     def test_no_captions_available(self):
         """No captions error should have user-friendly message."""
@@ -57,7 +66,10 @@ class TestErrorClassifier:
         result = classify_error(error)
 
         assert result.is_retryable is False
-        assert "untertitel" in result.user_message.lower() or "caption" in result.user_message.lower()
+        assert (
+            "untertitel" in result.user_message.lower()
+            or "caption" in result.user_message.lower()
+        )
 
     def test_unknown_error_has_generic_message(self):
         """Unknown errors should have generic user message."""

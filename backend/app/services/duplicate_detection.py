@@ -15,9 +15,7 @@ Example:
     >>> print(suggestions[0].score)  # 0.92 (high similarity)
 """
 
-import asyncio
 import logging
-from typing import List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 from uuid import UUID
@@ -25,9 +23,11 @@ from uuid import UUID
 try:
     from rapidfuzz import fuzz
     from rapidfuzz.distance import Levenshtein
+
     RAPIDFUZZ_AVAILABLE = True
 except ImportError:
     import difflib
+
     RAPIDFUZZ_AVAILABLE = False
 
 import httpx
@@ -37,21 +37,22 @@ from redis.asyncio import Redis
 from app.clients.gemini import GeminiClient
 from app.models.custom_field import CustomField
 
-
 logger = logging.getLogger(__name__)
 
 
 class SimilarityType(str, Enum):
     """Type of similarity match detected."""
-    EXACT = "exact"              # 100% - case-insensitive exact match
+
+    EXACT = "exact"  # 100% - case-insensitive exact match
     LEVENSHTEIN = "levenshtein"  # 80-99% - typo/edit distance
-    SEMANTIC = "semantic"        # 60-79% - meaning similarity via AI
-    NO_MATCH = "no_match"        # <60% - not similar
+    SEMANTIC = "semantic"  # 60-79% - meaning similarity via AI
+    NO_MATCH = "no_match"  # <60% - not similar
 
 
 @dataclass
 class SimilarityResult:
     """Result of similarity comparison with explanation."""
+
     field: CustomField
     score: float  # 0.0-1.0
     similarity_type: SimilarityType
@@ -66,12 +67,16 @@ class SimilarityResult:
                 "name": self.field.name,
                 "field_type": self.field.field_type,
                 "config": self.field.config,
-                "created_at": self.field.created_at.isoformat() if self.field.created_at else None,
-                "updated_at": self.field.updated_at.isoformat() if self.field.updated_at else None
+                "created_at": self.field.created_at.isoformat()
+                if self.field.created_at
+                else None,
+                "updated_at": self.field.updated_at.isoformat()
+                if self.field.updated_at
+                else None,
             },
             "score": round(self.score, 2),
             "similarity_type": self.similarity_type.value,
-            "explanation": self.explanation
+            "explanation": self.explanation,
         }
 
 
@@ -102,8 +107,8 @@ class DuplicateDetector:
 
     def __init__(
         self,
-        gemini_client: Optional[GeminiClient] = None,
-        redis_client: Optional[Redis] = None
+        gemini_client: GeminiClient | None = None,
+        redis_client: Redis | None = None,
     ):
         """
         Initialize duplicate detector.
@@ -125,9 +130,9 @@ class DuplicateDetector:
     async def find_similar_fields(
         self,
         field_name: str,
-        existing_fields: List[CustomField],
-        include_semantic: bool = True
-    ) -> List[SimilarityResult]:
+        existing_fields: list[CustomField],
+        include_semantic: bool = True,
+    ) -> list[SimilarityResult]:
         """
         Find fields similar to the given name using multiple strategies.
 
@@ -155,22 +160,23 @@ class DuplicateDetector:
         if not existing_fields:
             return []
 
-        results: List[SimilarityResult] = []
+        results: list[SimilarityResult] = []
 
         # Strategy 1: Exact match (case-insensitive)
         for field in existing_fields:
             if field.name.lower() == field_name.lower():
-                results.append(SimilarityResult(
-                    field=field,
-                    score=self.EXACT_SCORE,
-                    similarity_type=SimilarityType.EXACT,
-                    explanation=f"Exact match (case-insensitive): '{field.name}'"
-                ))
+                results.append(
+                    SimilarityResult(
+                        field=field,
+                        score=self.EXACT_SCORE,
+                        similarity_type=SimilarityType.EXACT,
+                        explanation=f"Exact match (case-insensitive): '{field.name}'",
+                    )
+                )
 
         # Strategy 2: Levenshtein distance (typos)
         levenshtein_results = self._find_levenshtein_matches(
-            field_name,
-            existing_fields
+            field_name, existing_fields
         )
         results.extend(levenshtein_results)
 
@@ -178,18 +184,22 @@ class DuplicateDetector:
         if include_semantic and self.ai_available:
             try:
                 semantic_results = await self._find_semantic_matches(
-                    field_name,
-                    existing_fields
+                    field_name, existing_fields
                 )
                 results.extend(semantic_results)
             except Exception as e:
-                logger.warning(f"Semantic similarity failed: {e}. Using Levenshtein only.")
+                logger.warning(
+                    f"Semantic similarity failed: {e}. Using Levenshtein only."
+                )
 
         # Deduplicate by field ID (keep highest score for each field)
         seen_fields: dict[UUID, SimilarityResult] = {}
         for result in results:
             field_id = result.field.id
-            if field_id not in seen_fields or result.score > seen_fields[field_id].score:
+            if (
+                field_id not in seen_fields
+                or result.score > seen_fields[field_id].score
+            ):
                 seen_fields[field_id] = result
 
         results = list(seen_fields.values())
@@ -199,21 +209,18 @@ class DuplicateDetector:
         return results
 
     def _find_levenshtein_matches(
-        self,
-        field_name: str,
-        existing_fields: List[CustomField]
-    ) -> List[SimilarityResult]:
+        self, field_name: str, existing_fields: list[CustomField]
+    ) -> list[SimilarityResult]:
         """
         Find fields with low Levenshtein distance (typo detection).
 
         Uses rapidfuzz if available (40% faster), otherwise falls back to difflib.
         """
-        results: List[SimilarityResult] = []
+        results: list[SimilarityResult] = []
 
         for field in existing_fields:
             distance, ratio = self._calculate_levenshtein(
-                field_name.lower(),
-                field.name.lower()
+                field_name.lower(), field.name.lower()
             )
 
             # Only suggest if distance is small enough
@@ -226,24 +233,24 @@ class DuplicateDetector:
 
                 # Generate human-readable explanation
                 if distance == 1:
-                    explanation = f"Very similar name (1 character difference): '{field.name}'"
+                    explanation = (
+                        f"Very similar name (1 character difference): '{field.name}'"
+                    )
                 else:
                     explanation = f"Similar name ({distance} character differences): '{field.name}'"
 
-                results.append(SimilarityResult(
-                    field=field,
-                    score=score,
-                    similarity_type=SimilarityType.LEVENSHTEIN,
-                    explanation=explanation
-                ))
+                results.append(
+                    SimilarityResult(
+                        field=field,
+                        score=score,
+                        similarity_type=SimilarityType.LEVENSHTEIN,
+                        explanation=explanation,
+                    )
+                )
 
         return results
 
-    def _calculate_levenshtein(
-        self,
-        str1: str,
-        str2: str
-    ) -> Tuple[int, float]:
+    def _calculate_levenshtein(self, str1: str, str2: str) -> tuple[int, float]:
         """
         Calculate Levenshtein distance and similarity ratio.
 
@@ -266,10 +273,8 @@ class DuplicateDetector:
         return distance, ratio
 
     async def _find_semantic_matches(
-        self,
-        field_name: str,
-        existing_fields: List[CustomField]
-    ) -> List[SimilarityResult]:
+        self, field_name: str, existing_fields: list[CustomField]
+    ) -> list[SimilarityResult]:
         """
         Find semantically similar fields using AI embeddings.
 
@@ -277,7 +282,7 @@ class DuplicateDetector:
         - "Video Rating" vs "Overall Score" (same concept)
         - "Presentation Style" vs "Speaking Quality" (related)
         """
-        results: List[SimilarityResult] = []
+        results: list[SimilarityResult] = []
 
         if not self.gemini_client:
             return results
@@ -296,20 +301,24 @@ class DuplicateDetector:
             if similarity >= self.SEMANTIC_MIN_SIMILARITY:
                 # Map similarity (0.75-1.0) to score range (0.60-0.79)
                 # Normalize to 0-1 first, then map to range
-                normalized = (similarity - self.SEMANTIC_MIN_SIMILARITY) / (1.0 - self.SEMANTIC_MIN_SIMILARITY)
+                normalized = (similarity - self.SEMANTIC_MIN_SIMILARITY) / (
+                    1.0 - self.SEMANTIC_MIN_SIMILARITY
+                )
                 score = self.SEMANTIC_SCORE_MIN + (
                     normalized * (self.SEMANTIC_SCORE_MAX - self.SEMANTIC_SCORE_MIN)
                 )
 
                 # Generate explanation
-                explanation = f"Semantically similar concept: '{field.name}' (AI detected {int(similarity*100)}% meaning similarity)"
+                explanation = f"Semantically similar concept: '{field.name}' (AI detected {int(similarity * 100)}% meaning similarity)"
 
-                results.append(SimilarityResult(
-                    field=field,
-                    score=score,
-                    similarity_type=SimilarityType.SEMANTIC,
-                    explanation=explanation
-                ))
+                results.append(
+                    SimilarityResult(
+                        field=field,
+                        score=score,
+                        similarity_type=SimilarityType.SEMANTIC,
+                        explanation=explanation,
+                    )
+                )
 
         return results
 
@@ -341,9 +350,7 @@ class DuplicateDetector:
                 # Serialize to bytes
                 embedding_bytes = embedding.astype(np.float32).tobytes()
                 await self.redis_client.setex(
-                    cache_key,
-                    self.EMBEDDING_CACHE_TTL,
-                    embedding_bytes
+                    cache_key, self.EMBEDDING_CACHE_TTL, embedding_bytes
                 )
             except Exception as e:
                 logger.warning(f"Redis cache write failed: {e}")
@@ -369,25 +376,20 @@ class DuplicateDetector:
         # CORRECTED: Use header auth with x-goog-api-key
         headers = {
             "Content-Type": "application/json",
-            "x-goog-api-key": self.gemini_client.api_key
+            "x-goog-api-key": self.gemini_client.api_key,
         }
 
         # CORRECTED: Include task_type and output_dimensionality
         payload = {
             "model": "models/gemini-embedding-001",
-            "content": {
-                "parts": [{"text": text}]
-            },
+            "content": {"parts": [{"text": text}]},
             "task_type": "SEMANTIC_SIMILARITY",
-            "output_dimensionality": 768
+            "output_dimensionality": 768,
         }
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                url,
-                headers=headers,
-                json=payload,
-                timeout=5.0
+                url, headers=headers, json=payload, timeout=5.0
             )
             response.raise_for_status()
 
@@ -397,11 +399,7 @@ class DuplicateDetector:
 
             return np.array(embedding, dtype=np.float32)
 
-    def _cosine_similarity(
-        self,
-        vec1: np.ndarray,
-        vec2: np.ndarray
-    ) -> float:
+    def _cosine_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
         """
         Calculate cosine similarity between two vectors.
 

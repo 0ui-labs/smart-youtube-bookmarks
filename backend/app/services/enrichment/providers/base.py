@@ -1,7 +1,7 @@
 """Base classes for caption providers."""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -13,6 +13,7 @@ class CaptionResult:
         language: ISO 639-1 language code (e.g., "en", "de")
         source: Source identifier (e.g., "youtube_manual", "youtube_auto", "groq_whisper")
     """
+
     vtt: str
     language: str
     source: str
@@ -32,7 +33,7 @@ class CaptionProvider(ABC):
         ...
 
     @abstractmethod
-    async def fetch(self, youtube_id: str, duration: int) -> Optional[CaptionResult]:
+    async def fetch(self, youtube_id: str, duration: int) -> CaptionResult | None:
         """Fetch captions for a YouTube video.
 
         Args:
