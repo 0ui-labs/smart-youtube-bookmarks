@@ -18,8 +18,10 @@ vi.mock("react-router-dom", async () => {
 // Mock stores and hooks
 const mockToggleTagFn = vi.fn();
 const mockMutateFn = vi.fn();
-let mockImportProgress: Map<string, { progress: number; stage: string }> =
-  new Map();
+let mockImportProgress: Map<
+  string,
+  { progress: number; stage: string; displayProgress: number }
+> = new Map();
 
 vi.mock("@/stores/importProgressStore", () => ({
   useImportProgressStore: () => ({
@@ -80,6 +82,9 @@ const mockVideo: VideoResponse = {
   created_at: "2025-01-01T00:00:00Z",
   updated_at: "2025-01-01T00:00:00Z",
   field_values: [],
+  // Import state - fully completed (not importing)
+  import_stage: "complete",
+  import_progress: 100,
 };
 
 describe("VideoCard", () => {
@@ -300,8 +305,12 @@ describe("VideoCard", () => {
   // Import progress tests (Phase 4.5)
   describe("Importing state", () => {
     it("shows grayscale filter when video is importing", () => {
-      // Set video as importing
-      mockImportProgress.set("video-123", { progress: 50, stage: "captions" });
+      // Set video as importing (displayProgress for animated UI)
+      mockImportProgress.set("video-123", {
+        progress: 50,
+        stage: "captions",
+        displayProgress: 50,
+      });
 
       const { container } = renderWithRouter(<VideoCard video={mockVideo} />);
 
@@ -311,7 +320,11 @@ describe("VideoCard", () => {
     });
 
     it("shows ProgressOverlay when video is importing", () => {
-      mockImportProgress.set("video-123", { progress: 60, stage: "captions" });
+      mockImportProgress.set("video-123", {
+        progress: 60,
+        stage: "captions",
+        displayProgress: 60,
+      });
 
       renderWithRouter(<VideoCard video={mockVideo} />);
 
@@ -322,7 +335,11 @@ describe("VideoCard", () => {
 
     it("does not show grayscale or overlay when video is complete", () => {
       // Video is complete (not importing)
-      mockImportProgress.set("video-123", { progress: 100, stage: "complete" });
+      mockImportProgress.set("video-123", {
+        progress: 100,
+        stage: "complete",
+        displayProgress: 100,
+      });
 
       const { container } = renderWithRouter(<VideoCard video={mockVideo} />);
 
@@ -336,6 +353,7 @@ describe("VideoCard", () => {
 
     it("does not show importing state when no progress in store", () => {
       // No progress set in mock (empty map)
+      // mockVideo has import_stage: "complete" so it should NOT be importing
 
       const { container } = renderWithRouter(<VideoCard video={mockVideo} />);
 
@@ -348,7 +366,11 @@ describe("VideoCard", () => {
     });
 
     it("disables card click while importing", async () => {
-      mockImportProgress.set("video-123", { progress: 50, stage: "captions" });
+      mockImportProgress.set("video-123", {
+        progress: 50,
+        stage: "captions",
+        displayProgress: 50,
+      });
 
       const user = userEvent.setup();
       renderWithRouter(<VideoCard video={mockVideo} />);
