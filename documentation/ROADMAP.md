@@ -21,13 +21,13 @@
 - [x] Remove unused dependencies (dnd-kit)
 
 ### Developer Tooling (Frontend)
-- [ ] Biome + Ultracite (replace ESLint, AI-optimized linting)
-- [ ] Husky + lint-staged (pre-commit hooks for Biome)
-- [ ] Commitlint (enforce Conventional Commits)
-- [ ] Orval setup (generate TypeScript types + React Query hooks from OpenAPI)
+- [x] Biome + Ultracite (replace ESLint, AI-optimized linting)
+- [x] Husky + lint-staged (pre-commit hooks for Biome)
+- [x] Commitlint (enforce Conventional Commits)
+- [x] Orval setup (generate TypeScript types + React Query hooks from OpenAPI)
 
 ### Developer Tooling (Backend)
-- [ ] Ruff (Python linter/formatter, Rust-based, replaces Black + Flake8)
+- [x] Ruff (Python linter/formatter, Rust-based, replaces Black + Flake8)
 
 ### Developer Tooling (Infrastructure)
 - [ ] Docker Compose Watch (hot-reload for containerized dev)
@@ -137,6 +137,10 @@
 _Use this section to capture decisions, blockers, or context._
 
 - **2024-11-29:** Roadmap created. Starting with Clerk Auth.
+- **2025-11-30:** Developer Tooling komplett abgeschlossen:
+  - Frontend: Biome 2.x + Ultracite, Husky + lint-staged, Commitlint, Orval
+  - Backend: Ruff 0.14+ mit FastAPI-spezifischer Konfiguration
+  - Pre-commit hooks für Frontend (Biome) und Backend (Ruff) aktiv
 - **App name:** Fluffless (currently "Smart YouTube Bookmarks")
 
 ### Tooling Decisions
