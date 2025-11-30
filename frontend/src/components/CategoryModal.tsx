@@ -81,7 +81,7 @@ export function CategoryModal({
   return (
     <>
       <Dialog onOpenChange={onOpenChange} open={open}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" hideDescription>
           <DialogHeader>
             <DialogTitle>Kategorie auswählen</DialogTitle>
           </DialogHeader>

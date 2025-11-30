@@ -41,6 +41,7 @@ export const TiptapEditor = ({
     extensions: [
       StarterKit.configure({
         codeBlock: false,
+        link: false, // Deaktiviert, da wir die separate Link-Extension mit eigener Konfiguration nutzen
       }),
       Placeholder.configure({
         placeholder,

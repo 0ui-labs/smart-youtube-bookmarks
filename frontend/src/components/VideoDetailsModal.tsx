@@ -197,7 +197,10 @@ export const VideoDetailsModal = ({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+      <DialogContent
+        className="max-h-[90vh] max-w-4xl overflow-y-auto"
+        hideDescription
+      >
         {/* Video Header */}
         <DialogHeader>
           <DialogTitle>{displayVideo.title}</DialogTitle>

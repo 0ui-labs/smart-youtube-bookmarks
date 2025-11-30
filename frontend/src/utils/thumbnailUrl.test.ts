@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   calculateThumbnailWidth,
+  getFallbackQuality,
   getQualityForWidth,
   getThumbnailUrls,
+  getThumbnailUrlsForQuality,
   THUMBNAIL_DIMENSIONS,
 } from "./thumbnailUrl";
 
@@ -51,9 +53,9 @@ describe("getQualityForWidth", () => {
     it("applies 1.5x multiplier to target width", () => {
       // 128px * 1.5 = 192px → still mq (320)
       expect(getQualityForWidth(128)).toBe("mq");
-      // 320px * 1.5 = 480px → hq (480)
+      // 320px * 1.5 = 480px → hq
       expect(getQualityForWidth(320)).toBe("hq");
-      // 500px * 1.5 = 750px → maxres (1280)
+      // 500px * 1.5 = 750px → maxres
       expect(getQualityForWidth(500)).toBe("maxres");
     });
   });
@@ -93,6 +95,48 @@ describe("getThumbnailUrls", () => {
       "https://i.ytimg.com/vi_webp/a-B_c123/mqdefault.webp"
     );
     expect(urls.jpeg).toBe("https://i.ytimg.com/vi/a-B_c123/mqdefault.jpg");
+  });
+});
+
+describe("getFallbackQuality", () => {
+  it('returns "sd" for maxres', () => {
+    expect(getFallbackQuality("maxres")).toBe("sd");
+  });
+
+  it('returns "hq" for sd (guaranteed to exist)', () => {
+    expect(getFallbackQuality("sd")).toBe("hq");
+  });
+
+  it("returns null for hq, mq, default (no fallback needed)", () => {
+    expect(getFallbackQuality("hq")).toBeNull();
+    expect(getFallbackQuality("mq")).toBeNull();
+    expect(getFallbackQuality("default")).toBeNull();
+  });
+});
+
+describe("getThumbnailUrlsForQuality", () => {
+  it("generates correct URLs for maxres quality", () => {
+    const urls = getThumbnailUrlsForQuality("test123", "maxres");
+    expect(urls.webp).toBe(
+      "https://i.ytimg.com/vi_webp/test123/maxresdefault.webp"
+    );
+    expect(urls.jpeg).toBe("https://i.ytimg.com/vi/test123/maxresdefault.jpg");
+  });
+
+  it("generates correct URLs for sd quality", () => {
+    const urls = getThumbnailUrlsForQuality("test123", "sd");
+    expect(urls.webp).toBe(
+      "https://i.ytimg.com/vi_webp/test123/sddefault.webp"
+    );
+    expect(urls.jpeg).toBe("https://i.ytimg.com/vi/test123/sddefault.jpg");
+  });
+
+  it("generates correct URLs for hq quality", () => {
+    const urls = getThumbnailUrlsForQuality("test123", "hq");
+    expect(urls.webp).toBe(
+      "https://i.ytimg.com/vi_webp/test123/hqdefault.webp"
+    );
+    expect(urls.jpeg).toBe("https://i.ytimg.com/vi/test123/hqdefault.jpg");
   });
 });
 

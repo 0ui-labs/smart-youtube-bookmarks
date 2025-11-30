@@ -43,7 +43,7 @@ export function FilterSettingsModal({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" hideDescription>
         <DialogHeader>
           <DialogTitle>Filter konfigurieren</DialogTitle>
         </DialogHeader>
