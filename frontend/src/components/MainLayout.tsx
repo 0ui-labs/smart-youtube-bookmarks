@@ -1,6 +1,6 @@
 import { Clock, History, Home, ListVideo, Settings, Star } from "lucide-react";
 import { useCallback, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { ChannelNavigation } from "@/components/ChannelNavigation";
 import { CollapsibleSidebar } from "@/components/CollapsibleSidebar";
@@ -18,6 +18,7 @@ import { CreateTagDialog } from "./CreateTagDialog";
  */
 export function MainLayout() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: lists } = useLists();
   const listId = lists?.[0]?.id ?? "";
 
@@ -34,12 +35,11 @@ export function MainLayout() {
   const clearTags = useTagStore((state) => state.clearTags);
   const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false);
 
-  // Channels
+  // Channels - URL is the single source of truth
   const { data: channels = [], isLoading: channelsLoading } = useChannels();
   const updateChannel = useUpdateChannel();
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
-    null
-  );
+  // Read selectedChannelId directly from URL instead of maintaining separate state
+  const selectedChannelId = searchParams.get("channel");
 
   // Store for drag & drop imports
   const setPendingImport = useImportDropStore(
@@ -63,19 +63,19 @@ export function MainLayout() {
 
   const handleHideChannel = (channelId: string) => {
     updateChannel.mutate({ channelId, data: { is_hidden: true } });
+    // If hiding the currently selected channel, navigate to clear the filter
     if (selectedChannelId === channelId) {
-      setSelectedChannelId(null);
+      navigate("/videos");
     }
   };
 
   const handleHomeClick = () => {
-    setSelectedChannelId(null);
     clearTags();
     navigate("/videos");
   };
 
   const handleChannelSelect = (channelId: string | null) => {
-    setSelectedChannelId(channelId);
+    // URL is the single source of truth - just navigate
     if (channelId) {
       navigate(`/videos?channel=${channelId}`);
     } else {

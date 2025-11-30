@@ -279,11 +279,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     videoTitle: null,
   });
 
-  // Channel filter state (YouTube Channels feature)
-  // Initialize from URL immediately to prevent fetching all videos first
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
-    () => searchParams.get("channel")
-  );
+  // Channel filter - URL is the single source of truth (no local state needed)
+  const selectedChannelId = searchParams.get("channel");
 
   // Video Details Modal state (follows pattern of ConfirmDeleteModal)
   const [videoDetailsModal, setVideoDetailsModal] = useState<{
@@ -686,6 +683,11 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   };
 
   // URL Sync: Parse tag names from URL on mount and sync to store
+  // Note: We use a ref to get current selectedTagIds without adding it to dependencies
+  // This prevents the circular dependency: URL → state → URL → state...
+  const selectedTagIdsRef = React.useRef(selectedTagIds);
+  selectedTagIdsRef.current = selectedTagIds;
+
   useEffect(() => {
     const urlTagNames = searchParams.get("tags");
     if (!urlTagNames || tags.length === 0) return;
@@ -701,14 +703,14 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       .filter((tag) => tagNamesFromUrl.includes(tag.name))
       .map((tag) => tag.id);
 
-    // Only update if different from current selection
-    const currentIds = [...selectedTagIds].sort().join(",");
+    // Only update if different from current selection (use ref to avoid dependency)
+    const currentIds = [...selectedTagIdsRef.current].sort().join(",");
     const urlIds = [...tagIdsFromUrl].sort().join(",");
 
     if (currentIds !== urlIds && tagIdsFromUrl.length > 0) {
       setSelectedTagIds(tagIdsFromUrl);
     }
-  }, [searchParams, tags, selectedTagIds, setSelectedTagIds]); // Run when URL changes or tags are loaded
+  }, [searchParams, tags, setSelectedTagIds]); // Removed selectedTagIds - use ref instead
 
   // URL Sync: Update URL when selected tags change
   useEffect(() => {
@@ -733,51 +735,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     }
   }, [selectedTags, searchParams, setSearchParams]); // Run when selected tags change
 
-  // URL Sync: Read channel from URL on mount and when URL changes (YouTube Channels feature)
-  useEffect(() => {
-    const urlChannelId = searchParams.get("channel");
-
-    // If no channel in URL, clear the selection
-    if (!urlChannelId) {
-      if (selectedChannelId !== null) {
-        setSelectedChannelId(null);
-      }
-      return;
-    }
-
-    // Wait for channels to load before validating
-    if (channels.length === 0) return;
-
-    // Verify channel exists and update state
-    const channelExists = channels.some((c) => c.id === urlChannelId);
-    if (channelExists && selectedChannelId !== urlChannelId) {
-      setSelectedChannelId(urlChannelId);
-    }
-  }, [searchParams, channels, selectedChannelId]); // Run when URL changes or channels are loaded
-
-  // URL Sync: Update URL when selected channel changes
-  useEffect(() => {
-    // Wait for channels to load before syncing state → URL
-    // This prevents removing channel param before we can validate it
-    if (channels.length === 0) return;
-
-    if (selectedChannelId === null) {
-      // Remove channel param if no channel selected
-      if (searchParams.has("channel")) {
-        const params = new URLSearchParams(searchParams);
-        params.delete("channel");
-        setSearchParams(params, { replace: true });
-      }
-    } else {
-      // Set channel param
-      const currentChannelParam = searchParams.get("channel");
-      if (currentChannelParam !== selectedChannelId) {
-        const params = new URLSearchParams(searchParams);
-        params.set("channel", selectedChannelId);
-        setSearchParams(params, { replace: true });
-      }
-    }
-  }, [selectedChannelId, channels.length, searchParams, setSearchParams]); // Run when selected channel changes or channels load
+  // Channel URL sync removed - URL is now the single source of truth
+  // selectedChannelId is read directly from searchParams above
 
   const handleExportCSV = async () => {
     try {
