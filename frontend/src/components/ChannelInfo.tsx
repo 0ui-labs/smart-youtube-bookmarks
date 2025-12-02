@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { UI_STRINGS } from "@/constants/ui";
+import { getOptimizedAvatarUrl } from "@/utils/avatarUrl";
 import { CategoryModal } from "./CategoryModal";
 
 interface CategoryTag {
@@ -69,9 +70,14 @@ export function ChannelInfo({
           <img
             alt={channelName || "Channel"}
             className="flex-shrink-0 rounded-full object-cover"
+            height={46}
             onError={() => setImageError(true)}
-            src={channelAvatarUrl!}
-            style={{ width: 46, height: 46 }}
+            src={
+              getOptimizedAvatarUrl(channelAvatarUrl, 46) ||
+              channelAvatarUrl ||
+              ""
+            }
+            width={46}
           />
         )}
 

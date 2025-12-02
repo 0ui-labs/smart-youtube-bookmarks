@@ -24,6 +24,7 @@ import {
   useUpdateChannel,
 } from "@/hooks/useChannels";
 import type { Channel } from "@/types/channel";
+import { getOptimizedAvatarUrl } from "@/utils/avatarUrl";
 
 /**
  * Get initials from channel name (max 2 characters)
@@ -159,13 +160,18 @@ export function ChannelsPage() {
                 className="flex w-full items-start gap-4 rounded-lg p-4 text-left transition-colors hover:bg-accent"
                 onClick={() => handleChannelClick(channel.id)}
               >
-                {/* Large round avatar */}
+                {/* Large round avatar - 80px display, optimized for Retina */}
                 {channel.thumbnail_url ? (
                   <img
                     alt={channel.name}
                     className="h-20 w-20 flex-shrink-0 rounded-full object-cover"
+                    height={80}
                     referrerPolicy="no-referrer"
-                    src={channel.thumbnail_url}
+                    src={
+                      getOptimizedAvatarUrl(channel.thumbnail_url, 80) ??
+                      channel.thumbnail_url
+                    }
+                    width={80}
                   />
                 ) : (
                   <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xl">

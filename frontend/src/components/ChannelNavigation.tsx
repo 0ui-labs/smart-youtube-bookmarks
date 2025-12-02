@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Channel } from "@/types/channel";
+import { getOptimizedAvatarUrl } from "@/utils/avatarUrl";
 
 /**
  * Get initials from channel name (max 2 characters)
@@ -107,13 +108,18 @@ export const ChannelNavigation = ({
                 )}
                 onClick={() => onChannelSelect(channel.id)}
               >
-                {/* Channel Avatar/Thumbnail */}
+                {/* Channel Avatar/Thumbnail - 24px display, optimized for Retina */}
                 {channel.thumbnail_url ? (
                   <img
                     alt={channel.name}
                     className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
+                    height={24}
                     referrerPolicy="no-referrer"
-                    src={channel.thumbnail_url}
+                    src={
+                      getOptimizedAvatarUrl(channel.thumbnail_url, 24) ??
+                      channel.thumbnail_url
+                    }
+                    width={24}
                   />
                 ) : (
                   <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs">
