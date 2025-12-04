@@ -14,14 +14,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.redis import get_redis_client
 from app.models.user import User
 from app.schemas.subscription import (
+    QuotaStatusResponse,
     SubscriptionCreate,
     SubscriptionMatchResponse,
     SubscriptionResponse,
     SubscriptionUpdate,
     SyncResponse,
 )
+from app.services.quota_service import QuotaService
 from app.services.subscription_service import SubscriptionService
 
 logger = logging.getLogger(__name__)
@@ -98,6 +101,23 @@ async def list_subscriptions(
         skip=skip, limit=limit, list_id=list_id, is_active=is_active
     )
     return subscriptions
+
+
+@router.get("/quota", response_model=QuotaStatusResponse)
+async def get_quota_status():
+    """
+    Get current YouTube API quota status.
+
+    Returns the daily usage, remaining quota, and percentage used.
+    YouTube API has a default daily limit of 10,000 units.
+
+    Common API costs:
+    - Search API: 100 units per request
+    - Videos list: 1 unit per request
+    """
+    redis_client = await get_redis_client()
+    quota = QuotaService(redis_client=redis_client)
+    return await quota.get_quota_status()
 
 
 @router.post(

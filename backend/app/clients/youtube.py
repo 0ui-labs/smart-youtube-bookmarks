@@ -4,6 +4,8 @@ import asyncio
 import json
 import logging
 import random
+from dataclasses import dataclass
+from datetime import datetime
 from typing import TypedDict
 
 import httpx
@@ -78,6 +80,28 @@ class VideoMetadata(TypedDict, total=False):
     # Status
     privacy_status: str
     is_embeddable: bool
+
+
+@dataclass
+class VideoSearchResult:
+    """
+    Result from YouTube Search API.
+
+    Used for keyword-based subscription polling (Etappe 3).
+    Contains minimal data from search results; full metadata
+    can be fetched via get_batch_metadata for filtering.
+    """
+
+    youtube_id: str
+    title: str
+    description: str
+    channel_id: str
+    channel_name: str
+    thumbnail_url: str
+    published_at: datetime
+    # Optional fields populated after fetching video details
+    duration_seconds: int | None = None
+    view_count: int | None = None
 
 
 class YouTubeClient:
@@ -521,3 +545,102 @@ class YouTubeClient:
                     # Continue with partial results rather than failing completely
 
         return all_results
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_should_retry),
+        reraise=True,
+    )
+    async def search_videos(
+        self,
+        keywords: list[str],
+        published_after: datetime | None = None,
+        max_results: int = 25,
+    ) -> list[VideoSearchResult]:
+        """
+        Search for videos using YouTube Search API.
+
+        This method is used for keyword-based subscription polling (Etappe 3).
+        Note: YouTube Search API costs 100 quota units per request.
+
+        Args:
+            keywords: List of keywords to search for (joined with spaces)
+            published_after: Only return videos published after this datetime
+            max_results: Maximum number of results (default 25, max 50)
+
+        Returns:
+            List of VideoSearchResult objects with basic video info.
+            To get full metadata (duration, views), use get_batch_metadata.
+
+        Example:
+            >>> results = await client.search_videos(
+            ...     keywords=["Python", "tutorial"],
+            ...     published_after=datetime(2024, 1, 1),
+            ...     max_results=10
+            ... )
+            >>> for result in results:
+            ...     print(f"{result.title} by {result.channel_name}")
+        """
+        query = " ".join(keywords)
+
+        params = {
+            "part": "snippet",
+            "q": query,
+            "type": "video",
+            "maxResults": min(max_results, 50),  # API limit is 50
+            "order": "date",  # Most recent first for subscription polling
+            "key": self.api_key,
+        }
+
+        if published_after:
+            # YouTube API expects RFC 3339 format
+            params["publishedAfter"] = published_after.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                "https://www.googleapis.com/youtube/v3/search",
+                params=params,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        results: list[VideoSearchResult] = []
+        for item in data.get("items", []):
+            snippet = item.get("snippet", {})
+            thumbnails = snippet.get("thumbnails", {})
+
+            # Get best available thumbnail
+            thumbnail_url = (
+                thumbnails.get("high", {}).get("url")
+                or thumbnails.get("medium", {}).get("url")
+                or thumbnails.get("default", {}).get("url", "")
+            )
+
+            # Parse published_at to datetime
+            published_at_str = snippet.get("publishedAt", "")
+            try:
+                published_at = datetime.fromisoformat(
+                    published_at_str.replace("Z", "+00:00")
+                )
+            except (ValueError, AttributeError):
+                published_at = datetime.utcnow()
+
+            results.append(
+                VideoSearchResult(
+                    youtube_id=item["id"]["videoId"],
+                    title=snippet.get("title", ""),
+                    description=snippet.get("description", ""),
+                    channel_id=snippet.get("channelId", ""),
+                    channel_name=snippet.get("channelTitle", ""),
+                    thumbnail_url=thumbnail_url,
+                    published_at=published_at,
+                )
+            )
+
+        logger.info(
+            f"YouTube search for '{query}' returned {len(results)} results "
+            f"(max_results={max_results})"
+        )
+
+        return results

@@ -363,3 +363,41 @@ async def test_list_subscriptions_pagination(client: AsyncClient):
     response = await client.get("/api/subscriptions?skip=2&limit=2")
     assert response.status_code == 200
     assert len(response.json()) == 2
+
+
+# ============================================================================
+# Quota Status API Tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_get_quota_status(client: AsyncClient):
+    """Test getting YouTube API quota status."""
+    response = await client.get("/api/subscriptions/quota")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "used" in data
+    assert "remaining" in data
+    assert "limit" in data
+    assert "percentage" in data
+    # Check types
+    assert isinstance(data["used"], int)
+    assert isinstance(data["remaining"], int)
+    assert isinstance(data["limit"], int)
+    assert isinstance(data["percentage"], (int, float))
+
+
+@pytest.mark.asyncio
+async def test_get_quota_status_values(client: AsyncClient):
+    """Test quota status returns reasonable values."""
+    response = await client.get("/api/subscriptions/quota")
+
+    assert response.status_code == 200
+    data = response.json()
+    # Default YouTube quota limit
+    assert data["limit"] == 10000
+    # Remaining should never be negative
+    assert data["remaining"] >= 0
+    # Percentage should be between 0-100+
+    assert data["percentage"] >= 0

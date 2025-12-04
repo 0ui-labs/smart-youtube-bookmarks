@@ -4,6 +4,7 @@ ARQ worker functions for subscription-related background tasks.
 Handles:
 - PubSubHubbub notifications (new video from channel)
 - Lease renewals for PubSubHubbub subscriptions
+- YouTube Search polling for keyword-based subscriptions (Etappe 3)
 """
 
 import logging
@@ -15,13 +16,14 @@ from isodate import parse_duration
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.clients.youtube import YouTubeClient
+from app.clients.youtube import VideoMetadata, VideoSearchResult, YouTubeClient
 from app.core.config import settings
 from app.core.redis import get_redis_client
 from app.models import Video
 from app.models.subscription import Subscription, SubscriptionMatch
 from app.services.channel_service import get_or_create_channel
 from app.services.pubsub_service import PubSubHubbubService
+from app.services.quota_service import QuotaService
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ def _parse_duration_to_seconds(iso_duration: str | None) -> int | None:
 
 
 async def process_pubsub_notification(
-    ctx: dict,
+    ctx: dict[str, Any],
     video_id: str,
     channel_id: str,
 ) -> dict[str, Any]:
@@ -63,11 +65,13 @@ async def process_pubsub_notification(
     """
     db: AsyncSession = ctx["db"]
 
-    logger.info(f"Processing PubSub notification: video={video_id}, channel={channel_id}")
+    logger.info(
+        f"Processing PubSub notification: video={video_id}, channel={channel_id}"
+    )
 
     # Find subscriptions matching this channel
     query = select(Subscription).where(
-        Subscription.is_active == True,  # noqa: E712
+        Subscription.is_active == True,
         Subscription.channel_ids.contains([channel_id]),
     )
     result = await db.execute(query)
@@ -77,7 +81,9 @@ async def process_pubsub_notification(
         logger.debug(f"No subscriptions match channel {channel_id}")
         return {"status": "no_matching_subscriptions", "created": 0}
 
-    logger.info(f"Found {len(subscriptions)} subscriptions matching channel {channel_id}")
+    logger.info(
+        f"Found {len(subscriptions)} subscriptions matching channel {channel_id}"
+    )
 
     # Fetch video details from YouTube
     try:
@@ -115,7 +121,7 @@ async def _process_subscription_match(
     db: AsyncSession,
     subscription: Subscription,
     video_id: str,
-    video_data: dict[str, Any],
+    video_data: VideoMetadata,
 ) -> bool:
     """
     Process a single subscription match for a video.
@@ -130,9 +136,7 @@ async def _process_subscription_match(
         )
     )
     if existing.scalar_one_or_none():
-        logger.debug(
-            f"Video {video_id} already exists in list {subscription.list_id}"
-        )
+        logger.debug(f"Video {video_id} already exists in list {subscription.list_id}")
         return False
 
     # Apply subscription filters
@@ -145,7 +149,8 @@ async def _process_subscription_match(
     # Get or create channel
     channel = await get_or_create_channel(
         db,
-        channel_id=video_data.get("channel_id", ""),
+        user_id=subscription.user_id,
+        youtube_channel_id=video_data.get("channel_id", ""),
         channel_name=video_data.get("channel", "Unknown"),
     )
 
@@ -202,7 +207,7 @@ async def _process_subscription_match(
     return True
 
 
-def _apply_filters(video_data: dict[str, Any], subscription: Subscription) -> bool:
+def _apply_filters(video_data: VideoMetadata, subscription: Subscription) -> bool:
     """
     Check if video passes subscription filters.
 
@@ -257,7 +262,7 @@ def _apply_filters(video_data: dict[str, Any], subscription: Subscription) -> bo
     return True
 
 
-async def renew_pubsub_leases(ctx: dict) -> dict[str, Any]:
+async def renew_pubsub_leases(ctx: dict[str, Any]) -> dict[str, Any]:
     """
     Renew PubSubHubbub leases that are expiring soon.
 
@@ -280,7 +285,7 @@ async def renew_pubsub_leases(ctx: dict) -> dict[str, Any]:
     threshold = datetime.utcnow() + timedelta(hours=24)
 
     query = select(Subscription).where(
-        Subscription.is_active == True,  # noqa: E712
+        Subscription.is_active == True,
         Subscription.pubsub_expires_at < threshold,
         Subscription.channel_ids != None,  # noqa: E711
     )
@@ -313,9 +318,7 @@ async def renew_pubsub_leases(ctx: dict) -> dict[str, Any]:
                             f"Failed to renew lease for channel {channel_id}"
                         )
                 except Exception as e:
-                    logger.error(
-                        f"Error renewing lease for channel {channel_id}: {e}"
-                    )
+                    logger.error(f"Error renewing lease for channel {channel_id}: {e}")
 
             # Update expiry timestamp (10 days from now)
             subscription.pubsub_expires_at = datetime.utcnow() + timedelta(days=10)
@@ -324,3 +327,269 @@ async def renew_pubsub_leases(ctx: dict) -> dict[str, Any]:
 
     logger.info(f"PubSubHubbub lease renewal complete: renewed {renewed_count} leases")
     return {"status": "ok", "renewed": renewed_count}
+
+
+async def poll_due_subscriptions(ctx: dict[str, Any]) -> dict[str, Any]:
+    """
+    Find and enqueue subscriptions that need polling.
+
+    This cron job runs every 15 minutes and finds keyword-based
+    subscriptions where next_poll_at < now().
+
+    Channel-only subscriptions are handled by PubSubHubbub, not polling.
+
+    Args:
+        ctx: ARQ context with db session and redis
+
+    Returns:
+        Status dict with number of enqueued jobs
+    """
+    db: AsyncSession = ctx["db"]
+    redis = ctx["redis"]
+
+    logger.info("Starting poll_due_subscriptions check")
+
+    # Check quota first
+    redis_client = await get_redis_client()
+    quota = QuotaService(redis_client=redis_client)
+
+    if not await quota.is_quota_available(100):
+        logger.warning("Quota exhausted, skipping subscription polling")
+        return {"status": "quota_exhausted", "enqueued": 0}
+
+    now = datetime.utcnow()
+
+    # Find due subscriptions with keywords (channel-only handled by PubSub)
+    query = (
+        select(Subscription)
+        .where(
+            Subscription.is_active == True,
+            Subscription.next_poll_at <= now,
+            Subscription.keywords != None,  # noqa: E711 - Must have keywords
+        )
+        .limit(10)  # Batch size to avoid overwhelming the system
+    )
+
+    result = await db.execute(query)
+    subscriptions = result.scalars().all()
+
+    if not subscriptions:
+        logger.debug("No subscriptions due for polling")
+        return {"status": "ok", "enqueued": 0}
+
+    logger.info(f"Found {len(subscriptions)} subscriptions due for polling")
+
+    # Enqueue individual poll jobs
+    enqueued = 0
+    for sub in subscriptions:
+        try:
+            await redis.enqueue_job("poll_subscription", subscription_id=str(sub.id))
+            enqueued += 1
+            logger.debug(f"Enqueued poll_subscription for {sub.id}")
+        except Exception as e:
+            logger.error(f"Failed to enqueue poll_subscription for {sub.id}: {e}")
+
+    logger.info(f"poll_due_subscriptions complete: enqueued {enqueued} jobs")
+    return {"status": "ok", "enqueued": enqueued}
+
+
+async def poll_subscription(
+    ctx: dict[str, Any], subscription_id: str
+) -> dict[str, Any]:
+    """
+    Poll a single subscription for new videos using YouTube Search API.
+
+    This worker:
+    1. Fetches videos matching keywords from YouTube Search
+    2. Applies subscription filters (duration, views, etc.)
+    3. Creates Video records for new matches
+    4. Creates SubscriptionMatch records
+    5. Updates subscription timestamps
+
+    Args:
+        ctx: ARQ context with db session
+        subscription_id: UUID of subscription to poll
+
+    Returns:
+        Status dict with number of new videos created
+    """
+    db: AsyncSession = ctx["db"]
+
+    logger.info(f"Polling subscription {subscription_id}")
+
+    # Get subscription
+    try:
+        sub_uuid = UUID(subscription_id)
+    except ValueError:
+        return {"status": "invalid_id"}
+
+    result = await db.execute(
+        select(Subscription).where(
+            Subscription.id == sub_uuid,
+            Subscription.is_active == True,
+        )
+    )
+    sub = result.scalar_one_or_none()
+
+    if not sub:
+        logger.warning(f"Subscription {subscription_id} not found or inactive")
+        return {"status": "not_found_or_inactive"}
+
+    # Check quota
+    redis_client = await get_redis_client()
+    quota = QuotaService(redis_client=redis_client)
+
+    if not await quota.is_quota_available(100):
+        # Set error and schedule retry for later
+        sub.error_message = "YouTube API Quota exhausted"
+        sub.next_poll_at = datetime.utcnow() + timedelta(hours=24)
+        await db.commit()
+        logger.warning(f"Quota exhausted, deferring subscription {subscription_id}")
+        return {"status": "quota_exhausted"}
+
+    try:
+        youtube = YouTubeClient(
+            api_key=settings.youtube_api_key, redis_client=redis_client
+        )
+
+        # Search for videos with keywords
+        search_results = await youtube.search_videos(
+            keywords=sub.keywords or [],
+            published_after=sub.last_polled_at,
+            max_results=25,
+        )
+
+        # Track quota usage (Search API = 100 units)
+        await quota.track_usage(100)
+
+        if not search_results:
+            await _update_poll_times(db, sub)
+            await db.commit()
+            return {"status": "no_results", "new_videos": 0}
+
+        # Apply filters to search results
+        filtered = _apply_search_filters(search_results, sub)
+
+        # Apply channel filter if both keywords AND channels specified
+        if sub.channel_ids:
+            filtered = [v for v in filtered if v.channel_id in sub.channel_ids]
+
+        # Create videos for filtered results
+        created = 0
+        for video_result in filtered:
+            # Check if video already exists in this list
+            existing = await db.execute(
+                select(Video).where(
+                    Video.youtube_id == video_result.youtube_id,
+                    Video.list_id == sub.list_id,
+                )
+            )
+            if existing.scalar_one_or_none():
+                continue
+
+            # Get or create channel
+            channel = await get_or_create_channel(
+                db,
+                user_id=sub.user_id,
+                youtube_channel_id=video_result.channel_id,
+                channel_name=video_result.channel_name,
+            )
+
+            # Create video
+            video = Video(
+                list_id=sub.list_id,
+                youtube_id=video_result.youtube_id,
+                title=video_result.title,
+                description=video_result.description,
+                channel_id=channel.id,
+                thumbnail_url=video_result.thumbnail_url,
+                published_at=video_result.published_at,
+                duration_seconds=video_result.duration_seconds,
+                view_count=video_result.view_count,
+                processing_status="completed",
+                source="subscription",
+            )
+            db.add(video)
+            await db.flush()  # Get video.id
+
+            # Create match record
+            match = SubscriptionMatch(
+                subscription_id=sub.id,
+                video_id=video.id,
+                source="search",
+            )
+            db.add(match)
+            created += 1
+
+        # Update subscription stats
+        sub.match_count += created
+        sub.error_message = None
+        await _update_poll_times(db, sub)
+
+        await db.commit()
+
+        logger.info(
+            f"Subscription {subscription_id} polled: created {created} videos "
+            f"from {len(search_results)} search results"
+        )
+        return {"status": "ok", "new_videos": created}
+
+    except Exception as e:
+        sub.error_message = str(e)
+        await db.commit()
+        logger.error(f"Failed to poll subscription {subscription_id}: {e}")
+        raise
+
+
+async def _update_poll_times(db: AsyncSession, subscription: Subscription) -> None:
+    """
+    Update poll timestamps based on subscription interval.
+
+    Args:
+        db: Database session
+        subscription: Subscription to update
+    """
+    subscription.last_polled_at = datetime.utcnow()
+
+    intervals = {
+        "hourly": timedelta(hours=1),
+        "daily": timedelta(days=1),
+        "twice_daily": timedelta(hours=12),
+    }
+    delta = intervals.get(subscription.poll_interval, timedelta(days=1))
+    subscription.next_poll_at = datetime.utcnow() + delta
+
+
+def _apply_search_filters(
+    videos: list[VideoSearchResult], subscription: Subscription
+) -> list[VideoSearchResult]:
+    """
+    Apply subscription filters to search results.
+
+    Args:
+        videos: List of search results
+        subscription: Subscription with filter config
+
+    Returns:
+        Filtered list of videos
+    """
+    filters = subscription.filters or {}
+    result = videos
+
+    # Duration filter
+    if duration := filters.get("duration"):
+        min_sec = duration.get("min_seconds", 0)
+        max_sec = duration.get("max_seconds", float("inf"))
+        result = [
+            v
+            for v in result
+            if v.duration_seconds is not None
+            and min_sec <= v.duration_seconds <= max_sec
+        ]
+
+    # Views filter
+    if views := filters.get("views"):
+        min_views = views.get("min_views", 0)
+        result = [v for v in result if (v.view_count or 0) >= min_views]
+
+    return result

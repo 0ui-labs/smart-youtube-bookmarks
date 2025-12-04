@@ -127,3 +127,12 @@ class SyncResponse(BaseModel):
     """Response from manual subscription sync."""
 
     new_videos: int = Field(description="Number of new videos imported")
+
+
+class QuotaStatusResponse(BaseModel):
+    """Response for YouTube API quota status."""
+
+    used: int = Field(description="Units used today")
+    remaining: int = Field(description="Units remaining today")
+    limit: int = Field(description="Daily quota limit")
+    percentage: float = Field(description="Percentage of quota used")
