@@ -154,7 +154,7 @@ export const TagNavigation = ({
   );
 
   return (
-    <div className="tag-navigation p-4">
+    <div className="tag-navigation border-border border-t p-4">
       {/* Header with title and create button */}
       <div className="mb-4 flex items-center justify-between gap-1 px-3">
         <h2 className="font-semibold text-lg">Kategorien</h2>
@@ -179,8 +179,10 @@ export const TagNavigation = ({
               aria-label={`Kategorie ${tag.name} ${isSelected ? "abwählen" : "auswählen"}`}
               aria-pressed={isSelected}
               className={cn(
-                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
-                "hover:bg-accent",
+                // Base styles + touch-action for fast taps (removes 300ms delay)
+                "tag-nav-btn flex w-full touch-manipulation items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                // Active state for immediate touch feedback
+                "active:bg-accent",
                 isSelected && "bg-accent font-medium",
                 isDragOver && "bg-primary/10 ring-2 ring-primary"
               )}

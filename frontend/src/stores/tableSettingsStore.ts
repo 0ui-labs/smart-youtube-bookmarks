@@ -57,7 +57,7 @@ export type ViewMode = "list" | "grid";
  * REF MCP Validation: Union type preferred over number with runtime validation
  * (compile-time safety, matches existing ThumbnailSize pattern)
  */
-export type GridColumnCount = 2 | 3 | 4 | 5;
+export type GridColumnCount = 1 | 2 | 3 | 4 | 5;
 
 /**
  * Video details display mode (Task #131)
@@ -179,7 +179,7 @@ export const useTableSettingsStore = create<TableSettingsStore>()(
       // State
       thumbnailSize: "small",
       visibleColumns: DEFAULT_VISIBLE_COLUMNS,
-      viewMode: "list", // Task #32: Default to list view (preserves current behavior)
+      viewMode: "grid", // Default to grid view (better mobile experience)
       gridColumns: 3, // Task #33: Default to 3 columns (balanced, matches YouTube)
       videoDetailsView: "page", // Task #131: Default to page (preserves existing behavior)
 

@@ -57,7 +57,7 @@ export const ChannelNavigation = ({
 
   if (isLoading) {
     return (
-      <div className="channel-navigation p-4">
+      <div className="channel-navigation border-border border-t p-4">
         <h2 className="mb-4 px-3 font-semibold text-lg">Kanäle</h2>
         <div className="space-y-2 px-3">
           <div className="h-8 animate-pulse rounded-md bg-muted" />
@@ -70,7 +70,7 @@ export const ChannelNavigation = ({
 
   if (channels.length === 0) {
     return (
-      <div className="channel-navigation p-4">
+      <div className="channel-navigation border-border border-t p-4">
         <h2 className="mb-4 px-3 font-semibold text-lg">Kanäle</h2>
         <p className="px-3 text-muted-foreground text-sm">
           Noch keine Kanäle. Füge Videos hinzu um Kanäle zu sehen.
@@ -80,7 +80,7 @@ export const ChannelNavigation = ({
   }
 
   return (
-    <div className="channel-navigation p-4">
+    <div className="channel-navigation border-border border-t p-4">
       {/* Header */}
       <h2 className="mb-4 px-3 font-semibold text-lg">Kanäle</h2>
 
@@ -94,7 +94,6 @@ export const ChannelNavigation = ({
             <div
               className={cn(
                 "group flex items-center gap-1 rounded-md transition-colors",
-                "hover:bg-accent",
                 isSelected && "bg-accent"
               )}
               key={channel.id}
@@ -103,10 +102,13 @@ export const ChannelNavigation = ({
                 aria-label={`Kanal ${channel.name} ${isSelected ? "abwählen" : "auswählen"}`}
                 aria-pressed={isSelected}
                 className={cn(
-                  "flex flex-1 items-center gap-2 px-3 py-2 text-sm transition-colors",
-                  isSelected && "font-medium"
+                  // Base styles + touch-action for fast taps (removes 300ms delay)
+                  "channel-nav-btn flex flex-1 touch-manipulation items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                  // Active state for immediate touch feedback
+                  "active:bg-accent",
+                  isSelected && "bg-accent font-medium"
                 )}
-                onClick={() => onChannelSelect(channel.id)}
+                onClick={() => onChannelSelect(isSelected ? null : channel.id)}
               >
                 {/* Channel Avatar/Thumbnail - 24px display, optimized for Retina */}
                 {channel.thumbnail_url ? (

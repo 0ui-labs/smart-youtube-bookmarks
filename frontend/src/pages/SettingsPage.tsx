@@ -1,4 +1,4 @@
-import { AlertCircle, Plus, X } from "lucide-react";
+import { AlertCircle, Moon, Plus, Sun, X } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDeleteTagDialog } from "@/components/ConfirmDeleteTagDialog";
 import { CreateTagDialog } from "@/components/CreateTagDialog";
@@ -12,6 +12,8 @@ import { TagsList } from "@/components/settings/TagsList";
 import { WorkspaceFieldsCard } from "@/components/settings/WorkspaceFieldsCard";
 import { WorkspaceFieldsEditor } from "@/components/settings/WorkspaceFieldsEditor";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Tabs,
   TabsContent,
@@ -27,6 +29,7 @@ import {
 import { useLists } from "@/hooks/useLists"; // ✨ FIX #4: Import useLists
 import { useSchemas } from "@/hooks/useSchemas";
 import { useTags } from "@/hooks/useTags";
+import { useThemeStore } from "@/stores";
 import type { CustomField } from "@/types/customField";
 import type { Tag } from "@/types/tag";
 
@@ -51,8 +54,13 @@ import type { Tag } from "@/types/tag";
  * <Route path="/settings/schemas" element={<SettingsPage />} />
  */
 export function SettingsPage() {
-  // Category-Fields Feature: Simplified to just Kategorien tab
-  const [activeTab, setActiveTab] = useState<"kategorien">("kategorien");
+  // Tabs: Kategorien and Design
+  const [activeTab, setActiveTab] = useState<"kategorien" | "design">(
+    "kategorien"
+  );
+
+  // Theme store for dark/light mode
+  const { theme, setTheme } = useThemeStore();
 
   // ✨ FIX #4: Fetch lists dynamically instead of hardcoded listId
   const {
@@ -190,15 +198,17 @@ export function SettingsPage() {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm">
+      <div className="min-h-screen bg-background">
+        <header className="bg-card shadow-sm">
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-            <h1 className="font-bold text-2xl text-gray-900">Einstellungen</h1>
+            <h1 className="font-bold text-2xl text-foreground">
+              Einstellungen
+            </h1>
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="py-12 text-center">
-            <p className="text-gray-500 text-lg">Lade Daten...</p>
+            <p className="text-lg text-muted-foreground">Lade Daten...</p>
           </div>
         </main>
       </div>
@@ -206,12 +216,14 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-card shadow-sm">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            <h1 className="font-bold text-2xl text-gray-900">Einstellungen</h1>
+            <h1 className="font-bold text-2xl text-foreground">
+              Einstellungen
+            </h1>
           </div>
         </div>
       </header>
@@ -219,11 +231,12 @@ export function SettingsPage() {
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <Tabs
-          onValueChange={(v) => setActiveTab(v as "kategorien")}
+          onValueChange={(v) => setActiveTab(v as "kategorien" | "design")}
           value={activeTab}
         >
           <TabsListUI className="mb-6">
             <TabsTrigger value="kategorien">Kategorien</TabsTrigger>
+            <TabsTrigger value="design">Design</TabsTrigger>
           </TabsListUI>
 
           {/* Schemas Tab */}
@@ -236,7 +249,7 @@ export function SettingsPage() {
               <SchemasList listId={listId} schemas={schemas} />
             ) : (
               <div className="py-12 text-center">
-                <p className="mb-4 text-gray-500 text-lg">
+                <p className="mb-4 text-lg text-muted-foreground">
                   No schemas yet. Create your first schema to organize custom
                   fields!
                 </p>
@@ -292,7 +305,7 @@ export function SettingsPage() {
               />
             ) : (
               <div className="py-12 text-center">
-                <p className="mb-4 text-gray-500 text-lg">
+                <p className="mb-4 text-lg text-muted-foreground">
                   No custom fields yet. Create your first field to extend video
                   metadata!
                 </p>
@@ -338,6 +351,52 @@ export function SettingsPage() {
                   tags={tags}
                 />
               )}
+            </div>
+          </TabsContent>
+
+          {/* Design Tab - Theme Settings */}
+          <TabsContent value="design">
+            <div className="space-y-6">
+              <div>
+                <h2 className="font-bold text-2xl tracking-tight">Design</h2>
+                <p className="text-muted-foreground">
+                  Passe das Erscheinungsbild der Anwendung an
+                </p>
+              </div>
+
+              {/* Dark Mode Toggle */}
+              <div className="rounded-lg border bg-card p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
+                      {theme === "dark" ? (
+                        <Moon className="h-5 w-5" />
+                      ) : (
+                        <Sun className="h-5 w-5" />
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <Label
+                        className="font-medium text-base"
+                        htmlFor="dark-mode"
+                      >
+                        Dark Mode
+                      </Label>
+                      <p className="text-muted-foreground text-sm">
+                        Aktiviere den dunklen Modus für eine augenfreundlichere
+                        Darstellung
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={theme === "dark"}
+                    id="dark-mode"
+                    onCheckedChange={(checked) =>
+                      setTheme(checked ? "dark" : "light")
+                    }
+                  />
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

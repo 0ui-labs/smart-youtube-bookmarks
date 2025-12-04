@@ -39,6 +39,7 @@ export const VideoGrid = ({
   // Pattern from Task #31 (proven working with thumbnailSize)
   // REF IMPROVEMENT #2: 5 cols uses md:grid-cols-2 instead of md:grid-cols-3 for better Tablet UX
   const gridColumnClasses = {
+    1: "grid-cols-1", // Mobile-only single column
     2: "grid-cols-1 md:grid-cols-2",
     3: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
     4: "grid-cols-1 md:grid-cols-2 lg:grid-cols-4",

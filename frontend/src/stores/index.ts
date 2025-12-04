@@ -29,3 +29,6 @@ export type {
 export { useTableSettingsStore } from "./tableSettingsStore";
 // Tag Store
 export { useTagStore } from "./tagStore";
+// Theme Store
+export type { Theme } from "./themeStore";
+export { initializeTheme, useThemeStore } from "./themeStore";

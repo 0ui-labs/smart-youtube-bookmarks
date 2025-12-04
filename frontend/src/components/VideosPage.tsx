@@ -132,7 +132,7 @@ const TagCarousel = () => {
         <CarouselContent className="-ml-2">
           {dummyTags.map((tag) => (
             <CarouselItem className="basis-auto pl-2" key={tag}>
-              <button className="whitespace-nowrap rounded-full bg-gray-100 px-3 py-1.5 text-gray-700 text-sm transition-colors hover:bg-gray-200">
+              <button className="whitespace-nowrap rounded-full bg-secondary px-3 py-1.5 text-secondary-foreground text-sm transition-colors hover:bg-accent">
                 {tag}
               </button>
             </CarouselItem>
@@ -360,6 +360,16 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const [isPolling, setIsPolling] = useState(false);
   const [pendingVideoIds, setPendingVideoIds] = useState<string[]>([]);
   const POLLING_INTERVAL = 500; // 500ms for snappy updates
+
+  // Mobile detection for responsive behavior
+  // On mobile, always use "page" mode for video details (never modal)
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Tag integration
   const { data: tags = [] } = useTags();
@@ -875,13 +885,13 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
             return (
               <div className="flex min-w-[200px] max-w-[400px] flex-col gap-1">
                 <span
-                  className="line-clamp-2 font-medium text-gray-900 leading-tight"
+                  className="line-clamp-2 font-medium text-gray-900 leading-tight dark:text-gray-100"
                   title={title}
                 >
                   {title}
                 </span>
                 {channel && (
-                  <span className="truncate text-gray-600 text-sm">
+                  <span className="truncate text-gray-600 text-sm dark:text-gray-400">
                     {channel}
                   </span>
                 )}
@@ -916,7 +926,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           cell: (info) => {
             const duration = info.getValue();
             return (
-              <span className="font-mono text-gray-700 text-sm tabular-nums">
+              <span className="font-mono text-gray-700 text-sm tabular-nums dark:text-gray-300">
                 {formatDuration(duration)}
               </span>
             );
@@ -941,6 +951,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                 tabIndex={-1}
               >
                 <svg
+                  aria-hidden="true"
                   className="h-4 w-4"
                   fill="currentColor"
                   viewBox="0 0 24 24"
@@ -969,6 +980,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                   }}
                 >
                   <svg
+                    aria-hidden="true"
                     className="mr-2 h-4 w-4"
                     fill="none"
                     stroke="currentColor"
@@ -1117,11 +1129,13 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   };
 
   // Handle video card click from Grid View
-  // Opens modal if videoDetailsView is 'modal', otherwise navigates to page
+  // Opens modal if videoDetailsView is 'modal' (desktop only), otherwise navigates to page
+  // Mobile always uses page mode for better UX (modals are awkward on small screens)
   const handleGridVideoClick = (video: VideoResponse) => {
     const videoDetailsView = useTableSettingsStore.getState().videoDetailsView;
 
-    if (videoDetailsView === "modal") {
+    // Mobile override: always use page mode regardless of setting
+    if (!isMobile && videoDetailsView === "modal") {
       setVideoDetailsModal({
         open: true,
         video,
@@ -1189,7 +1203,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-gray-600">Lädt Videos...</div>
+        <div className="text-muted-foreground">Lädt Videos...</div>
       </div>
     );
   }
@@ -1207,8 +1221,10 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   return (
     <div
       {...getRootProps()}
-      className="relative mx-auto w-full max-w-[2180px] p-8"
+      aria-label="Video-Bereich mit Drag-and-Drop Unterstützung"
+      className="relative mx-auto w-full max-w-[2180px] px-1.5 py-2 md:p-8"
       onDrop={handleNativeDrop}
+      role="region"
     >
       {/* Hidden file input for react-dropzone */}
       <input {...getInputProps()} />
@@ -1222,7 +1238,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         <div>
           {selectedChannelId ? (
             <div>
-              <h1 className="font-bold text-3xl text-gray-900">
+              <h1 className="font-bold text-3xl text-foreground">
                 {channels.find((c) => c.id === selectedChannelId)?.name ||
                   "Kanal"}
               </h1>
@@ -1233,7 +1249,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
             </div>
           ) : selectedTags.length > 0 ? (
             <div>
-              <h1 className="font-bold text-3xl text-gray-900">
+              <h1 className="font-bold text-3xl text-foreground">
                 {selectedTags.map((t) => t.name).join(", ")}
               </h1>
               <p className="mt-1 text-muted-foreground text-sm">
@@ -1243,7 +1259,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
             </div>
           ) : (
             <div>
-              <h1 className="font-bold text-3xl text-gray-900">Alle Videos</h1>
+              <h1 className="font-bold text-3xl text-foreground">
+                Alle Videos
+              </h1>
               <p className="mt-1 text-muted-foreground text-sm">
                 {videos.length} {videos.length === 1 ? "Video" : "Videos"} in
                 dieser Liste
@@ -1281,11 +1299,11 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
               Video hinzufügen
             </button>
           )}
-          {/* YouTube-style Add Button - Quick Add Shortcut (Task #30) */}
+          {/* YouTube-style Add Button - Quick Add Shortcut (Task #30) - Desktop only */}
           {FEATURE_FLAGS.SHOW_ADD_PLUS_ICON_BUTTON && (
             <button
               aria-label="Video hinzufügen"
-              className="flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2.5 font-medium text-gray-900 transition-colors hover:bg-gray-200"
+              className="hidden items-center gap-2 rounded-full bg-secondary px-4 py-2.5 font-medium text-secondary-foreground transition-colors hover:bg-accent md:flex"
               onClick={handleQuickAdd}
             >
               <Plus className="h-5 w-5" strokeWidth={2.5} />
@@ -1295,8 +1313,19 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         </div>
       </div>
 
-      {/* Filter and View Controls Bar */}
-      <div className="mb-6 flex items-center gap-4">
+      {/* Mobile Floating Action Button */}
+      {FEATURE_FLAGS.SHOW_ADD_PLUS_ICON_BUTTON && (
+        <button
+          aria-label="Video hinzufügen"
+          className="fixed right-4 bottom-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 md:hidden"
+          onClick={handleQuickAdd}
+        >
+          <Plus className="h-6 w-6" strokeWidth={2.5} />
+        </button>
+      )}
+
+      {/* Filter and View Controls Bar - Hidden on mobile */}
+      <div className="mb-6 hidden items-center gap-4 md:flex">
         {/* Left side - Tag filters with carousel */}
         <div className="min-w-0 flex-1">
           <TagCarousel />
@@ -1325,6 +1354,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <svg
+                aria-hidden="true"
                 className="h-5 w-5 animate-spin text-yellow-400"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -1363,6 +1393,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           <div className="flex">
             <div className="flex-shrink-0">
               <svg
+                aria-hidden="true"
                 className="h-5 w-5 text-red-400"
                 fill="currentColor"
                 viewBox="0 0 20 20"
@@ -1397,14 +1428,16 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
       {isAdding && (
         <form
-          className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+          className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800"
           onSubmit={handleAddVideo}
         >
-          <h2 className="mb-4 font-semibold text-lg">Neues Video hinzufügen</h2>
+          <h2 className="mb-4 font-semibold text-gray-900 text-lg dark:text-gray-100">
+            Neues Video hinzufügen
+          </h2>
           <div className="space-y-4">
             <div>
               <label
-                className="mb-1 block font-medium text-gray-700 text-sm"
+                className="mb-1 block font-medium text-gray-700 text-sm dark:text-gray-300"
                 htmlFor="video-url"
               >
                 YouTube-URL *
@@ -1412,8 +1445,10 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
               <input
                 autoFocus
                 className={`w-full border px-3 py-2 ${
-                  urlError ? "border-red-500" : "border-gray-300"
-                } rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+                  urlError
+                    ? "border-red-500"
+                    : "border-gray-300 dark:border-gray-600"
+                } rounded-lg bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400`}
                 id="video-url"
                 onChange={(e) => setNewVideoUrl(e.target.value)}
                 placeholder="https://www.youtube.com/watch?v=..."
@@ -1422,9 +1457,11 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                 value={newVideoUrl}
               />
               {urlError && (
-                <p className="mt-1 text-red-600 text-sm">{urlError}</p>
+                <p className="mt-1 text-red-600 text-sm dark:text-red-400">
+                  {urlError}
+                </p>
               )}
-              <p className="mt-1 text-gray-500 text-sm">
+              <p className="mt-1 text-gray-500 text-sm dark:text-gray-400">
                 Unterstützte Formate: youtube.com/watch?v=..., youtu.be/...,
                 youtube.com/embed/...
               </p>
@@ -1439,7 +1476,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
               {createVideo.isPending ? "Wird hinzugefügt..." : "Hinzufügen"}
             </button>
             <button
-              className="rounded-lg bg-gray-300 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-400"
+              className="rounded-lg bg-gray-300 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-400 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
               onClick={() => {
                 setIsAdding(false);
                 setNewVideoUrl("");
@@ -1454,8 +1491,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       )}
 
       {videos.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white py-12 text-center">
-          <p className="text-gray-500 text-lg">
+        <div className="rounded-lg border border-border bg-card py-12 text-center">
+          <p className="text-lg text-muted-foreground">
             Noch keine Videos in dieser Liste. Fügen Sie Ihr erstes Video hinzu!
           </p>
         </div>
@@ -1469,14 +1506,14 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         />
       ) : (
         // Table View (existing implementation)
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+          <table className="min-w-full divide-y divide-border">
             <thead className="hidden">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <th
-                      className="px-6 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wider"
+                      className="px-6 py-3 text-left font-medium text-muted-foreground text-xs uppercase tracking-wider"
                       key={header.id}
                     >
                       {header.isPlaceholder
@@ -1490,16 +1527,18 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                 </tr>
               ))}
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody className="divide-y divide-border bg-card">
               {table.getRowModel().rows.map((row) => {
                 const video = row.original;
 
                 // Use same logic as Grid View: respect videoDetailsView setting
+                // Mobile override: always use page mode (same as handleGridVideoClick)
                 const handleRowClick = () => {
                   const videoDetailsView =
                     useTableSettingsStore.getState().videoDetailsView;
 
-                  if (videoDetailsView === "modal") {
+                  // Mobile override: always use page mode regardless of setting
+                  if (!isMobile && videoDetailsView === "modal") {
                     setVideoDetailsModal({
                       open: true,
                       video: video as VideoResponse,
@@ -1519,7 +1558,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
                 return (
                   <tr
-                    className="cursor-pointer transition-colors hover:bg-gray-50 focus:bg-gray-100 focus:outline-none"
+                    className="cursor-pointer transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
                     key={row.id}
                     onClick={handleRowClick}
                     onKeyDown={handleKeyDown}

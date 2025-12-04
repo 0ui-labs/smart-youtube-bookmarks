@@ -96,25 +96,24 @@ export function CollapsibleSidebar({
 
   return (
     <>
-      {/* Mobile toggle button */}
-      {isMobile && (
-        <div className="flex items-center p-4 md:hidden">
-          <Button
-            aria-label={isOpen ? "Close navigation" : "Open navigation"}
-            onClick={() => setIsOpen(!isOpen)}
-            size="icon"
-            variant="ghost"
-          >
-            {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
-        </div>
+      {/* Mobile toggle button - Fixed position top-right */}
+      {isMobile && !isOpen && (
+        <Button
+          aria-label="Open navigation"
+          className="fixed top-4 right-4 z-50 md:hidden"
+          onClick={() => setIsOpen(true)}
+          size="icon"
+          variant="ghost"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
       )}
 
       {/* Desktop sidebar - always visible, OUTSIDE AnimatePresence */}
       {!isMobile && (
         <aside
           className={cn(
-            "hidden md:flex md:h-screen md:w-72 md:flex-col md:border-r md:bg-background",
+            "hidden md:flex md:h-screen md:w-72 md:flex-col md:bg-background",
             className
           )}
           ref={sidebarRef}
@@ -143,7 +142,7 @@ export function CollapsibleSidebar({
             <motion.aside
               animate={{ x: 0, opacity: 1 }}
               className={cn(
-                "fixed top-0 left-0 z-40 flex h-screen w-72 flex-col border-r bg-background md:hidden",
+                "fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-background md:hidden",
                 className
               )}
               exit={{ x: -300, opacity: 0 }}
@@ -156,7 +155,20 @@ export function CollapsibleSidebar({
                 damping: 30,
               }}
             >
-              {children}
+              {/* Close button inside drawer */}
+              <Button
+                aria-label="Close navigation"
+                className="absolute top-4 right-4 z-50"
+                onClick={() => setIsOpen(false)}
+                size="icon"
+                variant="ghost"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+              {/* Scrollable content with overscroll containment to prevent bleeding */}
+              <div className="flex-1 overflow-y-auto overscroll-contain pb-safe">
+                {children}
+              </div>
             </motion.aside>
           </>
         )}

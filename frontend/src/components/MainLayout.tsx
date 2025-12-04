@@ -11,6 +11,7 @@ import { useLists } from "@/hooks/useLists";
 import { useTags } from "@/hooks/useTags";
 import { useImportDropStore } from "@/stores/importDropStore";
 import { useTagStore } from "@/stores/tagStore";
+import { useThemeStore } from "@/stores/themeStore";
 import { CreateTagDialog } from "./CreateTagDialog";
 
 /**
@@ -45,6 +46,9 @@ export function MainLayout() {
   const setPendingImport = useImportDropStore(
     (state) => state.setPendingImport
   );
+
+  // Theme for logo switching
+  const theme = useThemeStore((state) => state.theme);
 
   const handleCreateTag = () => {
     setIsCreateTagDialogOpen(true);
@@ -92,20 +96,26 @@ export function MainLayout() {
     <div className="flex h-screen">
       {/* Sidebar */}
       <CollapsibleSidebar>
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="border-b p-4">
+        <div className="flex min-h-full flex-col">
+          {/* Logo - switches based on theme */}
+          <div className="p-4">
             <img
-              alt="Logo"
+              alt="YouTube Logo"
               className="h-6"
-              src="https://upload.wikimedia.org/wikipedia/commons/d/dd/YouTube_Premium_logo.svg"
+              height={24}
+              src={
+                theme === "dark"
+                  ? "/youTube-logo-white.svg"
+                  : "/youTube-logo-black.svg"
+              }
+              width={98}
             />
           </div>
 
           {/* Main Navigation */}
           <nav className="space-y-1 p-2">
             <button
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent"
+              className="nav-btn flex w-full touch-manipulation items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors active:bg-accent"
               onClick={handleHomeClick}
             >
               <Home className="h-4 w-4" />
@@ -143,7 +153,7 @@ export function MainLayout() {
 
           {/* Categories/Tags */}
           {tagsLoading ? (
-            <div className="p-4 text-gray-500 text-sm">
+            <div className="p-4 text-muted-foreground text-sm">
               Kategorien werden geladen...
             </div>
           ) : tagsError ? (
@@ -170,9 +180,9 @@ export function MainLayout() {
           />
 
           {/* Settings Button */}
-          <div className="mt-auto border-gray-200 border-t pt-4">
+          <div className="mt-auto pt-4 pb-4">
             <Button
-              className="w-full justify-start text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+              className="w-full justify-start text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => navigate("/settings/schemas")}
               variant="ghost"
             >

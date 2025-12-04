@@ -6,7 +6,11 @@ import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { WebSocketProvider } from "./components/WebSocketProvider";
 import { getQueryClient } from "./lib/queryClient";
+import { initializeTheme } from "./stores";
 import "./index.css";
+
+// Initialize theme before first render to prevent flash of wrong theme
+initializeTheme();
 
 const rootElement = document.getElementById("root");
 

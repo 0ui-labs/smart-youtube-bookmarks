@@ -150,7 +150,7 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
   return (
     <div
       aria-label={`Video: ${video.title} von ${(video as any).channel_name || video.channel || "Unbekannt"}`}
-      className="video-card group cursor-pointer rounded-lg border bg-card transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+      className="video-card group cursor-pointer rounded-lg bg-card transition-shadow duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
       onClick={handleCardClick}
       // REF MCP #3: ARIA label with channel name for screen readers
       onKeyDown={handleKeyDown}
@@ -185,8 +185,10 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
             aria-label="Import-Fehler"
             className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
             data-error="true"
+            role="img"
           >
             <svg
+              aria-hidden="true"
               className="h-5 w-5"
               fill="none"
               stroke="currentColor"
@@ -230,7 +232,12 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
               }}
               tabIndex={-1}
             >
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+              <svg
+                aria-hidden="true"
+                className="h-4 w-4"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <circle cx="12" cy="5" r="2" />
                 <circle cx="12" cy="12" r="2" />
                 <circle cx="12" cy="19" r="2" />
@@ -245,6 +252,7 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
                 }}
               >
                 <svg
+                  aria-hidden="true"
                   className="mr-2 h-4 w-4"
                   fill="none"
                   stroke="currentColor"

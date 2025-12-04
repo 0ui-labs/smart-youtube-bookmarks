@@ -59,10 +59,10 @@ export function ChannelInfo({
         {/* Channel Avatar - 46px to align with channel name + category */}
         {showFallback ? (
           <div
-            className="flex flex-shrink-0 items-center justify-center rounded-full bg-gray-200"
+            className="flex flex-shrink-0 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700"
             style={{ width: 46, height: 46 }}
           >
-            <span className="font-medium text-base text-gray-600">
+            <span className="font-medium text-base text-gray-600 dark:text-gray-300">
               {getInitials(channelName)}
             </span>
           </div>
@@ -86,7 +86,7 @@ export function ChannelInfo({
           {/* Channel Name */}
           {channelName && (
             <button
-              className="truncate text-left font-medium text-base text-gray-900 hover:text-gray-700"
+              className="truncate text-left font-medium text-base text-gray-900 hover:text-gray-700 dark:text-gray-100 dark:hover:text-gray-300"
               onClick={onChannelClick}
             >
               {channelName}
@@ -95,7 +95,7 @@ export function ChannelInfo({
 
           {/* Category (clickable to open modal) */}
           <button
-            className="mt-0.5 flex items-center gap-1.5 text-left text-gray-500 text-sm hover:text-gray-700"
+            className="mt-0.5 flex items-center gap-1.5 text-left text-gray-500 text-sm hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             onClick={() => setCategoryModalOpen(true)}
           >
             {currentCategory ? (

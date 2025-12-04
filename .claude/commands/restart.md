@@ -1,0 +1,1 @@
+Starte das Backend, das Frontend und den Worker neu

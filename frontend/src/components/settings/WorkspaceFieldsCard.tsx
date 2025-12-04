@@ -47,11 +47,13 @@ export function WorkspaceFieldsCard({
       .map((sf) => sf.field) ?? [];
 
   return (
-    <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
+    <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:border-[#333333] dark:bg-[#1B1B1B] dark:bg-none">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Home className="h-5 w-5 text-blue-600" />
-          <h3 className="font-medium">Alle Videos</h3>
+          <Home className="h-5 w-5 text-blue-600 dark:text-gray-400" />
+          <h3 className="font-medium text-gray-900 dark:text-gray-100">
+            Alle Videos
+          </h3>
         </div>
         <Button onClick={onEdit} size="sm" variant="outline">
           Bearbeiten

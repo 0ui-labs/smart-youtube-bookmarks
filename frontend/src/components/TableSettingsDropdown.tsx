@@ -13,6 +13,7 @@
  * ```
  */
 import { Settings } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,6 +30,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useTableSettingsStore } from "@/stores"; // REF MCP Improvement #5: Central import
 
 export const TableSettingsDropdown = () => {
+  // Track mobile breakpoint for responsive settings
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
   // REF MCP Improvement #1: Use separate selectors (NOT useShallow object pattern)
   const viewMode = useTableSettingsStore((state) => state.viewMode);
   const thumbnailSize = useTableSettingsStore((state) => state.thumbnailSize);
@@ -66,8 +76,14 @@ export const TableSettingsDropdown = () => {
   // Task #34: Runtime validation for GridColumnCount
   const handleGridColumnsChange = (value: string) => {
     const parsed = Number.parseInt(value, 10);
-    // Type guard - TypeScript narrows type automatically
-    if (parsed === 2 || parsed === 3 || parsed === 4 || parsed === 5) {
+    // Type guard - TypeScript narrows type automatically (including 1 for mobile)
+    if (
+      parsed === 1 ||
+      parsed === 2 ||
+      parsed === 3 ||
+      parsed === 4 ||
+      parsed === 5
+    ) {
       setGridColumns(parsed); // TypeScript knows parsed is GridColumnCount here
     } else {
       console.warn(`Invalid grid column count: ${value}`);
@@ -131,18 +147,29 @@ export const TableSettingsDropdown = () => {
               onValueChange={handleGridColumnsChange}
               value={String(gridColumns)}
             >
+              {/* Mobile: Only show 1-2 columns */}
+              {isMobile && (
+                <DropdownMenuRadioItem value="1">
+                  1 Spalte
+                </DropdownMenuRadioItem>
+              )}
               <DropdownMenuRadioItem value="2">
-                2 Spalten (Breit)
+                2 Spalten {isMobile ? "" : "(Breit)"}
               </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="3">
-                3 Spalten (Standard)
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="4">
-                4 Spalten (Kompakt)
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="5">
-                5 Spalten (Dicht)
-              </DropdownMenuRadioItem>
+              {/* Desktop: Show 3-5 columns */}
+              {!isMobile && (
+                <>
+                  <DropdownMenuRadioItem value="3">
+                    3 Spalten (Standard)
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="4">
+                    4 Spalten (Kompakt)
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="5">
+                    5 Spalten (Dicht)
+                  </DropdownMenuRadioItem>
+                </>
+              )}
             </DropdownMenuRadioGroup>
             <DropdownMenuSeparator />
           </>
@@ -186,32 +213,38 @@ export const TableSettingsDropdown = () => {
           </>
         )}
 
-        {/* Video Details Ansicht Section (Task #131 Step 5) */}
+        {/* Video Details Ansicht Section (Task #131 Step 5) - Desktop only */}
         {/* REF MCP #4: RadioGroup for mutually exclusive choice (page OR modal) */}
-        <div className="px-2 py-1.5">
-          <Label className="font-medium text-xs">Video Details</Label>
-          <RadioGroup
-            className="mt-2 space-y-2"
-            onValueChange={handleVideoDetailsViewChange}
-            value={videoDetailsView}
-          >
-            <div className="flex items-center gap-2">
-              <RadioGroupItem id="view-page" value="page" />
-              <Label className="cursor-pointer font-normal" htmlFor="view-page">
-                Eigene Seite (Standard)
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <RadioGroupItem id="view-modal" value="modal" />
-              <Label
-                className="cursor-pointer font-normal"
-                htmlFor="view-modal"
-              >
-                Modal Dialog
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
+        {/* Mobile: Always use "page" view, no toggle needed */}
+        {!isMobile && (
+          <div className="px-2 py-1.5">
+            <Label className="font-medium text-xs">Video Details</Label>
+            <RadioGroup
+              className="mt-2 space-y-2"
+              onValueChange={handleVideoDetailsViewChange}
+              value={videoDetailsView}
+            >
+              <div className="flex items-center gap-2">
+                <RadioGroupItem id="view-page" value="page" />
+                <Label
+                  className="cursor-pointer font-normal"
+                  htmlFor="view-page"
+                >
+                  Eigene Seite (Standard)
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem id="view-modal" value="modal" />
+                <Label
+                  className="cursor-pointer font-normal"
+                  htmlFor="view-modal"
+                >
+                  Modal Dialog
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
