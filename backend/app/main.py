@@ -20,6 +20,7 @@ from app.api import (
     schema_fields,
     schemas,
     search,
+    subscriptions,
     tags,
     videos,
     websocket,
@@ -101,6 +102,7 @@ app.include_router(analytics.router)
 app.include_router(channels.router)
 app.include_router(enrichment.router)
 app.include_router(search.router)
+app.include_router(subscriptions.router)
 
 
 @app.get("/api/health")

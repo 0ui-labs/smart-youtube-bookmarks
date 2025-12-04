@@ -1,200 +1,274 @@
 /**
  * CategorySelector Component
- * Phase 5 Step 5.1-5.3, 5.7
  *
- * Dropdown component for selecting a video's category.
- * Categories are tags with is_video_type=true (only one per video).
+ * Dropdown selector for assigning/changing a video's category.
+ * Categories are mutually exclusive - a video can only have one.
  *
  * Features:
- * - Select from available categories
- * - Clear button to remove category
- * - Loading states for data fetch and mutations
- * - Color indicators for categories
- * - Warning dialog when changing/removing category (Step 5.7)
+ * - Shows CategoryChangeWarning dialog before category changes
+ * - Displays which field values will be backed up
+ * - Supports backup restoration (future feature)
+ *
+ * Uses:
+ * - useCategories() to fetch available category tags
+ * - useSetVideoCategory() mutation to change category
+ *
+ * @example
+ * ```tsx
+ * <CategorySelector
+ *   videoId="video-uuid"
+ *   currentCategoryId="category-uuid"
+ *   fieldValues={video.field_values}
+ *   onCategoryChange={(categoryId) => console.log('Changed to:', categoryId)}
+ * />
+ * ```
  */
-
-import { Loader2, X } from "lucide-react";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react'
+import { useCategories } from '@/hooks/useTags'
+import { useSetVideoCategory } from '@/hooks/useVideos'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useCategories } from "@/hooks/useTags";
-import { CategoryChangeWarning } from "./CategoryChangeWarning";
+} from '@/components/ui/select'
+import { FolderOpen } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { CategoryChangeWarning } from './CategoryChangeWarning'
+import type { VideoFieldValue } from '@/types/video'
 
-export interface CategorySelectorProps {
-  videoId: string;
-  currentCategoryId: string | null;
-  onCategoryChange: (
-    categoryId: string | null,
-    restoreBackup?: boolean
-  ) => void;
-  disabled?: boolean;
-  isMutating?: boolean;
+interface FieldValueInfo {
+  id: string
+  fieldName: string
+  value: string | number | boolean | null
+}
+
+interface CategorySelectorProps {
+  /** Video ID to assign category to */
+  videoId: string
+  /** Current category ID (null if no category assigned) */
+  currentCategoryId: string | null
+  /** Current field values for the video */
+  fieldValues?: VideoFieldValue[]
+  /** Optional callback when category changes */
+  onCategoryChange?: (categoryId: string | null) => void
+  /** Whether the selector is disabled */
+  disabled?: boolean
 }
 
 export function CategorySelector({
+  videoId,
   currentCategoryId,
+  fieldValues = [],
   onCategoryChange,
   disabled = false,
-  isMutating = false,
 }: CategorySelectorProps) {
-  const { data: categories, isLoading } = useCategories();
+  const { data: categories, isLoading: categoriesLoading } = useCategories()
+  const setCategory = useSetVideoCategory()
 
-  // Warning dialog state (Step 5.7)
-  const [showWarning, setShowWarning] = useState(false);
-  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(
-    null
-  );
+  // Warning dialog state
+  const [warningOpen, setWarningOpen] = useState(false)
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null)
 
-  // Find selected category
-  const selectedCategory = categories?.find((c) => c.id === currentCategoryId);
+  const currentCategory = categories.find((c) => c.id === currentCategoryId) || null
+  const newCategory = categories.find((c) => c.id === pendingCategoryId) || null
 
-  // Find pending category for warning dialog
-  const pendingCategory = pendingCategoryId
-    ? (categories?.find((c) => c.id === pendingCategoryId) ?? null)
-    : null;
+  /**
+   * Calculate which fields belong to the current category (will be backed up)
+   * vs workspace fields (will persist)
+   */
+  const calculateFieldInfo = () => {
+    const fieldValuesToBackup: FieldValueInfo[] = []
+    const fieldValuesThatPersist: FieldValueInfo[] = []
 
-  // Handle selection change
+    // For now, treat all fields as category-specific if there's a current category
+    // TODO: When workspace schemas are implemented, properly separate them
+    fieldValues.forEach((fv) => {
+      const fieldInfo: FieldValueInfo = {
+        id: fv.id,
+        fieldName: fv.field_name || fv.field?.name || 'Unbekannt',
+        value: fv.value,
+      }
+
+      // Simple heuristic: if field has a value and we're changing categories,
+      // it will be backed up
+      if (fv.value !== null && currentCategoryId) {
+        fieldValuesToBackup.push(fieldInfo)
+      } else if (fv.value !== null) {
+        fieldValuesThatPersist.push(fieldInfo)
+      }
+    })
+
+    return { fieldValuesToBackup, fieldValuesThatPersist }
+  }
+
   const handleValueChange = (value: string) => {
-    const newCategoryId = value === "__none__" ? null : value;
+    const newCategoryId = value === 'none' ? null : value
 
-    // If no current category, assign directly (no warning needed)
-    if (currentCategoryId === null) {
-      onCategoryChange(newCategoryId);
-      return;
+    // Don't do anything if selecting the same category
+    if (newCategoryId === currentCategoryId) return
+
+    // If there's a current category with field values, show warning
+    const hasFieldValues = fieldValues.some((fv) => fv.value !== null)
+
+    if (currentCategoryId && hasFieldValues) {
+      // Show warning dialog
+      setPendingCategoryId(newCategoryId)
+      setWarningOpen(true)
+    } else {
+      // No warning needed, proceed directly
+      executeChange(newCategoryId)
     }
+  }
 
-    // If same category, do nothing
-    if (newCategoryId === currentCategoryId) {
-      return;
+  const executeChange = async (newCategoryId: string | null) => {
+    try {
+      await setCategory.mutateAsync({
+        videoId,
+        categoryId: newCategoryId,
+      })
+      onCategoryChange?.(newCategoryId)
+    } catch (error) {
+      console.error('Failed to set category:', error)
     }
+  }
 
-    // Otherwise show warning dialog
-    setPendingCategoryId(newCategoryId);
-    setShowWarning(true);
-  };
+  const handleConfirm = async (_restoreBackup: boolean) => {
+    setWarningOpen(false)
+    // TODO: Pass _restoreBackup to backend when implemented
+    await executeChange(pendingCategoryId)
+    setPendingCategoryId(null)
+  }
 
-  // Handle clear button click
-  const handleClear = () => {
-    // Show warning when removing category
-    setPendingCategoryId(null);
-    setShowWarning(true);
-  };
-
-  // Handle warning dialog confirm
-  const handleConfirm = (restoreBackup: boolean) => {
-    onCategoryChange(pendingCategoryId, restoreBackup);
-    setShowWarning(false);
-    setPendingCategoryId(null);
-  };
-
-  // Handle warning dialog cancel
   const handleCancel = () => {
-    setShowWarning(false);
-    setPendingCategoryId(null);
-  };
-
-  // Loading state - fetching categories
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        <label className="font-medium text-sm">Kategorie</label>
-        <div className="flex h-10 items-center gap-2 rounded-md border px-3 text-muted-foreground text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Lade Kategorien...
-        </div>
-      </div>
-    );
+    setWarningOpen(false)
+    setPendingCategoryId(null)
   }
 
-  // Mutating state
-  if (isMutating) {
-    return (
-      <div className="space-y-2">
-        <label className="font-medium text-sm">Kategorie</label>
-        <div className="flex h-10 items-center gap-2 rounded-md border px-3 text-muted-foreground text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Ändere Kategorie...
-        </div>
-      </div>
-    );
-  }
+  const isDisabled = disabled || categoriesLoading || setCategory.isPending
+
+  const { fieldValuesToBackup, fieldValuesThatPersist } = calculateFieldInfo()
 
   return (
-    <div className="space-y-2">
-      <label className="font-medium text-sm">Kategorie</label>
-      <div className="relative flex items-center gap-2">
+    <>
+      <div className="flex items-center gap-2">
+        <FolderOpen className="h-4 w-4 text-muted-foreground" />
         <Select
-          disabled={disabled}
+          value={currentCategoryId || 'none'}
           onValueChange={handleValueChange}
-          value={currentCategoryId || "__none__"}
+          disabled={isDisabled}
         >
-          <SelectTrigger aria-label="Kategorie auswählen" className="w-full">
-            <SelectValue placeholder="Keine Kategorie">
-              {selectedCategory ? (
+          <SelectTrigger className="w-[200px]" data-testid="category-selector">
+            <SelectValue placeholder="Kategorie wählen">
+              {currentCategory ? (
                 <span className="flex items-center gap-2">
-                  <span
-                    className="h-3 w-3 rounded-full"
-                    data-testid="category-color-dot"
-                    style={{
-                      backgroundColor: selectedCategory.color || "#888",
-                    }}
-                  />
-                  {selectedCategory.name}
+                  {currentCategory.color && (
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: currentCategory.color }}
+                    />
+                  )}
+                  {currentCategory.name}
                 </span>
               ) : (
-                "Keine Kategorie"
+                <span className="text-muted-foreground">Keine Kategorie</span>
               )}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__none__">Keine Kategorie</SelectItem>
-            {categories?.map((category) => (
+            <SelectItem value="none">
+              <span className="text-muted-foreground">Keine Kategorie</span>
+            </SelectItem>
+            {categories.map((category) => (
               <SelectItem key={category.id} value={category.id}>
                 <span className="flex items-center gap-2">
-                  <span
-                    className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: category.color || "#888" }}
-                  />
+                  {category.color && (
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: category.color }}
+                    />
+                  )}
                   {category.name}
                 </span>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-
-        {/* Clear button - only shown when category is selected */}
-        {currentCategoryId && (
-          <Button
-            aria-label="Kategorie entfernen"
-            className="h-8 w-8 shrink-0"
-            disabled={disabled}
-            onClick={handleClear}
-            size="icon"
-            variant="ghost"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+        {setCategory.isPending && (
+          <span className="text-sm text-muted-foreground">Speichert...</span>
         )}
       </div>
 
-      {/* Warning dialog (Step 5.7) */}
+      {/* Category Change Warning Dialog */}
       <CategoryChangeWarning
-        fieldValuesThatPersist={[]}
-        fieldValuesToBackup={[]}
-        hasBackup={false}
-        newCategory={pendingCategory}
-        oldCategory={selectedCategory ?? null} // TODO: Get from API
-        onCancel={handleCancel} // TODO: Get from API
-        onConfirm={handleConfirm} // TODO: Get from API
-        onOpenChange={setShowWarning}
-        open={showWarning}
+        open={warningOpen}
+        onOpenChange={setWarningOpen}
+        oldCategory={currentCategory}
+        newCategory={newCategory}
+        fieldValuesToBackup={fieldValuesToBackup}
+        fieldValuesThatPersist={fieldValuesThatPersist}
+        hasBackup={false} // TODO: Check for existing backup
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+        isLoading={setCategory.isPending}
       />
-    </div>
-  );
+    </>
+  )
+}
+
+/**
+ * CategoryBadge Component
+ *
+ * Displays the current category as a badge with icon.
+ * Read-only display for contexts where editing is not needed.
+ */
+interface CategoryBadgeProps {
+  /** Category name */
+  name: string
+  /** Category color (hex) */
+  color?: string | null
+}
+
+export function CategoryBadge({ name, color }: CategoryBadgeProps) {
+  return (
+    <Badge
+      variant="outline"
+      className="flex items-center gap-1.5"
+      style={color ? { borderColor: color } : undefined}
+    >
+      <FolderOpen className="h-3 w-3" />
+      {color && (
+        <span
+          className="w-2 h-2 rounded-full"
+          style={{ backgroundColor: color }}
+        />
+      )}
+      {name}
+    </Badge>
+  )
+}
+
+/**
+ * LabelBadge Component
+ *
+ * Displays a label tag as a badge.
+ * Visually distinct from CategoryBadge.
+ */
+interface LabelBadgeProps {
+  /** Label name */
+  name: string
+  /** Label color (hex) */
+  color?: string | null
+}
+
+export function LabelBadge({ name, color }: LabelBadgeProps) {
+  return (
+    <Badge
+      variant="secondary"
+      style={color ? { backgroundColor: color, color: '#fff' } : undefined}
+    >
+      {name}
+    </Badge>
+  )
 }

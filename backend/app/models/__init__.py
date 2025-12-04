@@ -7,6 +7,7 @@ from .job_progress import JobProgressEvent
 from .list import BookmarkList
 from .schema import Schema
 from .schema_field import SchemaField
+from .subscription import Subscription, SubscriptionMatch
 from .tag import Tag, video_tags
 from .user import User
 from .video import Video
@@ -25,6 +26,8 @@ __all__ = [
     "ProcessingJob",
     "Schema",
     "SchemaField",
+    "Subscription",
+    "SubscriptionMatch",
     "Tag",
     "User",
     "Video",

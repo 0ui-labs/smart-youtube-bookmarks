@@ -17,6 +17,17 @@ from .field_schema import (
 )
 from .job_progress import JobProgressEventCreate, JobProgressEventRead, ProgressData
 from .list import ListCreate, ListResponse, ListUpdate
+from .subscription import (
+    CustomFieldFilter,
+    DurationFilter,
+    SubscriptionCreate,
+    SubscriptionFilters,
+    SubscriptionMatchResponse,
+    SubscriptionResponse,
+    SubscriptionUpdate,
+    SyncResponse,
+    ViewsFilter,
+)
 from .tag import TagBase, TagCreate, TagResponse, TagUpdate
 
 __all__ = [
@@ -44,4 +55,14 @@ __all__ = [
     "FieldSchemaCreate",
     "FieldSchemaUpdate",
     "FieldSchemaResponse",
+    # Subscription schemas
+    "DurationFilter",
+    "ViewsFilter",
+    "CustomFieldFilter",
+    "SubscriptionFilters",
+    "SubscriptionCreate",
+    "SubscriptionUpdate",
+    "SubscriptionResponse",
+    "SubscriptionMatchResponse",
+    "SyncResponse",
 ]

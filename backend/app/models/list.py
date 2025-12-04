@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from .field_schema import FieldSchema
     from .job import ProcessingJob
     from .schema import Schema
+    from .subscription import Subscription
     from .user import User
     from .video import Video
 
@@ -80,6 +81,12 @@ class BookmarkList(BaseModel):
         "FieldSchema",
         foreign_keys=[default_schema_id],
         lazy="raise",  # Prevent MissingGreenlet - force explicit selectinload
+    )
+    subscriptions: Mapped[list["Subscription"]] = relationship(
+        "Subscription",
+        back_populates="list",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     def __repr__(self) -> str:

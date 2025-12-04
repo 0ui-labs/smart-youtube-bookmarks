@@ -1,9 +1,8 @@
 /**
  * CreateTagDialog Component
  *
- * Simplified dialog for creating categories and labels.
- * Schema/field management is hidden from the user - they add fields
- * after creating the category via the edit dialog.
+ * Modal dialog for creating new tags with name, optional color, and optional schema.
+ * Uses AlertDialog from Radix UI for accessibility.
  *
  * @example
  * ```tsx
@@ -14,140 +13,251 @@
  * />
  * ```
  */
-import { useState } from "react";
+import { useState } from 'react'
 import {
   AlertDialog,
-  AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { useCreateTag } from "@/hooks/useTags";
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { FolderOpen, Tag as TagIcon } from 'lucide-react'
+import { useCreateTag } from '@/hooks/useTags'
+import { SchemaSelector } from './SchemaSelector'
+import { schemasOptions, useCreateSchema } from '@/hooks/useSchemas'
+import { useQuery } from '@tanstack/react-query'
+import { SchemaEditor, type SchemaFormData } from './schemas/SchemaEditor'
 
 interface CreateTagDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  listId: string;
+  open: boolean
+  onOpenChange?: (open: boolean) => void
+  onClose?: () => void
+  listId?: string
+  defaultIsVideoType?: boolean
 }
 
 export const CreateTagDialog = ({
   open,
   onOpenChange,
-  listId: _listId,
+  onClose,
+  listId,
+  defaultIsVideoType = true
 }: CreateTagDialogProps) => {
-  const [name, setName] = useState("");
-  const [color, setColor] = useState("#3B82F6"); // Default blue
-  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState('')
+  const [color, setColor] = useState('#3B82F6') // Default blue
+  const [isVideoType, setIsVideoType] = useState(defaultIsVideoType)
+  const [error, setError] = useState<string | null>(null)
+  // Task #82: Schema ID state for SchemaSelector
+  // null = "Kein Schema", 'new' = Create new schema, UUID string = Existing schema
+  const [schemaId, setSchemaId] = useState<string | null>(null)
 
-  const createTag = useCreateTag();
+  const createTag = useCreateTag()
+  const createSchema = useCreateSchema(listId ?? '')
+
+  // Task #82 Batch 3: Fetch schemas with dependent query
+  const { data: schemas = [], isLoading: isSchemasLoading } = useQuery({
+    ...schemasOptions(listId ?? ''),
+    enabled: !!listId,  // REF MCP Improvement #4: Dependent query pattern
+  })
+
+  // Bug #001 Fix: Handlers for inline schema creation
+  const handleSchemaCreated = async (schemaData: SchemaFormData) => {
+    try {
+      const newSchema = await createSchema.mutateAsync({
+        name: schemaData.name,
+        description: schemaData.description,
+        fields: schemaData.fields,
+      })
+
+      // Set schemaId to newly created schema
+      setSchemaId(newSchema.id)
+    } catch (error) {
+      // Error is handled by SchemaEditor component
+      // Re-throw to let SchemaEditor display the error
+      throw error
+    }
+  }
+
+  const handleSchemaCancelled = () => {
+    // Reset to "no schema" when user cancels
+    setSchemaId(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
 
     // Validation
     if (!name.trim()) {
-      setError("Bitte gib einen Namen ein");
-      return;
+      setError('Bitte geben Sie einen Tag-Namen ein')
+      return
     }
 
     if (name.length > 50) {
-      setError("Name darf maximal 50 Zeichen lang sein");
-      return;
+      setError('Tag-Name darf maximal 50 Zeichen lang sein')
+      return
+    }
+
+    // Bug #001 Fix: Validate 'new' mode (edge case protection)
+    if (schemaId === 'new') {
+      setError('Bitte erstellen Sie das Schema oder brechen Sie die Erstellung ab')
+      return
     }
 
     try {
       await createTag.mutateAsync({
         name: name.trim(),
-        color: color || undefined,
-        is_video_type: true, // Always category
-      });
+        color: color || undefined, // Send undefined if empty
+        schema_id: schemaId,  // Task #82 Batch 3: Include schema_id
+        is_video_type: isVideoType,  // Category/Label support
+      })
 
       // Success - reset form and close dialog
-      setName("");
-      setColor("#3B82F6");
-      setError(null);
-      onOpenChange(false);
+      setName('')
+      setColor('#3B82F6')
+      setIsVideoType(defaultIsVideoType)
+      setSchemaId(null)
+      setError(null)
+      onClose?.()
+      onOpenChange?.(false)
     } catch (err: any) {
       // Handle errors
       if (err.response?.status === 409) {
-        setError("Eine Kategorie mit diesem Namen existiert bereits");
+        setError('Ein Tag mit diesem Namen existiert bereits')
       } else {
-        setError("Fehler beim Erstellen. Bitte versuche es erneut.");
+        setError('Fehler beim Erstellen des Tags. Bitte versuchen Sie es erneut.')
       }
     }
-  };
+  }
 
   const handleCancel = () => {
-    setName("");
-    setColor("#3B82F6");
-    setError(null);
-    onOpenChange(false);
-  };
+    setName('')
+    setColor('#3B82F6')
+    setIsVideoType(defaultIsVideoType)
+    setSchemaId(null)
+    setError(null)
+    onClose?.()
+    onOpenChange?.(false)
+  }
 
   return (
-    <AlertDialog onOpenChange={onOpenChange} open={open}>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Neue Kategorie erstellen</AlertDialogTitle>
-          <AlertDialogDescription>
-            Kategorien helfen dir Videos zu organisieren. Jedes Video kann nur
-            eine Kategorie haben.
-          </AlertDialogDescription>
+          <AlertDialogTitle>Neuen Tag erstellen</AlertDialogTitle>
         </AlertDialogHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
-            {/* Name Input */}
+            {/* Tag Name Input */}
             <div>
               <label
-                className="mb-1 block font-medium text-gray-700 text-sm"
                 htmlFor="tag-name"
+                className="block text-sm font-medium text-gray-700 mb-1"
               >
                 Name *
               </label>
               <input
-                autoFocus
-                className={`w-full border px-3 py-2 ${
-                  error ? "border-red-500" : "border-gray-300"
-                } rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
                 id="tag-name"
-                maxLength={50}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="z.B. Tutorial, Review, Vlog"
                 type="text"
                 value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="z.B. Python, Tutorial, Wichtig"
+                className={`w-full px-3 py-2 border ${
+                  error ? 'border-red-500' : 'border-gray-300'
+                } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                autoFocus
+                maxLength={50}
               />
-              {error && <p className="mt-1 text-red-600 text-sm">{error}</p>}
+              {error && (
+                <p className="mt-1 text-sm text-red-600">{error}</p>
+              )}
+            </div>
+
+            {/* Type Selector */}
+            <div>
+              <Label className="block text-sm font-medium text-gray-700 mb-1">Typ</Label>
+              <RadioGroup
+                value={isVideoType ? 'category' : 'label'}
+                onValueChange={(value) => setIsVideoType(value === 'category')}
+                className="flex gap-4 mt-2"
+                disabled={createTag.isPending}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="category" id="create-type-category" />
+                  <Label htmlFor="create-type-category" className="flex items-center gap-1 cursor-pointer">
+                    <FolderOpen className="h-4 w-4" />
+                    Kategorie
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="label" id="create-type-label" />
+                  <Label htmlFor="create-type-label" className="flex items-center gap-1 cursor-pointer">
+                    <TagIcon className="h-4 w-4" />
+                    Label
+                  </Label>
+                </div>
+              </RadioGroup>
+              <p className="mt-1 text-sm text-gray-500">
+                Kategorien sind exklusiv (ein Video kann nur eine haben), Labels nicht.
+              </p>
             </div>
 
             {/* Color Picker */}
             <div>
               <label
-                className="mb-1 block font-medium text-gray-700 text-sm"
                 htmlFor="tag-color"
+                className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Farbe
+                Farbe (optional)
               </label>
               <div className="flex items-center gap-3">
                 <input
-                  className="h-10 w-20 cursor-pointer rounded border border-gray-300"
                   id="tag-color"
-                  onChange={(e) => setColor(e.target.value)}
                   type="color"
                   value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="h-10 w-20 rounded cursor-pointer border border-gray-300"
                 />
-                <span className="text-gray-600 text-sm">{color}</span>
+                <span className="text-sm text-gray-600">{color}</span>
               </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Wählen Sie eine Farbe zur visuellen Unterscheidung
+              </p>
             </div>
 
-            {/* Hint about fields */}
-            <p className="rounded-lg bg-muted/50 p-3 text-muted-foreground text-sm">
-              Nach dem Erstellen kannst du über "Bearbeiten" eigene Felder
-              hinzufügen (z.B. Bewertung, Notizen, Kalorien).
-            </p>
+            {/* Task #82 Batch 3: Schema Selector */}
+            <div>
+              <label
+                htmlFor="tag-schema"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Schema (optional)
+              </label>
+              <SchemaSelector
+                value={schemaId}
+                schemas={schemas}
+                onChange={setSchemaId}
+                disabled={isSchemasLoading}
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Verknüpfen Sie benutzerdefinierte Felder mit diesem Tag
+              </p>
+
+              {/* Bug #001 Fix: Show SchemaEditor when schemaId === 'new' */}
+              {schemaId === 'new' && listId && (
+                <div className="mt-4 p-4 border rounded-lg bg-gray-50">
+                  <SchemaEditor
+                    listId={listId}
+                    onSave={handleSchemaCreated}
+                    onCancel={handleSchemaCancelled}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <AlertDialogFooter>
@@ -155,15 +265,15 @@ export const CreateTagDialog = ({
               Abbrechen
             </AlertDialogCancel>
             <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              disabled={createTag.isPending}
               type="submit"
+              disabled={createTag.isPending}
+              className="bg-blue-600 hover:bg-blue-700"
             >
-              {createTag.isPending ? "Wird erstellt..." : "Erstellen"}
+              {createTag.isPending ? 'Wird erstellt...' : 'Erstellen'}
             </Button>
           </AlertDialogFooter>
         </form>
       </AlertDialogContent>
     </AlertDialog>
-  );
-};
+  )
+}
