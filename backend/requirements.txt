@@ -24,3 +24,4 @@ numpy==1.26.4  # For embedding operations
 yt-dlp>=2024.07.01  # Video/audio downloading for enrichment (CVE fixes)
 groq>=0.4.0  # Whisper transcription API
 pydub>=0.25.0  # Audio processing for chunking
+feedparser>=6.0.0  # Parse Atom/RSS feeds from PubSubHubbub

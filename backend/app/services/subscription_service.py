@@ -2,8 +2,10 @@
 Subscription service for managing automatic video imports.
 
 Provides CRUD operations and sync functionality for subscriptions.
+Integrates with PubSubHubbub for real-time YouTube channel notifications.
 """
 
+import logging
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -17,6 +19,9 @@ from app.schemas.subscription import (
     SubscriptionFilters,
     SubscriptionUpdate,
 )
+from app.services.pubsub_service import PubSubHubbubService
+
+logger = logging.getLogger(__name__)
 
 
 class SubscriptionService:
@@ -123,6 +128,12 @@ class SubscriptionService:
             next_poll_at=next_poll,
         )
         self.db.add(subscription)
+        await self.db.flush()  # Get subscription.id before PubSub
+
+        # Subscribe to PubSubHubbub for channel subscriptions
+        if data.channel_ids:
+            await self._subscribe_channels(subscription, data.channel_ids)
+
         await self.db.commit()
         await self.db.refresh(subscription)
         return subscription
@@ -169,6 +180,14 @@ class SubscriptionService:
                 update_data["poll_interval"]
             )
 
+        # Handle channel_ids changes - update PubSub subscriptions
+        if "channel_ids" in update_data:
+            await self._update_channel_subscriptions(
+                subscription,
+                old_channels=subscription.channel_ids or [],
+                new_channels=update_data["channel_ids"] or [],
+            )
+
         for field, value in update_data.items():
             setattr(subscription, field, value)
 
@@ -180,6 +199,8 @@ class SubscriptionService:
         """
         Delete a subscription.
 
+        Also unsubscribes from PubSubHubbub for any channel subscriptions.
+
         Args:
             subscription_id: ID of subscription to delete
 
@@ -189,6 +210,10 @@ class SubscriptionService:
         subscription = await self.get_subscription(subscription_id)
         if not subscription:
             return False
+
+        # Unsubscribe from PubSubHubbub for channel subscriptions
+        if subscription.channel_ids:
+            await self._unsubscribe_channels(subscription.channel_ids)
 
         await self.db.delete(subscription)
         await self.db.commit()
@@ -274,3 +299,82 @@ class SubscriptionService:
             return now + timedelta(hours=12)
         else:  # daily
             return now + timedelta(hours=24)
+
+    async def _subscribe_channels(
+        self, subscription: Subscription, channel_ids: list[str]
+    ) -> None:
+        """
+        Subscribe to PubSubHubbub for a list of channels.
+
+        Updates the subscription's pubsub_expires_at on success.
+
+        Args:
+            subscription: The subscription to update
+            channel_ids: List of YouTube channel IDs to subscribe to
+        """
+        if not channel_ids:
+            return
+
+        async with PubSubHubbubService() as pubsub:
+            results = await pubsub.subscribe_channels(channel_ids)
+
+            success_count = sum(1 for success in results.values() if success)
+            if success_count > 0:
+                # Set expiry to 10 days from now
+                subscription.pubsub_expires_at = datetime.utcnow() + timedelta(days=10)
+                logger.info(
+                    f"Subscribed to {success_count}/{len(channel_ids)} channels "
+                    f"for subscription {subscription.id}"
+                )
+            else:
+                logger.warning(
+                    f"Failed to subscribe to any channels for subscription {subscription.id}"
+                )
+
+    async def _unsubscribe_channels(self, channel_ids: list[str]) -> None:
+        """
+        Unsubscribe from PubSubHubbub for a list of channels.
+
+        Args:
+            channel_ids: List of YouTube channel IDs to unsubscribe from
+        """
+        if not channel_ids:
+            return
+
+        async with PubSubHubbubService() as pubsub:
+            results = await pubsub.unsubscribe_channels(channel_ids)
+
+            success_count = sum(1 for success in results.values() if success)
+            logger.info(
+                f"Unsubscribed from {success_count}/{len(channel_ids)} channels"
+            )
+
+    async def _update_channel_subscriptions(
+        self,
+        subscription: Subscription,
+        old_channels: list[str],
+        new_channels: list[str],
+    ) -> None:
+        """
+        Update PubSubHubbub subscriptions when channel list changes.
+
+        Subscribes to newly added channels and unsubscribes from removed ones.
+
+        Args:
+            subscription: The subscription being updated
+            old_channels: Previous list of channel IDs
+            new_channels: New list of channel IDs
+        """
+        old_set = set(old_channels)
+        new_set = set(new_channels)
+
+        # Channels to add (in new but not in old)
+        to_add = list(new_set - old_set)
+        # Channels to remove (in old but not in new)
+        to_remove = list(old_set - new_set)
+
+        if to_add:
+            await self._subscribe_channels(subscription, to_add)
+
+        if to_remove:
+            await self._unsubscribe_channels(to_remove)

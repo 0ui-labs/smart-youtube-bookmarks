@@ -15,6 +15,7 @@ from app.models.video import Video
 from app.models.video_enrichment import EnrichmentStatus, VideoEnrichment
 from app.workers.db_manager import db_session_context, sessionmanager
 from app.workers.enrichment_worker import enrich_video
+from app.workers.subscription_worker import process_pubsub_notification, renew_pubsub_leases
 from app.workers.video_processor import process_video, process_video_list
 
 logger = logging.getLogger(__name__)
@@ -389,11 +390,14 @@ class WorkerSettings:
         enrich_video,
         recover_failed_enrichments,
         recover_stuck_videos,
+        process_pubsub_notification,
+        renew_pubsub_leases,
     ]
 
     # Cron jobs - periodic tasks
     # Retry failed enrichments every 5 minutes
     # Recover stuck videos every 5 minutes (offset by 2 min to avoid collision)
+    # Renew PubSubHubbub leases every 12 hours (00:00 and 12:00)
     cron_jobs = [
         cron(
             recover_failed_enrichments,
@@ -401,6 +405,9 @@ class WorkerSettings:
         ),
         cron(
             recover_stuck_videos, minute={2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57}
+        ),
+        cron(
+            renew_pubsub_leases, hour={0, 12}, minute=0
         ),
     ]
 

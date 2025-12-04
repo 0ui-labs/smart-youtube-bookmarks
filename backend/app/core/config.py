@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     groq_api_key: str = ""
 
+    # PubSubHubbub (YouTube channel notifications)
+    pubsub_callback_url: str = "http://localhost:8000"
+
     # Enrichment settings
     enrichment_enabled: bool = True
     enrichment_auto_trigger: bool = True  # Auto-enrich on video import

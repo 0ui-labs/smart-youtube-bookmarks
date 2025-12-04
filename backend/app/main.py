@@ -23,6 +23,7 @@ from app.api import (
     subscriptions,
     tags,
     videos,
+    webhooks,
     websocket,
 )
 from app.core.redis import close_arq_pool, close_redis_client, get_arq_pool
@@ -103,6 +104,7 @@ app.include_router(channels.router)
 app.include_router(enrichment.router)
 app.include_router(search.router)
 app.include_router(subscriptions.router)
+app.include_router(webhooks.router)
 
 
 @app.get("/api/health")
