@@ -25,3 +25,4 @@ yt-dlp>=2024.07.01  # Video/audio downloading for enrichment (CVE fixes)
 groq>=0.4.0  # Whisper transcription API
 pydub>=0.25.0  # Audio processing for chunking
 feedparser>=6.0.0  # Parse Atom/RSS feeds from PubSubHubbub
+aiolimiter>=1.1.0

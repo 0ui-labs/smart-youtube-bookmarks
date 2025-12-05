@@ -22,8 +22,10 @@ from app.core.redis import get_redis_client
 from app.models import Video
 from app.models.subscription import Subscription, SubscriptionMatch
 from app.services.channel_service import get_or_create_channel
+from app.services.comments_service import CommentsService
 from app.services.pubsub_service import PubSubHubbubService
 from app.services.quota_service import QuotaService
+from app.services.video_pre_filter_service import VideoPreFilterService
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +147,33 @@ async def _process_subscription_match(
             f"Video {video_id} did not pass filters for subscription {subscription.id}"
         )
         return False
+
+    # Apply AI filter if enabled
+    ai_filter_settings = (subscription.filters or {}).get("ai_filter", {})
+    if ai_filter_settings.get("enabled", True):
+        # Create VideoSearchResult for AI analysis
+        video_result = VideoSearchResult(
+            youtube_id=video_id,
+            title=video_data.get("title", ""),
+            description=video_data.get("description", ""),
+            channel_id=video_data.get("channel_id", ""),
+            channel_name=video_data.get("channel", "Unknown"),
+            thumbnail_url=video_data.get("thumbnail_url", ""),
+            published_at=datetime.fromisoformat(
+                video_data.get("published_at", "2024-01-01T00:00:00Z").replace(
+                    "Z", "+00:00"
+                )
+            ),
+        )
+
+        pre_filter = VideoPreFilterService()
+        filtered = await pre_filter.filter_videos([video_result], subscription)
+
+        if not filtered:
+            logger.info(
+                f"Video {video_id} filtered out by AI for subscription {subscription.id}"
+            )
+            return False
 
     # Get or create channel
     channel = await get_or_create_channel(
@@ -473,6 +502,49 @@ async def poll_subscription(
         # Apply channel filter if both keywords AND channels specified
         if sub.channel_ids:
             filtered = [v for v in filtered if v.channel_id in sub.channel_ids]
+
+        # Apply AI filter if enabled
+        ai_filter_settings = (sub.filters or {}).get("ai_filter", {})
+        if ai_filter_settings.get("enabled", True) and filtered:
+            pre_filter = VideoPreFilterService()
+            filtered = await pre_filter.filter_videos(filtered, sub)
+
+            logger.info(
+                f"AI filter applied: {len(filtered)} videos passed "
+                f"for subscription {sub.id}"
+            )
+
+            # Optional: Detail analysis with transcript for remaining videos
+            if ai_filter_settings.get("use_transcript", False) and filtered:
+                comments_service = CommentsService(quota_service=quota)
+                final_filtered = []
+
+                for video in filtered:
+                    # Get transcript (already cached in YouTubeClient)
+                    transcript = await youtube.get_video_transcript(video.youtube_id)
+
+                    # Get comments if enabled
+                    comments = None
+                    if ai_filter_settings.get("use_comments", False):
+                        comments = await comments_service.get_top_comments(
+                            video.youtube_id, limit=10
+                        )
+
+                    # Perform detail analysis
+                    result = await pre_filter.analyze_with_transcript(
+                        video, sub, transcript, comments
+                    )
+
+                    if result.recommendation == "IMPORT":
+                        final_filtered.append(video)
+                    else:
+                        logger.debug(
+                            f"Video {video.youtube_id} skipped by detail analysis: "
+                            f"{result.reasoning}"
+                        )
+
+                filtered = final_filtered
+                logger.info(f"Detail analysis complete: {len(filtered)} videos passed")
 
         # Create videos for filtered results
         created = 0

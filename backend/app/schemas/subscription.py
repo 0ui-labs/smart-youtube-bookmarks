@@ -36,6 +36,28 @@ class CustomFieldFilter(BaseModel):
     value: str | int | float | bool
 
 
+class AIFilterSettings(BaseModel):
+    """
+    Settings for AI-based video pre-filtering.
+
+    When enabled, uses Gemini AI to analyze video metadata and filter
+    out irrelevant or low-quality content based on subscription criteria.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable AI-based relevance filtering",
+    )
+    use_transcript: bool = Field(
+        default=False,
+        description="Include video transcript in analysis (more accurate but slower)",
+    )
+    use_comments: bool = Field(
+        default=False,
+        description="Include top comments in analysis (helps detect clickbait)",
+    )
+
+
 class SubscriptionFilters(BaseModel):
     """
     Combined filters for subscription matching.
@@ -53,6 +75,10 @@ class SubscriptionFilters(BaseModel):
     )
     custom_fields: list[CustomFieldFilter] = Field(
         default_factory=list, description="Custom field value filters"
+    )
+    ai_filter: AIFilterSettings = Field(
+        default_factory=AIFilterSettings,
+        description="AI-based video pre-filtering settings",
     )
 
 
