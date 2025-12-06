@@ -1,5 +1,5 @@
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { AvailableFieldResponse, VideoFieldValue } from "@/types/video";
 
 /**
@@ -51,6 +51,7 @@ export const CustomFieldsModal = ({
       className="max-h-[80vh] max-w-2xl overflow-y-auto"
       hideDescription
     >
+      <DialogTitle className="sr-only">Video Informationen</DialogTitle>
       <div className="mt-2">
         <CustomFieldsSection
           availableFields={availableFields}

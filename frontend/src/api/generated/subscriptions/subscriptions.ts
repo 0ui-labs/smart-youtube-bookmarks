@@ -48,6 +48,7 @@ import type {
   GetSubscriptionMatchesApiSubscriptionsSubscriptionIdMatchesGetParams,
   HTTPValidationError,
   ListSubscriptionsApiSubscriptionsGetParams,
+  QuotaStatusResponse,
   SubscriptionCreate,
   SubscriptionMatchResponse,
   SubscriptionResponse,
@@ -230,6 +231,106 @@ export const useCreateSubscriptionApiSubscriptionsPost = <TError = HTTPValidatio
       return useMutation(mutationOptions, queryClient);
     }
     /**
+ * Get current YouTube API quota status.
+
+Returns the daily usage, remaining quota, and percentage used.
+YouTube API has a default daily limit of 10,000 units.
+
+Common API costs:
+- Search API: 100 units per request
+- Videos list: 1 unit per request
+ * @summary Get Quota Status
+ */
+export const getQuotaStatusApiSubscriptionsQuotaGet = (
+    
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<QuotaStatusResponse>(
+      {url: `/api/subscriptions/quota`, method: 'GET', signal
+    },
+      );
+    }
+  
+
+
+
+export const getGetQuotaStatusApiSubscriptionsQuotaGetQueryKey = () => {
+    return [
+    `/api/subscriptions/quota`
+    ] as const;
+    }
+
+    
+export const getGetQuotaStatusApiSubscriptionsQuotaGetQueryOptions = <TData = Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetQuotaStatusApiSubscriptionsQuotaGetQueryKey();
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>> = ({ signal }) => getQuotaStatusApiSubscriptionsQuotaGet(signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetQuotaStatusApiSubscriptionsQuotaGetQueryResult = NonNullable<Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>>
+export type GetQuotaStatusApiSubscriptionsQuotaGetQueryError = unknown
+
+
+export function useGetQuotaStatusApiSubscriptionsQuotaGet<TData = Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>,
+          TError,
+          Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetQuotaStatusApiSubscriptionsQuotaGet<TData = Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>,
+          TError,
+          Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetQuotaStatusApiSubscriptionsQuotaGet<TData = Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+/**
+ * @summary Get Quota Status
+ */
+
+export function useGetQuotaStatusApiSubscriptionsQuotaGet<TData = Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQuotaStatusApiSubscriptionsQuotaGet>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+
+  const queryOptions = getGetQuotaStatusApiSubscriptionsQuotaGetQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
  * Get a single subscription by ID.
  * @summary Get Subscription
  */

@@ -27,6 +27,7 @@ import type { SubscriptionFiltersViews } from './subscriptionFiltersViews';
 import type { SubscriptionFiltersYoutubeCategory } from './subscriptionFiltersYoutubeCategory';
 import type { SubscriptionFiltersPublishedAfter } from './subscriptionFiltersPublishedAfter';
 import type { CustomFieldFilter } from './customFieldFilter';
+import type { AIFilterSettings } from './aIFilterSettings';
 
 /**
  * Combined filters for subscription matching.
@@ -42,4 +43,6 @@ export interface SubscriptionFilters {
   published_after?: SubscriptionFiltersPublishedAfter;
   /** Custom field value filters */
   custom_fields?: CustomFieldFilter[];
+  /** AI-based video pre-filtering settings */
+  ai_filter?: AIFilterSettings;
 }

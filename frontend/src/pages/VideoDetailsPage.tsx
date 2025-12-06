@@ -1,14 +1,22 @@
-import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import { VideoResponseSchema } from '@/types/video'
-import { formatDuration } from '@/utils/formatDuration'
-import { CustomFieldsSection } from '@/components/CustomFieldsSection'
-import { CategorySelector, LabelBadge } from '@/components/CategorySelector'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft, AlertCircle, X, Tag as TagIcon } from 'lucide-react'
-import type { Tag } from '@/types/tag'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertCircle, ArrowLeft, Info, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ChannelInfo } from "@/components/ChannelInfo";
+import { CustomFieldsModal } from "@/components/CustomFieldsModal";
+import { EnrichmentStatus } from "@/components/EnrichmentStatus";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { VideoPlayer } from "@/components/VideoPlayer";
+import {
+  useRetryEnrichment,
+  useVideoEnrichment,
+} from "@/hooks/useVideoEnrichment";
+import { useSetVideoCategory } from "@/hooks/useVideos";
+import { api } from "@/lib/api";
+import { getLanguageLabel } from "@/lib/enrichmentUtils";
+import type { TextTrack } from "@/types/player";
+import { VideoResponseSchema } from "@/types/video";
 
 /**
  * VideoDetailsPage Component
@@ -37,10 +45,11 @@ import type { Tag } from '@/types/tag'
  * - Task #72: Batch update endpoint
  */
 export const VideoDetailsPage = () => {
-  const { videoId } = useParams<{ videoId: string }>()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const [updateError, setUpdateError] = useState<string | null>(null)
+  const { videoId } = useParams<{ videoId: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [isFieldsModalOpen, setIsFieldsModalOpen] = useState(false);
 
   // Fetch video with available_fields (Task #74)
   const {
@@ -48,83 +57,195 @@ export const VideoDetailsPage = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['videos', videoId],
+    queryKey: ["videos", videoId],
     queryFn: async () => {
-      const { data } = await api.get(`/videos/${videoId}`)
-      return VideoResponseSchema.parse(data)
+      const { data } = await api.get(`/videos/${videoId}`);
+      return VideoResponseSchema.parse(data);
     },
     enabled: !!videoId,
-  })
+  });
+
+  // Enrichment data (captions, chapters)
+  const { data: enrichment, isLoading: isEnrichmentLoading } =
+    useVideoEnrichment(videoId, { enabled: !!videoId });
+
+  const retryEnrichment = useRetryEnrichment();
+
+  // Generate text tracks from enrichment data with proper cleanup
+  const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
+  const blobUrlsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    // Cleanup previous blob URLs
+    blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    blobUrlsRef.current = [];
+
+    const tracks: TextTrack[] = [];
+
+    if (enrichment?.captions_vtt) {
+      // Create a blob URL from VTT content
+      const blob = new Blob([enrichment.captions_vtt], { type: "text/vtt" });
+      const src = URL.createObjectURL(blob);
+      blobUrlsRef.current.push(src);
+
+      tracks.push({
+        src,
+        label: getLanguageLabel(
+          enrichment.captions_language,
+          enrichment.captions_source
+        ),
+        language: enrichment.captions_language || "en",
+        kind: "captions",
+        type: "vtt",
+        default: true,
+      });
+    }
+
+    if (enrichment?.chapters_vtt) {
+      const blob = new Blob([enrichment.chapters_vtt], { type: "text/vtt" });
+      const src = URL.createObjectURL(blob);
+      blobUrlsRef.current.push(src);
+
+      tracks.push({
+        src,
+        label: "Chapters",
+        language: "en",
+        kind: "chapters",
+        type: "vtt",
+        default: true,
+      });
+    }
+
+    setTextTracks(tracks);
+
+    // Cleanup on unmount
+    return () => {
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      blobUrlsRef.current = [];
+    };
+  }, [
+    enrichment?.captions_vtt,
+    enrichment?.captions_language,
+    enrichment?.captions_source,
+    enrichment?.chapters_vtt,
+  ]);
 
   // Mutation for updating field values (Task #72)
   // Simplified without optimistic updates to avoid discriminated union type issues
   const updateField = useMutation({
-    mutationFn: async ({ fieldId, value }: { fieldId: string; value: string | number | boolean }) => {
+    mutationFn: async ({
+      fieldId,
+      value,
+    }: {
+      fieldId: string;
+      value: string | number | boolean;
+    }) => {
       const { data } = await api.put(`/videos/${videoId}/fields`, {
-        field_values: [{ field_id: fieldId, value }],  // FIX: Backend expects "field_values" not "updates"
-      })
-      return data
+        field_values: [{ field_id: fieldId, value }], // FIX: Backend expects "field_values" not "updates"
+      });
+      return data;
     },
     onSuccess: () => {
-      setUpdateError(null)
+      setUpdateError(null);
       // Invalidate to refetch latest data
-      queryClient.invalidateQueries({ queryKey: ['videos', videoId] })
+      queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
     },
     onError: (error: any) => {
-      console.error('Failed to update field value:', error)
-      const message = error.response?.data?.detail || 'Fehler beim Speichern. Bitte versuchen Sie es erneut.'
-      setUpdateError(message)
+      console.error("Failed to update field value:", error);
+      const message =
+        error.response?.data?.detail ||
+        "Fehler beim Speichern. Bitte versuchen Sie es erneut.";
+      setUpdateError(message);
     },
-  })
+  });
 
   // Handle field value changes
-  const handleFieldChange = (fieldId: string, value: string | number | boolean) => {
-    updateField.mutate({ fieldId, value })
-  }
+  const handleFieldChange = (
+    fieldId: string,
+    value: string | number | boolean
+  ) => {
+    updateField.mutate({ fieldId, value });
+  };
 
-  // Handle channel link click with stopPropagation
-  const handleChannelClick = (e: React.MouseEvent, channelName: string) => {
-    e.stopPropagation()
+  // Category change mutation (Step 5.8)
+  const setVideoCategory = useSetVideoCategory();
+
+  // Handle category change
+  const handleCategoryChange = (
+    categoryId: string | null,
+    restoreBackup?: boolean
+  ) => {
+    if (!videoId) return;
+
+    // TODO: Pass restoreBackup to API when endpoint supports it
+    setVideoCategory.mutate(
+      { videoId, categoryId, restoreBackup },
+      {
+        onSuccess: () => {
+          setUpdateError(null);
+        },
+        onError: (error: any) => {
+          const message =
+            error.response?.data?.detail ||
+            error.message ||
+            "Kategorie konnte nicht geändert werden";
+          setUpdateError(message);
+        },
+      }
+    );
+  };
+
+  // Handle channel link click
+  const handleChannelClick = (channelName: string) => {
     // TODO: Navigate to channel filter or search
-    console.log('Channel clicked:', channelName)
-  }
+    console.log("Channel clicked:", channelName);
+  };
+
+  // Get current category (is_video_type=true) and labels (is_video_type=false)
+  const currentCategory =
+    video?.tags?.find((t: any) => t.is_video_type) ?? null;
+  const labels = video?.tags?.filter((t: any) => !t.is_video_type) ?? [];
 
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex h-screen items-center justify-center">
         <p className="text-gray-600">Lädt Video...</p>
       </div>
-    )
+    );
   }
 
   // Error state
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen gap-4">
+      <div className="flex h-screen flex-col items-center justify-center gap-4">
         <p className="text-red-600">Fehler beim Laden des Videos.</p>
-        <Button onClick={() => navigate('/videos')}>Zurück zur Übersicht</Button>
+        <Button onClick={() => navigate("/videos")}>
+          Zurück zur Übersicht
+        </Button>
       </div>
-    )
+    );
   }
 
   // Not found state
   if (!video) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen gap-4">
+      <div className="flex h-screen flex-col items-center justify-center gap-4">
         <p className="text-gray-600">Video nicht gefunden.</p>
-        <Button onClick={() => navigate('/videos')}>Zurück zur Übersicht</Button>
+        <Button onClick={() => navigate("/videos")}>
+          Zurück zur Übersicht
+        </Button>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
+    <div className="container mx-auto max-w-[1840px] px-4 py-8">
       {/* Back button */}
       <Button
-        variant="ghost"
-        onClick={() => navigate('/videos')}
         className="mb-6"
+        onClick={() => navigate("/videos")}
+        variant="ghost"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
         Zurück zur Übersicht
@@ -132,14 +253,14 @@ export const VideoDetailsPage = () => {
 
       {/* Error Alert */}
       {updateError && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
           <div className="flex-1">
-            <p className="text-sm text-red-800">{updateError}</p>
+            <p className="text-red-800 text-sm">{updateError}</p>
           </div>
           <button
-            onClick={() => setUpdateError(null)}
             className="text-red-600 hover:text-red-800"
+            onClick={() => setUpdateError(null)}
           >
             <X className="h-4 w-4" />
           </button>
@@ -148,81 +269,79 @@ export const VideoDetailsPage = () => {
 
       {/* Video header */}
       <div className="mb-8">
-        {/* Large thumbnail (16:9) */}
-        {video.thumbnail_url && (
-          <div className="relative w-full aspect-video mb-4 rounded-lg overflow-hidden bg-gray-100">
-            <img
-              src={video.thumbnail_url}
-              alt={video.title || 'Video thumbnail'}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-            {video.duration && (
-              <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
-                {formatDuration(video.duration)}
-              </div>
-            )}
-          </div>
-        )}
+        {/* Video Player (replaces thumbnail) */}
+        <div className="mb-4">
+          <VideoPlayer
+            initialPosition={video.watch_position}
+            key={video.youtube_id}
+            textTracks={textTracks}
+            thumbnailsVtt={enrichment?.thumbnails_vtt_url}
+            thumbnailUrl={video.thumbnail_url}
+            videoId={video.id}
+            youtubeId={video.youtube_id}
+          />
+        </div>
 
         {/* Title */}
-        <h1 className="text-3xl font-bold mb-2">{video.title || 'Untitled Video'}</h1>
+        <h1 className="mb-4 font-bold text-3xl">
+          {video.title || "Untitled Video"}
+        </h1>
 
-        {/* Channel (clickable with stopPropagation) */}
-        {video.channel && (
-          <button
-            onClick={(e) => handleChannelClick(e, video.channel!)}
-            className="text-lg text-gray-600 hover:text-gray-900 mb-4 inline-block"
-          >
-            {video.channel}
-          </button>
+        {/* Channel Info with Category (YouTube-style) */}
+        <ChannelInfo
+          channelAvatarUrl={video.channel_thumbnail_url}
+          channelName={video.channel}
+          currentCategory={currentCategory}
+          isCategoryMutating={setVideoCategory.isPending}
+          onCategoryChange={handleCategoryChange}
+          onChannelClick={() => handleChannelClick(video.channel!)}
+        />
+
+        {/* Labels (only is_video_type=false tags) - Step 5.9 */}
+        {labels.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {labels.map((tag: any) => (
+              <Badge key={tag.id} variant="secondary">
+                {tag.name}
+              </Badge>
+            ))}
+          </div>
         )}
-
-        {/* Category & Labels Section */}
-        <div className="mt-4 space-y-3">
-          {/* Category Selector */}
-          {(() => {
-            const category = video.tags.find((tag: Tag) => tag.is_video_type)
-            const labels = video.tags.filter((tag: Tag) => !tag.is_video_type)
-
-            return (
-              <>
-                {/* Category - Always show selector for changing */}
-                <div className="flex items-center gap-2">
-                  <CategorySelector
-                    videoId={video.id}
-                    currentCategoryId={category?.id || null}
-                    fieldValues={video.field_values || []}
-                  />
-                </div>
-
-                {/* Labels - Display as badges */}
-                {labels.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <TagIcon className="h-4 w-4 text-muted-foreground" />
-                    {labels.map((label: Tag) => (
-                      <LabelBadge
-                        key={label.id}
-                        name={label.name}
-                        color={label.color}
-                      />
-                    ))}
-                  </div>
-                )}
-              </>
-            )
-          })()}
-        </div>
       </div>
 
-      {/* Custom Fields Section - Grouped by Schema (Task #131 Step 2: Extracted to CustomFieldsSection) */}
-      <CustomFieldsSection
+      {/* Enrichment Status */}
+      <div className="mb-6 flex items-center gap-4">
+        <EnrichmentStatus
+          enrichment={enrichment}
+          isLoading={isEnrichmentLoading}
+          isRetrying={retryEnrichment.isPending}
+          onRetry={() => retryEnrichment.mutate(video.id)}
+        />
+
+        {/* Custom Fields Button */}
+        {(video.available_fields?.length ?? 0) > 0 && (
+          <Button
+            className="flex items-center gap-2"
+            onClick={() => setIsFieldsModalOpen(true)}
+            size="sm"
+            variant="outline"
+          >
+            <Info className="h-4 w-4" />
+            Mehr Informationen
+          </Button>
+        )}
+      </div>
+
+      {/* Custom Fields Modal */}
+      <CustomFieldsModal
         availableFields={video.available_fields || []}
         fieldValues={video.field_values || []}
-        videoId={video.id}
         listId={video.list_id}
         onFieldChange={handleFieldChange}
+        onOpenChange={setIsFieldsModalOpen}
+        open={isFieldsModalOpen}
+        videoId={video.id}
       />
     </div>
-  )
-}
+  );
+};

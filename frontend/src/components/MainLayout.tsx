@@ -4,6 +4,7 @@ import { Outlet, useNavigate, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { ChannelNavigation } from "@/components/ChannelNavigation";
 import { CollapsibleSidebar } from "@/components/CollapsibleSidebar";
+import { SubscriptionChatModal } from "@/components/subscriptions/SubscriptionChatModal";
 import { TagNavigation } from "@/components/TagNavigation";
 import { Button } from "@/components/ui/button";
 import { useChannels, useUpdateChannel } from "@/hooks/useChannels";
@@ -204,6 +205,9 @@ export function MainLayout() {
         onOpenChange={setIsCreateTagDialogOpen}
         open={isCreateTagDialogOpen}
       />
+
+      {/* Subscription Chat Modal */}
+      <SubscriptionChatModal />
     </div>
   );
 }

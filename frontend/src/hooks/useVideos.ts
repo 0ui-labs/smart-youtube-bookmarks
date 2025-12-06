@@ -721,6 +721,8 @@ export const useSetVideoCategory = () => {
     onSettled: (_data, _error, { videoId }) => {
       // Invalidate all video queries to refetch with updated category
       queryClient.invalidateQueries({ queryKey: videoKeys.all });
+      // Also invalidate the single video detail query (used by VideoDetailsModal)
+      queryClient.invalidateQueries({ queryKey: ["video-detail", videoId] });
       // Also invalidate field values as they may have changed
       queryClient.invalidateQueries({
         queryKey: videoKeys.videoFieldValues(videoId),

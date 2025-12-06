@@ -23,15 +23,10 @@ import {
 } from "@/components/ui/dialog";
 import type { Tag } from "@/types/tag";
 
-interface FieldValue {
+interface FieldValueInfo {
   id: string;
-  field_id: string;
+  fieldName: string;
   value: string | number | boolean | null;
-  field: {
-    id: string;
-    name: string;
-    field_type: string;
-  };
 }
 
 export interface CategoryChangeWarningProps {
@@ -39,11 +34,12 @@ export interface CategoryChangeWarningProps {
   onOpenChange: (open: boolean) => void;
   oldCategory: Tag | null;
   newCategory: Tag | null;
-  fieldValuesToBackup: FieldValue[];
-  fieldValuesThatPersist: FieldValue[];
+  fieldValuesToBackup: FieldValueInfo[];
+  fieldValuesThatPersist: FieldValueInfo[];
   hasBackup: boolean;
   onConfirm: (restoreBackup: boolean) => void;
   onCancel: () => void;
+  isLoading?: boolean;
 }
 
 /**
@@ -124,7 +120,7 @@ export function CategoryChangeWarning({
                 {fieldValuesToBackup.map((fv) => (
                   <div className="flex justify-between text-sm" key={fv.id}>
                     <span className="text-muted-foreground">
-                      {fv.field.name}
+                      {fv.fieldName}
                     </span>
                     <span>{formatFieldValue(fv.value)}</span>
                   </div>
@@ -139,13 +135,13 @@ export function CategoryChangeWarning({
               <p className="mb-2 font-medium text-sm">
                 Die folgenden Felder bleiben:
               </p>
-              <div className="space-y-1 rounded-lg border bg-green-50 p-3">
+              <div className="space-y-1 rounded-lg border bg-green-50 p-3 dark:bg-green-950/30">
                 {fieldValuesThatPersist.map((fv) => (
                   <div
-                    className="flex justify-between text-green-900 text-sm"
+                    className="flex justify-between text-green-900 text-sm dark:text-green-100"
                     key={fv.id}
                   >
-                    <span>{fv.field.name}</span>
+                    <span>{fv.fieldName}</span>
                     <span>{formatFieldValue(fv.value)}</span>
                   </div>
                 ))}

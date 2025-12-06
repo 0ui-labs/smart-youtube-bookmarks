@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import (
     analytics,
     channels,
+    chat,
     custom_fields,
     enrichment,
     lists,
@@ -104,6 +105,7 @@ app.include_router(channels.router)
 app.include_router(enrichment.router)
 app.include_router(search.router)
 app.include_router(subscriptions.router)
+app.include_router(chat.router)
 app.include_router(webhooks.router)
 
 

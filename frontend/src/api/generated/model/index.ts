@@ -23,6 +23,7 @@ Currently uses a hardcoded user_id for development. Production deployment requir
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './aIFilterSettings';
 export * from './analyticsResponse';
 export * from './appSchemasFieldSchemaSchemaFieldResponse';
 export * from './appSchemasSchemaFieldSchemaFieldResponse';
@@ -43,10 +44,18 @@ export * from './channelResponseThumbnailUrl';
 export * from './channelUpdate';
 export * from './channelUpdateIsHidden';
 export * from './chapterSchema';
+export * from './chatMessage';
+export * from './chatRequest';
+export * from './chatRequestCurrentConfig';
+export * from './chatResponseSchema';
+export * from './chatResponseSchemaSubscriptionPreview';
 export * from './checkDuplicateFieldApiListsListIdCustomFieldsCheckDuplicatePost200';
 export * from './checkDuplicateFieldApiListsListIdCustomFieldsCheckDuplicatePostMode';
 export * from './checkDuplicateFieldApiListsListIdCustomFieldsCheckDuplicatePostParams';
+export * from './createFromChatRequest';
+export * from './createFromChatRequestConfig';
 export * from './createSubscriptionApiSubscriptionsPostParams';
+export * from './createSubscriptionFromChatApiChatSubscriptionCreatePostParams';
 export * from './createTagApiTagsPostParams';
 export * from './customFieldCreate';
 export * from './customFieldCreateConfig';
@@ -134,6 +143,8 @@ export * from './listUpdateDefaultSchemaId';
 export * from './listUpdateDescription';
 export * from './listUpdateName';
 export * from './mostUsedFieldStat';
+export * from './quotaStatusResponse';
+export * from './receivePubsubNotificationApiWebhooksPubsubhubbubPost200';
 export * from './schemaEffectivenessStat';
 export * from './schemaFieldBatchUpdateRequest';
 export * from './schemaFieldBatchUpdateResponse';
@@ -207,6 +218,7 @@ export * from './updateWatchProgressRequest';
 export * from './updateWatchProgressResponse';
 export * from './validationError';
 export * from './validationErrorLocItem';
+export * from './verifyPubsubApiWebhooksPubsubhubbubGetParams';
 export * from './videoAdd';
 export * from './videoFieldValueResponse';
 export * from './videoFieldValueResponseSchemaName';
