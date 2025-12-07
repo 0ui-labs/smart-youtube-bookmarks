@@ -297,7 +297,11 @@ export const VideoResponseSchema = z.object({
   // IMPORTANT: Use nullable() NOT default() - old videos won't have these fields
   // and we need to distinguish "no value" (old video, already imported) from "created" stage
   import_progress: z.number().nullable().optional(),
-  import_stage: z.string().nullable().optional(),
+  // FIX: Use enum to constrain import_stage to valid values, catching invalid data at parse time
+  import_stage: z
+    .enum(["created", "metadata", "captions", "chapters", "complete", "error"])
+    .nullable()
+    .optional(),
 });
 
 /**

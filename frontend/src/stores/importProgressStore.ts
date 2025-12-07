@@ -241,10 +241,19 @@ export const useImportProgressStore = create<ImportProgressState>(
         // Store the real progress from backend
         const realProgress = progress;
 
+        // FIX: Clamp targetProgress so backend updates can't rewind the UI below
+        // the currently displayed synthetic progress. Exception: terminal states
+        // (complete/error) always set to their exact value.
+        const isTerminalStage = stage === "complete" || stage === "error";
+        const currentTarget = current?.targetProgress ?? 0;
+        const clampedProgress = isTerminalStage
+          ? progress
+          : Math.max(progress, currentTarget);
+
         set((s) => {
           const newProgress = new Map(s.progress);
           newProgress.set(videoId, {
-            targetProgress: progress,
+            targetProgress: clampedProgress,
             displayProgress,
             realProgress,
             stage,

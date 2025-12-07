@@ -405,10 +405,12 @@ async def process_video(
     except Exception as e:
         logger.error(f"Error processing video {video_id}: {e}")
         # Mark as failed (only if video was fetched)
+        # FIX: Use commit() instead of flush() to persist error state before re-raising.
+        # ARQ will rollback the session on exception, so flush() alone would be undone.
         if video:
             video.processing_status = "failed"
             video.error_message = str(e)
-            await db.flush()
+            await db.commit()
 
         raise
 
