@@ -13,6 +13,7 @@ import {
   Loader2,
   MoreHorizontal,
   Pause,
+  Pencil,
   Play,
   RefreshCw,
   Tag,
@@ -21,6 +22,7 @@ import {
 import { useState } from "react";
 
 import type { SubscriptionResponse } from "@/api/generated/model";
+import { EditSubscriptionModal } from "@/components/subscriptions/EditSubscriptionModal";
 import { NewSubscriptionButton } from "@/components/subscriptions/NewSubscriptionButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +48,8 @@ export function SubscriptionsTab() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editingSubscription, setEditingSubscription] =
+    useState<SubscriptionResponse | null>(null);
 
   const handleSync = async (id: string) => {
     setSyncingId(id);
@@ -115,6 +119,7 @@ export function SubscriptionsTab() {
               onDeleteCancel={() => setDeleteConfirmId(null)}
               onDeleteConfirm={() => handleDelete(sub.id)}
               onDeleteRequest={() => setDeleteConfirmId(sub.id)}
+              onEdit={() => setEditingSubscription(sub)}
               onSync={() => handleSync(sub.id)}
               onToggle={() => handleToggle(sub.id, sub.is_active)}
               onToggleExpand={() =>
@@ -126,6 +131,13 @@ export function SubscriptionsTab() {
           ))}
         </div>
       )}
+
+      {/* Edit Subscription Modal */}
+      <EditSubscriptionModal
+        onClose={() => setEditingSubscription(null)}
+        open={editingSubscription !== null}
+        subscription={editingSubscription}
+      />
     </div>
   );
 }
@@ -138,6 +150,7 @@ interface SubscriptionCardProps {
   onToggleExpand: () => void;
   onSync: () => void;
   onToggle: () => void;
+  onEdit: () => void;
   onDeleteRequest: () => void;
   onDeleteConfirm: () => void;
   onDeleteCancel: () => void;
@@ -151,6 +164,7 @@ function SubscriptionCard({
   onToggleExpand,
   onSync,
   onToggle,
+  onEdit,
   onDeleteRequest,
   onDeleteConfirm,
   onDeleteCancel,
@@ -176,10 +190,10 @@ function SubscriptionCard({
                 {is_active ? "Aktiv" : "Pausiert"}
               </Badge>
               {isChannelSub && (
-                <Badge variant="outline">{channel_ids!.length} Kanäle</Badge>
+                <Badge variant="outline">{channel_ids?.length} Kanäle</Badge>
               )}
               {isKeywordSub && (
-                <Badge variant="outline">{keywords!.length} Keywords</Badge>
+                <Badge variant="outline">{keywords?.length} Keywords</Badge>
               )}
             </div>
             <div className="mt-1 flex items-center gap-4 text-muted-foreground text-sm">
@@ -223,6 +237,10 @@ function SubscriptionCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Bearbeiten
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggle}>
                 {is_active ? (
                   <>
@@ -255,7 +273,7 @@ function SubscriptionCard({
             <div>
               <h4 className="mb-2 font-medium text-sm">Kanäle</h4>
               <div className="flex flex-wrap gap-2">
-                {channel_ids!.map((id) => (
+                {channel_ids?.map((id) => (
                   <Badge key={id} variant="secondary">
                     {id}
                   </Badge>
@@ -268,7 +286,7 @@ function SubscriptionCard({
             <div>
               <h4 className="mb-2 font-medium text-sm">Keywords</h4>
               <div className="flex flex-wrap gap-2">
-                {keywords!.map((kw) => (
+                {keywords?.map((kw) => (
                   <Badge key={kw} variant="secondary">
                     {kw}
                   </Badge>
