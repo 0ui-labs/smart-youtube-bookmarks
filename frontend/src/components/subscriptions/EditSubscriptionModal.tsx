@@ -63,6 +63,65 @@ const POLL_INTERVALS: {
   { value: "daily", label: "Täglich" },
 ];
 
+/**
+ * Parses a string input as a non-negative integer.
+ * Returns the parsed number if valid, or null if empty/invalid.
+ */
+function parseNonNegativeInt(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
+    return null;
+  }
+  return parsed;
+}
+
+/**
+ * Validates form inputs and returns error messages if any.
+ */
+function validateForm(form: FormState): string[] {
+  const errors: string[] = [];
+
+  // Validate duration_min
+  if (form.duration_min.trim() !== "") {
+    const min = parseNonNegativeInt(form.duration_min);
+    if (min === null) {
+      errors.push("Minimale Videodauer muss eine positive Zahl sein.");
+    }
+  }
+
+  // Validate duration_max
+  if (form.duration_max.trim() !== "") {
+    const max = parseNonNegativeInt(form.duration_max);
+    if (max === null) {
+      errors.push("Maximale Videodauer muss eine positive Zahl sein.");
+    }
+  }
+
+  // Validate min <= max when both are present
+  if (form.duration_min.trim() !== "" && form.duration_max.trim() !== "") {
+    const min = parseNonNegativeInt(form.duration_min);
+    const max = parseNonNegativeInt(form.duration_max);
+    if (min !== null && max !== null && min > max) {
+      errors.push(
+        "Minimale Videodauer darf nicht größer als maximale Dauer sein."
+      );
+    }
+  }
+
+  // Validate min_views
+  if (form.min_views.trim() !== "") {
+    const views = parseNonNegativeInt(form.min_views);
+    if (views === null) {
+      errors.push("Mindest-Aufrufe muss eine positive Zahl sein.");
+    }
+  }
+
+  return errors;
+}
+
 export function EditSubscriptionModal({
   subscription,
   open,
@@ -70,6 +129,7 @@ export function EditSubscriptionModal({
 }: EditSubscriptionModalProps) {
   const updateSubscription = useUpdateSubscription();
   const [newKeyword, setNewKeyword] = useState("");
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [form, setForm] = useState<FormState>({
     name: "",
     keywords: [],
@@ -82,25 +142,44 @@ export function EditSubscriptionModal({
   // Initialize form when subscription changes
   useEffect(() => {
     if (subscription) {
-      const filters = subscription.filters as {
-        duration?: { min_seconds?: number; max_seconds?: number };
-        views?: { min_views?: number };
-      } | null;
+      // Safely extract filters with runtime validation
+      const filters =
+        subscription.filters &&
+        typeof subscription.filters === "object" &&
+        !Array.isArray(subscription.filters)
+          ? (subscription.filters as {
+              duration?: { min_seconds?: unknown; max_seconds?: unknown };
+              views?: { min_views?: unknown };
+            })
+          : null;
+
+      // Helper to safely convert to minutes (returns empty string if invalid)
+      const toMinutesString = (seconds: unknown): string => {
+        const num = typeof seconds === "string" ? Number(seconds) : seconds;
+        if (typeof num === "number" && Number.isFinite(num) && num > 0) {
+          return String(Math.floor(num / 60));
+        }
+        return "";
+      };
+
+      // Helper to safely convert views to string (returns empty string if invalid)
+      const toViewsString = (views: unknown): string => {
+        const num = typeof views === "string" ? Number(views) : views;
+        if (typeof num === "number" && Number.isFinite(num) && num >= 0) {
+          return String(Math.floor(num));
+        }
+        return "";
+      };
 
       setForm({
         name: subscription.name || "",
         keywords: subscription.keywords || [],
         poll_interval: subscription.poll_interval || "daily",
-        duration_min: filters?.duration?.min_seconds
-          ? String(Math.floor(filters.duration.min_seconds / 60))
-          : "",
-        duration_max: filters?.duration?.max_seconds
-          ? String(Math.floor(filters.duration.max_seconds / 60))
-          : "",
-        min_views: filters?.views?.min_views
-          ? String(filters.views.min_views)
-          : "",
+        duration_min: toMinutesString(filters?.duration?.min_seconds),
+        duration_max: toMinutesString(filters?.duration?.max_seconds),
+        min_views: toViewsString(filters?.views?.min_views),
       });
+      setValidationErrors([]);
     }
   }, [subscription]);
 
@@ -134,26 +213,36 @@ export function EditSubscriptionModal({
 
     if (!subscription) return;
 
-    // Build filters object
+    // Validate form inputs
+    const errors = validateForm(form);
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    setValidationErrors([]);
+
+    // Build filters object using validated parsing
     const filters: {
       duration?: { min_seconds?: number; max_seconds?: number };
       views?: { min_views?: number };
     } = {};
 
-    if (form.duration_min || form.duration_max) {
+    const durationMin = parseNonNegativeInt(form.duration_min);
+    const durationMax = parseNonNegativeInt(form.duration_max);
+
+    if (durationMin !== null || durationMax !== null) {
       filters.duration = {};
-      if (form.duration_min) {
-        filters.duration.min_seconds =
-          Number.parseInt(form.duration_min, 10) * 60;
+      if (durationMin !== null) {
+        filters.duration.min_seconds = durationMin * 60;
       }
-      if (form.duration_max) {
-        filters.duration.max_seconds =
-          Number.parseInt(form.duration_max, 10) * 60;
+      if (durationMax !== null) {
+        filters.duration.max_seconds = durationMax * 60;
       }
     }
 
-    if (form.min_views) {
-      filters.views = { min_views: Number.parseInt(form.min_views, 10) };
+    const minViews = parseNonNegativeInt(form.min_views);
+    if (minViews !== null) {
+      filters.views = { min_views: minViews };
     }
 
     await updateSubscription.mutateAsync({
@@ -309,6 +398,17 @@ export function EditSubscriptionModal({
               value={form.min_views}
             />
           </div>
+
+          {/* Validation Errors */}
+          {validationErrors.length > 0 && (
+            <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
+              <ul className="list-inside list-disc space-y-1 text-destructive text-sm">
+                {validationErrors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <DialogFooter>
             <Button onClick={onClose} type="button" variant="ghost">

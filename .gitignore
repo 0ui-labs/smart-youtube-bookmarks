@@ -93,7 +93,7 @@ alembic/versions/*.py
 semgrep.json
 
 # Local documentation (planning, bugs, features)
-docs/
+documentation/docs/
 
 # Bracket
 .br/
