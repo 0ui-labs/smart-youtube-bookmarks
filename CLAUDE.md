@@ -1,298 +1,146 @@
-# Smart YouTube Bookmarks - Claude Development Guide
+# CLAUDE.md
 
-> **MANDATORY:** Read `.claude/DEVELOPMENT_WORKFLOW.md` FIRST in every new thread!
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Workflow Documentation:** [`.claude/DEVELOPMENT_WORKFLOW.md`](.claude/DEVELOPMENT_WORKFLOW.md)
+## Project Overview
 
----
+Smart YouTube Bookmarks is a full-stack application for organizing YouTube video collections with custom fields, real-time processing, and video enrichment. It uses a FastAPI backend with PostgreSQL/Redis and a React frontend.
 
-## 🚀 Quick Start for New Threads
+## Development Commands
 
-1. **Read Workflow:** `Read(.claude/DEVELOPMENT_WORKFLOW.md)`
-2. **Check Plan:** `docs/plans/2025-10-27-initial-implementation.md`
-3. **Check Git Status:** `git status` and `git log --oneline -10`
-4. **Load Skills:** `Skill(superpowers:using-superpowers)`
-5. **Continue:** Follow 6-phase workflow from documentation
-
----
-
-## 📂 Project Structure
-
+### Infrastructure
+```bash
+docker-compose up -d                    # Start PostgreSQL and Redis
 ```
-Smart Youtube Bookmarks/
-├── .claude/
-│   └── DEVELOPMENT_WORKFLOW.md          ← Read this FIRST!
-├── .worktrees/
-│   └── initial-implementation/          ← Current working directory
-│       ├── backend/                     (FastAPI, Python 3.11)
-│       ├── frontend/                    (React 18, TypeScript, Vite)
-│       ├── docs/plans/                  (Implementation plans)
-│       └── docker-compose.yml           (PostgreSQL, Redis)
-├── CLAUDE.md                            ← You are here
-└── README.md
-```
-
----
-
-## 🎯 Current Status
-
-**Branch:** `feature/initial-implementation` (in worktree)
-
-**Completed Tasks:**
-- ✅ Task 1-3: Backend setup (models, database, Alembic)
-- ✅ Task 4: Frontend Project Structure (React, Vite, TypeScript)
-- ✅ Task 5: Docker Compose Setup (PostgreSQL, Redis)
-- ✅ Task 6: List API Endpoints (CRUD with TDD)
-- ✅ All 13 validation issues fixed
-
-**Next Task:**
-- Task 7: Video API Endpoints
-
-**Git Commits:** See `git log --oneline` for full history
-
----
-
-## 🛠️ Development Setup
 
 ### Backend (FastAPI)
 ```bash
 cd backend
-pip install -r requirements.txt
-alembic upgrade head
-pytest  # Run tests
-uvicorn app.main:app --reload
+source .venv/bin/activate               # Activate virtual environment
+pip install -r requirements.txt         # Install dependencies
+alembic upgrade head                    # Apply database migrations
+uvicorn app.main:app --reload           # Start dev server (port 8000)
+arq app.workers.video_processor.WorkerSettings  # Start background worker
 ```
 
 ### Frontend (React + Vite)
 ```bash
 cd frontend
-npm install
-npm run dev  # Starts on localhost:5173
-npm run build
+npm install                             # Install dependencies
+npm run dev                             # Start dev server (port 5173)
+npm run build                           # Production build (runs tsc first)
+npm run generate-api                    # Regenerate API client from OpenAPI spec
 ```
 
-### Docker Services
+### Testing
 ```bash
-docker-compose up -d postgres redis
-docker-compose ps  # Check health
+# Backend
+cd backend && source .venv/bin/activate
+pytest                                  # All tests
+pytest -v -k "test_name"               # Run specific test
+mypy app/                              # Type checking (strict mode)
+
+# Frontend
+cd frontend
+npm test                               # Run Vitest tests
+npm run test:coverage                  # Tests with coverage
+npx tsc --noEmit                       # Type checking
 ```
 
----
-
-## 📋 Mandatory Skills & Tools
-
-### Superpowers Skills (Always Use)
-1. `superpowers:using-superpowers` - Mandatory first response
-2. `superpowers:subagent-driven-development` - Task execution
-3. `superpowers:test-driven-development` - Backend with tests
-4. `superpowers:requesting-code-review` - After each task
-5. `superpowers:verification-before-completion` - Before claims
-6. `task-validator` - Comprehensive validation
-7. `superpowers:finishing-a-development-branch` - At end
-
-### Review Tools (Use ALL after implementation)
-1. **code-reviewer subagent** - Code quality review
-2. **CodeRabbit CLI** - AI-powered automated review (Race Conditions, Memory Leaks, Security)
-3. **Semgrep** - Security & code quality scan
-4. **REF MCP** (via subagent) - Best practices (BEFORE implementation!)
-
-### CodeRabbit CLI Quick Reference
+### Linting & Formatting
 ```bash
-# After Task Implementation (Phase 4)
-coderabbit --prompt-only --type committed    # Best for AI Agents
-coderabbit --plain --type committed          # Human-readable
-
-# Before Commit (uncommitted changes)
-coderabbit --prompt-only --type uncommitted
-
-# With specific base branch
-coderabbit --prompt-only --base main
-
-# Check authentication
-coderabbit auth status
+cd frontend
+npm run lint                           # Biome linting
+npm run lint:fix                       # Biome auto-fix
+npm run format                         # Biome formatting
 ```
 
-**IMPORTANT:**
-- Runs in background (7-30+ minutes)
-- Use `--prompt-only` for token efficiency
-- Fix ALL issues (Option C: Critical + Major + Minor + Trivial)
+## Architecture
 
-### Semgrep CLI Quick Reference
-```bash
-# Installation & Setup
-brew install semgrep           # macOS
-python3 -m pip install semgrep # Alternative
-semgrep login                  # Authenticate for Pro Rules (FastAPI/React)
-
-# After Task Implementation (Phase 4)
-# Backend (Python/FastAPI)
-semgrep scan --config=p/python --config=p/security-audit backend/
-
-# Frontend (TypeScript/React)
-semgrep scan --config=p/javascript --config=p/typescript frontend/
-
-# Quick full scan
-semgrep scan --config=auto --text --output=results.txt
+### Data Flow
+```
+Frontend (React) ──HTTP/WS──▶ FastAPI ──▶ PostgreSQL
+       │                         │
+       │ WebSocket               │ Pub/Sub
+       ▼                         ▼
+  Real-time UI ◀──────────── Redis ◀──── ARQ Worker
 ```
 
-**IMPORTANT:**
-- Fast (seconds to minutes) - run in foreground
-- **Authenticate** with `semgrep login` for FastAPI/React Pro Rules
-- CE (Community Edition) works without auth but **lacks framework-specific rules**
-- See `.claude/SEMGREP_QUICKREF.md` for detailed commands
+### Backend Structure (`backend/app/`)
+- **`api/`** - FastAPI routers (lists, videos, tags, custom_fields, schemas, channels, enrichment, search, websocket)
+- **`models/`** - SQLAlchemy ORM models (async, PostgreSQL)
+- **`schemas/`** - Pydantic request/response schemas
+- **`services/`** - Business logic (enrichment, duplicate detection, rate limiting)
+- **`workers/`** - ARQ background jobs (video_processor, enrichment_worker)
+- **`clients/`** - External API clients (YouTube, Gemini)
+- **`core/`** - Config, database, Redis connections
 
----
+### Frontend Structure (`frontend/src/`)
+- **`components/`** - React components (VideosPage, VideoCard, CustomFieldsSection, etc.)
+- **`pages/`** - Route-level components (Dashboard, ChannelsPage, SettingsPage)
+- **`hooks/`** - TanStack Query hooks (useVideos, useLists, useCustomFields, useWebSocket)
+- **`stores/`** - Zustand state stores (importProgressStore, tableSettingsStore, tagStore)
+- **`api/generated/`** - Orval-generated types and hooks from OpenAPI spec (don't edit manually)
+- **`api/`** - Manual API client code (customFields.ts)
+- **`lib/`** - Utilities (axios-instance.ts)
 
-## ⚠️ Critical Rules
+### Key Patterns
+- **API Client Generation**: Orval generates TypeScript types from FastAPI's OpenAPI spec
+  - Run `npm run generate-api` when backend API changes (new endpoints, changed response types)
+  - Generated files: `src/api/generated/` (180+ TypeScript files)
+  - **Hybrid approach**: Use generated types for new features, keep manual hooks in `src/hooks/` for optimistic updates and custom query keys
+- **Real-time Updates**: WebSocket connection for CSV import progress with Redis pub/sub
+- **Custom Fields System**: Dynamic fields (rating, select, text, boolean) attached to videos via field schemas
+- **Path Alias**: `@/` maps to `frontend/src/` (configured in vite.config.ts)
 
-### Evidence Before Claims
-- Never say "should work" - run commands and show output
-- Tests: Show pytest/npm test output
-- Builds: Show build output
-- Always use verification-before-completion skill
+## Commit Convention
 
-### Option C Approach
-- Fix **ALL issues**, not just Critical
-- No issue gets ignored
-- Re-validate after every fix batch
-
-### REF MCP BEFORE Implementation
-- Research best practices **BEFORE** writing code
-- Compare plan against current documentation
-- Identify issues early
-
-### Pause After Every Task
-- Complete Phase 1-6 of workflow
-- Create verständlichen Bericht (Was/Wie/Warum)
-- **STOP and wait for user OK**
-- Never auto-continue to next task
-
----
-
-## 📝 Tech Stack
-
-### Backend
-- **Framework:** FastAPI 0.109.0
-- **Database:** PostgreSQL 16 (async with asyncpg)
-- **ORM:** SQLAlchemy 2.0 (async)
-- **Migrations:** Alembic 1.13.1
-- **Task Queue:** ARQ (Redis-based)
-- **Validation:** Pydantic 2.5.3
-- **Testing:** pytest + pytest-asyncio
-
-### Frontend
-- **Framework:** React 18.2.0
-- **Build Tool:** Vite 5.0.11
-- **Language:** TypeScript 5.3.3 (strict mode)
-- **Styling:** Tailwind CSS 3.4.1
-- **State:** Zustand 4.5.0
-- **Data Fetching:** TanStack Query 5.17.19
-- **Tables:** TanStack Table 8.11.6
-- **Testing:** Vitest 1.2.1
-
-### Infrastructure
-- **Database:** PostgreSQL 16 (Docker)
-- **Cache/Queue:** Redis 7 (Docker)
-- **Containers:** Docker Compose 3.9
-
----
-
-## 🔗 Important Files
-
-| File | Purpose |
-|------|---------|
-| `.claude/DEVELOPMENT_WORKFLOW.md` | **Main workflow documentation** |
-| `.claude/thread-start-checks.sh` | **Automated thread start checks (run at every new thread!)** |
-| `.claude/SEMGREP_QUICKREF.md` | **Semgrep CLI quick reference** |
-| `docs/plans/2025-10-27-youtube-bookmarks-design.md` | Original design document |
-| `docs/plans/2025-10-27-initial-implementation.md` | Detailed implementation plan |
-| `backend/app/main.py` | FastAPI application entry |
-| `backend/alembic/env.py` | Database migrations config |
-| `frontend/src/main.tsx` | React application entry |
-| `docker-compose.yml` | Development services |
-
----
-
-## 🎓 Conventions
-
-### Commit Messages
-Format: `<type>: <subject>`
-
-Types:
+Uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by Commitlint:
 - `feat:` - New feature
 - `fix:` - Bug fix
-- `refactor:` - Code refactoring
 - `docs:` - Documentation
+- `style:` - Formatting
+- `refactor:` - Code restructuring
+- `perf:` - Performance
 - `test:` - Tests
-- `chore:` - Build/tooling
+- `chore:` - Maintenance
 
-Always include:
+Pre-commit hooks run Biome linting via Husky.
+
+## Code Style
+
+### Frontend (Biome)
+- Extends `ultracite/core` and `ultracite/react` presets
+- Key disabled rules: `noNestedTernary` (JSX conditionals), `noForEach`, `noExplicitAny`
+- Test files have relaxed linting (see `biome.jsonc` overrides)
+- Uses `dangerouslySetInnerHTML` with DOMPurify for sanitized HTML
+
+### Backend (Python)
+- Python 3.11+ with strict mypy type checking
+- Async everywhere (SQLAlchemy async, asyncpg, httpx)
+- pytest with `asyncio_mode = "auto"`
+
+## Database Migrations
+
+```bash
+cd backend && source .venv/bin/activate
+alembic revision --autogenerate -m "description"  # Create migration
+alembic upgrade head                               # Apply migrations
+alembic downgrade -1                               # Rollback one
 ```
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
-Co-Authored-By: Claude <noreply@anthropic.com>
+## Environment Variables
+
+### Backend (`backend/.env`)
+```env
+YOUTUBE_API_KEY=...          # Required
+GEMINI_API_KEY=...           # Optional (AI enrichment)
+GROQ_API_KEY=...             # Optional (Whisper transcription)
 ```
 
-### Code Style
-- **Backend:** PEP 8, type hints, docstrings
-- **Frontend:** ESLint, Prettier, strict TypeScript
-- **Tests:** Descriptive names, AAA pattern (Arrange-Act-Assert)
-
----
-
-## 📞 Help & Resources
-
-### If Stuck
-1. Read `.claude/DEVELOPMENT_WORKFLOW.md`
-2. Check `docs/plans/` for requirements
-3. Use `Skill(superpowers:systematic-debugging)`
-4. Ask user for clarification
-
-### Git Worktree Info
-- **Location:** `.worktrees/initial-implementation/`
-- **Strategy:** Isolated feature branch development
-- **Cleanup:** Use `superpowers:finishing-a-development-branch`
-
----
-
-## 🔄 Thread Handoff Checklist
-
-When starting new thread:
-- [ ] Read `.claude/DEVELOPMENT_WORKFLOW.md`
-- [ ] Read this CLAUDE.md
-- [ ] Load `superpowers:using-superpowers`
-- [ ] **Run automated thread start checks:**
-  ```bash
-  ./.claude/thread-start-checks.sh
-  ```
-  This checks:
-  - Git status & recent commits
-  - Semgrep authentication (Pro Rules for FastAPI/React)
-  - CodeRabbit authentication
-  - Python/Node versions
-  - Docker services status
-  - Summary with action items
-- [ ] Check current task status from plan
-- [ ] Continue with workflow Phase 1
-
----
-
-**Last Updated:** 2025-10-28
-**Version:** 1.3
-**Branch:** feature/initial-implementation (worktree)
-
-**Changes in v1.3:**
-- Added automated thread start checks script (`.claude/thread-start-checks.sh`)
-- Updated Thread Handoff Checklist to use automated checks
-- Added tool authentication verification for new threads
-- Ensures semgrep Pro Rules availability is checked automatically
-
-**Changes in v1.2:**
-- Added comprehensive Semgrep CLI documentation
-- Created `.claude/SEMGREP_QUICKREF.md` quick reference guide
-- Updated workflow with Semgrep commands for FastAPI/React
-- Added language-specific security scanning instructions
-
-**Changes in v1.1:**
-- Added CodeRabbit CLI setup and usage instructions
-- Updated workflow documentation with CodeRabbit integration
+### Docker (`.env` at root)
+```env
+POSTGRES_DB=youtube_bookmarks
+POSTGRES_USER=user
+POSTGRES_PASSWORD=changeme
+```

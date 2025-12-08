@@ -1,0 +1,94 @@
+import { Home } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useSchema } from "@/hooks/useSchemas";
+import { FieldTypeBadge } from "./FieldTypeBadge";
+
+interface WorkspaceFieldsCardProps {
+  listId: string;
+  defaultSchemaId: string | null;
+  onEdit: () => void;
+}
+
+/**
+ * Card displaying workspace-level fields that apply to all videos.
+ *
+ * Features:
+ * - Visual distinction with blue gradient background
+ * - Home icon to indicate workspace-level scope
+ * - Edit button to open WorkspaceFieldsEditor
+ * - Shows field count and list when schema exists
+ * - Empty state when no fields defined
+ *
+ * @example
+ * ```tsx
+ * <WorkspaceFieldsCard
+ *   listId={currentList.id}
+ *   defaultSchemaId={currentList.default_schema_id}
+ *   onEdit={() => setWorkspaceEditorOpen(true)}
+ * />
+ * ```
+ */
+export function WorkspaceFieldsCard({
+  listId,
+  defaultSchemaId,
+  onEdit,
+}: WorkspaceFieldsCardProps) {
+  // Fetch schema with nested fields (only if defaultSchemaId exists)
+  const { data: schema, isLoading } = useSchema(
+    listId,
+    defaultSchemaId ?? undefined
+  );
+
+  // Get sorted fields from schema
+  const fields =
+    schema?.schema_fields
+      ?.slice()
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((sf) => sf.field) ?? [];
+
+  return (
+    <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:border-[#333333] dark:bg-[#1B1B1B] dark:bg-none">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Home className="h-5 w-5 text-blue-600 dark:text-gray-400" />
+          <h3 className="font-medium text-gray-900 dark:text-gray-100">
+            Alle Videos
+          </h3>
+        </div>
+        <Button onClick={onEdit} size="sm" variant="outline">
+          Bearbeiten
+        </Button>
+      </div>
+      <p className="mt-2 text-muted-foreground text-sm">
+        Diese Felder haben alle Videos
+      </p>
+
+      {/* Field list or empty state */}
+      {isLoading ? (
+        <p className="mt-3 text-muted-foreground text-sm">Lade Felder...</p>
+      ) : fields.length > 0 ? (
+        <ul className="mt-3 space-y-1">
+          {fields.map((field) => (
+            <li className="flex items-center gap-2 text-sm" key={field.id}>
+              <span>•</span>
+              <span>{field.name}</span>
+              <FieldTypeBadge
+                className="px-1.5 py-0 text-[10px]"
+                fieldType={field.field_type}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-muted-foreground text-sm italic">
+          Keine Felder definiert
+        </p>
+      )}
+
+      {/* Field count */}
+      <p className="mt-2 text-muted-foreground text-xs">
+        ({fields.length} {fields.length === 1 ? "Feld" : "Felder"} definiert)
+      </p>
+    </div>
+  );
+}

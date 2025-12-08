@@ -1,158 +1,201 @@
 # Smart YouTube Bookmarks
 
-A modern web application for organizing and managing YouTube video collections with advanced metadata extraction and real-time processing capabilities.
+A modern web application for organizing and managing YouTube video collections with custom fields, real-time processing, and video enrichment.
 
 ---
 
 ## Features
 
-### Real-Time Progress Updates 🔄
+### 📚 Video Collections (Lists)
+- Create and manage multiple video collections
+- Each list can have its own custom fields and schemas
+- User-scoped organization
 
-WebSocket-based progress tracking for CSV video imports with resilient reconnection and history synchronization.
+### 🎬 Video Management
+- **Add Videos** – Via YouTube URL or video ID
+- **Bulk CSV Import** – Upload hundreds of videos with real-time progress tracking
+- **CSV Export** – Export with all custom field values included
+- **Metadata Extraction** – Automatic fetching of title, channel, duration, thumbnails, view counts
+- **Status Tracking** – Monitor processing status (Pending → Processing → Completed/Failed)
 
-**Key Capabilities:**
+### 🏷️ Custom Fields System
+Define your own fields to annotate videos:
 
-- **Live Progress Bar** - Real-time updates during video processing with visual feedback
-- **Reconnection Resilience** - Automatic history sync on reconnect - close tab, reopen, and progress is restored
-- **Multi-Tab Support** - Same progress displayed across all browser tabs simultaneously
-- **Error Handling** - Graceful degradation when services unavailable, detailed error messages
-- **Throttling** - Intelligent progress updates (5% steps) to prevent UI flooding
-- **Cleanup** - Completed jobs automatically removed after 5 minutes to prevent memory leaks
+| Field Type | Description | Example |
+|------------|-------------|---------|
+| **Rating** | Star rating (1-5 or custom max) | ⭐⭐⭐⭐ |
+| **Select** | Dropdown with predefined options | "Beginner", "Advanced" |
+| **Text** | Free-form text notes | "Great explanation of React hooks" |
+| **Boolean** | Yes/No toggle | ✅ Watched |
 
-**Technical Implementation:**
+- **Field Schemas** – Create reusable templates combining multiple fields
+- **Per-Video Values** – Each video stores its own field values
+- **CSV Round-Trip** – Import/export field values via CSV
 
-- **WebSocket Endpoint:** `ws://localhost:8000/api/ws/progress`
-- **History API:** `GET /api/jobs/{job_id}/progress-history?since={timestamp}`
-- **Dual-Write Pattern:** Redis pub/sub for real-time + PostgreSQL for persistence
-- **Post-Connection Auth:** Secure authentication after WebSocket establishment (Option B from security audit)
+### 📺 Channels
+- Auto-created from video metadata
+- Filter videos by channel in sidebar
+- Show/hide channels
+- Channel avatars and thumbnails
 
-**Usage:**
+### 🏷️ Tags
+- Create custom tags per list
+- Assign multiple tags to videos
+- Bulk tag assignment
 
-1. Navigate to Videos page for any list
-2. Click "Videos per CSV hochladen"
-3. Upload CSV file with YouTube video IDs (one per line)
-4. Progress bar appears automatically with live updates
-5. Processing continues in background - safe to close/reopen tab
-6. Completed progress bar fades after 5 minutes
+### 🔄 Real-Time Progress (WebSocket)
+- Live progress bar during CSV imports
+- Multi-tab synchronization
+- Reconnection resilience with history recovery
+- Redis pub/sub + PostgreSQL persistence
 
-**Architecture:**
+### 🎥 Video Player
+- Embedded HTML5 player (Vidstack)
+- Watch progress persistence
+- Keyboard shortcuts
+- Picture-in-picture support
 
-```
-┌─────────────┐         ┌─────────────┐         ┌──────────────┐
-│   Frontend  │◄───WS───┤   FastAPI   │◄───────┤   ARQ Worker │
-│   (React)   │         │   Backend   │         │  (VideoProc) │
-└─────────────┘         └─────────────┘         └──────────────┘
-       │                       │                        │
-       │                       │                        │
-       └───────HTTP────────────┤                        │
-               (History API)   │                        │
-                              │                        │
-                         ┌────▼────┐              ┌────▼────┐
-                         │  Redis  │              │ Postgres│
-                         │ Pub/Sub │              │   DB    │
-                         └─────────┘              └─────────┘
-                         (Real-time)              (Persistent)
-```
+### 🔍 Search & Filtering
+- Full-text search across video metadata
+- Filter by status, channel, tags, custom fields
+- Advanced field filtering with operators
+- Sortable, paginated table view (TanStack Table)
 
----
+### 📊 Analytics Dashboard
+- Real-time job monitoring
+- Video statistics by status/channel
+- WebSocket connection status
 
-### Video Collections Management 📚
-
-- **List Organization** - Create and manage multiple video collections
-- **CSV Import/Export** - Bulk upload videos via CSV, export for backup
-- **Metadata Extraction** - Automatic YouTube metadata fetching (title, channel, duration, thumbnails)
-- **Custom Schemas** - Define custom fields for video annotations
-- **Status Tracking** - Monitor video processing status (Pending, Processing, Completed, Failed)
-
----
-
-### Advanced Search & Filtering 🔍
-
-- **Full-Text Search** - Search across video titles, channels, and custom fields
-- **Filter by Status** - Find pending, completed, or failed videos
-- **Sort & Pagination** - Efficient browsing of large video collections
-- **Table View** - Responsive data table with TanStack Table
+### ✨ Video Enrichment (Optional)
+- Transcript extraction
+- Audio transcription (Groq Whisper)
+- AI-powered metadata enrichment (Google Gemini)
 
 ---
 
 ## Tech Stack
 
 ### Backend
-- **Framework:** FastAPI 0.109.0 (Python 3.11)
-- **Database:** PostgreSQL 16 (asyncpg, SQLAlchemy 2.0 async)
-- **Task Queue:** ARQ (Redis-based background workers)
-- **WebSocket:** FastAPI native WebSocket support
-- **Migrations:** Alembic 1.13.1
-- **Validation:** Pydantic 2.5.3
+| Technology | Purpose |
+|------------|---------|
+| **FastAPI** 0.109 | Web framework (Python 3.11) |
+| **PostgreSQL** 16 | Primary database |
+| **SQLAlchemy** 2.0 | Async ORM |
+| **Redis** 7 | Cache, pub/sub, job queue |
+| **ARQ** | Background task processing |
+| **Alembic** | Database migrations |
+| **Pydantic** 2.5 | Validation & serialization |
 
 ### Frontend
-- **Framework:** React 18.2.0
-- **Build Tool:** Vite 5.0.11
-- **Language:** TypeScript 5.3.3 (strict mode)
-- **Styling:** Tailwind CSS 3.4.1
-- **State Management:** Zustand 4.5.0
-- **Data Fetching:** TanStack Query 5.17.19
-- **Tables:** TanStack Table 8.11.6
-- **Testing:** Vitest 1.2.1
+| Technology | Purpose |
+|------------|---------|
+| **React** 18.2 | UI framework |
+| **TypeScript** 5.3 | Type safety (strict mode) |
+| **Vite** 5.0 | Build tool |
+| **Tailwind CSS** 3.4 | Styling |
+| **Zustand** | State management |
+| **TanStack Query** | Server state & caching |
+| **TanStack Table** | Data tables |
+| **Radix UI** | Accessible UI primitives |
+| **Tiptap** | Rich text editor |
+| **Vidstack** | Video player |
+| **React Hook Form + Zod** | Form handling & validation |
 
-### Infrastructure
-- **Database:** PostgreSQL 16 (Docker)
-- **Cache/Queue:** Redis 7 (Docker)
-- **Container Orchestration:** Docker Compose 3.9
+### External APIs
+| Service | Purpose |
+|---------|---------|
+| **YouTube Data API** | Video metadata |
+| **Google Gemini** | AI enrichment (optional) |
+| **Groq Whisper** | Audio transcription (optional) |
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
+- Python 3.11+
+- Node.js 18+
+- Docker & Docker Compose
 
-- **Python:** 3.11+
-- **Node.js:** 18+
-- **Docker:** Latest version
-- **Docker Compose:** Latest version
+### 1. Clone & Start Infrastructure
 
-### Installation
-
-**1. Clone the repository**
 ```bash
-git clone https://github.com/0ui-labs/smart-youtube-bookmarks.git
+git clone https://github.com/your-repo/smart-youtube-bookmarks.git
 cd smart-youtube-bookmarks
+
+# Start PostgreSQL and Redis
+docker-compose up -d
 ```
 
-**2. Start Docker services**
-```bash
-docker-compose up -d postgres redis
-```
+### 2. Backend Setup
 
-**3. Setup Backend**
 ```bash
 cd backend
+
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Run migrations
+# Configure environment
+cp .env.example .env
+# Edit .env with your API keys
+
+# Run database migrations
 alembic upgrade head
 
-# Start backend server
+# Start server
 uvicorn app.main:app --reload
 ```
 
-Backend will be available at **http://localhost:8000**
+Backend runs at **http://localhost:8000**
 
-**4. Setup Frontend**
+### 3. Frontend Setup
+
 ```bash
 cd frontend
+
+# Install dependencies
 npm install
 
-# Start development server
+# Start dev server
 npm run dev
 ```
 
-Frontend will be available at **http://localhost:5173**
+Frontend runs at **http://localhost:5173**
 
-**5. Start ARQ Worker (for background processing)**
+### 4. Start Background Worker
+
 ```bash
 cd backend
+source .venv/bin/activate
 arq app.workers.video_processor.WorkerSettings
+```
+
+---
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+```env
+# Required
+YOUTUBE_API_KEY=your_youtube_api_key_here
+
+# Optional (for enrichment features)
+GEMINI_API_KEY=your_gemini_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
+```
+
+### Docker (`/.env` – for docker-compose)
+
+```env
+POSTGRES_DB=youtube_bookmarks
+POSTGRES_USER=user
+POSTGRES_PASSWORD=changeme
+REDIS_URL=redis://redis:6379
 ```
 
 ---
@@ -161,107 +204,41 @@ arq app.workers.video_processor.WorkerSettings
 
 ### Creating a Video List
 
-1. Navigate to **Home** (`http://localhost:5173`)
+1. Open **http://localhost:5173**
 2. Click **"Neue Liste"**
-3. Enter list name and description
-4. Select optional schema for custom fields
-5. Click **"Erstellen"**
+3. Enter name and optional schema
+4. Click **"Erstellen"**
 
 ### Importing Videos via CSV
 
-1. Open a video list
-2. Click **"Videos per CSV hochladen"**
-3. Upload CSV file with YouTube video IDs (one per line, or `youtube_id` column)
-4. Watch real-time progress bar as videos are processed
-5. Videos appear in table once metadata extraction completes
-
-**Example CSV:**
 ```csv
-MW3t6jP9AOs
-R4I_YaFYv3M
-b-IXXlnLeuI
+youtube_id
+dQw4w9WgXcQ
+jNQXAC9IVRw
 ```
 
-### Monitoring Progress
+Or with custom fields:
 
-- **Live Updates:** Progress bar shows current status (0-100%)
-- **Video Counter:** Displays processed/total videos (e.g., "3/10")
-- **Status Badge:** Color-coded status (Processing=blue, Completed=green, Failed=red)
-- **Connection Status:** Banner shows reconnection attempts if connection lost
-- **History Recovery:** Close/reopen tab - progress is restored from database
-
----
-
-## Development
-
-### Running Tests
-
-**Backend (pytest):**
-```bash
-cd backend
-pytest                           # All tests
-pytest tests/integration/ -v     # Integration tests
-pytest -k "test_name" -v         # Specific test
+```csv
+url,field_Rating,field_Category
+https://youtube.com/watch?v=dQw4w9WgXcQ,5,Music
+https://youtu.be/jNQXAC9IVRw,3,Tutorial
 ```
 
-**Frontend (Vitest):**
-```bash
-cd frontend
-npm test                         # All tests
-npm test -- VideosPage           # Specific test
-npm run test:coverage            # With coverage
-```
+1. Open a list → Click **"CSV hochladen"**
+2. Select your CSV file
+3. Watch real-time progress bar
+4. Videos appear as they're processed
 
-### Code Quality
+### Exporting Videos
 
-**Backend:**
-```bash
-# Type checking
-mypy app/
-
-# Linting
-flake8 app/
-
-# Formatting
-black app/
-isort app/
-```
-
-**Frontend:**
-```bash
-# Type checking
-npx tsc --noEmit
-
-# Linting
-npm run lint
-
-# Formatting
-npm run format
-```
-
-### Database Migrations
-
-**Create migration:**
-```bash
-cd backend
-alembic revision --autogenerate -m "description"
-```
-
-**Apply migrations:**
-```bash
-alembic upgrade head
-```
-
-**Rollback:**
-```bash
-alembic downgrade -1
-```
+`GET /api/lists/{list_id}/export/csv` exports all videos with custom field values.
 
 ---
 
 ## API Documentation
 
-Once the backend is running, visit:
+Interactive docs available when backend is running:
 
 - **Swagger UI:** http://localhost:8000/docs
 - **ReDoc:** http://localhost:8000/redoc
@@ -270,141 +247,122 @@ Once the backend is running, visit:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/lists` | GET | List all video collections |
-| `/api/lists` | POST | Create new list |
-| `/api/lists/{id}/videos` | GET | Get videos in list |
-| `/api/lists/{id}/upload-csv` | POST | Upload CSV for processing |
-| `/api/jobs/{job_id}/progress-history` | GET | Get progress history |
-| `/api/ws/progress` | WS | WebSocket for real-time progress |
+| `/api/lists` | GET/POST | List collections |
+| `/api/lists/{id}/videos` | GET/POST | Videos in a list |
+| `/api/lists/{id}/videos/bulk` | POST | CSV bulk import |
+| `/api/lists/{id}/export/csv` | GET | CSV export |
+| `/api/videos/{id}` | GET/PATCH/DELETE | Single video |
+| `/api/videos/{id}/fields` | PUT | Update field values |
+| `/api/custom_fields` | GET/POST | Custom field definitions |
+| `/api/field_schemas` | GET/POST | Field schema templates |
+| `/api/channels` | GET | User's channels |
+| `/api/tags` | GET/POST | Tag management |
+| `/api/ws/progress` | WebSocket | Real-time progress |
 
 ---
 
-## WebSocket Progress API
+## Development
 
-### Connection
+### Running Tests
 
-```javascript
-const ws = new WebSocket('ws://localhost:8000/api/ws/progress');
-
-// Authenticate after connection
-ws.send(JSON.stringify({
-  type: 'auth',
-  token: 'your-auth-token'
-}));
+**Backend:**
+```bash
+cd backend && source .venv/bin/activate
+pytest                    # All tests
+pytest -v -k "test_name"  # Specific test
 ```
 
-### Message Types
-
-**Progress Event:**
-```json
-{
-  "job_id": "uuid",
-  "progress_percent": 45,
-  "processed_count": 9,
-  "total_count": 20,
-  "current_video": "MW3t6jP9AOs",
-  "message": "Processing video 9 of 20",
-  "timestamp": "2025-10-29T12:34:56Z"
-}
+**Frontend:**
+```bash
+cd frontend
+npm test                  # All tests
+npm run test:coverage     # With coverage
 ```
 
-**Completion Event:**
-```json
-{
-  "job_id": "uuid",
-  "progress_percent": 100,
-  "processed_count": 20,
-  "total_count": 20,
-  "status": "completed",
-  "message": "All videos processed successfully",
-  "timestamp": "2025-10-29T12:36:00Z"
-}
+### Code Quality
+
+**Backend:**
+```bash
+mypy app/          # Type checking
+black app/         # Formatting
 ```
 
-**Error Event:**
-```json
-{
-  "job_id": "uuid",
-  "progress_percent": 35,
-  "status": "error",
-  "error": "Failed to process video: Invalid video ID",
-  "timestamp": "2025-10-29T12:35:15Z"
-}
+**Frontend:**
+```bash
+npx tsc --noEmit   # Type checking
+npm run lint       # ESLint
+```
+
+### Database Migrations
+
+```bash
+cd backend && source .venv/bin/activate
+
+# Create migration
+alembic revision --autogenerate -m "description"
+
+# Apply
+alembic upgrade head
+
+# Rollback
+alembic downgrade -1
 ```
 
 ---
 
-## Testing
+## Architecture
 
-### Manual Testing
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│    Frontend     │────▶│    FastAPI      │────▶│   PostgreSQL    │
+│  React + Vite   │     │    Backend      │     │    Database     │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                       │
+        │ WebSocket             │ Pub/Sub
+        ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Real-time      │◀────│     Redis       │◀────│   ARQ Worker    │
+│  Progress UI    │     │   Pub/Sub       │     │  (Background)   │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
 
-See [`docs/testing/websocket-progress-manual-tests.md`](docs/testing/websocket-progress-manual-tests.md) for comprehensive manual testing checklist.
+---
 
-### Automated Testing Report
+## Project Structure
 
-See [`docs/testing/websocket-progress-automated-tests.md`](docs/testing/websocket-progress-automated-tests.md) for automated test results and findings.
-
-**Test Coverage:**
-- **Backend:** 59 tests (100% passing)
-- **Frontend:** 31 tests (100% passing)
-- **Integration:** 10 tests (progress flow + error scenarios)
+```
+smart-youtube-bookmarks/
+├── backend/
+│   ├── app/
+│   │   ├── api/           # FastAPI routers
+│   │   ├── models/        # SQLAlchemy models
+│   │   ├── schemas/       # Pydantic schemas
+│   │   ├── services/      # Business logic
+│   │   ├── workers/       # ARQ background jobs
+│   │   └── core/          # Config, database
+│   ├── tests/
+│   ├── alembic/           # Migrations
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── pages/         # Route components
+│   │   ├── components/    # Reusable UI
+│   │   ├── hooks/         # Custom hooks
+│   │   ├── stores/        # Zustand state
+│   │   ├── types/         # TypeScript types
+│   │   └── api/           # API client
+│   └── package.json
+├── docker-compose.yml
+└── README.md
+```
 
 ---
 
 ## Known Limitations
 
-### Authentication
-- Currently uses hardcoded `user_id` for development
-- Console warning: "No auth token found for WebSocket connection" (expected)
-- Production deployment requires OAuth/JWT implementation
-
-### CSV Upload & Processing
-- CSV upload endpoint (`/api/lists/{id}/videos/bulk`) automatically creates and starts processing jobs
-- Real-time progress updates via WebSocket connection
-- ARQ worker must be running for video metadata processing
-
-### Performance
-- Large CSV uploads (1000+ videos) may take significant time
-- WebSocket throttling limits progress updates to 5% steps
-- Redis pub/sub required for real-time updates (degrades gracefully to polling)
-
-### Browser Compatibility
-- Tested on Chrome 120+, Firefox 121+, Safari 17+
-- WebSocket support required (all modern browsers)
-- Reduced motion preferences respected for accessibility
-
----
-
-## Deployment
-
-### Docker Production Build
-
-```bash
-# Build images
-docker-compose -f docker-compose.prod.yml build
-
-# Start services
-docker-compose -f docker-compose.prod.yml up -d
-
-# Run migrations
-docker-compose exec backend alembic upgrade head
-```
-
-### Environment Variables
-
-**Backend (.env):**
-```env
-DATABASE_URL=postgresql+asyncpg://user:pass@postgres:5432/db
-REDIS_URL=redis://redis:6379
-SECRET_KEY=your-secret-key-here
-YOUTUBE_API_KEY=your-youtube-api-key
-```
-
-**Frontend (.env):**
-```env
-VITE_API_URL=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000
-```
+- **Authentication:** Currently uses hardcoded user_id for development
+- **Large Imports:** 1000+ videos may take significant time
+- **Enrichment:** Requires optional API keys (Gemini, Groq)
 
 ---
 
@@ -416,39 +374,14 @@ VITE_WS_URL=ws://localhost:8000
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Open Pull Request
 
-### Commit Convention
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation only
-- `refactor:` Code refactoring
-- `test:` Adding tests
-- `chore:` Build/tooling changes
+**Commit Convention:** [Conventional Commits](https://www.conventionalcommits.org/)
 
 ---
 
 ## License
 
-This project is licensed under the MIT License - see LICENSE file for details.
+MIT License – see LICENSE file for details.
 
 ---
 
-## Acknowledgements
-
-- **FastAPI** - Modern, fast web framework for building APIs
-- **React** - JavaScript library for building user interfaces
-- **TanStack** - Powerful data-fetching and table libraries
-- **Tailwind CSS** - Utility-first CSS framework
-- **ARQ** - Async task queue for Python
-
----
-
-## Support
-
-For bugs and feature requests, please open an issue on GitHub:
-https://github.com/0ui-labs/smart-youtube-bookmarks/issues
-
----
-
-**Built with ❤️ using FastAPI, React, and WebSockets**
+**Built with ❤️ using FastAPI, React, and TypeScript**

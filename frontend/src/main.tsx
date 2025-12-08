@@ -1,20 +1,38 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClient } from './lib/queryClient'
-import App from './App'
-import './index.css'
+import { QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import App from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { WebSocketProvider } from "./components/WebSocketProvider";
+import { getQueryClient } from "./lib/queryClient";
+import { initializeTheme } from "./stores";
+import "./index.css";
 
-const rootElement = document.getElementById('root')
+// Initialize theme before first render to prevent flash of wrong theme
+initializeTheme();
+
+const rootElement = document.getElementById("root");
 
 if (!rootElement) {
-  throw new Error('Root element not found')
+  throw new Error("Root element not found");
 }
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </React.StrictMode>,
-)
+    <ErrorBoundary>
+      <QueryClientProvider client={getQueryClient()}>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
+          <WebSocketProvider>
+            <App />
+          </WebSocketProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  </React.StrictMode>
+);

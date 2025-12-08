@@ -4,21 +4,16 @@ API dependencies for authentication and database access.
 Provides dependency injection functions for FastAPI routes.
 """
 
-from typing import Optional
-from fastapi import WebSocket, HTTPException, status
-from jose import jwt, JWTError
+from fastapi import HTTPException, WebSocket, status
+from jose import JWTError, jwt
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.user import User
 
 
-async def get_current_ws_user(
-    websocket: WebSocket,
-    token: str
-) -> User:
+async def get_current_ws_user(websocket: WebSocket, token: str) -> User:
     """
     Authenticate WebSocket connection via query parameter token.
 
@@ -34,17 +29,15 @@ async def get_current_ws_user(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials"
+        detail="Could not validate credentials",
     )
 
     try:
         # Decode JWT token
         payload = jwt.decode(
-            token,
-            settings.secret_key,
-            algorithms=[settings.algorithm]
+            token, settings.secret_key, algorithms=[settings.algorithm]
         )
-        user_id: Optional[str] = payload.get("sub")
+        user_id: str | None = payload.get("sub")
         if user_id is None:
             await websocket.close(code=1008)  # Policy Violation
             raise credentials_exception

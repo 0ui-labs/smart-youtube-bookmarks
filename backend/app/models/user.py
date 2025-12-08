@@ -7,6 +7,7 @@ Can be expanded later with full user management features.
 
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.models.base import BaseModel
 
 
@@ -16,6 +17,7 @@ class User(BaseModel):
 
     Minimal implementation for WebSocket auth.
     """
+
     __tablename__ = "users"
 
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
@@ -23,7 +25,16 @@ class User(BaseModel):
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
     # Relationships
-    lists: Mapped[list["BookmarkList"]] = relationship("BookmarkList", back_populates="user")
+    lists: Mapped[list["BookmarkList"]] = relationship(
+        "BookmarkList", back_populates="user"
+    )
+    tags: Mapped[list["Tag"]] = relationship("Tag", back_populates="user")
+    channels: Mapped[list["Channel"]] = relationship(
+        "Channel", back_populates="user", cascade="all, delete-orphan"
+    )
+    subscriptions: Mapped[list["Subscription"]] = relationship(
+        "Subscription", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email})>"

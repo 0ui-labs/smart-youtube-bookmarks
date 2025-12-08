@@ -7,6 +7,7 @@ These tests verify WebSocket authentication and message delivery.
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
+
 from app.main import app
 
 
@@ -38,4 +39,6 @@ async def test_websocket_accepts_valid_token():
     # 2. JWT token generation
     # 3. Test fixture for authenticated user
     # Will implement in a follow-up task
-    pytest.skip("Requires full user authentication system - implement after basic endpoint is working")
+    pytest.skip(
+        "Requires full user authentication system - implement after basic endpoint is working"
+    )

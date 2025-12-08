@@ -1,78 +1,80 @@
-import { useState, useMemo } from 'react'
 import {
-  useReactTable,
   createColumnHelper,
   flexRender,
   getCoreRowModel,
-} from '@tanstack/react-table'
-import { useLists, useCreateList, useDeleteList } from '@/hooks/useLists'
-import type { ListResponse } from '@/types/list'
+  useReactTable,
+} from "@tanstack/react-table";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCreateList, useDeleteList, useLists } from "@/hooks/useLists";
+import type { ListResponse } from "@/types/list";
 
-const columnHelper = createColumnHelper<ListResponse>()
+const columnHelper = createColumnHelper<ListResponse>();
 
-interface ListsPageProps {
-  onSelectList?: (listId: string) => void
-}
+export const ListsPage = () => {
+  const navigate = useNavigate();
+  const [isCreating, setIsCreating] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [newListDescription, setNewListDescription] = useState("");
 
-export const ListsPage = ({ onSelectList }: ListsPageProps) => {
-  const [isCreating, setIsCreating] = useState(false)
-  const [newListName, setNewListName] = useState('')
-  const [newListDescription, setNewListDescription] = useState('')
-
-  const { data: lists = [], isLoading, error } = useLists()
-  const createList = useCreateList()
-  const deleteList = useDeleteList()
+  const { data: lists = [], isLoading, error } = useLists();
+  const createList = useCreateList();
+  const deleteList = useDeleteList();
 
   const columns = useMemo(
     () => [
-      columnHelper.accessor('name', {
-        header: 'Name',
+      columnHelper.accessor("name", {
+        header: "Name",
         cell: (info) => (
           <span className="font-semibold text-gray-900">{info.getValue()}</span>
         ),
       }),
-      columnHelper.accessor('description', {
-        header: 'Beschreibung',
+      columnHelper.accessor("description", {
+        header: "Beschreibung",
         cell: (info) => (
-          <span className="text-gray-600 block max-w-md break-words">
-            {info.getValue() || <span className="italic text-gray-400">Keine Beschreibung</span>}
+          <span className="block max-w-md break-words text-gray-600">
+            {info.getValue() || (
+              <span className="text-gray-400 italic">Keine Beschreibung</span>
+            )}
           </span>
         ),
         meta: {
-          className: 'whitespace-normal', // Override whitespace-nowrap for this column
+          className: "whitespace-normal", // Override whitespace-nowrap for this column
         },
       }),
-      columnHelper.accessor('video_count', {
-        header: 'Videos',
+      columnHelper.accessor("video_count", {
+        header: "Videos",
         cell: (info) => (
-          <span className="text-sm text-gray-500">{info.getValue()} Videos</span>
-        ),
-      }),
-      columnHelper.accessor('created_at', {
-        header: 'Erstellt',
-        cell: (info) => (
-          <span className="text-sm text-gray-500">
-            {new Date(info.getValue()).toLocaleDateString('de-DE')}
+          <span className="text-gray-500 text-sm">
+            {info.getValue()} Videos
           </span>
         ),
       }),
-      columnHelper.accessor('id', {
-        header: 'Aktionen',
+      columnHelper.accessor("created_at", {
+        header: "Erstellt",
+        cell: (info) => (
+          <span className="text-gray-500 text-sm">
+            {new Date(info.getValue()).toLocaleDateString("de-DE")}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("id", {
+        header: "Aktionen",
         cell: (info) => (
           <div className="flex gap-2">
             <button
-              onClick={() => onSelectList?.(info.getValue())}
-              className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+              className="rounded px-3 py-1 text-blue-600 text-sm transition-colors hover:bg-blue-50 hover:text-blue-800"
+              onClick={() => navigate("/videos")}
             >
               Videos
             </button>
             <button
+              className="rounded px-3 py-1 text-red-600 text-sm transition-colors hover:bg-red-50 hover:text-red-800"
               onClick={() => {
-                if (window.confirm('Liste wirklich löschen?')) {
-                  deleteList.mutate(info.getValue())
+                if (window.confirm("Liste wirklich löschen?")) {
+                  deleteList.mutate(info.getValue());
                 }
               }}
-              className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
             >
               Löschen
             </button>
@@ -80,113 +82,122 @@ export const ListsPage = ({ onSelectList }: ListsPageProps) => {
         ),
       }),
     ],
-    [deleteList, onSelectList]
-  )
+    [deleteList, navigate]
+  );
 
   const table = useReactTable({
     data: lists,
     columns,
     getCoreRowModel: getCoreRowModel(),
-  })
+  });
 
   const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newListName.trim()) return
+    e.preventDefault();
+    if (!newListName.trim()) return;
 
     try {
       await createList.mutateAsync({
         name: newListName,
         description: newListDescription || undefined,
-      })
+      });
 
-      setNewListName('')
-      setNewListDescription('')
-      setIsCreating(false)
-    } catch (error) {
+      setNewListName("");
+      setNewListDescription("");
+      setIsCreating(false);
+    } catch (_error) {
       // Error is already handled by React Query error state
       // Form stays open and user input is preserved
     }
-  }
+  };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="text-gray-600">Lädt Listen...</div>
       </div>
-    )
+    );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="text-red-600">
           Fehler beim Laden der Listen. Bitte versuchen Sie es später erneut.
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Meine Listen</h1>
+    <div className="mx-auto max-w-6xl p-8">
+      <div className="mb-8 flex items-center justify-between">
+        <h1 className="font-bold text-3xl text-gray-900">Meine Listen</h1>
         <button
+          className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
           onClick={() => setIsCreating(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           Neue Liste
         </button>
       </div>
 
       {isCreating && (
-        <form onSubmit={handleCreate} className="mb-6 p-6 border border-gray-200 rounded-lg bg-white shadow-sm">
-          <h2 className="text-lg font-semibold mb-4">Neue Liste erstellen</h2>
+        <form
+          className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+          onSubmit={handleCreate}
+        >
+          <h2 className="mb-4 font-semibold text-lg">Neue Liste erstellen</h2>
           <div className="space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                className="mb-1 block font-medium text-gray-700 text-sm"
+                htmlFor="name"
+              >
                 Name *
               </label>
               <input
+                autoFocus
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                 id="name"
-                type="text"
-                value={newListName}
                 onChange={(e) => setNewListName(e.target.value)}
                 placeholder="Listenname"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                autoFocus
                 required
+                type="text"
+                value={newListName}
               />
             </div>
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                className="mb-1 block font-medium text-gray-700 text-sm"
+                htmlFor="description"
+              >
                 Beschreibung
               </label>
               <textarea
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                 id="description"
-                value={newListDescription}
                 onChange={(e) => setNewListDescription(e.target.value)}
                 placeholder="Optionale Beschreibung"
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={newListDescription}
               />
             </div>
           </div>
-          <div className="flex gap-2 mt-4">
+          <div className="mt-4 flex gap-2">
             <button
-              type="submit"
+              className="rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700 disabled:bg-gray-400"
               disabled={createList.isPending}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+              type="submit"
             >
-              {createList.isPending ? 'Erstellt...' : 'Erstellen'}
+              {createList.isPending ? "Erstellt..." : "Erstellen"}
             </button>
             <button
-              type="button"
+              className="rounded-lg bg-gray-300 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-400"
               onClick={() => {
-                setIsCreating(false)
-                setNewListName('')
-                setNewListDescription('')
+                setIsCreating(false);
+                setNewListName("");
+                setNewListDescription("");
               }}
-              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+              type="button"
             >
               Abbrechen
             </button>
@@ -195,43 +206,50 @@ export const ListsPage = ({ onSelectList }: ListsPageProps) => {
       )}
 
       {lists.length === 0 ? (
-        <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
+        <div className="rounded-lg border border-gray-200 bg-white py-12 text-center">
           <p className="text-gray-500 text-lg">
             Noch keine Listen vorhanden. Erstellen Sie Ihre erste Liste!
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <th
+                      className="px-6 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wider"
                       key={header.id}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
                       {header.isPlaceholder
                         ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
                     </th>
                   ))}
                 </tr>
               ))}
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200 bg-white">
               {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                <tr className="transition-colors hover:bg-gray-50" key={row.id}>
                   {row.getVisibleCells().map((cell) => {
-                    const isDescriptionColumn = cell.column.id === 'description'
+                    const isDescriptionColumn =
+                      cell.column.id === "description";
                     return (
                       <td
+                        className={`px-6 py-4 ${isDescriptionColumn ? "max-w-md" : "whitespace-nowrap"}`}
                         key={cell.id}
-                        className={`px-6 py-4 ${isDescriptionColumn ? 'max-w-md' : 'whitespace-nowrap'}`}
                       >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
                       </td>
-                    )
+                    );
                   })}
                 </tr>
               ))}
@@ -240,5 +258,5 @@ export const ListsPage = ({ onSelectList }: ListsPageProps) => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};

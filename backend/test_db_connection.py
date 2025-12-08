@@ -9,8 +9,10 @@ Usage:
 """
 
 import asyncio
-from app.core.database import engine
+
 from sqlalchemy import text
+
+from app.core.database import engine
 
 
 async def test_connection():
@@ -47,11 +49,15 @@ async def test_migration_table():
             if exists:
                 print("Migration table exists - migrations have been applied")
                 # Get current version
-                result = await conn.execute(text("SELECT version_num FROM alembic_version"))
+                result = await conn.execute(
+                    text("SELECT version_num FROM alembic_version")
+                )
                 version = result.scalar()
                 print(f"Current migration version: {version}")
             else:
-                print("Migration table does not exist - run 'alembic upgrade head' to apply migrations")
+                print(
+                    "Migration table does not exist - run 'alembic upgrade head' to apply migrations"
+                )
             return exists
     except Exception as e:
         print(f"Error checking migration table: {e}")

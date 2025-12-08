@@ -1,0 +1,326 @@
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import type {
+  BulkApplySchemaRequest,
+  BulkApplySchemaResponse,
+  TagUpdateResult,
+} from "@/types/bulk";
+import { type Tag, type TagCreate, TagSchema, TagsSchema } from "@/types/tag";
+
+/**
+ * Query options factory for tags
+ * Enables type-safe reuse of query configuration
+ *
+ * @example
+ * ```ts
+ * // Use in useQuery
+ * useQuery(tagsOptions())
+ *
+ * // Use with queryClient
+ * queryClient.setQueryData(tagsOptions().queryKey, newTags)
+ * queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey })
+ * ```
+ */
+export function tagsOptions() {
+  return queryOptions({
+    queryKey: ["tags"],
+    queryFn: async () => {
+      const { data } = await api.get<Tag[]>("/tags");
+      // Validate response with Zod schema
+      return TagsSchema.parse(data);
+    },
+  });
+}
+
+/**
+ * React Query hook to fetch all tags for the current user
+ *
+ * @returns Query result with tags array
+ *
+ * @example
+ * ```tsx
+ * const { data: tags, isLoading, error } = useTags()
+ * ```
+ */
+export const useTags = () => useQuery(tagsOptions());
+
+/**
+ * React Query hook to fetch only categories (is_video_type=true)
+ *
+ * Categories are tags that represent video types - only one can be assigned per video.
+ *
+ * @returns Query result with filtered categories array
+ *
+ * @example
+ * ```tsx
+ * const { data: categories, isLoading } = useCategories()
+ * ```
+ */
+export const useCategories = () => {
+  const { data: tags, ...rest } = useTags();
+  return {
+    data: tags?.filter((t) => t.is_video_type) ?? [],
+    ...rest,
+  };
+};
+
+/**
+ * React Query hook to fetch only labels (is_video_type=false)
+ *
+ * Labels are tags that can be freely assigned - multiple can be assigned per video.
+ *
+ * @returns Query result with filtered labels array
+ *
+ * @example
+ * ```tsx
+ * const { data: labels, isLoading } = useLabels()
+ * ```
+ */
+export const useLabels = () => {
+  const { data: tags, ...rest } = useTags();
+  return {
+    data: tags?.filter((t) => !t.is_video_type) ?? [],
+    ...rest,
+  };
+};
+
+/**
+ * React Query mutation hook to create a new tag
+ *
+ * Automatically invalidates tags query after successful creation or error
+ * to ensure UI consistency
+ *
+ * @returns Mutation result with mutate function
+ *
+ * @example
+ * ```tsx
+ * const createTag = useCreateTag()
+ *
+ * createTag.mutate({ name: 'Python', color: '#3B82F6' })
+ * ```
+ */
+export const useCreateTag = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: ["createTag"],
+    mutationFn: async (tagData: TagCreate) => {
+      const { data } = await api.post<Tag>("/tags", tagData);
+      // Validate response with Zod schema (consistent with tagsOptions)
+      return TagSchema.parse(data);
+    },
+    onError: (error) => {
+      console.error("Failed to create tag:", error);
+    },
+    onSettled: async () => {
+      // Invalidate and refetch to ensure UI consistency
+      // This runs on both success and error to handle edge cases
+      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
+    },
+  });
+};
+
+/**
+ * Hook to apply schema to multiple tags in bulk
+ *
+ * Uses frontend-side batch processing with Promise.allSettled for partial failure handling.
+ * Each tag is updated individually via PUT /api/tags/{tag_id}.
+ *
+ * @returns Mutation hook with progress tracking and error details
+ *
+ * @example
+ * ```tsx
+ * const bulkApply = useBulkApplySchema()
+ *
+ * bulkApply.mutate({
+ *   tagIds: ['uuid1', 'uuid2', 'uuid3'],
+ *   schemaId: 'schema-uuid' // or null to unbind
+ * })
+ *
+ * // Access results
+ * if (bulkApply.data) {
+ *   console.log(`${bulkApply.data.successCount} of ${bulkApply.data.totalRequested} updated`)
+ *   bulkApply.data.results.filter(r => !r.success).forEach(failure => {
+ *     console.error(`Failed to update ${failure.tagName}: ${failure.error}`)
+ *   })
+ * }
+ * ```
+ */
+export const useBulkApplySchema = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    BulkApplySchemaResponse,
+    Error,
+    BulkApplySchemaRequest,
+    { previousTags: Tag[] | undefined }
+  >({
+    mutationKey: ["bulkApplySchema"],
+    mutationFn: async ({ tagIds, schemaId }: BulkApplySchemaRequest) => {
+      // Fetch current tags to get names for error reporting
+      const currentTags =
+        queryClient.getQueryData<Tag[]>(tagsOptions().queryKey) || [];
+      const tagMap = new Map(currentTags.map((t) => [t.id, t]));
+
+      // Execute all updates in parallel with Promise.all
+      const updatePromises = tagIds.map(
+        async (tagId): Promise<TagUpdateResult> => {
+          try {
+            await api.put(`/tags/${tagId}`, { schema_id: schemaId });
+            return {
+              tagId,
+              tagName: tagMap.get(tagId)?.name || "Unknown",
+              success: true,
+            };
+          } catch (error: any) {
+            return {
+              tagId,
+              tagName: tagMap.get(tagId)?.name || "Unknown",
+              success: false,
+              error:
+                error.response?.data?.detail ||
+                error.message ||
+                "Unknown error",
+            };
+          }
+        }
+      );
+
+      const results = await Promise.all(updatePromises);
+
+      const successCount = results.filter((r) => r.success).length;
+      const failureCount = results.filter((r) => !r.success).length;
+
+      return {
+        successCount,
+        failureCount,
+        totalRequested: tagIds.length,
+        results,
+      };
+    },
+
+    // Optimistic updates
+    onMutate: async ({ tagIds, schemaId }) => {
+      // Cancel outgoing queries to prevent overwrites
+      await queryClient.cancelQueries({ queryKey: tagsOptions().queryKey });
+
+      // Snapshot previous state for rollback
+      const previousTags = queryClient.getQueryData<Tag[]>(
+        tagsOptions().queryKey
+      );
+
+      // Optimistically update tags
+      if (previousTags) {
+        queryClient.setQueryData<Tag[]>(
+          tagsOptions().queryKey,
+          previousTags.map((tag) =>
+            tagIds.includes(tag.id) ? { ...tag, schema_id: schemaId } : tag
+          )
+        );
+      }
+
+      return { previousTags };
+    },
+
+    // Rollback on error
+    // Note: This only rolls back the optimistic updates, not individual tag failures.
+    // Individual failures are captured in the response and handled by the UI.
+    onError: (error, _variables, context) => {
+      console.error("Bulk schema application failed:", error);
+      if (context?.previousTags) {
+        queryClient.setQueryData(tagsOptions().queryKey, context.previousTags);
+      }
+    },
+
+    // Always invalidate to ensure consistency
+    // REF MCP Improvement: Invalidate both tags AND schemas to keep schema usage counts accurate
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
+      queryClient.invalidateQueries({ queryKey: ["schemas"] });
+    },
+  });
+};
+
+/**
+ * React Query mutation hook to update an existing tag
+ *
+ * Automatically invalidates tags query after successful update or error
+ *
+ * @returns Mutation result with mutate function
+ *
+ * @example
+ * ```tsx
+ * const updateTag = useUpdateTag()
+ *
+ * updateTag.mutate({
+ *   tagId: 'uuid',
+ *   data: { name: 'New Name', color: '#FF0000', schema_id: 'uuid-or-null' }
+ * })
+ * ```
+ */
+export const useUpdateTag = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: ["updateTag"],
+    mutationFn: async ({
+      tagId,
+      data,
+    }: {
+      tagId: string;
+      data: Partial<TagCreate>;
+    }) => {
+      const { data: responseData } = await api.put<Tag>(`/tags/${tagId}`, data);
+      // Validate response with Zod schema
+      return TagSchema.parse(responseData);
+    },
+    onError: (error) => {
+      console.error("Failed to update tag:", error);
+    },
+    onSettled: async () => {
+      // Invalidate tags query to refresh UI
+      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
+    },
+  });
+};
+
+/**
+ * React Query mutation hook to delete a tag
+ *
+ * Automatically invalidates tags AND videos queries after successful deletion
+ * to ensure tag badges disappear from video cards
+ *
+ * @returns Mutation result with mutate function
+ *
+ * @example
+ * ```tsx
+ * const deleteTag = useDeleteTag()
+ *
+ * deleteTag.mutate('tag-uuid')
+ * ```
+ */
+export const useDeleteTag = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: ["deleteTag"],
+    mutationFn: async (tagId: string) => {
+      await api.delete(`/tags/${tagId}`);
+      // 204 No Content - no response body
+    },
+    onError: (error) => {
+      console.error("Failed to delete tag:", error);
+    },
+    onSettled: async () => {
+      // Invalidate both tags and videos queries
+      // Videos query needs refresh to remove deleted tag badges
+      await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
+      await queryClient.invalidateQueries({ queryKey: ["videos"] });
+    },
+  });
+};

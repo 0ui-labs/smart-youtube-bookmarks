@@ -11,8 +11,7 @@ async def test_get_lists_empty(client):
 @pytest.mark.asyncio
 async def test_create_list(client):
     response = await client.post(
-        "/api/lists",
-        json={"name": "Test List", "description": "A test"}
+        "/api/lists", json={"name": "Test List", "description": "A test"}
     )
     assert response.status_code == 201
     data = response.json()

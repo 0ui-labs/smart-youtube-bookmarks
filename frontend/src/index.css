@@ -1,3 +1,278 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
+  /* YouTube-inspired Dark Theme
+   * Background: #0F0F0F (0 0% 5.9%)
+   * Foreground/Font: #f1f1f1 (0 0% 94.5%)
+   * Hover/Secondary: #272727 (0 0% 15.3%)
+   * Primary: Blue accent for action buttons
+   */
+  .dark {
+    --background: 0 0% 5.9%;
+    --foreground: 0 0% 94.5%;
+    --card: 0 0% 5.9%;
+    --card-foreground: 0 0% 94.5%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 94.5%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15.3%;
+    --secondary-foreground: 0 0% 94.5%;
+    --muted: 0 0% 15.3%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 15.3%;
+    --accent-foreground: 0 0% 94.5%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 94.5%;
+    --border: 0 0% 20%;
+    --input: 0 0% 15.3%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Vidstack Video Player Theme - integrates with app color scheme */
+
+/* Video player container styling */
+.video-player[data-view-type="video"] {
+  aspect-ratio: 16 / 9;
+}
+
+/* Default Video Layout customization */
+.vds-video-layout {
+  /* Brand color - used for progress bar, buttons, focus rings */
+  --video-brand: hsl(var(--primary));
+  /* Focus ring color */
+  --video-focus-ring-color: hsl(var(--ring));
+  /* Slider progress fill */
+  --video-slider-track-fill-bg: hsl(var(--primary));
+  /* Font family */
+  --video-font-family: ui-sans-serif, system-ui, sans-serif;
+  /* Border radius to match app */
+  --video-border-radius: var(--radius);
+}
+
+/* Menu styling */
+.vds-menu {
+  --menu-bg: hsl(var(--popover));
+  --menu-border: hsl(var(--border));
+  --menu-item-hover-bg: hsl(var(--accent));
+}
+
+/* Tooltip styling */
+.vds-tooltip {
+  --tooltip-bg: hsl(var(--popover));
+  --tooltip-color: hsl(var(--popover-foreground));
+}
+
+/* Chapter markers on timeline */
+.vds-time-slider .vds-slider-chapter {
+  --chapter-title-color: hsl(var(--foreground));
+}
+
+/* Captions/Subtitles styling */
+.vds-captions {
+  --cue-bg: hsl(0 0% 0% / 0.85);
+  --cue-color: hsl(0 0% 100%);
+  --cue-font-size: clamp(20px, 4vw, 32px);
+  /* Fix position to bottom - prevent jumping when controls show/hide */
+  bottom: 12px !important;
+  transition: none !important;
+}
+
+/* Ensure captions don't move when controls appear */
+.vds-video-layout[data-controls] .vds-captions,
+.vds-video-layout:not([data-controls]) .vds-captions {
+  bottom: 12px !important;
+}
+
+/* Focus styles for accessibility */
+.vds-button:focus-visible,
+.vds-slider:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Ensure poster image covers container */
+.vds-poster {
+  object-fit: cover;
+}
+
+/* Buffering indicator */
+.vds-buffering-indicator {
+  --buffering-color: hsl(var(--primary));
+}
+
+/* ========================================
+   Tiptap Editor Styles
+   ======================================== */
+
+/* Editor Container */
+.tiptap-editor {
+  @apply min-h-[80px] p-3 rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2;
+}
+
+.tiptap-editor .ProseMirror {
+  @apply outline-none min-h-[60px];
+}
+
+/* Placeholder */
+.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+  @apply text-muted-foreground pointer-events-none float-left h-0;
+  content: attr(data-placeholder);
+}
+
+/* Typography */
+.tiptap-editor h1 {
+  @apply text-xl font-bold mt-4 mb-2 first:mt-0;
+}
+.tiptap-editor h2 {
+  @apply text-lg font-semibold mt-3 mb-2 first:mt-0;
+}
+.tiptap-editor h3 {
+  @apply text-base font-medium mt-2 mb-1 first:mt-0;
+}
+.tiptap-editor p {
+  @apply my-1 first:mt-0 last:mb-0;
+}
+
+/* Lists */
+.tiptap-editor ul {
+  @apply list-disc ml-6 my-2;
+}
+.tiptap-editor ol {
+  @apply list-decimal ml-6 my-2;
+}
+.tiptap-editor li {
+  @apply my-0.5;
+}
+.tiptap-editor li p {
+  @apply my-0;
+}
+
+/* Blockquote */
+.tiptap-editor blockquote {
+  @apply border-l-4 border-muted-foreground/30 pl-4 italic my-2;
+}
+
+/* Inline Code */
+.tiptap-editor code {
+  @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+/* Code Block */
+.tiptap-editor pre {
+  @apply bg-muted p-4 rounded-md overflow-x-auto my-2;
+}
+
+.tiptap-editor pre code {
+  @apply bg-transparent p-0;
+}
+
+/* Links */
+.tiptap-editor a {
+  @apply text-primary underline cursor-pointer;
+}
+
+/* ========================================
+   Tiptap Prose Styles (Read-Only)
+   ======================================== */
+
+.tiptap-prose h1 {
+  @apply text-xl font-bold mt-4 mb-2 first:mt-0;
+}
+.tiptap-prose h2 {
+  @apply text-lg font-semibold mt-3 mb-2 first:mt-0;
+}
+.tiptap-prose h3 {
+  @apply text-base font-medium mt-2 mb-1 first:mt-0;
+}
+.tiptap-prose p {
+  @apply my-1 first:mt-0 last:mb-0;
+}
+.tiptap-prose ul {
+  @apply list-disc ml-6 my-2;
+}
+.tiptap-prose ol {
+  @apply list-decimal ml-6 my-2;
+}
+.tiptap-prose li {
+  @apply my-0.5;
+}
+.tiptap-prose blockquote {
+  @apply border-l-4 border-muted-foreground/30 pl-4 italic my-2;
+}
+.tiptap-prose code {
+  @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono;
+}
+.tiptap-prose pre {
+  @apply bg-muted p-4 rounded-md overflow-x-auto my-2;
+}
+.tiptap-prose pre code {
+  @apply bg-transparent p-0;
+}
+.tiptap-prose a {
+  @apply text-primary underline;
+}
+
+/* ========================================
+   Mobile Touch Optimization
+   ======================================== */
+
+/* Navigation buttons: hover only on devices with pointer (not touch) */
+@media (hover: hover) and (pointer: fine) {
+  .nav-btn:hover,
+  .channel-nav-btn:hover,
+  .tag-nav-btn:hover {
+    @apply bg-accent;
+  }
+}
+
+/* Safe area padding for iOS devices with notch/home indicator */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+}

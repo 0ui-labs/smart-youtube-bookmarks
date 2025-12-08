@@ -28,6 +28,7 @@ wheels/
 
 # Virtual environments
 venv/
+.venv/
 ENV/
 env/
 
@@ -87,3 +88,12 @@ alembic/versions/*.py
 
 # Git worktrees
 .worktrees/
+
+# Code analysis results
+semgrep.json
+
+# Local documentation (planning, bugs, features)
+documentation/docs/
+
+# Bracket
+.br/

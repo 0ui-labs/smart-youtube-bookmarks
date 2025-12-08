@@ -6,11 +6,28 @@ and provides the health check endpoint.
 """
 
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import lists, videos, processing, websocket
-from app.core.redis import close_redis_client
+from app.api import (
+    analytics,
+    channels,
+    chat,
+    custom_fields,
+    enrichment,
+    lists,
+    processing,
+    schema_fields,
+    schemas,
+    search,
+    subscriptions,
+    tags,
+    videos,
+    webhooks,
+    websocket,
+)
+from app.core.redis import close_arq_pool, close_redis_client, get_arq_pool
 
 
 @asynccontextmanager
@@ -19,15 +36,52 @@ async def lifespan(app: FastAPI):
     Application lifespan manager.
 
     Handles startup and shutdown events for the application.
-    Currently manages Redis connection lifecycle.
+    Manages Redis client and ARQ pool lifecycle.
     """
-    # Startup: nothing to do yet
+    # Startup: Initialize ARQ pool eagerly (not lazy on first request)
+    # If Redis is unavailable, log warning and continue in degraded mode
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        await get_arq_pool()
+    except Exception as e:
+        logger.warning(
+            f"Failed to connect to Redis on startup: {e}. "
+            "Background job processing will be unavailable."
+        )
+
     yield
-    # Shutdown: close Redis connection
+
+    # Shutdown: Close both Redis client and ARQ pool
     await close_redis_client()
+    await close_arq_pool()
 
 
-app = FastAPI(title="Smart YouTube Bookmarks", lifespan=lifespan)
+app = FastAPI(
+    title="Smart YouTube Bookmarks API",
+    description="""
+API for managing YouTube video collections with custom fields, real-time processing, and video enrichment.
+
+## Features
+
+- **Lists** – Create and manage video collections
+- **Videos** – Add, import (CSV), export, and manage videos
+- **Custom Fields** – Define rating, select, text, and boolean fields
+- **Field Schemas** – Create reusable field templates
+- **Channels** – Auto-created from video metadata
+- **Tags** – Organize videos with custom tags
+- **Enrichment** – Transcripts and AI-powered metadata
+- **Real-Time Progress** – WebSocket-based import tracking
+
+## Authentication
+
+Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+    """,
+    version="0.1.0",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,6 +96,17 @@ app.include_router(lists.router)
 app.include_router(videos.router)
 app.include_router(processing.router)
 app.include_router(websocket.router, prefix="/api", tags=["websocket"])
+app.include_router(tags.router)
+app.include_router(custom_fields.router)
+app.include_router(schemas.router)
+app.include_router(schema_fields.router)
+app.include_router(analytics.router)
+app.include_router(channels.router)
+app.include_router(enrichment.router)
+app.include_router(search.router)
+app.include_router(subscriptions.router)
+app.include_router(chat.router)
+app.include_router(webhooks.router)
 
 
 @app.get("/api/health")

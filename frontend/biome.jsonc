@@ -1,0 +1,107 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
+  "extends": ["ultracite/core", "ultracite/react"],
+  "linter": {
+    "rules": {
+      "style": {
+        // Disable file naming - too strict for existing codebase
+        "useFilenamingConvention": "off",
+        // interface vs type - both are valid, don't enforce
+        "useConsistentTypeDefinitions": "off",
+        // Single-line if/else without braces is fine for simple cases
+        "useBlockStatements": "off",
+        // Nested ternaries are common in JSX for conditional rendering
+        "noNestedTernary": "off",
+        // Non-null assertions are sometimes necessary
+        "noNonNullAssertion": "warn"
+      },
+      "performance": {
+        // Disable for now - too noisy in test files
+        "useTopLevelRegex": "off",
+        // import * as is valid for certain patterns (icons, etc.)
+        "noNamespaceImport": "off",
+        // Barrel files are standard in this project
+        "noBarrelFile": "off"
+      },
+      "complexity": {
+        // forEach is idiomatic in React/JS
+        "noForEach": "off",
+        // Complex functions - some existing functions exceed limit, allow for now
+        "noExcessiveCognitiveComplexity": "off",
+        // void operator - sometimes useful
+        "noVoid": "off"
+      },
+      "correctness": {
+        // Unused variables - warn for now, clean up incrementally
+        "noUnusedVariables": "warn",
+        // React hooks deps - warn for now
+        "useExhaustiveDependencies": "warn",
+        // Image sizes - not always known for dynamic images
+        "useImageSize": "warn"
+      },
+      "nursery": {
+        // Too many false positives with React conditional rendering
+        "noLeakedRender": "off",
+        // Variable shadowing - common in callbacks like onOpenChange={(open) => ...}
+        "noShadow": "off",
+        // Increment/decrement operators are standard JS
+        "noIncrementDecrement": "off"
+      },
+      "suspicious": {
+        // Empty blocks sometimes used for try-catch fallbacks
+        "noEmptyBlockStatements": "warn",
+        // Async without await - warn only
+        "useAwait": "warn",
+        // Explicit any - TypeScript already catches most issues, disable
+        "noExplicitAny": "off",
+        // Array index as key - valid when order is stable (e.g., error lists)
+        "noArrayIndexKey": "off",
+        // Alert is used for quick confirmations, warn only
+        "noAlert": "warn",
+        // Returning in forEach - common pattern for assertions in tests
+        "useIterableCallbackReturn": "off",
+        // Bitwise operators are intentionally used for UUID generation
+        "noBitwiseOperators": "off",
+        // @tailwind is a valid PostCSS/Tailwind directive
+        "noUnknownAtRules": "off"
+      },
+      "a11y": {
+        // Button type - too many existing violations, disable for now
+        "useButtonType": "off",
+        // SVG titles - warn instead of error
+        "noSvgWithoutTitle": "warn",
+        // Semantic elements - warn for now
+        "useSemanticElements": "warn",
+        // Interactive elements - warn for now
+        "noNoninteractiveElementInteractions": "warn",
+        "noStaticElementInteractions": "warn",
+        "useKeyWithClickEvents": "warn",
+        // Labels - warn for now
+        "noLabelWithoutControl": "warn",
+        // ARIA roles - warn for now
+        "useAriaPropsSupportedByRole": "warn"
+      },
+      "security": {
+        // dangerouslySetInnerHTML - warn only (used intentionally with DOMPurify)
+        "noDangerouslySetInnerHtml": "warn"
+      }
+    }
+  },
+  "overrides": [
+    {
+      // Test files - relax rules
+      "includes": ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}", "**/__tests__/**/*", "**/test/**/*", "**/__mocks__/**/*"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noSkippedTests": "warn"
+          },
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off"
+          }
+        }
+      }
+    }
+  ]
+}
