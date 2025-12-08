@@ -41,6 +41,7 @@ import {
   useCreateVideo,
   useDeleteVideo,
   useVideos,
+  videoKeys,
 } from "@/hooks/useVideos";
 import { useVideosFilter } from "@/hooks/useVideosFilter";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -408,79 +409,53 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       return data;
     },
     onMutate: async ({ videoId, fieldId, value }) => {
-      // Cancel outgoing refetches to avoid race conditions
-      await queryClient.cancelQueries({ queryKey: ["video-detail", videoId] });
-      await queryClient.cancelQueries({ queryKey: ["videos", listId] });
+      // Cancel ALL video queries
+      await queryClient.cancelQueries({ queryKey: videoKeys.all });
 
-      // Snapshot previous value for rollback
-      const previousVideoDetail = queryClient.getQueryData([
-        "video-detail",
-        videoId,
-      ]);
-      const previousVideosList = queryClient.getQueryData(["videos", listId]);
-
-      // Optimistically update video detail cache
-      queryClient.setQueryData(
-        ["video-detail", videoId],
-        (old: VideoResponse | undefined) => {
-          if (!old) return old;
-          return {
-            ...old,
-            field_values:
-              old.field_values?.map((fv) =>
-                fv.field_id === fieldId ? { ...fv, value } : fv
-              ) ?? [],
-          };
-        }
-      );
-
-      // Optimistically update videos list cache
-      queryClient.setQueryData(
-        ["videos", listId],
-        (old: VideoResponse[] | undefined) => {
-          if (!old) return old;
-          return old.map((video) =>
-            video.id === videoId
-              ? {
-                  ...video,
-                  field_values:
-                    video.field_values?.map((fv) =>
-                      fv.field_id === fieldId ? { ...fv, value } : fv
-                    ) ?? [],
-                }
-              : video
-          );
-        }
-      );
-
-      return { previousVideoDetail, previousVideosList };
-    },
-    onSuccess: (_data, variables) => {
-      // Invalidate queries to refetch and sync with server state
-      queryClient.invalidateQueries({
-        queryKey: ["video-detail", variables.videoId],
+      // Snapshot ALL video queries for rollback
+      const previousVideos = queryClient.getQueriesData({
+        queryKey: videoKeys.all,
       });
-      queryClient.invalidateQueries({ queryKey: ["videos", listId] });
+
+      // Optimistically update ALL video queries
+      queryClient.setQueriesData(
+        { queryKey: videoKeys.all },
+        (oldVideos: VideoResponse[] | undefined) => {
+          // Guard against non-array data (setQueriesData iterates all matching queries)
+          if (!(oldVideos && Array.isArray(oldVideos))) return oldVideos;
+
+          return oldVideos.map((video) => {
+            if (video.id !== videoId) return video;
+
+            return {
+              ...video,
+              field_values:
+                video.field_values?.map((fv) =>
+                  fv.field_id === fieldId ? { ...fv, value } : fv
+                ) ?? [],
+            };
+          });
+        }
+      );
+
+      return { previousVideos };
     },
-    onError: (error: any, variables, context) => {
-      // Rollback optimistic updates on error
-      if (context?.previousVideoDetail) {
-        queryClient.setQueryData(
-          ["video-detail", variables.videoId],
-          context.previousVideoDetail
-        );
-      }
-      if (context?.previousVideosList) {
-        queryClient.setQueryData(
-          ["videos", listId],
-          context.previousVideosList
-        );
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: videoKeys.all });
+    },
+    onError: (error: any, _variables, context) => {
+      console.error("Failed to update field value:", error);
+
+      // Rollback ALL queries
+      if (context?.previousVideos) {
+        context.previousVideos.forEach(([queryKey, data]) => {
+          queryClient.setQueryData<VideoResponse[]>(
+            queryKey,
+            data as VideoResponse[]
+          );
+        });
       }
 
-      // Log error and notify user
-      console.error("Failed to update field value:", error);
-      // TODO: Replace console.error with toast notification
-      // toast.error('Failed to update field value')
       alert("Failed to update field value. Please try again.");
     },
   });
