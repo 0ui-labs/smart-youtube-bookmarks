@@ -68,10 +68,19 @@ const COMPLETED_JOB_TTL = 5 * 60 * 1000; // 5 minutes
  *
  * @returns WebSocket state and job progress map
  */
+const disconnectedProgress: UseWebSocketReturn = {
+  jobProgress: new Map(),
+  isConnected: false,
+  reconnecting: false,
+  readyState: ReadyState.UNINSTANTIATED,
+  sendJsonMessage: () => {},
+  authStatus: "pending",
+  historyError: null,
+  retryHistory: async () => {},
+};
+
 export function useWebSocket(): UseWebSocketReturn {
-  const shared = useContext(ProgressContext);
-  const connection = useProgressConnection(!shared);
-  return shared ?? connection;
+  return useContext(ProgressContext) ?? disconnectedProgress;
 }
 
 export function useProgressConnection(enabled = true): UseWebSocketReturn {

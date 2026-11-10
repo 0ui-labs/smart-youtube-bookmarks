@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { useWebSocket } from "./useWebSocket";
+import { useProgressConnection as useWebSocket } from "./useWebSocket";
 
 const socket = vi.hoisted(() => ({
   options: null as any,

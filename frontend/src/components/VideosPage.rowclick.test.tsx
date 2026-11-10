@@ -1,4 +1,3 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -116,16 +115,8 @@ vi.mock("@/stores/tagStore", () => ({
 }));
 
 describe("VideosPage - Row Click & Menu Interaction", () => {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-
   const renderVideosPage = () =>
-    renderWithRouter(
-      <QueryClientProvider client={queryClient}>
-        <VideosPage listId="list-1" />
-      </QueryClientProvider>
-    );
+    renderWithRouter(<VideosPage listId="list-1" />);
 
   beforeEach(() => {
     vi.clearAllMocks();

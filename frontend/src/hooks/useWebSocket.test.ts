@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
-import { useWebSocket } from "./useWebSocket";
+import { useProgressConnection as useWebSocket } from "./useWebSocket";
 
 // Mock react-use-websocket
 let mockLastJsonMessage: any = null;
