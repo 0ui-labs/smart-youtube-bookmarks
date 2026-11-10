@@ -40,6 +40,7 @@ async def test_get_analytics_success(client: AsyncClient, test_db: AsyncSession)
     # Create list
     test_list = BookmarkList(id=uuid4(), name="Test List", user_id=user.id)
     test_db.add(test_list)
+    await test_db.flush()
 
     # Create field
     field = CustomField(
@@ -92,6 +93,7 @@ async def test_most_used_fields_calculation(client: AsyncClient, test_db: AsyncS
 
     test_list = BookmarkList(id=uuid4(), name="Test List", user_id=user.id)
     test_db.add(test_list)
+    await test_db.flush()
 
     # Create 3 fields
     field1 = CustomField(
@@ -173,6 +175,7 @@ async def test_unused_schemas_no_tags(client: AsyncClient, test_db: AsyncSession
 
     test_list = BookmarkList(id=uuid4(), name="Test List", user_id=user.id)
     test_db.add(test_list)
+    await test_db.flush()
 
     # Create schema with no tags
     schema = FieldSchema(
@@ -225,6 +228,7 @@ async def test_unused_schemas_no_values(client: AsyncClient, test_db: AsyncSessi
 
     test_list = BookmarkList(id=uuid4(), name="Test List", user_id=user.id)
     test_db.add(test_list)
+    await test_db.flush()
 
     # Create schema
     schema = FieldSchema(
@@ -280,6 +284,7 @@ async def test_field_coverage_sorted_ascending(
 
     test_list = BookmarkList(id=uuid4(), name="Test List", user_id=user.id)
     test_db.add(test_list)
+    await test_db.flush()
 
     # Create 2 fields
     low_coverage_field = CustomField(
@@ -358,6 +363,7 @@ async def test_schema_effectiveness_calculation(
 
     test_list = BookmarkList(id=uuid4(), name="Test List", user_id=user.id)
     test_db.add(test_list)
+    await test_db.flush()
 
     # Create schema with 4 fields
     schema = FieldSchema(
@@ -455,6 +461,7 @@ async def test_analytics_empty_list(client: AsyncClient, test_db: AsyncSession):
 
     test_list = BookmarkList(id=uuid4(), name="Empty List", user_id=user.id)
     test_db.add(test_list)
+    await test_db.flush()
     await test_db.commit()
 
     response = await client.get(f"/api/lists/{test_list.id}/analytics")
