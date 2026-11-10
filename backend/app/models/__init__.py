@@ -23,6 +23,7 @@ __all__ = [
     "EnrichmentStatus",
     "FieldSchema",
     "JobProgressEvent",
+    "JobOutbox",
     "ProcessingJob",
     "Schema",
     "SchemaField",
@@ -35,3 +36,4 @@ __all__ = [
     "VideoFieldValue",
     "video_tags",
 ]
+from .job_outbox import JobOutbox
