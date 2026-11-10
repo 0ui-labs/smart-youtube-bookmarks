@@ -23,7 +23,7 @@ async def test_parallel_first_login_has_one_local_identity(
             await db.commit()
             return user.id
 
-    ids = await asyncio.gather(login(), login(), login())
+    ids = await asyncio.gather(*(login() for _ in range(12)))
     assert len(set(ids)) == 1
     assert ids[0] != legacy_id
     assert len((await test_db.execute(select(User))).scalars().all()) == 2
