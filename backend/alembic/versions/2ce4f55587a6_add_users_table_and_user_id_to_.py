@@ -5,34 +5,46 @@ Revises: 40371b58bbe1
 Create Date: 2025-10-28 23:10:14.630050
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+import uuid
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql import text
-import uuid
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = '2ce4f55587a6'
-down_revision: Union[str, None] = '40371b58bbe1'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "2ce4f55587a6"
+down_revision: str | None = "40371b58bbe1"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     # Step 1: Create users table
     op.create_table(
-        'users',
-        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('email', sa.String(), nullable=False),
-        sa.Column('hashed_password', sa.String(), nullable=False),
-        sa.Column('is_active', sa.Boolean(), server_default='true', nullable=False),
-        sa.PrimaryKeyConstraint('id')
+        "users",
+        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("email", sa.String(), nullable=False),
+        sa.Column("hashed_password", sa.String(), nullable=False),
+        sa.Column("is_active", sa.Boolean(), server_default="true", nullable=False),
+        sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index('ix_users_email', 'users', ['email'], unique=True)
+    op.create_index("ix_users_email", "users", ["email"], unique=True)
 
     # Step 2: Create a default test user for existing data
     # Generate a UUID for the default user
@@ -41,52 +53,56 @@ def upgrade() -> None:
     # Insert default test user using parameterized query
     # SECURITY: The password hash is intentionally invalid to prevent authentication.
     # Users must reset their password before they can log in.
-    op.execute(
+    op.get_bind().execute(
         text("""
             INSERT INTO users (id, email, hashed_password, is_active)
             VALUES (:user_id, :email, :password, :is_active)
         """),
         {
-            'user_id': default_user_id,
-            'email': 'test@example.com',
-            'password': '!INVALID_HASH_PLEASE_RESET_PASSWORD!',  # Invalid hash - requires password reset
-            'is_active': True
-        }
+            "user_id": default_user_id,
+            "email": "test@example.com",
+            "password": "!INVALID_HASH_PLEASE_RESET_PASSWORD!",  # Invalid hash - requires password reset
+            "is_active": True,
+        },
     )
 
     # Step 3: Add user_id column as nullable first
     op.add_column(
-        'bookmarks_lists',
-        sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=True)
+        "bookmarks_lists",
+        sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=True),
     )
 
     # Step 4: Set default user_id for existing rows using parameterized query
-    op.execute(
+    op.get_bind().execute(
         text("""
             UPDATE bookmarks_lists
             SET user_id = :user_id
             WHERE user_id IS NULL
         """),
-        {'user_id': default_user_id}
+        {"user_id": default_user_id},
     )
 
     # Step 5: Make user_id NOT NULL and add constraints
-    op.alter_column('bookmarks_lists', 'user_id', nullable=False)
+    op.alter_column("bookmarks_lists", "user_id", nullable=False)
     op.create_foreign_key(
-        'fk_bookmarks_lists_user_id',
-        'bookmarks_lists', 'users',
-        ['user_id'], ['id'],
-        ondelete='CASCADE'
+        "fk_bookmarks_lists_user_id",
+        "bookmarks_lists",
+        "users",
+        ["user_id"],
+        ["id"],
+        ondelete="CASCADE",
     )
-    op.create_index('idx_bookmarks_lists_user_id', 'bookmarks_lists', ['user_id'])
+    op.create_index("idx_bookmarks_lists_user_id", "bookmarks_lists", ["user_id"])
 
 
 def downgrade() -> None:
     # Drop foreign key and index first
-    op.drop_index('idx_bookmarks_lists_user_id', table_name='bookmarks_lists')
-    op.drop_constraint('fk_bookmarks_lists_user_id', 'bookmarks_lists', type_='foreignkey')
-    op.drop_column('bookmarks_lists', 'user_id')
+    op.drop_index("idx_bookmarks_lists_user_id", table_name="bookmarks_lists")
+    op.drop_constraint(
+        "fk_bookmarks_lists_user_id", "bookmarks_lists", type_="foreignkey"
+    )
+    op.drop_column("bookmarks_lists", "user_id")
 
     # Drop users table
-    op.drop_index('ix_users_email', table_name='users')
-    op.drop_table('users')
+    op.drop_index("ix_users_email", table_name="users")
+    op.drop_table("users")
