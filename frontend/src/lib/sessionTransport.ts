@@ -75,11 +75,14 @@ export async function authorizedFetch(
       const refreshed = await prepareSessionRequest(true, init?.signal);
       try {
         headers.set("Authorization", `Bearer ${refreshed.token}`);
-        return await fetch(input, {
+        const response = await fetch(input, {
           ...init,
           headers,
           signal: refreshed.signal,
         });
+        if (!refreshed.isCurrent())
+          throw new DOMException("Session changed", "AbortError");
+        return response;
       } finally {
         refreshed.release();
       }

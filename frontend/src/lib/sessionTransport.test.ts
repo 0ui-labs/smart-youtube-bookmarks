@@ -83,3 +83,31 @@ it("uses the same current credentials for fetch callers", async () => {
     await (await authorizedFetch("http://localhost/api/session-probe")).json()
   ).toEqual({ authorization: "Bearer synthetic-a" });
 });
+
+it("rejects a refreshed fetch response arriving after a user change", async () => {
+  configureSessionTransport(async () => "synthetic-a");
+  let release!: (response: Response) => void;
+  let started!: () => void;
+  const secondStarted = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const second = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  const fetchMock = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(new Response(null, { status: 401 }))
+    .mockImplementationOnce(() => {
+      started();
+      return second;
+    });
+  try {
+    const result = authorizedFetch("http://localhost/api/session-probe");
+    await secondStarted;
+    configureSessionTransport(async () => "synthetic-b");
+    release(new Response(JSON.stringify({ private: "A" }), { status: 200 }));
+    await expect(result).rejects.toMatchObject({ name: "AbortError" });
+  } finally {
+    fetchMock.mockRestore();
+  }
+});
