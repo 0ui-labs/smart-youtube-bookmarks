@@ -70,7 +70,8 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
   // - null/undefined = old video before feature (treat as done)
   const importing = storeProgress
     ? storeProgress.stage !== "complete" && storeProgress.stage !== "error"
-    : video.import_stage !== null &&
+    : video.import_stage !== undefined &&
+      video.import_stage !== null &&
       video.import_stage !== "complete" &&
       video.import_stage !== "error";
 
