@@ -1,4 +1,5 @@
 import asyncio
+import os
 from datetime import UTC
 from unittest.mock import AsyncMock, patch
 
@@ -10,15 +11,20 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.test_database import validated_test_database_url
 from app.main import app
 from app.models import Base
 from app.models.list import BookmarkList
 from app.models.user import User
 from app.models.video import Video
 
+
 # Test database URL
 # Replace the database name in the URL with _test suffix
-TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/youtube_bookmarks_test"
+def safe_test_database_url():
+    return validated_test_database_url(
+        os.environ.get("TEST_DATABASE_URL"), settings.database_url
+    )
 
 
 @pytest.fixture(scope="session")
@@ -37,14 +43,18 @@ def event_loop():
 @pytest.fixture(scope="session")
 async def test_engine():
     """Create test database engine."""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
+    engine = create_async_engine(
+        safe_test_database_url(), echo=False, poolclass=NullPool
+    )
 
     async with engine.begin() as conn:
+        safe_test_database_url()
         await conn.run_sync(Base.metadata.create_all)
 
     yield engine
 
     async with engine.begin() as conn:
+        safe_test_database_url()
         await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
@@ -67,10 +77,9 @@ async def test_db(test_engine):
         finally:
             # Clean up all data after each test to ensure isolation
             # Disable foreign key checks, truncate all tables, re-enable
-            await session.execute(text("SET session_replication_role = 'replica'"))
+            safe_test_database_url()
             for table in reversed(Base.metadata.sorted_tables):
                 await session.execute(text(f'TRUNCATE TABLE "{table.name}" CASCADE'))
-            await session.execute(text("SET session_replication_role = 'origin'"))
             await session.commit()
             await session.close()
 
