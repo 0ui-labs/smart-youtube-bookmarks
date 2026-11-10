@@ -1,13 +1,15 @@
-"""Video query construction and bounded batch hydration."""
+"""One collection selection contract with page-limited batch hydration."""
 
 import logging
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, asc, desc, func, or_, select
+from sqlalchemy import and_, asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
+from sqlalchemy.sql import Select
 
 from app.api.helpers.field_union import get_available_fields_for_videos
 from app.models.channel import Channel
@@ -89,9 +91,10 @@ async def _apply_sorting(stmt, sort_by: str | None, sort_order: str, db: AsyncSe
     Raises:
         HTTPException: If sort_by is invalid or field not found
     """
+    stmt = stmt.order_by(None)
     if not sort_by:
         # Default sorting: created_at descending (newest first)
-        return stmt.order_by(desc(Video.created_at))
+        return stmt.order_by(desc(Video.created_at), Video.id)
 
     if sort_by.startswith("field:"):
         # Field-based sorting
@@ -166,137 +169,40 @@ async def _apply_sorting(stmt, sort_by: str | None, sort_order: str, db: AsyncSe
         else:
             stmt = stmt.order_by(asc(sort_column).nulls_last())
 
-    return stmt
+    return stmt.order_by(Video.id)
 
 
-async def query_all_videos(
-    db: AsyncSession, tags: list[str] | None = None, tags_all: list[str] | None = None
-) -> list[Video]:
-    """
-    List all videos with optional tag filtering.
-
-    Query params:
-    - tags: OR filter (any matching tag) - can be specified multiple times
-    - tags_all: AND filter (all tags required) - can be specified multiple times
-
-    Examples:
-    - /api/videos - All videos
-    - /api/videos?tags=Python&tags=Tutorial - Videos with Python OR Tutorial tags
-    - /api/videos?tags_all=Python&tags_all=Advanced - Videos with BOTH Python AND Advanced tags
-    """
-    stmt = select(Video).order_by(Video.created_at)
-
-    # Filter by tags (OR logic) - case-insensitive
-    if tags and len(tags) > 0:
-        # Join to tags and filter by tag names using case-insensitive ILIKE
-        # or_() creates OR conditions for each tag
-        stmt = (
-            stmt.join(Video.tags)
-            .where(or_(*[Tag.name.ilike(tag) for tag in tags]))
-            .distinct()
-        )
-
-    # Filter by tags (AND logic) - case-insensitive
-    if tags_all and len(tags_all) > 0:
-        # Subquery: videos that have ALL specified tags (case-insensitive)
-        # Count distinct tag matches - only include videos with count == number of requested tags
-        subquery = (
-            select(video_tags.c.video_id)
-            .select_from(video_tags)
-            .join(Tag, video_tags.c.tag_id == Tag.id)
-            .where(or_(*[Tag.name.ilike(tag) for tag in tags_all]))
-            .group_by(video_tags.c.video_id)
-            .having(func.count(func.distinct(video_tags.c.tag_id)) == len(tags_all))
-        )
-
-        stmt = stmt.where(Video.id.in_(subquery))
-
-    result = await db.execute(stmt)
-    videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
-
-    if not videos:
-        return []
-
-    # Load all tags for all videos in a single batch query (prevents N+1)
-    # Use a join query to fetch all tags at once
-    video_ids = [video.id for video in videos]
-    tags_stmt = (
-        select(video_tags.c.video_id, Tag)
-        .join(Tag, video_tags.c.tag_id == Tag.id)
-        .options(
-            selectinload(Tag.schema)
-        )  # Eager load schema to prevent lazy='raise' error
-        .where(video_tags.c.video_id.in_(video_ids))
-    )
-    tags_result = await db.execute(tags_stmt)
-
-    # Group tags by video_id
-    tags_by_video: dict = {}
-    for video_id, tag in tags_result:
-        if video_id not in tags_by_video:
-            tags_by_video[video_id] = []
-        tags_by_video[video_id].append(tag)
-
-    # Assign tags to videos
-    for video in videos:
-        video.__dict__["tags"] = tags_by_video.get(video.id, [])
-
-    # Assign empty field_values to all videos (this endpoint doesn't support field filtering)
-    # This prevents MissingGreenlet error when VideoResponse tries to access field_values
-    for video in videos:
-        video.__dict__["field_values"] = []
-
-    # Load channel thumbnails for all videos
-    await _load_channel_thumbnails(videos, db)
-
-    return list(videos)
-
-
-async def query_filtered_videos(
+async def build_video_selection(
     db: AsyncSession, list_id: UUID, filter_request: VideoFilterRequest
-) -> list[Video]:
-    """
-    Filter videos in a bookmark list by tags and/or custom field values.
-
-    Filtering Logic:
-    - Tags: OR logic (video matches ANY selected tag)
-    - Field filters: AND logic (video matches ALL field filters)
-    - Tags + Field filters: Combined with AND
-
-    Examples:
-        POST /api/lists/{id}/videos/filter
-        Body: {"tags": ["Python"], "field_filters": [{"field_id": "...", "operator": "gte", "value": 4}]}
-        -> Videos with tag "Python" AND rating >= 4
-
-        Body: {"field_filters": [{"field_id": "...", "operator": "contains", "value": "tutorial"}]}
-        -> Videos where field contains "tutorial"
-
-        Body: {"tags": ["Python", "JavaScript"]}
-        -> Videos with Python OR JavaScript tags
-
-    Args:
-        list_id: UUID of the bookmark list
-        filter_request: Filter criteria (tags and/or field filters)
-        db: Database session
-
-    Returns:
-        List[VideoResponse]: Filtered videos
-
-    Raises:
-        HTTPException 404: List not found
-    """
-    # Step 1: Validate list exists
-    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
-    bookmark_list = result.scalar_one_or_none()
-
-    if not bookmark_list:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found",
+) -> Select[Any]:
+    if (
+        await db.execute(select(BookmarkList.id).where(BookmarkList.id == list_id))
+    ).scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    field_ids = {item.field_id for item in filter_request.field_filters or []}
+    if filter_request.sort_by and filter_request.sort_by.startswith("field:"):
+        try:
+            field_ids.add(UUID(filter_request.sort_by.removeprefix("field:")))
+        except ValueError as error:
+            raise HTTPException(
+                status_code=400, detail="Invalid field_id in sort_by parameter"
+            ) from error
+    if field_ids:
+        owned = set(
+            (
+                await db.execute(
+                    select(CustomField.id).where(
+                        CustomField.id.in_(field_ids), CustomField.list_id == list_id
+                    )
+                )
+            )
+            .scalars()
+            .all()
         )
-
+        if owned != field_ids:
+            raise HTTPException(status_code=404, detail="Resource not found")
     # Step 2: Build base query
-    stmt = select(Video).where(Video.list_id == list_id).order_by(Video.created_at)
+    stmt = select(Video).where(Video.list_id == list_id)
 
     # Step 3: Apply tag filtering (OR logic) - case-insensitive exact match
     if filter_request.tags and len(filter_request.tags) > 0:
@@ -307,11 +213,7 @@ async def query_filtered_videos(
 
         if normalized_tags:
             # Join to tags and filter by exact case-insensitive match using func.lower
-            stmt = (
-                stmt.join(Video.tags)
-                .where(func.lower(Tag.name).in_(normalized_tags))
-                .distinct()
-            )
+            stmt = stmt.where(Video.tags.any(func.lower(Tag.name).in_(normalized_tags)))
 
     # Step 3.5: Apply channel filtering (YouTube Channels feature)
     if filter_request.channel_id:
@@ -404,201 +306,18 @@ async def query_filtered_videos(
                 stmt = stmt.where(vfv_alias.value_boolean == field_filter.value)
 
         # Use distinct() to prevent duplicates from multiple JOINs
-        stmt = stmt.distinct()
 
     # Step 5: Apply sorting
     stmt = await _apply_sorting(
         stmt, filter_request.sort_by, filter_request.sort_order or "asc", db
     )
 
-    # Step 6: Execute query
-    result = await db.execute(stmt)
-    videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
+    return stmt
 
+
+async def hydrate_videos(db: AsyncSession, videos: Sequence[Video]) -> list[Video]:
     if not videos:
         return []
-
-    # Step 7: Load tags for all videos (prevent N+1)
-    video_ids = [video.id for video in videos]
-
-    # First, get video-tag associations
-    associations_stmt = select(video_tags).where(video_tags.c.video_id.in_(video_ids))
-    associations_result = await db.execute(associations_stmt)
-    associations = associations_result.all()
-
-    # Get all unique tag IDs
-    tag_ids = list(set(assoc.tag_id for assoc in associations))
-
-    # Load all tags with schema relationship eagerly loaded
-    if tag_ids:
-        tags_stmt = (
-            select(Tag).options(selectinload(Tag.schema)).where(Tag.id.in_(tag_ids))
-        )
-        tags_result = await db.execute(tags_stmt)
-        tags_by_id = {tag.id: tag for tag in tags_result.scalars().all()}
-    else:
-        tags_by_id = {}
-
-    # Group tags by video_id
-    tags_by_video: dict = {}
-    for assoc in associations:
-        video_id = assoc.video_id
-        tag_id = assoc.tag_id
-        if video_id not in tags_by_video:
-            tags_by_video[video_id] = []
-        if tag_id in tags_by_id:
-            tags_by_video[video_id].append(tags_by_id[tag_id])
-
-    # Assign tags to videos
-    for video in videos:
-        video.__dict__["tags"] = tags_by_video.get(video.id, [])
-
-    # Step 8: Batch-load applicable fields for ALL videos
-    applicable_fields_by_video = await get_available_fields_for_videos(videos, db)
-
-    # Step 9: Batch load field values
-    if video_ids:
-        # Fetch all field values for all videos in one query
-        field_values_stmt = (
-            select(VideoFieldValue)
-            .options(
-                selectinload(VideoFieldValue.field)  # Eager load CustomField
-            )
-            .where(VideoFieldValue.video_id.in_(video_ids))
-        )
-        field_values_result = await db.execute(field_values_stmt)
-        all_field_values = field_values_result.scalars().all()
-
-        # Group field values by video_id
-        field_values_by_video: dict[UUID, list[VideoFieldValue]] = {}
-        for fv in all_field_values:
-            if fv.video_id not in field_values_by_video:
-                field_values_by_video[fv.video_id] = []
-            field_values_by_video[fv.video_id].append(fv)
-
-        # Build field_values response for each video
-        for video in videos:
-            # Get applicable fields (from batch-loaded data)
-            applicable_fields = applicable_fields_by_video.get(video.id, [])
-
-            # Get actual field values for this video
-            video_field_values = field_values_by_video.get(video.id, [])
-            values_by_field_id = {fv.field_id: fv for fv in video_field_values}
-
-            # Build response list: ONLY fields that have values set
-            # FIX BUG #003: Only include fields that have actual values (not None)
-            # available_fields shows what CAN be filled, field_values shows what HAS been filled
-            field_values_response = []
-            for field, schema_name, display_order, show_on_card in applicable_fields:
-                field_value = values_by_field_id.get(field.id)
-
-                # FIX BUG #003: Only append if field_value exists
-                if field_value:
-                    # Extract value based on field type
-                    value = None
-                    if field.field_type == "rating":
-                        value = field_value.value_numeric  # Can be float
-                    elif field.field_type in ("select", "text"):
-                        value = field_value.value_text
-                    elif field.field_type == "boolean":
-                        value = field_value.value_boolean
-
-                    # Create response dict (Pydantic will serialize)
-                    field_values_response.append(
-                        {
-                            "id": field_value.id,  # Always valid UUID
-                            "video_id": video.id,
-                            "field_id": field.id,
-                            "field_name": field.name,
-                            "field": field,  # CustomField ORM object
-                            "value": value,
-                            "schema_name": schema_name,
-                            "show_on_card": show_on_card,
-                            "display_order": display_order,
-                            "updated_at": field_value.updated_at,  # Always valid datetime
-                        }
-                    )
-
-            # Assign to video (FastAPI will serialize via VideoResponse schema)
-            video.__dict__["field_values"] = field_values_response
-    else:
-        # No videos -> no field values needed
-        for video in videos:
-            video.__dict__["field_values"] = []
-
-    # Load channel thumbnails for all videos
-    await _load_channel_thumbnails(videos, db)
-
-    return list(videos)
-
-
-async def query_videos_in_list(
-    db: AsyncSession,
-    list_id: UUID,
-    tags: list[str] | None = None,
-    sort_by: str | None = None,
-    sort_order: str | None = "asc",
-) -> list[Video]:
-    """
-    Get all videos in a bookmark list with optional tag filtering and sorting.
-
-    Args:
-        list_id: UUID of the bookmark list
-        tags: Optional list of tag names for OR filtering (case-insensitive)
-        sort_by: Sort column (standard column or 'field:<field_id>')
-        sort_order: Sort direction ('asc' or 'desc')
-        db: Database session
-
-    Returns:
-        List[VideoResponse]: List of videos in the bookmark list
-
-    Raises:
-        HTTPException 404: List not found or custom field not found
-        HTTPException 400: Invalid sort_by parameter
-
-    Examples:
-        - /api/lists/{id}/videos - All videos in list (default: created_at DESC)
-        - /api/lists/{id}/videos?tags=Python&tags=Tutorial - Videos with Python OR Tutorial tags
-        - /api/lists/{id}/videos?sort_by=title&sort_order=asc - Videos sorted by title A-Z
-        - /api/lists/{id}/videos?sort_by=field:uuid-rating-field&sort_order=desc - Videos sorted by rating field
-    """
-    # Validate list exists
-    result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
-    bookmark_list = result.scalar_one_or_none()
-
-    if not bookmark_list:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List with id {list_id} not found",
-        )
-
-    # Build query for videos in list
-    stmt = select(Video).where(Video.list_id == list_id)
-
-    # Apply tag filtering (OR logic) - case-insensitive exact match
-    if tags and len(tags) > 0:
-        # Normalize tag names: strip whitespace and lowercase
-        normalized_tags = [tag.strip().lower() for tag in tags if tag and tag.strip()]
-
-        if normalized_tags:
-            # Join to tags and filter by exact case-insensitive match using func.lower
-            # This is more robust than ILIKE (no wildcard interpretation) and index-friendly
-            stmt = (
-                stmt.join(Video.tags)
-                .where(func.lower(Tag.name).in_(normalized_tags))
-                .distinct()  # DISTINCT must come before ORDER BY for PostgreSQL
-            )
-
-    # Apply sorting
-    stmt = await _apply_sorting(stmt, sort_by, sort_order, db)
-
-    # Execute query
-    result = await db.execute(stmt)
-    videos: Sequence[Video] = result.scalars().all()  # type: ignore[assignment]
-
-    if not videos:
-        return []
-
     # Load all tags for all videos in two queries (prevents N+1)
     # First, get video-tag associations
     video_ids = [video.id for video in videos]
@@ -637,15 +356,20 @@ async def query_videos_in_list(
     for video in videos:
         video.__dict__["tags"] = tags_by_video.get(video.id, [])
 
-    # Load parent list once (for Two-Layer Field System: workspace fields from list.default_schema_id)
-    # All videos in this endpoint share the same list_id
-    parent_list_stmt = select(BookmarkList).where(BookmarkList.id == list_id)
-    parent_list_result = await db.execute(parent_list_stmt)
-    parent_list = parent_list_result.scalar_one_or_none()
-
-    # Assign list to all videos
+    parent_lists = (
+        (
+            await db.execute(
+                select(BookmarkList).where(
+                    BookmarkList.id.in_({video.list_id for video in videos})
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    parents = {parent.id: parent for parent in parent_lists}
     for video in videos:
-        video.__dict__["list"] = parent_list
+        video.__dict__["list"] = parents.get(video.list_id)
 
     # === NEW: Batch-load applicable fields for ALL videos ===
     # ✅ REF #1: Single query for all videos
@@ -726,3 +450,77 @@ async def query_videos_in_list(
     await _load_channel_thumbnails(videos, db)
 
     return list(videos)
+
+
+async def query_video_page(
+    db: AsyncSession,
+    list_id: UUID,
+    filters: VideoFilterRequest,
+    offset: int = 0,
+    limit: int = 50,
+) -> dict[str, Any]:
+    if offset < 0 or not 1 <= limit <= 100:
+        raise ValueError("Invalid page bounds")
+    selection = await build_video_selection(db, list_id, filters)
+    total = (
+        await db.execute(
+            select(func.count()).select_from(selection.order_by(None).subquery())
+        )
+    ).scalar_one()
+    videos = (await db.execute(selection.offset(offset).limit(limit))).scalars().all()
+    return {
+        "items": await hydrate_videos(db, videos),
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+async def query_videos_in_list(
+    db: AsyncSession,
+    list_id: UUID,
+    tags: list[str] | None = None,
+    sort_by: str | None = None,
+    sort_order: str | None = "asc",
+    offset: int = 0,
+    limit: int = 100,
+) -> list[Video]:
+    selection = await build_video_selection(
+        db,
+        list_id,
+        VideoFilterRequest(tags=tags, sort_by=sort_by, sort_order=sort_order),
+    )
+    return await hydrate_videos(
+        db, (await db.execute(selection.offset(offset).limit(limit))).scalars().all()
+    )
+
+
+async def query_filtered_videos(
+    db: AsyncSession,
+    list_id: UUID,
+    filter_request: VideoFilterRequest,
+    offset: int = 0,
+    limit: int = 100,
+) -> list[Video]:
+    selection = await build_video_selection(db, list_id, filter_request)
+    return await hydrate_videos(
+        db, (await db.execute(selection.offset(offset).limit(limit))).scalars().all()
+    )
+
+
+async def query_all_videos(
+    db: AsyncSession,
+    tags: list[str] | None = None,
+    tags_all: list[str] | None = None,
+    offset: int = 0,
+    limit: int = 100,
+) -> list[Video]:
+    selection = select(Video).order_by(Video.created_at, Video.id)
+    names = [name.strip().lower() for name in tags or [] if name.strip()]
+    if names:
+        selection = selection.where(Video.tags.any(func.lower(Tag.name).in_(names)))
+    for name in {name.strip().lower() for name in tags_all or [] if name.strip()}:
+        selection = selection.where(Video.tags.any(func.lower(Tag.name) == name))
+    return await hydrate_videos(
+        db, (await db.execute(selection.offset(offset).limit(limit))).scalars().all()
+    )

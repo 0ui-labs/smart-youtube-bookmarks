@@ -412,3 +412,10 @@ def rebuild_schemas():
 
 # Call rebuild when module is imported
 rebuild_schemas()
+
+
+class VideoPageResponse(BaseModel):
+    items: list[VideoResponse]
+    total: int
+    offset: int
+    limit: int

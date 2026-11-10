@@ -21,11 +21,13 @@ from app.models.video_field_value import VideoFieldValue
 from app.schemas.video import (
     AvailableFieldResponse,
     VideoFilterRequest,
+    VideoPageResponse,
     VideoResponse,
 )
 from app.services.video_query_service import (
     query_all_videos,
     query_filtered_videos,
+    query_video_page,
     query_videos_in_list,
 )
 
@@ -44,10 +46,18 @@ async def get_videos_in_list(
     sort_order: Literal["asc", "desc"] | None = Query(
         "asc", description="Sort direction"
     ),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> list[Video]:
     return await query_videos_in_list(
-        list_id=list_id, tags=tags, sort_by=sort_by, sort_order=sort_order, db=db
+        list_id=list_id,
+        tags=tags,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        db=db,
+        offset=offset,
+        limit=limit,
     )
 
 
@@ -55,10 +65,16 @@ async def get_videos_in_list(
 async def filter_videos_in_list(
     list_id: UUID,
     filter_request: VideoFilterRequest,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> list[Video]:
     return await query_filtered_videos(
-        list_id=list_id, filter_request=filter_request, db=db
+        list_id=list_id,
+        filter_request=filter_request,
+        db=db,
+        offset=offset,
+        limit=limit,
     )
 
 
@@ -231,6 +247,40 @@ async def get_video_by_id(video_id: UUID, db: AsyncSession = Depends(get_db)) ->
 async def list_all_videos(
     tags: Annotated[list[str] | None, Query(max_length=10)] = None,
     tags_all: Annotated[list[str] | None, Query(max_length=10)] = None,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> list[Video]:
-    return await query_all_videos(tags=tags, tags_all=tags_all, db=db)
+    return await query_all_videos(
+        tags=tags, tags_all=tags_all, db=db, offset=offset, limit=limit
+    )
+
+
+@router.get("/lists/{list_id}/videos/page", response_model=VideoPageResponse)
+async def get_video_page(
+    list_id: UUID,
+    tags: Annotated[list[str] | None, Query(max_length=10)] = None,
+    sort_by: str | None = None,
+    sort_order: Literal["asc", "desc"] = "asc",
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    return await query_video_page(
+        db,
+        list_id,
+        VideoFilterRequest(tags=tags, sort_by=sort_by, sort_order=sort_order),
+        offset,
+        limit,
+    )
+
+
+@router.post("/lists/{list_id}/videos/filter/page", response_model=VideoPageResponse)
+async def get_filtered_video_page(
+    list_id: UUID,
+    filters: VideoFilterRequest,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    return await query_video_page(db, list_id, filters, offset, limit)
