@@ -130,7 +130,7 @@ async def test_add_video_to_nonexistent_list(
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == f"List with id {nonexistent_id} not found"
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -226,7 +226,7 @@ async def test_get_videos_nonexistent_list(client: AsyncClient, test_db: AsyncSe
     response = await client.get(f"/api/lists/{nonexistent_id}/videos")
 
     assert response.status_code == 404
-    assert response.json()["detail"] == f"List with id {nonexistent_id} not found"
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -259,7 +259,7 @@ async def test_delete_nonexistent_video(client: AsyncClient, test_db: AsyncSessi
     response = await client.delete(f"/api/videos/{nonexistent_id}")
 
     assert response.status_code == 404
-    assert response.json()["detail"] == f"Video with id {nonexistent_id} not found"
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -307,7 +307,10 @@ async def test_bulk_upload_csv_success(client, test_list, monkeypatch):
         )
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         # Create CSV content with 3 videos
         csv_content = """url
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
@@ -377,7 +380,10 @@ async def test_bulk_upload_csv_with_failures(client, test_list, monkeypatch):
         )
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         csv_content = """url
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 https://invalid.com/video
@@ -515,8 +521,12 @@ async def test_bulk_upload_fetches_youtube_metadata(
 
     # Patch YouTubeClient and extract_youtube_id within the videos module
     with (
-        patch("app.api.videos.YouTubeClient") as mock_youtube_client_class,
-        patch("app.api.videos.extract_youtube_id") as mock_extract_id,
+        patch(
+            "app.api.video_routes.import_export.YouTubeClient"
+        ) as mock_youtube_client_class,
+        patch(
+            "app.api.video_routes.import_export.extract_youtube_id"
+        ) as mock_extract_id,
     ):
         # Mock extract_youtube_id with exact URL mapping (not substring matching)
         url_to_id = {
@@ -1080,7 +1090,10 @@ async def test_sort_by_title_ascending(
         }
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         # Create videos with different titles
         await client.post(
             f"/api/lists/{test_list.id}/videos",
@@ -1146,7 +1159,10 @@ async def test_sort_by_title_descending(
         }
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         # Create videos with different titles
         await client.post(
             f"/api/lists/{test_list.id}/videos",
@@ -1214,7 +1230,10 @@ async def test_sort_by_duration_ascending(
         }
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         # Create videos
         await client.post(
             f"/api/lists/{test_list.id}/videos",
@@ -1285,7 +1304,10 @@ async def test_sort_by_duration_descending(
         }
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         # Create videos
         await client.post(
             f"/api/lists/{test_list.id}/videos",
@@ -1373,7 +1395,10 @@ async def test_sort_by_field_rating_descending(
         }
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         # Create videos
         video_high_response = await client.post(
             f"/api/lists/{test_list.id}/videos",
@@ -1470,7 +1495,10 @@ async def test_sort_by_field_rating_ascending_nulls_last(
         }
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         # Create videos
         v1_response = await client.post(
             f"/api/lists/{test_list.id}/videos",
@@ -1562,7 +1590,10 @@ async def test_sort_by_field_select_ascending(
         }
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         # Create videos
         video_high_response = await client.post(
             f"/api/lists/{test_list.id}/videos",
@@ -1636,7 +1667,7 @@ async def test_sort_by_invalid_field_id(
     )
 
     assert response.status_code == 404
-    assert "Custom field not found" in response.json()["detail"]
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -1704,7 +1735,10 @@ async def test_sort_combined_with_tag_filter(
         }
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         # Create videos
         v1_response = await client.post(
             f"/api/lists/{test_list.id}/videos",
@@ -1788,7 +1822,10 @@ async def test_default_sort_created_at_desc(
         }
     )
 
-    with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
+    with patch(
+        "app.api.video_routes.import_export.YouTubeClient",
+        return_value=mock_youtube_client,
+    ):
         # Create videos with slight delay to ensure different timestamps
         old_response = await client.post(
             f"/api/lists/{test_list.id}/videos",

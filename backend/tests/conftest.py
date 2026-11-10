@@ -157,7 +157,10 @@ async def client(test_db, mock_arq_pool, mock_redis_client, monkeypatch):
     with (
         patch("app.core.redis.get_arq_pool", return_value=mock_arq_pool),
         patch("app.core.redis.get_redis_client", return_value=mock_redis_client),
-        patch("app.api.videos.get_redis_client", return_value=mock_redis_client),
+        patch(
+            "app.api.video_routes.import_export.get_redis_client",
+            return_value=mock_redis_client,
+        ),
         patch("app.api.subscriptions.get_redis_client", return_value=mock_redis_client),
         patch(
             "app.clients.youtube.YouTubeClient.get_video_metadata",

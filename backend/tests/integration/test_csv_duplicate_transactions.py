@@ -28,9 +28,15 @@ async def test_duplicate_import_preserves_other_rows(client, test_db, test_list,
         f"https://youtu.be/{youtube_id}" for youtube_id in ids
     )
     with (
-        patch("app.api.videos.YouTubeClient") as youtube,
-        patch("app.api.videos._enqueue_enrichment", new_callable=AsyncMock),
-        patch("app.api.videos._enqueue_video_processing", new_callable=AsyncMock),
+        patch("app.api.video_routes.import_export.YouTubeClient") as youtube,
+        patch(
+            "app.api.video_routes.import_export._enqueue_enrichment",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.api.video_routes.import_export._enqueue_video_processing",
+            new_callable=AsyncMock,
+        ),
     ):
         youtube.return_value.get_video_metadata = AsyncMock(
             return_value={"title": "Synthetic", "channel": "Test"}
@@ -80,8 +86,11 @@ async def test_parallel_imports_keep_one_video(test_db, test_list, test_engine):
             )
 
     with (
-        patch("app.api.videos.YouTubeClient") as youtube,
-        patch("app.api.videos._enqueue_enrichment", new_callable=AsyncMock),
+        patch("app.api.video_routes.import_export.YouTubeClient") as youtube,
+        patch(
+            "app.api.video_routes.import_export._enqueue_enrichment",
+            new_callable=AsyncMock,
+        ),
     ):
         youtube.return_value.get_video_metadata = AsyncMock(
             return_value={"title": "Synthetic", "channel": "Test"}
@@ -109,7 +118,9 @@ async def test_repeated_fields_use_last_valid_value(client, test_db, test_list):
     test_db.add(field)
     await test_db.commit()
     contents = "url,field_Rating\nhttps://youtu.be/aaaaaaaaaaa,2\nhttps://youtu.be/aaaaaaaaaaa,4\nhttps://youtu.be/aaaaaaaaaaa,invalid"
-    with patch("app.api.videos._enqueue_enrichment", new_callable=AsyncMock):
+    with patch(
+        "app.api.video_routes.import_export._enqueue_enrichment", new_callable=AsyncMock
+    ):
         response = await client.post(
             f"/api/lists/{test_list.id}/videos/bulk",
             files={"file": ("fields.csv", contents, "text/csv")},
