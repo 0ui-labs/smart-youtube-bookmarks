@@ -10,7 +10,8 @@
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",
     "test": "vitest",
-    "generate-api": "orval"
+    "generate-api": "orval",
+    "test:coverage": "vitest run --coverage"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": "biome check --write --no-errors-on-unmatched",
