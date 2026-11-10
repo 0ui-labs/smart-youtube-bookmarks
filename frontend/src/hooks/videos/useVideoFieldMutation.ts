@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { videoKeys } from "@/lib/videoKeys";
 import type { VideoResponse } from "@/types/video";
+import { invalidateVideoViews } from "./cache";
 export function useVideoFieldMutation() {
   const queryClient = useQueryClient();
   // Mutation for updating field values in video detail modal
@@ -53,18 +54,15 @@ export function useVideoFieldMutation() {
       return { previousVideos };
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: videoKeys.all });
+      invalidateVideoViews(queryClient);
     },
-    onError: (error: any, _variables, context) => {
+    onError: (error: unknown, _variables, context) => {
       console.error("Failed to update field value:", error);
 
       // Rollback ALL queries
       if (context?.previousVideos) {
         context.previousVideos.forEach(([queryKey, data]) => {
-          queryClient.setQueryData<VideoResponse[]>(
-            queryKey,
-            data as VideoResponse[]
-          );
+          queryClient.setQueryData(queryKey, data);
         });
       }
 
