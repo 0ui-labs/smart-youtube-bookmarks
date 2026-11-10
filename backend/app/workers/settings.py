@@ -1,7 +1,9 @@
 """ARQ worker configuration with lifecycle hooks."""
 
 import logging
+from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from arq.connections import RedisSettings
@@ -346,11 +348,13 @@ async def after_job_end(ctx: dict) -> None:
         db_session_context.set(None)
 
 
-def transactional_job(handler):
+def transactional_job(
+    handler: Callable[..., Coroutine[Any, Any, Any]],
+) -> Callable[..., Coroutine[Any, Any, Any]]:
     from functools import wraps
 
     @wraps(handler)
-    async def run(ctx, *args, **kwargs):
+    async def run(ctx: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
         try:
             result = await handler(ctx, *args, **kwargs)
             if ctx.get("db") is not None:

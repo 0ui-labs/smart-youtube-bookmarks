@@ -1,6 +1,7 @@
 """CSV persistence and field updates. The caller owns the transaction."""
 
 import logging
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -22,8 +23,8 @@ logger = logging.getLogger(__name__)
 async def process_field_values(
     db: AsyncSession,
     created_videos: list[Video],
-    csv_rows_map: dict[str, dict],
-    field_columns: dict,
+    csv_rows_map: dict[str, list[dict[str, str]]],
+    field_columns: dict[str, dict[str, Any]],
     failures: list[BulkUploadFailure],
 ) -> None:
     """
@@ -45,8 +46,6 @@ async def process_field_values(
     for video in created_videos:
         # Get CSV row for this video by youtube_id
         rows = csv_rows_map.get(video.youtube_id, [])
-        if isinstance(rows, dict):
-            rows = [rows]
         for row_data in rows:
             field_updates = []
 
