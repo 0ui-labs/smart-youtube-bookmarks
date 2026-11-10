@@ -23,3 +23,20 @@ def validated_test_database_url(target: str | None, application_url: str) -> str
     if test.database == application.database or identity(test) == identity(application):
         raise ValueError("Test database must differ from the application database")
     return target
+
+
+def isolated_test_connect_args(target: str) -> dict[str, bool]:
+    """The loopback-only Compose test service on 55438 has SSL disabled.
+
+    Avoid negotiating an unsupported upgrade for every NullPool connection.
+    Never override transport security on application or remote database targets.
+    Call after validated_test_database_url and before constructing a test engine.
+    """
+    url = make_url(target)
+    if (
+        url.host in {"localhost", "127.0.0.1", "::1"}
+        and url.port == 55438
+        and (url.database or "").endswith("_test")
+    ):
+        return {"ssl": False}
+    return {}

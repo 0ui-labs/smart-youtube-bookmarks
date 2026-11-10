@@ -18,7 +18,10 @@ from alembic import context
 
 # Import settings and models
 from app.core.config import settings
-from app.core.test_database import validated_test_database_url
+from app.core.test_database import (
+    isolated_test_connect_args,
+    validated_test_database_url,
+)
 from app.models import Base
 
 # this is the Alembic Config object, which provides
@@ -92,6 +95,9 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=isolated_test_connect_args(test_migration_url)
+        if test_migration_url
+        else {},
     )
 
     async with connectable.connect() as connection:

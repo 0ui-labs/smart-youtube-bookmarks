@@ -12,7 +12,10 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.config import settings
-from app.core.test_database import validated_test_database_url
+from app.core.test_database import (
+    isolated_test_connect_args,
+    validated_test_database_url,
+)
 
 url = validated_test_database_url(
     os.environ.get("TEST_MIGRATION_DATABASE_URL"), settings.database_url
@@ -20,7 +23,7 @@ url = validated_test_database_url(
 
 
 async def verify_empty():
-    engine = create_async_engine(url)
+    engine = create_async_engine(url, connect_args=isolated_test_connect_args(url))
     try:
         async with engine.connect() as connection:
             count = await connection.scalar(
@@ -37,7 +40,7 @@ async def verify_empty():
 
 
 async def add_synthetic_data(user_id, list_id):
-    engine = create_async_engine(url)
+    engine = create_async_engine(url, connect_args=isolated_test_connect_args(url))
     try:
         async with engine.begin() as connection:
             await connection.execute(
@@ -57,7 +60,7 @@ async def add_synthetic_data(user_id, list_id):
 
 
 async def verify_preserved(list_id):
-    engine = create_async_engine(url)
+    engine = create_async_engine(url, connect_args=isolated_test_connect_args(url))
     try:
         async with engine.connect() as connection:
             assert (

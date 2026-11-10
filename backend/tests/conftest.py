@@ -10,7 +10,10 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.test_database import validated_test_database_url
+from app.core.test_database import (
+    isolated_test_connect_args,
+    validated_test_database_url,
+)
 from app.main import app
 from app.models import Base
 from app.models.list import BookmarkList
@@ -30,7 +33,10 @@ def safe_test_database_url():
 async def test_engine():
     """Protect the dedicated database against overlapping destructive suites."""
     engine = create_async_engine(
-        safe_test_database_url(), echo=False, poolclass=NullPool
+        safe_test_database_url(),
+        echo=False,
+        poolclass=NullPool,
+        connect_args=isolated_test_connect_args(safe_test_database_url()),
     )
     async with engine.connect() as suite_lock:
         acquired = await suite_lock.scalar(
@@ -66,10 +72,6 @@ async def test_db(test_engine):
     async with TestSessionLocal() as session:
         try:
             yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
         finally:
             await session.rollback()
             # Clean up all data after each test to ensure isolation
