@@ -17,7 +17,7 @@ import { CustomFieldsPreview } from "./fields";
 import { ProgressOverlay } from "./ProgressOverlay";
 // Import VideoThumbnail from VideosPage (reuse existing component)
 // REF MCP Improvement #2: Use VideoThumbnail with responsive loading (youtubeId, fallbackUrl props)
-import { VideoThumbnail } from "./VideosPage";
+import { VideoThumbnail } from "./videos/VideoThumbnail";
 
 interface VideoCardProps {
   video: VideoResponse;
@@ -70,7 +70,8 @@ export const VideoCard = ({ video, onDelete, onCardClick }: VideoCardProps) => {
   // - null/undefined = old video before feature (treat as done)
   const importing = storeProgress
     ? storeProgress.stage !== "complete" && storeProgress.stage !== "error"
-    : video.import_stage !== null &&
+    : video.import_stage !== undefined &&
+      video.import_stage !== null &&
       video.import_stage !== "complete" &&
       video.import_stage !== "error";
 

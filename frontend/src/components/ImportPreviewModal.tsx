@@ -17,11 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCategories } from "@/hooks/useTags";
+import { useVideoDuplicateLookup } from "@/hooks/videos/useVideoDuplicateLookup";
 import { cn } from "@/lib/utils";
 import { extractYouTubeId } from "@/utils/urlParser";
 
 export interface ImportPreviewModalProps {
   open: boolean;
+  listId?: string;
   onOpenChange: (open: boolean) => void;
   urls: string[];
   existingVideoIds?: string[];
@@ -38,6 +40,7 @@ interface UrlValidation {
 
 export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
   open,
+  listId,
   onOpenChange,
   urls,
   existingVideoIds = [],
@@ -56,6 +59,13 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
     }
   }, [preselectedCategoryId]);
 
+  const lookupIds = useMemo(
+    () => urls.map(extractYouTubeId).filter((id): id is string => id !== null),
+    [urls]
+  );
+  const lookup = useVideoDuplicateLookup(listId, lookupIds, open);
+  const knownVideoIds = lookup.data ?? existingVideoIds;
+  const checking = !!listId && lookupIds.length > 0 && lookup.isPending;
   // Validate all URLs
   const validatedUrls = useMemo<UrlValidation[]>(
     () =>
@@ -65,10 +75,10 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
           url,
           videoId,
           isValid: videoId !== null,
-          isDuplicate: videoId !== null && existingVideoIds.includes(videoId),
+          isDuplicate: videoId !== null && knownVideoIds.includes(videoId),
         };
       }),
-    [urls, existingVideoIds]
+    [urls, knownVideoIds]
   );
 
   const validUrls = validatedUrls.filter((v) => v.isValid);
@@ -156,11 +166,25 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
           </Select>
         </div>
 
+        {checking && <p role="status">Vorhandene Videos werden geprüft…</p>}
+        {listId && lookup.isError && (
+          <div role="alert">
+            Vorhandene Videos konnten nicht geprüft werden.
+            <button onClick={() => void lookup.refetch()} type="button">
+              Erneut prüfen
+            </button>
+          </div>
+        )}
         <DialogFooter>
           <Button onClick={handleCancel} variant="outline">
             Abbrechen
           </Button>
-          <Button disabled={validUrls.length === 0} onClick={handleImport}>
+          <Button
+            disabled={
+              validUrls.length === 0 || checking || (!!listId && lookup.isError)
+            }
+            onClick={handleImport}
+          >
             Importieren ({validUrls.length})
           </Button>
         </DialogFooter>

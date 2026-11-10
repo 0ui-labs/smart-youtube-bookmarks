@@ -102,7 +102,11 @@ def parse_vtt(vtt_content: str) -> list[VTTSegment]:
         match = TIMESTAMP_LINE_PATTERN.match(line_stripped)
         if match:
             # Save previous cue if we have one
-            if current_start is not None and current_text_lines:
+            if (
+                current_start is not None
+                and current_end is not None
+                and current_text_lines
+            ):
                 text = "\n".join(current_text_lines).strip()
                 if text:
                     segments.append(
@@ -113,7 +117,7 @@ def parse_vtt(vtt_content: str) -> list[VTTSegment]:
             current_start = _timestamp_to_seconds(match.group(1))
             current_end = _timestamp_to_seconds(match.group(2))
             current_text_lines = []
-        elif current_start is not None:
+        elif current_start is not None and current_end is not None:
             # This is cue text (could be empty line ending the cue or text content)
             if line_stripped == "":
                 # Empty line - save cue and reset
@@ -136,7 +140,7 @@ def parse_vtt(vtt_content: str) -> list[VTTSegment]:
                     current_text_lines.append(line_stripped)
 
     # Don't forget the last cue
-    if current_start is not None and current_text_lines:
+    if current_start is not None and current_end is not None and current_text_lines:
         text = "\n".join(current_text_lines).strip()
         if text:
             segments.append(VTTSegment(start=current_start, end=current_end, text=text))

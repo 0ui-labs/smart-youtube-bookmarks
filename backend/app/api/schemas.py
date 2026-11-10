@@ -40,7 +40,9 @@ router = APIRouter()
     response_model=list[FieldSchemaResponse],
     tags=["schemas"],
 )
-async def list_schemas(list_id: UUID, db: AsyncSession = Depends(get_db)):
+async def list_schemas(
+    list_id: UUID, db: AsyncSession = Depends(get_db)
+) -> list[FieldSchema]:
     """
     List all field schemas for a list.
 
@@ -115,7 +117,7 @@ async def list_schemas(list_id: UUID, db: AsyncSession = Depends(get_db)):
 )
 async def get_schema(
     list_id: UUID, schema_id: UUID, db: AsyncSession = Depends(get_db)
-):
+) -> FieldSchema:
     """
     Get a single field schema by ID.
 
@@ -160,7 +162,7 @@ async def get_schema(
 )
 async def create_schema(
     list_id: UUID, schema_data: FieldSchemaCreate, db: AsyncSession = Depends(get_db)
-):
+) -> FieldSchema:
     """
     Create a new field schema.
 
@@ -250,15 +252,15 @@ async def create_schema(
     await db.commit()
 
     # Reload with relationships for response
-    stmt = (
+    reload_stmt = (
         select(FieldSchema)
         .where(FieldSchema.id == new_schema.id)
         .options(
             selectinload(FieldSchema.schema_fields).selectinload(SchemaField.field)
         )
     )
-    result = await db.execute(stmt)
-    created_schema = result.scalar_one()
+    reload_result = await db.execute(reload_stmt)
+    created_schema = reload_result.scalar_one()
 
     return created_schema
 
@@ -273,7 +275,7 @@ async def update_schema(
     schema_id: UUID,
     schema_update: FieldSchemaUpdate,
     db: AsyncSession = Depends(get_db),
-):
+) -> FieldSchema:
     """
     Update field schema metadata (name and/or description).
 
@@ -342,7 +344,7 @@ async def update_schema(
 )
 async def delete_schema(
     list_id: UUID, schema_id: UUID, db: AsyncSession = Depends(get_db)
-):
+) -> None:
     """
     Delete a field schema.
 
@@ -390,7 +392,7 @@ async def delete_schema(
     tag_count_result = await db.execute(tag_count_stmt)
     tag_count = tag_count_result.scalar()
 
-    if tag_count > 0:
+    if (tag_count or 0) > 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(

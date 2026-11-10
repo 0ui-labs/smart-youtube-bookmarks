@@ -42,7 +42,7 @@ async def get_redis_client() -> redis.Redis:
     async with _redis_lock:
         # Double-check: another coroutine might have initialized it
         if _redis_client is None:
-            _redis_client = redis.from_url(
+            _redis_client = redis.Redis.from_url(
                 settings.redis_url, encoding="utf-8", decode_responses=True
             )
         return _redis_client

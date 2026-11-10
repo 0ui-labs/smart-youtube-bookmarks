@@ -4,6 +4,7 @@ import asyncio
 import logging
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 import yt_dlp
 from yt_dlp.utils import DownloadError, ExtractorError
@@ -33,9 +34,9 @@ class ChapterExtractor:
     2. Parsing timestamps from video description
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the chapter extractor."""
-        self._ydl_opts = {
+        self._ydl_opts: _YoutubeDLOptions = {
             "quiet": True,
             "no_warnings": True,
             "extract_flat": False,
@@ -94,7 +95,7 @@ class ChapterExtractor:
             )
             return None
 
-    async def _extract_info(self, youtube_id: str) -> dict | None:
+    async def _extract_info(self, youtube_id: str) -> dict[str, Any] | None:
         """Extract video info using yt-dlp.
 
         Args:
@@ -105,9 +106,9 @@ class ChapterExtractor:
         """
         url = f"https://www.youtube.com/watch?v={youtube_id}"
 
-        def _sync_extract():
+        def _sync_extract() -> dict[str, Any] | None:
             with yt_dlp.YoutubeDL(self._ydl_opts) as ydl:
-                return ydl.extract_info(url, download=False)
+                return dict(ydl.extract_info(url, download=False))
 
         # Run in thread pool to avoid blocking (Python 3.9+)
         return await asyncio.to_thread(_sync_extract)
@@ -134,7 +135,7 @@ class ChapterExtractor:
         # Dash character class includes: hyphen-minus (-), en dash (–), em dash (—)
         timestamp_pattern = r"^(\d{1,2}:\d{2}(?::\d{2})?)\s*[\-\u2013\u2014]?\s*(.+)$"
 
-        chapters: list[tuple] = []
+        chapters: list[tuple[float, str]] = []
 
         for line in description.split("\n"):
             line = line.strip()
@@ -220,7 +221,7 @@ def chapters_to_vtt(chapters: list[Chapter]) -> str:
     return "\n".join(lines)
 
 
-def chapters_to_json(chapters: list[Chapter]) -> list[dict]:
+def chapters_to_json(chapters: list[Chapter]) -> list[dict[str, Any]]:
     """Convert chapters to JSON-serializable format.
 
     Args:
@@ -250,3 +251,7 @@ def _format_vtt_time(seconds: float) -> str:
     millis = int((seconds % 1) * 1000)
 
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millis:03d}"
+
+
+if TYPE_CHECKING:
+    from yt_dlp import _YoutubeDLOptions

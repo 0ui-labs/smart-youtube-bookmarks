@@ -131,7 +131,10 @@ describe("VideoThumbnail - Dynamic Sizing (Task #31)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset store to default state before each test
-    useTableSettingsStore.setState({ thumbnailSize: "small" });
+    useTableSettingsStore.setState({
+      thumbnailSize: "small",
+      viewMode: "list",
+    });
   });
 
   describe("Thumbnail Size Classes", () => {

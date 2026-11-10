@@ -1,0 +1,145 @@
+"""Durable ARQ entry point. PostgreSQL serializes delivery and provider work."""
+
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
+from typing import Any
+from uuid import UUID
+
+from sqlalchemy import select, text, update
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from app.core.database import AsyncSessionLocal
+from app.models.job_outbox import JobOutbox
+from app.services.job_dispatch_service import dispatch_jobs
+
+
+def job_handlers() -> dict[str, Callable[..., Awaitable[Any]]]:
+    from app.workers.enrichment_worker import enrich_video
+    from app.workers.progress_delivery import publish_job_progress
+    from app.workers.subscription_worker import (
+        poll_subscription,
+        process_pubsub_notification,
+        sync_pubsub_channel,
+    )
+    from app.workers.video_processor import process_video, process_video_list
+
+    return {
+        handler.__name__: handler
+        for handler in (
+            sync_pubsub_channel,
+            publish_job_progress,
+            enrich_video,
+            poll_subscription,
+            process_pubsub_notification,
+            process_video,
+            process_video_list,
+        )
+    }
+
+
+async def dispatch_outbox(ctx: dict[str, Any]) -> int:
+    sessions = ctx.get("outbox_session_factory", AsyncSessionLocal)
+    async with sessions() as db:
+        delivered = await dispatch_jobs(db, ctx["redis"])
+        from app.core.readiness import mark_worker_ready
+
+        await mark_worker_ready(ctx["redis"])
+        return delivered
+
+
+async def run_durable_job(ctx: dict[str, Any], operation_id: str) -> Any:
+    sessions = ctx.get("outbox_session_factory", AsyncSessionLocal)
+    async with sessions() as db:
+        operation = await db.get(JobOutbox, UUID(operation_id))
+        if operation is None or operation.status in {"completed", "failed"}:
+            return {"status": "ignored"}
+        # A session-level advisory lock remains held across the durable claim's
+        # commit and all handler commits. Expiring a lease cannot run a second
+        # handler while the original process still holds its database connection.
+        lock_key = f"outbox:{operation.kind}:{operation.target_id}"
+        bind = db.bind
+        if not isinstance(bind, AsyncEngine):
+            raise RuntimeError("Durable handlers require an async engine")
+        async with bind.connect() as lock_connection:
+            acquired = await lock_connection.scalar(
+                text("SELECT pg_try_advisory_lock(hashtextextended(:key, 0))"),
+                {"key": lock_key},
+            )
+            if not acquired:
+                return {"status": "busy"}
+            try:
+                operation = (
+                    await db.execute(
+                        select(JobOutbox)
+                        .where(JobOutbox.id == operation.id)
+                        .with_for_update()
+                        .execution_options(populate_existing=True)
+                    )
+                ).scalar_one()
+                if operation.status in {"completed", "failed"}:
+                    return {"status": "ignored"}
+                if (
+                    operation.payload_version != 1
+                    or operation.kind not in job_handlers()
+                ):
+                    operation.status = "failed"
+                    operation.last_error = "UnsupportedPayload"
+                    await db.commit()
+                    return {"status": "failed"}
+                executions = int(operation.payload.get("execution_attempts", 0)) + 1
+                operation.payload = {
+                    **operation.payload,
+                    "execution_attempts": executions,
+                }
+                operation.status = "running"
+                operation.lease_until = datetime.now(UTC) + timedelta(minutes=20)
+                await db.commit()
+                try:
+                    result = await job_handlers()[operation.kind](
+                        ctx, *operation.payload["args"], **operation.payload["kwargs"]
+                    )
+                except Exception as error:
+                    if ctx.get("db") is not None:
+                        await ctx["db"].rollback()
+                    operation.status = "failed" if executions >= 5 else "pending"
+                    operation.last_error = type(error).__name__
+                    operation.next_attempt_at = datetime.now(UTC) + timedelta(minutes=1)
+                    operation.lease_until = None
+                    await db.commit()
+                    raise
+                business = ctx.get("db", db)
+                failed = isinstance(result, dict) and result.get("status") in {
+                    "failed",
+                    "error",
+                }
+                if operation.kind == "process_video":
+                    args = operation.payload["args"]
+                    parent_id = (
+                        args[3]
+                        if len(args) > 3
+                        else operation.payload["kwargs"].get("job_id")
+                    )
+                    if parent_id:
+                        from app.services.job_progress_service import (
+                            advance_job_progress,
+                        )
+
+                        await advance_job_progress(
+                            business, UUID(parent_id), not failed
+                        )
+                # The acknowledgement and final business changes share one commit.
+                # A crash before it replays both; a crash after it ignores delivery.
+                await business.execute(
+                    update(JobOutbox)
+                    .where(JobOutbox.id == operation.id)
+                    .values(
+                        status="failed" if failed else "completed", lease_until=None
+                    )
+                )
+                await business.commit()
+                return result
+            finally:
+                await lock_connection.execute(
+                    text("SELECT pg_advisory_unlock(hashtextextended(:key, 0))"),
+                    {"key": lock_key},
+                )

@@ -11,6 +11,7 @@ import type {
   TagUpdateResult,
 } from "@/types/bulk";
 import { type Tag, type TagCreate, TagSchema, TagsSchema } from "@/types/tag";
+import { invalidateVideoViews } from "./videos/cache";
 
 /**
  * Query options factory for tags
@@ -118,6 +119,7 @@ export const useCreateTag = () => {
       console.error("Failed to create tag:", error);
     },
     onSettled: async () => {
+      await invalidateVideoViews(queryClient);
       // Invalidate and refetch to ensure UI consistency
       // This runs on both success and error to handle edge cases
       await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
@@ -240,6 +242,7 @@ export const useBulkApplySchema = () => {
     // Always invalidate to ensure consistency
     // REF MCP Improvement: Invalidate both tags AND schemas to keep schema usage counts accurate
     onSettled: () => {
+      void invalidateVideoViews(queryClient);
       queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
       queryClient.invalidateQueries({ queryKey: ["schemas"] });
     },
@@ -283,6 +286,7 @@ export const useUpdateTag = () => {
       console.error("Failed to update tag:", error);
     },
     onSettled: async () => {
+      await invalidateVideoViews(queryClient);
       // Invalidate tags query to refresh UI
       await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });
     },
@@ -317,6 +321,7 @@ export const useDeleteTag = () => {
       console.error("Failed to delete tag:", error);
     },
     onSettled: async () => {
+      await invalidateVideoViews(queryClient);
       // Invalidate both tags and videos queries
       // Videos query needs refresh to remove deleted tag badges
       await queryClient.invalidateQueries({ queryKey: tagsOptions().queryKey });

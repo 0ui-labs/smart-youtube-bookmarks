@@ -2,22 +2,26 @@
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime
+from typing import Any, TypeVar
 from uuid import UUID
 
 from arq import Retry
-from isodate import parse_duration
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.youtube import YouTubeClient
 from app.core.config import settings
 from app.core.redis import get_redis_client
-from app.models import ProcessingJob, Video
+from app.models import Video
 from app.models.job_progress import JobProgressEvent
 from app.models.list import BookmarkList
 from app.services.channel_service import get_or_create_channel
+from app.services.job_dispatch_service import DurableJobQueue
 from app.services.rate_limiter import AdaptiveRateLimiter
+from app.services.video_metadata_service import parse_youtube_duration
 
 logger = logging.getLogger(__name__)
 
@@ -28,16 +32,7 @@ _enrichment_rate_limiter = AdaptiveRateLimiter(
 )
 
 
-def _parse_duration(iso_duration: str | None) -> int | None:
-    """Parse ISO 8601 duration to seconds."""
-    if not iso_duration:
-        return None
-    try:
-        duration_obj = parse_duration(iso_duration)
-        return int(duration_obj.total_seconds())
-    except Exception as e:
-        logger.debug(f"Invalid duration format '{iso_duration}': {e}")
-        return None
+_parse_duration = parse_youtube_duration
 
 
 def _parse_timestamp(timestamp: str | None) -> datetime | None:
@@ -51,9 +46,16 @@ def _parse_timestamp(timestamp: str | None) -> datetime | None:
         return None
 
 
+T = TypeVar("T")
+
+
 async def fetch_with_retry(
-    func, *args, max_retries: int = 3, base_delay: float = 1.0, **kwargs
-):
+    func: Callable[..., Awaitable[T]],
+    *args: Any,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    **kwargs: Any,
+) -> T:
     """
     Execute async function with exponential backoff retry.
 
@@ -88,7 +90,9 @@ async def fetch_with_retry(
             await asyncio.sleep(delay)
 
     # Should not reach here, but just in case
-    raise last_exception
+    if last_exception is not None:
+        raise last_exception
+    raise ValueError("max_retries must be non-negative")
 
 
 async def update_stage(
@@ -109,7 +113,7 @@ async def update_stage(
 
 
 async def publish_progress(
-    redis, user_id: str, video_id: str, progress: int, stage: str
+    redis: Redis, user_id: str, video_id: str, progress: int, stage: str
 ) -> None:
     """
     Publish import progress update via Redis Pub/Sub.
@@ -137,7 +141,7 @@ async def publish_progress(
     )
 
 
-async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
+async def enrich_video_staged(ctx: dict[str, Any], video_id: str) -> dict[str, Any]:
     """
     Enrich a video with captions and chapters, updating progress through stages.
 
@@ -236,8 +240,12 @@ async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
 
 
 async def process_video(
-    ctx: dict, video_id: str, list_id: str, schema: dict, job_id: str
-) -> dict:
+    ctx: dict[str, Any],
+    video_id: str,
+    list_id: str,
+    schema: dict[str, Any],
+    job_id: str,
+) -> dict[str, Any]:
     """
     Process a single video:
     1. Fetch YouTube metadata
@@ -367,13 +375,16 @@ async def process_video(
             if settings.enrichment_enabled and settings.enrichment_auto_trigger:
                 try:
                     # Use the worker's existing Redis connection from ctx
-                    arq_redis = ctx["redis"]
-                    job = await arq_redis.enqueue_job("enrich_video", str(video.id))
+                    job = await DurableJobQueue(db).enqueue_job(
+                        "enrich_video", str(video.id)
+                    )
 
                     # Retry once if enqueue failed (handles transient Redis issues)
                     if not job:
                         await asyncio.sleep(0.1)
-                        job = await arq_redis.enqueue_job("enrich_video", str(video.id))
+                        job = await DurableJobQueue(db).enqueue_job(
+                            "enrich_video", str(video.id)
+                        )
 
                     if job:
                         logger.info(f"Enqueued enrichment job for video {video_id}")
@@ -409,6 +420,7 @@ async def process_video(
         # ARQ will rollback the session on exception, so flush() alone would be undone.
         if video:
             video.processing_status = "failed"
+            video.import_stage = "error"
             video.error_message = str(e)
             await db.commit()
 
@@ -416,8 +428,12 @@ async def process_video(
 
 
 async def process_video_list(
-    ctx: dict, job_id: str, list_id: str, video_ids: list[str], schema: dict
-) -> dict:
+    ctx: dict[str, Any],
+    job_id: str,
+    list_id: str,
+    video_ids: list[str],
+    schema: dict[str, Any],
+) -> dict[str, Any]:
     """
     Process a list of videos in batch (for CSV bulk upload).
 
@@ -501,7 +517,9 @@ async def process_video_list(
     }
 
 
-async def _publish_video_update(redis_client, video, job_id: str, user_id: str) -> None:
+async def _publish_video_update(
+    redis_client: Redis, video: Video, job_id: str, user_id: str
+) -> None:
     """
     Publish WebSocket update when video processing completes.
 
@@ -538,134 +556,8 @@ async def _publish_video_update(redis_client, video, job_id: str, user_id: str) 
 
 
 async def _update_job_progress(
-    db: AsyncSession, job_id: str, success: bool, redis_client=None
+    db: AsyncSession, job_id: str, success: bool, redis_client: Redis | None = None
 ) -> None:
-    """
-    Update parent ProcessingJob progress counters and create progress event.
+    from app.services.job_progress_service import advance_job_progress
 
-    Args:
-        db: Database session
-        job_id: UUID of ProcessingJob
-        success: Whether video processing succeeded
-        redis_client: Optional Redis client for publishing progress (from ctx)
-    """
-    try:
-        result = await db.execute(
-            select(ProcessingJob).where(ProcessingJob.id == UUID(job_id))
-        )
-        parent_job = result.scalar_one_or_none()
-
-        if not parent_job:
-            logger.warning(f"Parent job {job_id} not found for progress update")
-            return
-
-        # Increment counters
-        if success:
-            parent_job.processed_count += 1
-        else:
-            parent_job.failed_count += 1
-
-        # Calculate progress percentage
-        total_processed = parent_job.processed_count + parent_job.failed_count
-        progress_percentage = (
-            int((total_processed / parent_job.total_videos) * 100)
-            if parent_job.total_videos > 0
-            else 0
-        )
-
-        # Determine status
-        if total_processed >= parent_job.total_videos:
-            # Job complete
-            event_status = "completed"
-        elif success:
-            event_status = "success"
-        else:
-            event_status = "error"
-
-        # Throttling: Only create DB events for significant progress changes (for large batches)
-        # For small batches (<= 20 videos), create event for every video
-        # For large batches, create event on: 0%, every 5%, and 100%
-        if parent_job.total_videos <= 20:
-            should_create_event = True  # Every update for small batches
-        else:
-            should_create_event = (
-                progress_percentage == 0  # Initial
-                or progress_percentage == 100  # Final
-                or progress_percentage % 5 == 0  # Every 5%
-            )
-
-        # Create progress event (with error handling to not block Redis publish)
-        if should_create_event:
-            try:
-                progress_event = JobProgressEvent(
-                    job_id=UUID(job_id),
-                    progress_data={
-                        "progress": progress_percentage,
-                        "processed": parent_job.processed_count,
-                        "failed": parent_job.failed_count,
-                        "total": parent_job.total_videos,
-                        "status": event_status,
-                    },
-                )
-                db.add(progress_event)
-            except Exception as e:
-                logger.warning(f"Failed to create progress event: {e}")
-                # Continue to Redis publish even if DB write fails
-
-        # Publish progress to Redis (with throttling for large batches)
-        # For small batches (<= 20 videos), publish every update
-        # For large batches, publish on: 0%, every 5%, and 100%
-        if parent_job.total_videos <= 20:
-            should_publish = True
-        else:
-            should_publish = (
-                progress_percentage == 0  # Initial
-                or progress_percentage == 100  # Final
-                or progress_percentage % 5 == 0  # Every 5%
-            )
-
-        if should_publish and redis_client:
-            try:
-                import json
-
-                from app.models.list import BookmarkList
-
-                # Get user_id for channel routing
-                list_result = await db.execute(
-                    select(BookmarkList.user_id).where(
-                        BookmarkList.id == parent_job.list_id
-                    )
-                )
-                user_id = list_result.scalar_one_or_none()
-
-                if user_id:
-                    progress_message = {
-                        "job_id": str(job_id),
-                        "progress": progress_percentage,
-                        "processed": parent_job.processed_count,
-                        "failed": parent_job.failed_count,
-                        "total": parent_job.total_videos,
-                        "status": event_status,
-                    }
-                    channel = f"progress:user:{user_id}"
-                    await redis_client.publish(channel, json.dumps(progress_message))
-            except Exception as e:
-                logger.warning(f"Failed to publish progress to Redis: {e}")
-                # Don't fail job if Redis publish fails
-
-        # Auto-complete job when all videos processed
-        if total_processed >= parent_job.total_videos:
-            if parent_job.failed_count == 0:
-                parent_job.status = "completed"
-            else:
-                parent_job.status = "completed_with_errors"
-            logger.info(
-                f"Job {job_id} completed: {parent_job.processed_count}/{parent_job.total_videos} succeeded, "
-                f"{parent_job.failed_count} failed"
-            )
-
-        await db.flush()
-
-    except Exception as e:
-        logger.error(f"Failed to update job progress for job {job_id}: {e}")
-        # Don't raise - progress update failure shouldn't fail video processing
+    await advance_job_progress(db, UUID(job_id), success)

@@ -1,3 +1,4 @@
+import { invalidateVideoViews } from "./videos/cache";
 /**
  * React Query hooks for managing video custom field values.
  *
@@ -118,9 +119,7 @@ export const useUpdateVideoFieldValues = (videoId: string) => {
       });
 
       // Also invalidate video queries (field_values included in video response)
-      await queryClient.invalidateQueries({
-        queryKey: videoKeys.all,
-      });
+      await invalidateVideoViews(queryClient);
     },
 
     // Error logging for debugging

@@ -1,0 +1,67 @@
+{
+  "phase": "before",
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "python": "3.11.15",
+  "samples": [
+    {
+      "size": 100,
+      "returned": 100,
+      "sql_queries": [
+        12,
+        12,
+        12
+      ],
+      "response_bytes": [
+        165001,
+        165001,
+        165001
+      ],
+      "latency_ms": [
+        123.8,
+        40.06,
+        43.33
+      ],
+      "median_ms": 43.33
+    },
+    {
+      "size": 1000,
+      "returned": 1000,
+      "sql_queries": [
+        12,
+        12,
+        12
+      ],
+      "response_bytes": [
+        1650001,
+        1650001,
+        1650001
+      ],
+      "latency_ms": [
+        202.4,
+        210.1,
+        265.65
+      ],
+      "median_ms": 210.1
+    },
+    {
+      "size": 10000,
+      "returned": 10000,
+      "sql_queries": [
+        12,
+        12,
+        12
+      ],
+      "response_bytes": [
+        16500001,
+        16500001,
+        16500001
+      ],
+      "latency_ms": [
+        2482.36,
+        2379.71,
+        2322.26
+      ],
+      "median_ms": 2379.71
+    }
+  ]
+}

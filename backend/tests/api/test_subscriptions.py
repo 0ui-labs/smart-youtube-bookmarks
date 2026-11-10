@@ -119,7 +119,7 @@ async def test_create_subscription_with_filters(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_subscription_invalid_list(client: AsyncClient):
+async def test_create_subscription_invalid_list(client: AsyncClient, test_user):
     """Test creating a subscription with non-existent list fails."""
     fake_list_id = str(uuid.uuid4())
 
@@ -131,7 +131,7 @@ async def test_create_subscription_invalid_list(client: AsyncClient):
         },
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
 
@@ -182,7 +182,7 @@ async def test_get_subscription(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_subscription_not_found(client: AsyncClient):
+async def test_get_subscription_not_found(client: AsyncClient, test_user):
     """Test getting a non-existent subscription returns 404."""
     fake_id = str(uuid.uuid4())
 
@@ -241,7 +241,7 @@ async def test_update_subscription_deactivate(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_update_subscription_not_found(client: AsyncClient):
+async def test_update_subscription_not_found(client: AsyncClient, test_user):
     """Test updating a non-existent subscription returns 404."""
     fake_id = str(uuid.uuid4())
 
@@ -275,7 +275,7 @@ async def test_delete_subscription(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_delete_subscription_not_found(client: AsyncClient):
+async def test_delete_subscription_not_found(client: AsyncClient, test_user):
     """Test deleting a non-existent subscription returns 404."""
     fake_id = str(uuid.uuid4())
 
@@ -304,7 +304,7 @@ async def test_sync_subscription(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_sync_subscription_not_found(client: AsyncClient):
+async def test_sync_subscription_not_found(client: AsyncClient, test_user):
     """Test syncing a non-existent subscription returns 404."""
     fake_id = str(uuid.uuid4())
 
@@ -332,7 +332,7 @@ async def test_get_subscription_matches_empty(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_subscription_matches_not_found(client: AsyncClient):
+async def test_get_subscription_matches_not_found(client: AsyncClient, test_user):
     """Test getting matches for non-existent subscription returns 404."""
     fake_id = str(uuid.uuid4())
 

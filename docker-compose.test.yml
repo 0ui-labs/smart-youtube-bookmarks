@@ -1,0 +1,22 @@
+# Separate ephemeral services. Never mounts the application's postgres_data volume.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bookmarks_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+    ports:
+      - "127.0.0.1:55438:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d bookmarks_test"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:56388:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]

@@ -113,8 +113,12 @@ describe("Robust Import Integration Flow", () => {
       await waitFor(() => {
         expect(screen.getByRole("progressbar")).toBeInTheDocument();
       });
-      expect(screen.getByText("25%")).toBeInTheDocument();
-      expect(screen.getByText("Metadata")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+        ).toBeGreaterThanOrEqual(25 - 1)
+      );
+      expect(screen.getByText("Lade Metadaten...")).toBeInTheDocument();
 
       // Assert: Thumbnail has grayscale effect
       const grayscaleElement = container.querySelector(".grayscale");
@@ -132,7 +136,9 @@ describe("Robust Import Integration Flow", () => {
 
       // Assert initial state
       await waitFor(() => {
-        expect(screen.getByText("25%")).toBeInTheDocument();
+        expect(
+          Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+        ).toBeGreaterThanOrEqual(25 - 1);
       });
       expect(screen.getByText("Lade Metadaten...")).toBeInTheDocument();
 
@@ -145,7 +151,9 @@ describe("Robust Import Integration Flow", () => {
 
       // Assert: Progress updated
       await waitFor(() => {
-        expect(screen.getByText("50%")).toBeInTheDocument();
+        expect(
+          Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+        ).toBeGreaterThanOrEqual(50 - 1);
         expect(screen.getByText("Lade Untertitel...")).toBeInTheDocument();
       });
 
@@ -444,12 +452,12 @@ describe("Robust Import Integration Flow", () => {
       store.setProgress("video-2", 75, "chapters");
 
       // Assert: Both videos tracked independently
-      expect(store.getProgress("video-1")).toEqual({
-        progress: 25,
+      expect(store.getProgress("video-1")).toMatchObject({
+        realProgress: 25,
         stage: "metadata",
       });
-      expect(store.getProgress("video-2")).toEqual({
-        progress: 75,
+      expect(store.getProgress("video-2")).toMatchObject({
+        realProgress: 75,
         stage: "chapters",
       });
     });
@@ -480,8 +488,8 @@ describe("Robust Import Integration Flow", () => {
 
       // Assert: Only video-1 cleared
       expect(store.getProgress("video-1")).toBeUndefined();
-      expect(store.getProgress("video-2")).toEqual({
-        progress: 75,
+      expect(store.getProgress("video-2")).toMatchObject({
+        realProgress: 75,
         stage: "chapters",
       });
     });
@@ -530,7 +538,10 @@ describe("Robust Import Integration Flow", () => {
       );
 
       // Initially: No progress overlay (video just created)
-      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+      expect(screen.getByRole("progressbar")).toHaveAttribute(
+        "aria-valuenow",
+        "0"
+      );
       unmount();
 
       // Step 2: Metadata stage (simulates WebSocket message arrival)
@@ -548,8 +559,12 @@ describe("Robust Import Integration Flow", () => {
       await waitFor(() => {
         expect(screen.getByRole("progressbar")).toBeInTheDocument();
       });
-      expect(screen.getByText("25%")).toBeInTheDocument();
-      expect(screen.getByText("Metadata")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+        ).toBeGreaterThanOrEqual(25 - 1)
+      );
+      expect(screen.getByText("Lade Metadaten...")).toBeInTheDocument();
       expect(container2.querySelector(".grayscale")).toBeInTheDocument();
       unmount2();
 
@@ -565,9 +580,11 @@ describe("Robust Import Integration Flow", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("50%")).toBeInTheDocument();
+        expect(
+          Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+        ).toBeGreaterThanOrEqual(50 - 1);
       });
-      expect(screen.getByText("Untertitel")).toBeInTheDocument();
+      expect(screen.getByText("Lade Untertitel...")).toBeInTheDocument();
       unmount3();
 
       // Step 4: Complete

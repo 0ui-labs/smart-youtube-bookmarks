@@ -5,6 +5,8 @@ This is a minimal implementation to support WebSocket authentication.
 Can be expanded later with full user management features.
 """
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,6 +21,8 @@ class User(BaseModel):
     """
 
     __tablename__ = "users"
+
+    clerk_id: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
 
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
@@ -38,3 +42,10 @@ class User(BaseModel):
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email})>"
+
+
+if TYPE_CHECKING:
+    from .channel import Channel
+    from .list import BookmarkList
+    from .subscription import Subscription
+    from .tag import Tag

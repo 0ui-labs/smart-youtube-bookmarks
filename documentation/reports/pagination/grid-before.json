@@ -1,0 +1,22 @@
+{
+  "phase": "before",
+  "runtime": "v22.22.3",
+  "environment": "Vitest/jsdom; no browser paint",
+  "samples": [
+    {
+      "size": 100,
+      "initial_cards": 100,
+      "render_ms": 271.62
+    },
+    {
+      "size": 1000,
+      "initial_cards": 1000,
+      "render_ms": 1702.37
+    },
+    {
+      "size": 10000,
+      "initial_cards": 10000,
+      "render_ms": 17244.99
+    }
+  ]
+}

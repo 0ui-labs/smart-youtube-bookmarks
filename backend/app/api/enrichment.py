@@ -9,12 +9,10 @@ import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from redis.exceptions import ConnectionError as RedisConnectionError, RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.redis import get_arq_pool
 from app.models.video import Video
 from app.models.video_enrichment import EnrichmentStatus, VideoEnrichment
 from app.schemas.enrichment import (
@@ -23,6 +21,7 @@ from app.schemas.enrichment import (
     EnrichmentRetryResponse,
     EnrichmentStatus as SchemaEnrichmentStatus,
 )
+from app.services.job_dispatch_service import DurableJobQueue
 
 logger = logging.getLogger(__name__)
 
@@ -168,21 +167,9 @@ async def retry_enrichment(
         )
         db.add(enrichment)
 
-    # Enqueue job BEFORE committing DB to ensure atomicity
-    # If enqueue fails, the DB transaction will be rolled back
-    try:
-        arq_pool = await get_arq_pool()
-        await arq_pool.enqueue_job("enrich_video", str(video_id))
-        logger.info(f"Enqueued enrichment job for video {video_id}")
-    except (RedisError, RedisConnectionError, OSError) as e:
-        logger.exception(f"Failed to enqueue enrichment job for video {video_id}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Failed to enqueue enrichment job: {type(e).__name__}",
-        )
+    # Persist retry intent together with the status reset.
+    await DurableJobQueue(db).enqueue_job("enrich_video", str(video_id))
 
-    # Only commit after successful enqueue
     await db.commit()
     await db.refresh(enrichment)
 

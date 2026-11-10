@@ -333,7 +333,7 @@ describe("VideoCard - Custom Fields Integration", () => {
       renderWithQuery(<VideoCard video={mockVideoWithFields} />);
 
       // Find the 5th star (currently unselected, value is 4)
-      const stars = screen.getAllByRole("button", { name: /star/i });
+      const stars = screen.getAllByRole("radio", { name: /star/i });
       const fifthStar = stars[4]; // 0-indexed
 
       // Click 5th star to set rating to 5
@@ -342,7 +342,7 @@ describe("VideoCard - Custom Fields Integration", () => {
       // Verify API called with correct payload
       await waitFor(() => {
         expect(mockPut).toHaveBeenCalledWith("/videos/video-123/fields", {
-          updates: [{ field_id: "rating-123", value: 5 }],
+          field_values: [{ field_id: "rating-123", value: 5 }],
         });
       });
 
@@ -378,7 +378,7 @@ describe("VideoCard - Custom Fields Integration", () => {
       await user.click(selectBadge);
 
       // Select 'great' option
-      const greatOption = await screen.findByRole("menuitem", {
+      const greatOption = await screen.findByRole("menuitemradio", {
         name: "great",
       });
       await user.click(greatOption);
@@ -386,7 +386,7 @@ describe("VideoCard - Custom Fields Integration", () => {
       // Verify API called with correct payload
       await waitFor(() => {
         expect(mockPut).toHaveBeenCalledWith("/videos/video-123/fields", {
-          updates: [{ field_id: "select-123", value: "great" }],
+          field_values: [{ field_id: "select-123", value: "great" }],
         });
       });
 
@@ -423,7 +423,7 @@ describe("VideoCard - Custom Fields Integration", () => {
       // Verify API called with correct payload
       await waitFor(() => {
         expect(mockPut).toHaveBeenCalledWith("/videos/video-123/fields", {
-          updates: [{ field_id: "boolean-123", value: false }],
+          field_values: [{ field_id: "boolean-123", value: false }],
         });
       });
 
@@ -438,7 +438,7 @@ describe("VideoCard - Custom Fields Integration", () => {
       const handleVideoClick = vi.fn();
 
       renderWithQuery(
-        <VideoCard onClick={handleVideoClick} video={mockVideoWithFields} />
+        <VideoCard onCardClick={handleVideoClick} video={mockVideoWithFields} />
       );
 
       // Click checkbox (should NOT trigger video card onClick)
@@ -453,7 +453,7 @@ describe("VideoCard - Custom Fields Integration", () => {
       await user.click(title);
 
       // Verify VideoCard onClick WAS called
-      expect(handleVideoClick).toHaveBeenCalledWith(mockVideoWithFields);
+      expect(handleVideoClick).toHaveBeenCalledWith();
     });
 
     it("does not trigger video onClick when clicking rating star", async () => {
@@ -461,11 +461,11 @@ describe("VideoCard - Custom Fields Integration", () => {
       const handleVideoClick = vi.fn();
 
       renderWithQuery(
-        <VideoCard onClick={handleVideoClick} video={mockVideoWithFields} />
+        <VideoCard onCardClick={handleVideoClick} video={mockVideoWithFields} />
       );
 
       // Click star (should NOT trigger video card onClick)
-      const stars = screen.getAllByRole("button", { name: /star/i });
+      const stars = screen.getAllByRole("radio", { name: /star/i });
       await user.click(stars[2]); // Click 3rd star
 
       // Verify VideoCard onClick was NOT called
@@ -477,7 +477,7 @@ describe("VideoCard - Custom Fields Integration", () => {
       const handleVideoClick = vi.fn();
 
       renderWithQuery(
-        <VideoCard onClick={handleVideoClick} video={mockVideoWithFields} />
+        <VideoCard onCardClick={handleVideoClick} video={mockVideoWithFields} />
       );
 
       // Click select badge (should NOT trigger video card onClick)
@@ -535,7 +535,10 @@ describe("VideoCard - Custom Fields Integration", () => {
       const consoleLogSpy = vi.spyOn(console, "log");
 
       renderWithQuery(
-        <VideoCard onClick={handleVideoClick} video={mockVideoWithManyFields} />
+        <VideoCard
+          onCardClick={handleVideoClick}
+          video={mockVideoWithManyFields}
+        />
       );
 
       // Click "+2 more" badge (should NOT trigger video card onClick)
@@ -573,20 +576,20 @@ describe("VideoCard - Custom Fields Integration", () => {
       ).toBeInTheDocument();
 
       // Click 5th star to set rating to 5
-      const stars = screen.getAllByRole("button", { name: /star/i });
+      const stars = screen.getAllByRole("radio", { name: /star/i });
       await user.click(stars[4]);
 
       // Wait for API error to be logged
       await waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          "Failed to update field value:",
+          "Failed to update field values:",
           expect.any(Error)
         );
       });
 
       // Verify mutation was attempted (the hook's error handling was triggered)
       expect(mockPut).toHaveBeenCalledWith("/videos/video-123/fields", {
-        updates: [{ field_id: "rating-123", value: 5 }],
+        field_values: [{ field_id: "rating-123", value: 5 }],
       });
 
       // Note: Optimistic update rollback in React Query may not always reflect immediately in test environment

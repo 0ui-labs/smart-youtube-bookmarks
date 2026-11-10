@@ -18,6 +18,7 @@
  * - className?: string - Custom Tailwind classes
  */
 
+import DOMPurify from "dompurify";
 import { ChevronRight } from "lucide-react";
 import React from "react";
 import { Button } from "@/components/ui/button";
@@ -94,14 +95,16 @@ export const TextSnippet = React.forwardRef<HTMLDivElement, TextSnippetProps>(
           ref={ref}
         >
           {textContent ? (
-            <div
-              className="tiptap-prose"
-              dangerouslySetInnerHTML={{
-                __html: isTruncated
-                  ? `${getTextContent(normalizedValue).slice(0, truncateAt)}...`
-                  : normalizedValue,
-              }}
-            />
+            isTruncated ? (
+              <div className="tiptap-prose">{`${textContent.slice(0, truncateAt)}...`}</div>
+            ) : (
+              <div
+                className="tiptap-prose"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(normalizedValue),
+                }}
+              />
+            )
           ) : (
             <span className="text-muted-foreground">—</span>
           )}

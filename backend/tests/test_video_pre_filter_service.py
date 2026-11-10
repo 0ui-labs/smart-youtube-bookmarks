@@ -456,3 +456,10 @@ class TestParseDetailResponse:
         assert result.recommendation == "IMPORT"
         assert result.relevance_score == 5.0
         assert "Could not parse" in result.reasoning
+
+
+@pytest.fixture(autouse=True)
+def synthetic_provider_configuration(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "gemini_api_key", "synthetic-offline-test-key")

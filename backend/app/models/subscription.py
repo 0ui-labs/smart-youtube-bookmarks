@@ -5,6 +5,7 @@ Subscriptions allow users to define channel/keyword combinations
 that automatically import new videos into their lists.
 """
 
+import builtins
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID as PyUUID
@@ -50,8 +51,12 @@ class Subscription(BaseModel):
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
     # Source filters (what to search for)
-    channel_ids: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
-    keywords: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    channel_ids: Mapped[builtins.list[str] | None] = mapped_column(
+        ARRAY(Text), nullable=True
+    )
+    keywords: Mapped[builtins.list[str] | None] = mapped_column(
+        ARRAY(Text), nullable=True
+    )
 
     # Meta filters (which videos match)
     filters: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default={})
@@ -78,7 +83,7 @@ class Subscription(BaseModel):
     list: Mapped["BookmarkList"] = relationship(
         "BookmarkList", back_populates="subscriptions"
     )
-    matches: Mapped[list["SubscriptionMatch"]] = relationship(
+    matches: Mapped[builtins.list["SubscriptionMatch"]] = relationship(
         "SubscriptionMatch",
         back_populates="subscription",
         cascade="all, delete-orphan",

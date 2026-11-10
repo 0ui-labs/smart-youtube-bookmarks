@@ -18,7 +18,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
@@ -52,11 +52,9 @@ export * from './chatResponseSchemaSubscriptionPreview';
 export * from './checkDuplicateFieldApiListsListIdCustomFieldsCheckDuplicatePost200';
 export * from './checkDuplicateFieldApiListsListIdCustomFieldsCheckDuplicatePostMode';
 export * from './checkDuplicateFieldApiListsListIdCustomFieldsCheckDuplicatePostParams';
+export * from './createConnectionTicketApiAuthWsTicketPost200';
 export * from './createFromChatRequest';
 export * from './createFromChatRequestConfig';
-export * from './createSubscriptionApiSubscriptionsPostParams';
-export * from './createSubscriptionFromChatApiChatSubscriptionCreatePostParams';
-export * from './createTagApiTagsPostParams';
 export * from './customFieldCreate';
 export * from './customFieldCreateConfig';
 export * from './customFieldCreateFieldType';
@@ -71,9 +69,6 @@ export * from './customFieldUpdateConfig';
 export * from './customFieldUpdateConfigAnyOf';
 export * from './customFieldUpdateFieldType';
 export * from './customFieldUpdateName';
-export * from './deleteChannelApiChannelsChannelIdDeleteParams';
-export * from './deleteSubscriptionApiSubscriptionsSubscriptionIdDeleteParams';
-export * from './deleteTagApiTagsTagIdDeleteParams';
 export * from './duplicateCheckRequest';
 export * from './duplicateCheckResponse';
 export * from './duplicateCheckResponseField';
@@ -114,11 +109,13 @@ export * from './fieldSchemaUpdateDescription';
 export * from './fieldSchemaUpdateName';
 export * from './fieldValueUpdate';
 export * from './fieldValueUpdateValue';
+export * from './filterVideosInListApiListsListIdVideosFilterPostParams';
 export * from './getChannelsApiChannelsGetParams';
+export * from './getFilteredVideoPageApiListsListIdVideosFilterPagePostParams';
 export * from './getProgressHistoryApiJobsJobIdProgressHistoryGetParams';
-export * from './getSubscriptionApiSubscriptionsSubscriptionIdGetParams';
 export * from './getSubscriptionMatchesApiSubscriptionsSubscriptionIdMatchesGetParams';
-export * from './getTagApiTagsTagIdGetParams';
+export * from './getVideoPageApiListsListIdVideosPageGetParams';
+export * from './getVideoPageApiListsListIdVideosPageGetSortOrder';
 export * from './getVideosInListApiListsListIdVideosGetParams';
 export * from './hTTPValidationError';
 export * from './healthCheckApiHealthGet200';
@@ -137,13 +134,13 @@ export * from './listResponseDefaultSchemaId';
 export * from './listResponseDescription';
 export * from './listResponseSchemaId';
 export * from './listSubscriptionsApiSubscriptionsGetParams';
-export * from './listTagsApiTagsGetParams';
 export * from './listUpdate';
 export * from './listUpdateDefaultSchemaId';
 export * from './listUpdateDescription';
 export * from './listUpdateName';
 export * from './mostUsedFieldStat';
 export * from './quotaStatusResponse';
+export * from './readinessCheckApiReadyGet200';
 export * from './receivePubsubNotificationApiWebhooksPubsubhubbubPost200';
 export * from './schemaEffectivenessStat';
 export * from './schemaFieldBatchUpdateRequest';
@@ -196,7 +193,6 @@ export * from './subscriptionUpdateListId';
 export * from './subscriptionUpdateName';
 export * from './subscriptionUpdatePollInterval';
 export * from './syncResponse';
-export * from './syncSubscriptionApiSubscriptionsSubscriptionIdSyncPostParams';
 export * from './tagCreate';
 export * from './tagCreateColor';
 export * from './tagCreateSchemaId';
@@ -211,13 +207,11 @@ export * from './tagUpdateSchemaId';
 export * from './unusedSchemaStat';
 export * from './unusedSchemaStatLastUsed';
 export * from './unusedSchemaStatReason';
-export * from './updateChannelApiChannelsChannelIdPatchParams';
-export * from './updateSubscriptionApiSubscriptionsSubscriptionIdPutParams';
-export * from './updateTagApiTagsTagIdPutParams';
 export * from './updateWatchProgressRequest';
 export * from './updateWatchProgressResponse';
 export * from './validationError';
 export * from './validationErrorLocItem';
+export * from './verifyPubsubApiWebhooksPubsubhubbubGetHubMode';
 export * from './verifyPubsubApiWebhooksPubsubhubbubGetParams';
 export * from './videoAdd';
 export * from './videoFieldValueResponse';
@@ -229,6 +223,11 @@ export * from './videoFilterRequestFieldFilters';
 export * from './videoFilterRequestSortBy';
 export * from './videoFilterRequestSortOrder';
 export * from './videoFilterRequestTags';
+export * from './videoImportStatusRequest';
+export * from './videoImportStatusResponse';
+export * from './videoLookupRequest';
+export * from './videoLookupResponse';
+export * from './videoPageResponse';
 export * from './videoResponse';
 export * from './videoResponseAvailableFields';
 export * from './videoResponseChannel';

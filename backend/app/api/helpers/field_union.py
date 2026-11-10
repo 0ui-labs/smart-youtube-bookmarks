@@ -29,6 +29,8 @@ Related:
 - Two-Layer System: Workspace + Category fields
 """
 
+from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -99,7 +101,7 @@ def compute_field_union_with_conflicts(
     }
 
     # PASS 2: Build registry with conflict resolution
-    field_registry: dict[str, dict] = {}
+    field_registry: dict[str, dict[str, Any]] = {}
 
     for schema_id in schema_ids:
         if schema_id not in fields_by_schema:
@@ -150,7 +152,7 @@ def compute_field_union_with_conflicts(
 
 
 async def get_available_fields_for_videos(
-    videos: list[Video], db: AsyncSession
+    videos: Sequence[Video], db: AsyncSession
 ) -> dict[UUID, list[tuple[CustomField, str | None, int, bool]]]:
     """
     Batch-load applicable fields for ALL videos in a single query.
@@ -200,22 +202,7 @@ async def get_available_fields_for_videos(
         if hasattr(video, "list") and video.list and video.list.default_schema_id:
             schema_ids.append(video.list.default_schema_id)
 
-        # Layer 2: Category schemas (from video's tags)
-        # Handle case where tags relationship might not be loaded or is None
-        # WORKAROUND: SQLAlchemy sometimes has issues with tags relationship
-        # Catch TypeError that occurs when tags is a single Tag object instead of a list
-        try:
-            tags = video.tags if video.tags is not None else []
-
-            # Additional safety: If tags is a single Tag object (not iterable), convert to list
-            if tags and not isinstance(tags, (list, tuple)):
-                tags = [tags]
-        except TypeError as e:
-            # If we get TypeError accessing video.tags, try to get it as a single object
-            if "'Tag' object is not iterable" in str(e):
-                tags = [video.tags] if hasattr(video, "tags") and video.tags else []
-            else:
-                raise
+        tags = video.tags
 
         # Add category schemas (avoiding duplicates with workspace schema)
         for tag in tags:

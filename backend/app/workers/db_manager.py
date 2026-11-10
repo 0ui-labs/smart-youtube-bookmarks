@@ -28,9 +28,9 @@ db_session_context: ContextVar[str | None] = ContextVar(
 class DatabaseConnectionManager:
     """Manages database connections for ARQ workers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.engine: AsyncEngine | None = None
-        self.scoped_session: async_scoped_session | None = None
+        self.scoped_session: async_scoped_session[AsyncSession] | None = None
 
     async def connect(self) -> None:
         """Initialize database connection pool (called on worker startup)."""

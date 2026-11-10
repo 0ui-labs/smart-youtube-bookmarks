@@ -76,13 +76,17 @@ class TestGeminiClientErrorHandling:
             GeminiClient(api_key="")
 
     @pytest.mark.asyncio
-    async def test_handles_empty_transcript(self, gemini_client):
+    async def test_handles_empty_transcript(self):
         """
         Test handling of empty transcript.
 
         Should raise ValueError for empty/whitespace-only transcripts.
         """
         from pydantic import BaseModel
+
+        from app.clients.gemini import GeminiClient
+
+        gemini_client = GeminiClient(api_key="synthetic-local-validation-only")
 
         class SimpleSchema(BaseModel):
             topic: str

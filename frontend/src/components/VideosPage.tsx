@@ -1,10 +1,3 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
 import axios from "axios";
 import { Plus } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -12,139 +5,36 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { DropZoneOverlay } from "@/components/DropZoneOverlay";
 import { ImportPreviewModal } from "@/components/ImportPreviewModal";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { FilterBar } from "@/components/videos/FilterBar";
-import { FilterSettingsModal } from "@/components/videos/FilterSettingsModal";
 import { FEATURE_FLAGS } from "@/config/featureFlags";
 import { useChannels } from "@/hooks/useChannels";
 import { useTags } from "@/hooks/useTags";
-import {
-  type ParsedDropData,
-  useVideoDropZone,
-} from "@/hooks/useVideoDropZone";
+import { useVideoDropZone } from "@/hooks/useVideoDropZone";
 import {
   exportVideosCSV,
-  useAssignTags,
-  useBulkUploadVideos,
   useCreateVideo,
   useDeleteVideo,
   useVideos,
 } from "@/hooks/useVideos";
 import { useVideosFilter } from "@/hooks/useVideosFilter";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { api } from "@/lib/api";
+import { buildVideoSelection } from "@/hooks/videos/selection";
+import { useVideoFieldMutation } from "@/hooks/videos/useVideoFieldMutation";
+import { useVideoImportController } from "@/hooks/videos/useVideoImportController";
+import { useVideoImportPolling } from "@/hooks/videos/useVideoImportPolling";
+import { useVideoPageState } from "@/hooks/videos/useVideoPageState";
 import { useFieldFilterStore } from "@/stores/fieldFilterStore";
-import { useImportDropStore } from "@/stores/importDropStore";
 import { useTableSettingsStore } from "@/stores/tableSettingsStore";
 import { useTagStore } from "@/stores/tagStore";
 import type { VideoResponse } from "@/types/video";
-import { formatDuration } from "@/utils/formatDuration";
-import {
-  calculateThumbnailWidth,
-  getBestQualityForVideo,
-  getQualityForWidth,
-  getThumbnailUrlsForQuality,
-  setCachedQuality,
-  type ThumbnailQuality,
-} from "@/utils/thumbnailUrl";
-import { createCSVFromUrls, parseUrlsFromText } from "@/utils/urlParser";
+import { parseUrlsFromText } from "@/utils/urlParser";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { CSVUpload } from "./CSVUpload";
-import { TableSettingsDropdown } from "./TableSettingsDropdown";
 import { VideoDetailsModal } from "./VideoDetailsModal";
 import { VideoGrid } from "./VideoGrid";
-import { ViewModeToggle } from "./ViewModeToggle";
-
-// Note: VideoResponse type has optional field_values, but TanStack Table needs explicit type
-// Using Partial to handle cases where backend doesn't return all fields in list view
-type VideoListItem = Omit<
-  VideoResponse,
-  "field_values" | "available_fields"
-> & {
-  field_values?: VideoResponse["field_values"];
-  available_fields?: VideoResponse["available_fields"];
-};
-
-const columnHelper = createColumnHelper<VideoListItem>();
-
-// Tag Carousel Component with conditional arrow display
-const TagCarousel = () => {
-  const dummyTags = [
-    "Python",
-    "JavaScript",
-    "React",
-    "Machine Learning",
-    "Web Development",
-    "Tutorial",
-    "Backend",
-    "Database",
-    "API",
-    "DevOps",
-    "Security",
-    "Testing",
-  ];
-  const [api, setApi] = React.useState<any>();
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false);
-  const [canScrollNext, setCanScrollNext] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!api) return;
-
-    const updateScrollState = () => {
-      setCanScrollPrev(api.canScrollPrev());
-      setCanScrollNext(api.canScrollNext());
-    };
-
-    updateScrollState();
-    api.on("select", updateScrollState);
-    api.on("reInit", updateScrollState);
-
-    return () => {
-      api.off("select", updateScrollState);
-    };
-  }, [api]);
-
-  return (
-    <Carousel
-      className="w-full max-w-[calc(100vw-400px)]"
-      opts={{
-        align: "start",
-        slidesToScroll: 3,
-      }}
-      setApi={setApi}
-    >
-      <div className="flex items-center gap-2">
-        {canScrollPrev && (
-          <CarouselPrevious className="static h-8 w-8 flex-shrink-0 translate-y-0" />
-        )}
-        <CarouselContent className="-ml-2">
-          {dummyTags.map((tag) => (
-            <CarouselItem className="basis-auto pl-2" key={tag}>
-              <button className="whitespace-nowrap rounded-full bg-secondary px-3 py-1.5 text-secondary-foreground text-sm transition-colors hover:bg-accent">
-                {tag}
-              </button>
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-        {canScrollNext && (
-          <CarouselNext className="static h-8 w-8 flex-shrink-0 translate-y-0" />
-        )}
-      </div>
-    </Carousel>
-  );
-};
+import { VideoFilterControls } from "./videos/VideoFilterControls";
+import { VideoPagination } from "./videos/VideoPagination";
+import { VideoRecoveryStatus } from "./videos/VideoRecoveryStatus";
+import { VideoTable } from "./videos/VideoTable";
 
 // YouTube URL validation regex
 const YOUTUBE_URL_PATTERN =
@@ -153,169 +43,6 @@ const YOUTUBE_URL_PATTERN =
 interface VideosPageProps {
   listId: string;
 }
-
-// VideoThumbnail component with React state for error handling and quality fallback
-// REF MCP Improvement #1: Use existing component (extend, not recreate)
-// REF MCP Improvement #3: Object mapping for Tailwind PurgeCSS compatibility
-// REF MCP Improvement #5: w-48 for large (not w-64) for smoother progression
-// REF MCP Improvement #6: Placeholder also scales dynamically
-// Task #35 Fix: Add useFullWidth prop for Grid mode (container-adapted sizing)
-// Thumbnail 404 Fix: Fallback chain for sd/maxres that don't exist on all videos
-const VideoThumbnail = ({
-  youtubeId,
-  fallbackUrl,
-  title,
-  useFullWidth = false,
-}: {
-  youtubeId: string;
-  fallbackUrl?: string | null;
-  title: string;
-  useFullWidth?: boolean;
-}) => {
-  const thumbnailSize = useTableSettingsStore((state) => state.thumbnailSize);
-  const viewMode = useTableSettingsStore((state) => state.viewMode);
-  const gridColumns = useTableSettingsStore((state) => state.gridColumns);
-
-  // Calculate target width and initial quality (considering cache)
-  const targetWidth = calculateThumbnailWidth(
-    useFullWidth ? "grid" : viewMode,
-    thumbnailSize,
-    gridColumns as 2 | 3 | 4 | 5
-  );
-  // Use cached quality if available, otherwise use optimal quality for view size
-  const initialQuality = getBestQualityForVideo(youtubeId, targetWidth);
-
-  const [currentQuality, setCurrentQuality] =
-    useState<ThumbnailQuality>(initialQuality);
-  const [useFallbackUrl, setUseFallbackUrl] = useState(false);
-
-  // Reset when dependencies change (e.g., switching views)
-  useEffect(() => {
-    setCurrentQuality(getBestQualityForVideo(youtubeId, targetWidth));
-    setUseFallbackUrl(false);
-  }, [youtubeId, targetWidth]);
-
-  // Get next fallback quality (maxres → sd → hq)
-  const getNextQuality = (
-    quality: ThumbnailQuality
-  ): ThumbnailQuality | null => {
-    switch (quality) {
-      case "maxres":
-        return "sd";
-      case "sd":
-        return "hq";
-      default:
-        return null; // hq, mq, default are guaranteed
-    }
-  };
-
-  // Handle image load - check if it's a placeholder and fallback if needed
-  const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { naturalWidth } = e.currentTarget;
-    const expectedWidth = {
-      maxres: 1280,
-      sd: 640,
-      hq: 480,
-      mq: 320,
-      default: 120,
-    }[currentQuality];
-
-    // If image is too small, it's YouTube's gray placeholder - fallback to next quality
-    if (naturalWidth < expectedWidth * 0.5) {
-      const nextQuality = getNextQuality(currentQuality);
-      if (nextQuality) {
-        setCurrentQuality(nextQuality);
-      } else {
-        // All qualities failed, use fallbackUrl
-        setCachedQuality(youtubeId, "hq");
-        setUseFallbackUrl(true);
-      }
-      return;
-    }
-
-    // Image loaded successfully - cache this quality if we had to fall back
-    const optimalQuality = getQualityForWidth(targetWidth);
-    if (currentQuality !== optimalQuality) {
-      setCachedQuality(youtubeId, currentQuality);
-    }
-  };
-
-  // REF MCP Improvement #3: Full class strings for Tailwind PurgeCSS
-  // Object mapping ensures all classes are detected at build time (no dynamic concatenation)
-  // xlarge uses w-[500px] for YouTube's standard list view thumbnail size (500x280)
-  // Task #35 Fix: List mode uses thumbnailSize, Grid mode uses w-full (container-adapted)
-  const sizeClasses = {
-    small: "w-32 aspect-video object-cover rounded shadow-sm",
-    medium: "w-40 aspect-video object-cover rounded shadow-sm",
-    large: "w-48 aspect-video object-cover rounded shadow-sm",
-    xlarge: "w-[500px] aspect-video object-cover rounded shadow-sm",
-  } as const;
-
-  const placeholderSizeClasses = {
-    small:
-      "w-32 aspect-video bg-gray-100 rounded flex items-center justify-center",
-    medium:
-      "w-40 aspect-video bg-gray-100 rounded flex items-center justify-center",
-    large:
-      "w-48 aspect-video bg-gray-100 rounded flex items-center justify-center",
-    xlarge:
-      "w-[500px] aspect-video bg-gray-100 rounded flex items-center justify-center",
-  } as const;
-
-  // Task #35 Fix: Grid mode uses w-full for container-adapted sizing
-  const fullWidthClasses = "w-full aspect-video object-cover rounded shadow-sm";
-  const fullWidthPlaceholderClasses =
-    "w-full aspect-video bg-gray-100 rounded flex items-center justify-center";
-
-  // Generate URLs for current quality
-  const urls = getThumbnailUrlsForQuality(youtubeId, currentQuality);
-
-  // Placeholder class based on size
-  const placeholderClass = useFullWidth
-    ? fullWidthPlaceholderClasses
-    : placeholderSizeClasses[thumbnailSize];
-
-  // Fallback to fallbackUrl or placeholder if primary fails
-  if (useFallbackUrl) {
-    if (fallbackUrl) {
-      return (
-        <img
-          alt={title}
-          className={
-            useFullWidth ? fullWidthClasses : sizeClasses[thumbnailSize]
-          }
-          loading="lazy"
-          src={fallbackUrl}
-        />
-      );
-    }
-    // Inline placeholder to avoid nested component definition
-    return (
-      <div className={placeholderClass}>
-        <svg
-          aria-hidden="true"
-          className="h-8 w-8 text-gray-400"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-        </svg>
-      </div>
-    );
-  }
-
-  // Primary: render current quality, handleLoad detects placeholders and triggers fallback
-  return (
-    <img
-      alt={title}
-      className={useFullWidth ? fullWidthClasses : sizeClasses[thumbnailSize]}
-      loading="lazy"
-      onError={() => setUseFallbackUrl(true)}
-      onLoad={handleLoad}
-      src={urls.webp}
-    />
-  );
-};
 
 export const VideosPage = ({ listId }: VideosPageProps) => {
   const navigate = useNavigate();
@@ -346,19 +73,20 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     video: null,
   });
 
-  // Drag & Drop Import state (Steps 19-23)
-  const [importPreviewModal, setImportPreviewModal] = useState<{
-    open: boolean;
-    urls: string[];
-  }>({
-    open: false,
-    urls: [],
-  });
-
   // Polling state for real-time updates after import
   // When true, refetch videos frequently until all are processed
-  const [isPolling, setIsPolling] = useState(false);
   const [pendingVideoIds, setPendingVideoIds] = useState<string[]>([]);
+  const isPolling = pendingVideoIds.length > 0;
+  const importPolling = useVideoImportPolling(
+    listId,
+    pendingVideoIds,
+    (finished) => {
+      if (finished.length)
+        setPendingVideoIds((current) =>
+          current.filter((id) => !finished.includes(id))
+        );
+    }
+  );
   const POLLING_INTERVAL = 500; // 500ms for snappy updates
 
   // Mobile detection for responsive behavior
@@ -388,102 +116,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     [tags, selectedTagIds]
   );
 
-  // Query client for cache invalidation
-  const queryClient = useQueryClient();
-
-  // Mutation for updating field values in video detail modal
-  const updateField = useMutation({
-    mutationFn: async ({
-      videoId,
-      fieldId,
-      value,
-    }: {
-      videoId: string;
-      fieldId: string;
-      value: string | number | boolean;
-    }) => {
-      const { data } = await api.put(`/videos/${videoId}/fields`, {
-        field_values: [{ field_id: fieldId, value }], // FIX: Backend expects "field_values" not "updates"
-      });
-      return data;
-    },
-    onMutate: async ({ videoId, fieldId, value }) => {
-      // Cancel outgoing refetches to avoid race conditions
-      await queryClient.cancelQueries({ queryKey: ["video-detail", videoId] });
-      await queryClient.cancelQueries({ queryKey: ["videos", listId] });
-
-      // Snapshot previous value for rollback
-      const previousVideoDetail = queryClient.getQueryData([
-        "video-detail",
-        videoId,
-      ]);
-      const previousVideosList = queryClient.getQueryData(["videos", listId]);
-
-      // Optimistically update video detail cache
-      queryClient.setQueryData(
-        ["video-detail", videoId],
-        (old: VideoResponse | undefined) => {
-          if (!old) return old;
-          return {
-            ...old,
-            field_values:
-              old.field_values?.map((fv) =>
-                fv.field_id === fieldId ? { ...fv, value } : fv
-              ) ?? [],
-          };
-        }
-      );
-
-      // Optimistically update videos list cache
-      queryClient.setQueryData(
-        ["videos", listId],
-        (old: VideoResponse[] | undefined) => {
-          if (!old) return old;
-          return old.map((video) =>
-            video.id === videoId
-              ? {
-                  ...video,
-                  field_values:
-                    video.field_values?.map((fv) =>
-                      fv.field_id === fieldId ? { ...fv, value } : fv
-                    ) ?? [],
-                }
-              : video
-          );
-        }
-      );
-
-      return { previousVideoDetail, previousVideosList };
-    },
-    onSuccess: (_data, variables) => {
-      // Invalidate queries to refetch and sync with server state
-      queryClient.invalidateQueries({
-        queryKey: ["video-detail", variables.videoId],
-      });
-      queryClient.invalidateQueries({ queryKey: ["videos", listId] });
-    },
-    onError: (error: any, variables, context) => {
-      // Rollback optimistic updates on error
-      if (context?.previousVideoDetail) {
-        queryClient.setQueryData(
-          ["video-detail", variables.videoId],
-          context.previousVideoDetail
-        );
-      }
-      if (context?.previousVideosList) {
-        queryClient.setQueryData(
-          ["videos", listId],
-          context.previousVideosList
-        );
-      }
-
-      // Log error and notify user
-      console.error("Failed to update field value:", error);
-      // TODO: Replace console.error with toast notification
-      // toast.error('Failed to update field value')
-      alert("Failed to update field value. Please try again.");
-    },
-  });
+  const updateField = useVideoFieldMutation();
 
   // Handle field value changes from video detail modal
   const handleFieldChange = (
@@ -505,7 +138,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     [selectedTags]
   );
 
-  // TASK 4: Parse sort parameters from URL query params
   const sortBy = searchParams.get("sort_by") || undefined;
   const sortOrderParam = searchParams.get("sort_order");
   const sortOrder: "asc" | "desc" = sortOrderParam === "desc" ? "desc" : "asc";
@@ -526,6 +158,17 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     });
   }, [activeFilters.forEach, removeFilter]); // Run once on mount to clean up stale data
 
+  const selectionKey = JSON.stringify({
+    listId,
+    tags: selectedTagNames,
+    channel: selectedChannelId,
+    fields: activeFilters,
+    sortBy,
+    sortOrder,
+  });
+  const { page, setPage } = useVideoPageState(selectionKey);
+  const pageSize = 50;
+
   // Fetch videos with both tag filters and field filters
   // Falls back to useVideos if no field filters are active
   const hasFieldFilters = activeFilters.length > 0;
@@ -535,10 +178,13 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   // Use new filter hook if any filters are active, otherwise fallback to old hook
   const {
     data: filteredVideos = [],
+    total: filteredTotal,
     isLoading: filterLoading,
     error: filterError,
   } = useVideosFilter({
     listId,
+    offset: page * pageSize,
+    limit: pageSize,
     tags: hasTagFilters ? selectedTagNames : undefined,
     channelId: hasChannelFilter ? selectedChannelId : undefined,
     fieldFilters: hasFieldFilters ? activeFilters : undefined,
@@ -550,9 +196,13 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   const {
     data: allVideos = [],
+    total: allTotal,
     isLoading: allLoading,
     error: allError,
   } = useVideos(listId, {
+    offset: page * pageSize,
+    limit: pageSize,
+    enabled: !(hasFieldFilters || hasTagFilters || hasChannelFilter),
     tags: undefined,
     sortBy,
     sortOrder,
@@ -564,9 +214,22 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const videos = hasAnyFilter ? filteredVideos : allVideos;
   const isLoading = hasAnyFilter ? filterLoading : allLoading;
   const error = hasAnyFilter ? filterError : allError;
+  const serverTotal = hasAnyFilter ? filteredTotal : allTotal;
+  const totalVideos = serverTotal ?? videos.length;
+  useEffect(() => {
+    if (serverTotal !== undefined && page > 0 && page * pageSize >= serverTotal)
+      setPage(Math.max(0, Math.ceil(serverTotal / pageSize) - 1));
+  }, [serverTotal, page, setPage]);
   const createVideo = useCreateVideo(listId);
-  const assignTags = useAssignTags();
-  const bulkUpload = useBulkUploadVideos(listId);
+  const {
+    importPreviewModal,
+    setImportPreviewModal,
+    handleVideosDetected,
+    handleImportConfirm,
+    assignTags,
+    pendingImport,
+    clearPendingImport,
+  } = useVideoImportController(listId, setPendingVideoIds);
 
   // Get existing video IDs for duplicate detection in import preview
   const existingVideoIds = useMemo(
@@ -575,116 +238,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     [videos]
   );
 
-  // Stop polling when all PENDING videos have been fully processed (import_stage = complete/error)
-  // This provides real-time UI updates after import without manual refresh
-  useEffect(() => {
-    console.log(
-      "[Polling] isPolling:",
-      isPolling,
-      "pendingVideoIds:",
-      pendingVideoIds.length,
-      "videos.length:",
-      videos.length
-    );
-    if (!isPolling || pendingVideoIds.length === 0) return;
-
-    // Find the pending videos in the current videos list
-    const pendingVideos = videos.filter((video) =>
-      pendingVideoIds.includes(video.id)
-    );
-    console.log(
-      "[Polling] Found pending videos:",
-      pendingVideos.length,
-      "of",
-      pendingVideoIds.length
-    );
-
-    // Check if all pending videos have finished import (complete or error)
-    // Videos are "still processing" if import_stage is NOT 'complete' or 'error'
-    // Note: Type assertion needed because import_stage may not be in all response types
-    const stillProcessing = pendingVideos.filter((video) => {
-      const stage = (video as VideoResponse).import_stage || "created";
-      return stage !== "complete" && stage !== "error";
-    });
-    console.log(
-      "[Polling] Still processing:",
-      stillProcessing.length,
-      stillProcessing.map(
-        (v) => `${v.youtube_id}:${(v as VideoResponse).import_stage}`
-      )
-    );
-
-    // Only stop polling when we found all pending videos AND they're all done
-    if (
-      pendingVideos.length === pendingVideoIds.length &&
-      stillProcessing.length === 0
-    ) {
-      console.log("[Polling] All pending videos processed, stopping polling");
-      setIsPolling(false);
-      setPendingVideoIds([]);
-    }
-  }, [isPolling, pendingVideoIds, videos]);
-
-  // Drag & Drop handler: called when videos are detected
-  const handleVideosDetected = useCallback((data: ParsedDropData) => {
-    if (data.urls.length === 0) {
-      return;
-    }
-
-    // Open import preview modal with detected URLs
-    setImportPreviewModal({
-      open: true,
-      urls: data.urls,
-    });
-  }, []);
-
-  // Drag & Drop handler: called when import is confirmed
-  const handleImportConfirm = useCallback(
-    async (urls: string[], categoryId?: string) => {
-      try {
-        // Close modal first
-        setImportPreviewModal({ open: false, urls: [] });
-
-        if (urls.length === 0) {
-          return;
-        }
-
-        // Create CSV blob from URLs
-        const csvBlob = createCSVFromUrls(urls);
-        const csvFile = new File([csvBlob], "import.csv", { type: "text/csv" });
-
-        // Upload via bulk upload API
-        const result = await bulkUpload.mutateAsync(csvFile);
-
-        // Start polling for real-time updates after successful import
-        if (result.created_video_ids.length > 0) {
-          console.log(
-            "[Import] Starting polling for",
-            result.created_video_ids.length,
-            "videos:",
-            result.created_video_ids
-          );
-          setPendingVideoIds(result.created_video_ids);
-          setIsPolling(true);
-        }
-
-        // If category was selected, assign it to all imported videos
-        if (categoryId && result.created_video_ids.length > 0) {
-          await Promise.all(
-            result.created_video_ids.map((videoId) =>
-              assignTags.mutateAsync({ videoId, tagIds: [categoryId] })
-            )
-          );
-        }
-      } catch (error) {
-        console.error("Failed to import videos:", error);
-        // TODO: Add toast notification for error
-      }
-    },
-    [bulkUpload, assignTags]
-  );
-
-  // Mobile detection: Disable drag-drop on touch devices (Step 29)
   const isTouchDevice = useMemo(() => {
     if (typeof window === "undefined") return false;
     return "ontouchstart" in window || navigator.maxTouchPoints > 0;
@@ -697,53 +250,29 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     disabled: dropZoneDisabled,
   });
 
-  // Listen for pending imports from TagNavigation drops
-  const pendingImport = useImportDropStore((state) => state.pendingImport);
-  const clearPendingImport = useImportDropStore(
-    (state) => state.clearPendingImport
-  );
-
-  // Handle pending imports from TagNavigation drops
-  useEffect(() => {
-    if (pendingImport) {
-      // If category was preselected (dropped on a tag), auto-import without modal
-      if (pendingImport.preselectedCategoryId) {
-        handleImportConfirm(
-          pendingImport.urls,
-          pendingImport.preselectedCategoryId
-        );
-        clearPendingImport();
-      } else {
-        // No category preselected - show modal for selection
-        setImportPreviewModal({
-          open: true,
-          urls: pendingImport.urls,
-        });
-      }
-    }
-  }, [pendingImport, handleImportConfirm, clearPendingImport]);
-
   // WebSocket for bulk upload progress and import progress tracking
   // Provides real-time updates for video enrichment stages (created → metadata → captions → chapters → complete)
-  const { jobProgress, reconnecting, historyError } = useWebSocket();
+  const { jobProgress, reconnecting, historyError, retryHistory } =
+    useWebSocket();
 
   const deleteVideo = useDeleteVideo(listId);
 
-  // TASK 4: Handlers to update sort state in URL
-  const handleSortChange = (
-    newSortBy: string,
-    newSortOrder: "asc" | "desc"
-  ) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("sort_by", newSortBy);
-    params.set("sort_order", newSortOrder);
-    setSearchParams(params, { replace: true });
-  };
+  const handleSortChange = useCallback(
+    (newSortBy: string, newSortOrder: "asc" | "desc") => {
+      const params = new URLSearchParams(searchParams);
+      params.set("sort_by", newSortBy);
+      params.set("sort_order", newSortOrder);
+      params.delete("page");
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
 
   const handleClearSort = () => {
     const params = new URLSearchParams(searchParams);
     params.delete("sort_by");
     params.delete("sort_order");
+    params.delete("page");
     setSearchParams(params, { replace: true });
   };
 
@@ -782,8 +311,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     if (selectedTags.length === 0) {
       // Remove tags param if no tags selected
       if (searchParams.has("tags")) {
-        searchParams.delete("tags");
-        setSearchParams(searchParams, { replace: true });
+        setSearchParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            next.delete("tags");
+            next.delete("page");
+            return next;
+          },
+          { replace: true }
+        );
       }
     } else {
       // Set tags param with comma-separated tag names
@@ -794,8 +330,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       const currentTagsParam = searchParams.get("tags");
 
       if (currentTagsParam !== tagNames) {
-        searchParams.set("tags", tagNames);
-        setSearchParams(searchParams, { replace: true });
+        setSearchParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            next.set("tags", tagNames);
+            next.delete("page");
+            return next;
+          },
+          { replace: true }
+        );
       }
     }
   }, [selectedTags, searchParams, setSearchParams]); // Run when selected tags change
@@ -805,7 +348,16 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   const handleExportCSV = async () => {
     try {
-      await exportVideosCSV(listId);
+      await exportVideosCSV(
+        listId,
+        buildVideoSelection({
+          tags: selectedTagNames,
+          channelId: selectedChannelId ?? undefined,
+          fieldFilters: activeFilters,
+          sortBy,
+          sortOrder,
+        })
+      );
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const errorMessage =
@@ -820,231 +372,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     }
   };
 
-  // Get column visibility settings from store
-  const visibleColumns = useTableSettingsStore((state) => state.visibleColumns);
-
-  // Get viewMode from store (REF MCP #1: independent from thumbnailSize)
-  // REF Improvement #1 (Task #35): Use separate selectors for optimal re-render prevention
   const viewMode = useTableSettingsStore((state) => state.viewMode);
   const setViewMode = useTableSettingsStore((state) => state.setViewMode);
-
-  // Get gridColumns from store (Task #35: Dynamic grid column count)
   const gridColumns = useTableSettingsStore((state) => state.gridColumns);
-
-  const columns = useMemo(
-    () => {
-      const allColumns = [
-        // Column 1: Thumbnail (with Aspect Ratio + Loading State)
-        columnHelper.accessor("thumbnail_url", {
-          id: "thumbnail",
-          header: "Vorschau",
-          enableSorting: false, // TASK 5: Disable sorting on thumbnail
-          cell: (info) => {
-            const thumbnailUrl = info.getValue();
-            const row = info.row.original;
-            const title = row.title || `Video ${row.youtube_id}`;
-
-            return (
-              <VideoThumbnail
-                fallbackUrl={thumbnailUrl}
-                title={title}
-                youtubeId={row.youtube_id}
-              />
-            );
-          },
-        }),
-
-        // Column 2: Title + Channel
-        columnHelper.accessor("title", {
-          id: "title",
-          header: ({ column }) => (
-            <button
-              className="flex items-center gap-2 transition-colors hover:text-blue-600"
-              onClick={column.getToggleSortingHandler()}
-            >
-              Titel
-              {column.getIsSorted() && (
-                <span
-                  aria-label={
-                    column.getIsSorted() === "asc"
-                      ? "Aufsteigend sortiert"
-                      : "Absteigend sortiert"
-                  }
-                >
-                  {column.getIsSorted() === "asc" ? "↑" : "↓"}
-                </span>
-              )}
-            </button>
-          ),
-          enableSorting: true, // TASK 5: Enable sorting on title
-          cell: (info) => {
-            const row = info.row.original;
-            const title = info.getValue() || `Video ${row.youtube_id}`;
-            const channel = row.channel;
-
-            return (
-              <div className="flex min-w-[200px] max-w-[400px] flex-col gap-1">
-                <span
-                  className="line-clamp-2 font-medium text-gray-900 leading-tight dark:text-gray-100"
-                  title={title}
-                >
-                  {title}
-                </span>
-                {channel && (
-                  <span className="truncate text-gray-600 text-sm dark:text-gray-400">
-                    {channel}
-                  </span>
-                )}
-              </div>
-            );
-          },
-        }),
-
-        // Column 3: Duration
-        columnHelper.accessor("duration", {
-          id: "duration",
-          header: ({ column }) => (
-            <button
-              className="flex items-center gap-2 transition-colors hover:text-blue-600"
-              onClick={column.getToggleSortingHandler()}
-            >
-              Dauer
-              {column.getIsSorted() && (
-                <span
-                  aria-label={
-                    column.getIsSorted() === "asc"
-                      ? "Aufsteigend sortiert"
-                      : "Absteigend sortiert"
-                  }
-                >
-                  {column.getIsSorted() === "asc" ? "↑" : "↓"}
-                </span>
-              )}
-            </button>
-          ),
-          enableSorting: true, // TASK 5: Enable sorting on duration
-          cell: (info) => {
-            const duration = info.getValue();
-            return (
-              <span className="font-mono text-gray-700 text-sm tabular-nums dark:text-gray-300">
-                {formatDuration(duration)}
-              </span>
-            );
-          },
-        }),
-
-        // Column 4: Three-dot menu
-        columnHelper.accessor("id", {
-          id: "menu",
-          header: "", // No header text - just icon column
-          cell: (info) => (
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger
-                aria-label="Aktionen"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.stopPropagation();
-                  }
-                }}
-                tabIndex={-1}
-              >
-                <svg
-                  aria-hidden="true"
-                  className="h-4 w-4"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <circle cx="12" cy="5" r="2" />
-                  <circle cx="12" cy="12" r="2" />
-                  <circle cx="12" cy="19" r="2" />
-                </svg>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  className="cursor-pointer text-red-600 focus:text-red-700"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const row = info.row.original;
-                    // REF MCP #3: Smart video title with fallback chain
-                    const videoTitle =
-                      row.title ||
-                      `Video ${row.youtube_id}` ||
-                      "Unbekanntes Video";
-                    setDeleteModal({
-                      open: true,
-                      videoId: info.getValue() as string,
-                      videoTitle,
-                    });
-                  }}
-                >
-                  <svg
-                    aria-hidden="true"
-                    className="mr-2 h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M3 6h18" />
-                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                    <line x1="10" x2="10" y1="11" y2="17" />
-                    <line x1="14" x2="14" y1="11" y2="17" />
-                  </svg>
-                  Löschen
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ),
-        }),
-      ];
-
-      // Filter columns based on visibility settings
-      return allColumns.filter((column) => {
-        const columnId = column.id as
-          | "thumbnail"
-          | "title"
-          | "duration"
-          | "menu";
-
-        // Map 'menu' column id to 'actions' in store
-        if (columnId === "menu") {
-          return visibleColumns.actions;
-        }
-
-        return visibleColumns[columnId];
-      });
-    },
-    [visibleColumns] // TASK 5: Add sort params to dependencies
-  );
-
-  // TASK 5: Configure TanStack Table with manual sorting
-  const table = useReactTable({
-    data: videos as VideoListItem[],
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    manualSorting: true, // Backend handles sorting
-    state: {
-      sorting: sortBy ? [{ id: sortBy, desc: sortOrder === "desc" }] : [],
-    },
-    onSortingChange: (updater) => {
-      const newSorting =
-        typeof updater === "function"
-          ? updater(sortBy ? [{ id: sortBy, desc: sortOrder === "desc" }] : [])
-          : updater;
-
-      if (newSorting.length > 0) {
-        const sort = newSorting[0];
-        if (sort) {
-          handleSortChange(sort.id, sort.desc ? "desc" : "asc");
-        }
-      } else {
-        handleClearSort();
-      }
-    },
-  });
 
   const validateYoutubeUrl = (url: string): boolean => {
     if (!url.trim()) {
@@ -1103,6 +433,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
     deleteVideo.mutate(deleteModal.videoId, {
       onSuccess: () => {
+        setPendingVideoIds((current) =>
+          current.filter((id) => id !== deleteModal.videoId)
+        );
         // Close modal after successful delete
         setDeleteModal({ open: false, videoId: null, videoTitle: null });
       },
@@ -1243,8 +576,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                   "Kanal"}
               </h1>
               <p className="mt-1 text-muted-foreground text-sm">
-                {videos.length} {videos.length === 1 ? "Video" : "Videos"} in
-                dieser Liste
+                {totalVideos} {totalVideos === 1 ? "Video" : "Videos"} in dieser
+                Liste
               </p>
             </div>
           ) : selectedTags.length > 0 ? (
@@ -1253,8 +586,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                 {selectedTags.map((t) => t.name).join(", ")}
               </h1>
               <p className="mt-1 text-muted-foreground text-sm">
-                {videos.length} {videos.length === 1 ? "Video" : "Videos"} in
-                dieser Liste
+                {totalVideos} {totalVideos === 1 ? "Video" : "Videos"} in dieser
+                Liste
               </p>
             </div>
           ) : (
@@ -1263,8 +596,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                 Alle Videos
               </h1>
               <p className="mt-1 text-muted-foreground text-sm">
-                {videos.length} {videos.length === 1 ? "Video" : "Videos"} in
-                dieser Liste
+                {totalVideos} {totalVideos === 1 ? "Video" : "Videos"} in dieser
+                Liste
               </p>
             </div>
           )}
@@ -1324,99 +657,19 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         </button>
       )}
 
-      {/* Filter and View Controls Bar - Hidden on mobile */}
-      <div className="mb-6 hidden items-center gap-4 md:flex">
-        {/* Left side - Tag filters with carousel */}
-        <div className="min-w-0 flex-1">
-          <TagCarousel />
-        </div>
+      <VideoFilterControls
+        listId={listId}
+        selectedTagIds={selectedTagIds}
+        setViewMode={setViewMode}
+        viewMode={viewMode}
+      />
 
-        {/* Right side - View controls */}
-        <div className="ml-auto flex flex-shrink-0 items-center gap-1">
-          {/* Filter Settings Modal - Field-based filters */}
-          <FilterSettingsModal
-            listId={listId}
-            selectedTagIds={selectedTagIds}
-          />
-          {/* View Mode Toggle - Task #32 */}
-          <ViewModeToggle onToggle={setViewMode} viewMode={viewMode} />
-          {/* Table Settings Dropdown - Task #35 */}
-          <TableSettingsDropdown />
-        </div>
-      </div>
-
-      {/* Field-Based Filter Bar - Task #145 */}
-      <FilterBar listId={listId} />
-
-      {/* WebSocket Connection Status Banner - Only show when jobs are active */}
-      {reconnecting && jobProgress.size > 0 && (
-        <div className="mb-6 rounded-lg border-yellow-400 border-l-4 bg-yellow-50 p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5 animate-spin text-yellow-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  fill="currentColor"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="font-medium text-sm text-yellow-800">
-                Verbindung zu Fortschritts-Updates wird wiederhergestellt...
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* History Error Display */}
-      {historyError && (
-        <div
-          className="mb-6 rounded-lg border-red-400 border-l-4 bg-red-50 p-4"
-          role="alert"
-        >
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5 text-red-400"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  clipRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  fillRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="font-medium text-red-800 text-sm">
-                Fehler beim Laden der Verlaufshistorie
-              </h3>
-              <p className="mt-1 text-red-700 text-sm">{historyError}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Job-level progress removed - individual video progress is shown on thumbnails */}
+      <VideoRecoveryStatus
+        hasActiveJobs={jobProgress.size > 0}
+        historyError={historyError}
+        reconnecting={reconnecting}
+        retryHistory={retryHistory}
+      />
 
       {isUploadingCSV && (
         <CSVUpload
@@ -1497,7 +750,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           </p>
         </div>
       ) : viewMode === "grid" ? (
-        // Grid View - Task #32, Task #35 (gridColumns), Task #130 (navigation)
         <VideoGrid
           gridColumns={gridColumns}
           onDeleteVideo={handleGridDeleteClick}
@@ -1506,80 +758,32 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         />
       ) : (
         // Table View (existing implementation)
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-          <table className="min-w-full divide-y divide-border">
-            <thead className="hidden">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <th
-                      className="px-6 py-3 text-left font-medium text-muted-foreground text-xs uppercase tracking-wider"
-                      key={header.id}
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody className="divide-y divide-border bg-card">
-              {table.getRowModel().rows.map((row) => {
-                const video = row.original;
+        <VideoTable
+          handleClearSort={handleClearSort}
+          handleSortChange={handleSortChange}
+          onDeleteVideo={handleGridDeleteClick}
+          onVideoClick={handleGridVideoClick}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          videos={videos as VideoResponse[]}
+        />
+      )}
 
-                // Use same logic as Grid View: respect videoDetailsView setting
-                // Mobile override: always use page mode (same as handleGridVideoClick)
-                const handleRowClick = () => {
-                  const videoDetailsView =
-                    useTableSettingsStore.getState().videoDetailsView;
-
-                  // Mobile override: always use page mode regardless of setting
-                  if (!isMobile && videoDetailsView === "modal") {
-                    setVideoDetailsModal({
-                      open: true,
-                      video: video as VideoResponse,
-                    });
-                  } else {
-                    // Page mode - navigate to video details page
-                    navigate(`/videos/${video.id}`);
-                  }
-                };
-
-                const handleKeyDown = (e: React.KeyboardEvent) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleRowClick();
-                  }
-                };
-
-                return (
-                  <tr
-                    className="cursor-pointer transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
-                    key={row.id}
-                    onClick={handleRowClick}
-                    onKeyDown={handleKeyDown}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td className="px-6 py-4" key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {importPolling.error && (
+        <div role="alert">
+          {importPolling.error}
+          <button onClick={importPolling.retry} type="button">
+            Erneut prüfen
+          </button>
         </div>
       )}
+      <VideoPagination
+        onPage={setPage}
+        page={page}
+        pageSize={pageSize}
+        shown={videos.length}
+        total={totalVideos}
+      />
 
       {/* Confirm Delete Modal */}
       <ConfirmDeleteModal
@@ -1608,6 +812,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       {/* Import Preview Modal (Drag & Drop Import feature) */}
       <ImportPreviewModal
         existingVideoIds={existingVideoIds}
+        listId={listId}
         onImport={handleImportConfirm}
         onOpenChange={(open) => {
           if (!open) {
@@ -1623,5 +828,4 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   );
 };
 
-// Export VideoThumbnail for reuse in VideoCard (Task #32)
-export { VideoThumbnail };
+export { VideoThumbnail } from "./videos/VideoThumbnail";

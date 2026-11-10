@@ -18,7 +18,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
@@ -36,7 +36,6 @@ import type {
   ChatRequest,
   ChatResponseSchema,
   CreateFromChatRequest,
-  CreateSubscriptionFromChatApiChatSubscriptionCreatePostParams,
   HTTPValidationError,
   SubscriptionResponse
 } from '.././model';
@@ -142,7 +141,6 @@ Resolves channel names to channel IDs automatically.
  */
 export const createSubscriptionFromChatApiChatSubscriptionCreatePost = (
     createFromChatRequest: CreateFromChatRequest,
-    params?: CreateSubscriptionFromChatApiChatSubscriptionCreatePostParams,
  signal?: AbortSignal
 ) => {
       
@@ -150,8 +148,7 @@ export const createSubscriptionFromChatApiChatSubscriptionCreatePost = (
       return customInstance<SubscriptionResponse>(
       {url: `/api/chat/subscription/create`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: createFromChatRequest,
-        params, signal
+      data: createFromChatRequest, signal
     },
       );
     }
@@ -159,8 +156,8 @@ export const createSubscriptionFromChatApiChatSubscriptionCreatePost = (
 
 
 export const getCreateSubscriptionFromChatApiChatSubscriptionCreatePostMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionFromChatApiChatSubscriptionCreatePost>>, TError,{data: CreateFromChatRequest;params?: CreateSubscriptionFromChatApiChatSubscriptionCreatePostParams}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionFromChatApiChatSubscriptionCreatePost>>, TError,{data: CreateFromChatRequest;params?: CreateSubscriptionFromChatApiChatSubscriptionCreatePostParams}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionFromChatApiChatSubscriptionCreatePost>>, TError,{data: CreateFromChatRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionFromChatApiChatSubscriptionCreatePost>>, TError,{data: CreateFromChatRequest}, TContext> => {
 
 const mutationKey = ['createSubscriptionFromChatApiChatSubscriptionCreatePost'];
 const {mutation: mutationOptions} = options ?
@@ -172,10 +169,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSubscriptionFromChatApiChatSubscriptionCreatePost>>, {data: CreateFromChatRequest;params?: CreateSubscriptionFromChatApiChatSubscriptionCreatePostParams}> = (props) => {
-          const {data,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSubscriptionFromChatApiChatSubscriptionCreatePost>>, {data: CreateFromChatRequest}> = (props) => {
+          const {data} = props ?? {};
 
-          return  createSubscriptionFromChatApiChatSubscriptionCreatePost(data,params,)
+          return  createSubscriptionFromChatApiChatSubscriptionCreatePost(data,)
         }
 
         
@@ -191,11 +188,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Create Subscription From Chat
  */
 export const useCreateSubscriptionFromChatApiChatSubscriptionCreatePost = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionFromChatApiChatSubscriptionCreatePost>>, TError,{data: CreateFromChatRequest;params?: CreateSubscriptionFromChatApiChatSubscriptionCreatePostParams}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionFromChatApiChatSubscriptionCreatePost>>, TError,{data: CreateFromChatRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createSubscriptionFromChatApiChatSubscriptionCreatePost>>,
         TError,
-        {data: CreateFromChatRequest;params?: CreateSubscriptionFromChatApiChatSubscriptionCreatePostParams},
+        {data: CreateFromChatRequest},
         TContext
       > => {
 

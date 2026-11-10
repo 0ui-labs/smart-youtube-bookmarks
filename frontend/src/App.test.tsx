@@ -102,6 +102,8 @@ vi.mock("./hooks/useVideosFilter", () => ({
 }));
 
 vi.mock("./hooks/useTags", () => ({
+  useCategories: () => ({ data: [], isLoading: false, error: null }),
+  useLabels: () => ({ data: [], isLoading: false, error: null }),
   useTags: vi.fn(() => ({
     data: [],
     isLoading: false,
@@ -124,9 +126,10 @@ vi.mock("./hooks/useTags", () => ({
 }));
 
 vi.mock("./stores/fieldFilterStore", () => ({
-  useFieldFilterStore: vi.fn(() => ({
-    activeFilters: [],
-  })),
+  useFieldFilterStore: vi.fn((selector) => {
+    const state = { activeFilters: [], removeFilter: vi.fn() };
+    return selector ? selector(state) : state;
+  }),
 }));
 
 vi.mock("./stores/tagStore", () => ({
@@ -137,12 +140,15 @@ vi.mock("./stores/tagStore", () => ({
 }));
 
 vi.mock("./stores/tableSettingsStore", () => ({
-  useTableSettingsStore: vi.fn(() => ({
-    viewMode: "table",
-    visibleColumns: [],
-    setViewMode: vi.fn(),
-    setVisibleColumns: vi.fn(),
-  })),
+  useTableSettingsStore: vi.fn((selector) => {
+    const state = {
+      viewMode: "table",
+      visibleColumns: [],
+      setViewMode: vi.fn(),
+      setVisibleColumns: vi.fn(),
+    };
+    return selector ? selector(state) : state;
+  }),
 }));
 
 describe("App", () => {

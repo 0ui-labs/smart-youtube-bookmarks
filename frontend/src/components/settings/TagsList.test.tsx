@@ -67,12 +67,11 @@ describe("TagsList", () => {
 
     // Check German headers exist
     const headers = screen.getAllByRole("columnheader");
-    expect(headers).toHaveLength(5); // Name, Farbe, Typ, Felder, Aktionen
+    expect(headers).toHaveLength(4); // Name, Farbe, Felder, Aktionen
     expect(headers[0]).toHaveTextContent("Name");
     expect(headers[1]).toHaveTextContent("Farbe");
-    expect(headers[2]).toHaveTextContent("Typ");
-    expect(headers[3]).toHaveTextContent("Felder");
-    expect(headers[4]).toHaveTextContent("Aktionen");
+    expect(headers[2]).toHaveTextContent("Felder");
+    expect(headers[3]).toHaveTextContent("Aktionen");
   });
 
   it("displays color badge with hex code", () => {
@@ -101,13 +100,9 @@ describe("TagsList", () => {
     expect(screen.getByText("Felder konfiguriert")).toBeInTheDocument();
   });
 
-  it("shows type badge (Kategorie/Label)", () => {
+  it("offers actions for every displayed category", () => {
     render(<TagsList onDelete={vi.fn()} onEdit={vi.fn()} tags={mockTags} />);
-
-    // First tag is_video_type=true -> "Kategorie"
-    expect(screen.getByText("Kategorie")).toBeInTheDocument();
-    // Second tag is_video_type=false -> "Label"
-    expect(screen.getByText("Label")).toBeInTheDocument();
+    expect(screen.getAllByRole("button")).toHaveLength(mockTags.length);
   });
 
   it("table rows have hover effect class", () => {

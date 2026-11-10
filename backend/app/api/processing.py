@@ -1,5 +1,7 @@
-import asyncio
+"""Processing job API and progress history."""
+
 import logging
+from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
@@ -9,11 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.core.redis import get_arq_pool
 from app.models import BookmarkList, ProcessingJob, Schema, Video
 from app.models.job_progress import JobProgressEvent
 from app.schemas.job import JobResponse, JobStatus
 from app.schemas.job_progress import JobProgressEventRead
+from app.services.job_dispatch_service import DurableJobQueue
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +24,33 @@ router = APIRouter(prefix="/api", tags=["processing"])
 
 @router.post("/lists/{list_id}/process", response_model=JobResponse, status_code=201)
 async def start_processing(
-    list_id: UUID, db: AsyncSession = Depends(get_db), arq_pool=Depends(get_arq_pool)
-):
+    list_id: UUID, db: AsyncSession = Depends(get_db)
+) -> JobResponse:
     try:
         # Verify list exists
         result = await db.execute(
-            select(BookmarkList).where(BookmarkList.id == list_id)
+            select(BookmarkList)
+            .where(BookmarkList.id == list_id)
+            .with_for_update(of=BookmarkList)
         )
         list_obj = result.scalar_one_or_none()
         if not list_obj:
             raise HTTPException(status_code=404, detail="List not found")
+
+        active_job = (
+            await db.execute(
+                select(ProcessingJob.id)
+                .where(
+                    ProcessingJob.list_id == list_id,
+                    ProcessingJob.status.in_(["running", "paused"]),
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if active_job is not None:
+            raise HTTPException(
+                status_code=409, detail="A processing job is already active"
+            )
 
         # Count pending videos efficiently
         count_result = await db.execute(
@@ -44,15 +63,14 @@ async def start_processing(
         if pending_count == 0:
             raise HTTPException(status_code=400, detail="No pending videos to process")
 
-        # Create job in database FIRST (workers need to query it)
+        # Persist job and all delivery intents in the same transaction.
         job = ProcessingJob(
             list_id=list_id, total_videos=pending_count, status="running"
         )
         db.add(job)
-        await db.commit()  # CRITICAL: Commit before enqueue (not just flush)
-        await db.refresh(job)
+        await db.flush()
 
-        # Wrap all post-commit operations to handle failures (prevents orphaned jobs)
+        # No dispatcher can observe these intents before the final commit.
         try:
             # Fetch schema for Gemini extraction (if list has one)
             schema_fields = {}
@@ -72,33 +90,27 @@ async def start_processing(
             )
             pending_videos = videos_result.scalars().all()
 
-            # Build list of enqueue coroutines
-            enqueue_tasks = [
-                arq_pool.enqueue_job(
-                    "process_video",  # Function name from WorkerSettings
-                    str(video.id),  # video_id
-                    str(list_id),  # list_id
-                    schema_fields,  # schema for Gemini
-                    str(job.id),  # job_id for progress updates
+            for video in pending_videos:
+                await DurableJobQueue(db).enqueue_job(
+                    "process_video",
+                    str(video.id),
+                    str(list_id),
+                    schema_fields,
+                    str(job.id),
                 )
-                for video in pending_videos
-            ]
-
-            # Execute all enqueues atomically
-            await asyncio.gather(*enqueue_tasks)
+            await db.commit()
             logger.info(
                 f"Enqueued {len(pending_videos)} videos for processing (job {job.id})"
             )
 
         except Exception as e:
-            # Mark job as failed if ANY operation fails (schema fetch, video fetch, or enqueue)
-            logger.exception("Failed to enqueue jobs for list %s", list_id)
-            job.status = "failed"
-            job.error_message = f"Failed to start processing: {e!s}"
-            await db.commit()
-            raise HTTPException(
-                status_code=500, detail=f"Failed to start processing: {e!s}"
+            await db.rollback()
+            logger.exception(
+                "Failed to persist processing intents for list %s", list_id
             )
+            raise HTTPException(
+                status_code=500, detail="Failed to accept processing job"
+            ) from e
 
         return JobResponse(
             job_id=job.id,
@@ -113,7 +125,9 @@ async def start_processing(
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatus)
-async def get_job_status(job_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_job_status(
+    job_id: UUID, db: AsyncSession = Depends(get_db)
+) -> ProcessingJob:
     try:
         result = await db.execute(
             select(ProcessingJob).where(ProcessingJob.id == job_id)
@@ -132,7 +146,7 @@ async def get_job_status(job_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/jobs/{job_id}/pause", status_code=204)
-async def pause_job(job_id: UUID, db: AsyncSession = Depends(get_db)):
+async def pause_job(job_id: UUID, db: AsyncSession = Depends(get_db)) -> None:
     try:
         result = await db.execute(
             select(ProcessingJob).where(ProcessingJob.id == job_id)
@@ -163,27 +177,14 @@ async def pause_job(job_id: UUID, db: AsyncSession = Depends(get_db)):
 )
 async def get_progress_history(
     job_id: UUID,
-    user_id: UUID = Query(
-        ..., description="User ID for authentication (temporary mock auth)"
-    ),
     since: datetime | None = Query(
         None, description="Return events after this timestamp"
     ),
     offset: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, gt=0, le=100, description="Maximum records to return"),
     db: AsyncSession = Depends(get_db),
-):
-    """
-    Get progress history for a job with pagination and filtering.
+) -> Sequence[JobProgressEvent]:
 
-    Supports:
-    - Filtering by 'since' timestamp for efficient reconnection
-    - Pagination with offset/limit (max 100 per request)
-    - Authorization: user can only access their own jobs
-
-    Note: Uses user_id query param for temporary mock authentication.
-    This will be replaced with proper JWT authentication later.
-    """
     try:
         # Verify job exists and load list relationship (with eager loading)
         stmt = (
@@ -198,12 +199,6 @@ async def get_progress_history(
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
-        # Authorization: Check ownership via job -> list -> user relationship
-        if job.list.user_id != user_id:
-            raise HTTPException(
-                status_code=403, detail="Not authorized to access this job"
-            )
-
         # Query progress events with filters and pagination
         query = select(JobProgressEvent).where(JobProgressEvent.job_id == job_id)
 
@@ -212,10 +207,14 @@ async def get_progress_history(
             query = query.where(JobProgressEvent.created_at >= since)
 
         # Order chronologically and apply pagination
-        query = query.order_by(JobProgressEvent.created_at).offset(offset).limit(limit)
+        query = (
+            query.order_by(JobProgressEvent.created_at, JobProgressEvent.id)
+            .offset(offset)
+            .limit(limit)
+        )
 
-        result = await db.execute(query)
-        events = result.scalars().all()
+        events_result = await db.execute(query)
+        events = events_result.scalars().all()
 
         return events
     except HTTPException:

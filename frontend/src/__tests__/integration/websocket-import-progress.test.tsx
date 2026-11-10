@@ -7,7 +7,7 @@
  * 3. VideoCard displays progress overlay
  */
 
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { VideoCard } from "@/components/VideoCard";
@@ -52,7 +52,7 @@ describe("WebSocket Import Progress Integration", () => {
     });
   });
 
-  it("VideoCard shows progress overlay when store has importing progress", () => {
+  it("VideoCard shows progress overlay when store has importing progress", async () => {
     // Simulate receiving import_progress message by updating store directly
     act(() => {
       useImportProgressStore
@@ -68,7 +68,11 @@ describe("WebSocket Import Progress Integration", () => {
 
     // Progress overlay should be visible
     expect(screen.getByRole("progressbar")).toBeInTheDocument();
-    expect(screen.getByText("50%")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+      ).toBeGreaterThanOrEqual(50 - 1)
+    );
     expect(screen.getAllByText(/untertitel/i).length).toBeGreaterThanOrEqual(1);
   });
 
@@ -121,12 +125,12 @@ describe("WebSocket Import Progress Integration", () => {
     expect(store.isImporting("video-2")).toBe(true);
     expect(store.isImporting("video-3")).toBe(false); // complete
 
-    expect(store.getProgress("video-1")?.progress).toBe(25);
-    expect(store.getProgress("video-2")?.progress).toBe(75);
-    expect(store.getProgress("video-3")?.progress).toBe(100);
+    expect(store.getProgress("video-1")?.realProgress).toBe(25);
+    expect(store.getProgress("video-2")?.realProgress).toBe(75);
+    expect(store.getProgress("video-3")?.realProgress).toBe(100);
   });
 
-  it("progress updates flow correctly from store to component", () => {
+  it("progress updates flow correctly from store to component", async () => {
     render(
       <MemoryRouter>
         <VideoCard video={mockVideo} />
@@ -145,7 +149,11 @@ describe("WebSocket Import Progress Integration", () => {
 
     // Now should show overlay with 30%
     expect(screen.getByRole("progressbar")).toBeInTheDocument();
-    expect(screen.getByText("30%")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+      ).toBeGreaterThanOrEqual(30 - 1)
+    );
 
     // Update progress
     act(() => {
@@ -155,6 +163,10 @@ describe("WebSocket Import Progress Integration", () => {
     });
 
     // Should show updated progress
-    expect(screen.getByText("60%")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        Number(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+      ).toBeGreaterThanOrEqual(59)
+    );
   });
 });

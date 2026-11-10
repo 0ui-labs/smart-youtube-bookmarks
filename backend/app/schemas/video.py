@@ -6,7 +6,7 @@ Includes enhanced URL validation with security checks.
 
 import re
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 # Import for circular dependency resolution (TYPE_CHECKING)
 from typing import TYPE_CHECKING, Annotated, Any, Literal
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 from .custom_field import CustomFieldResponse
 
 
-class FieldFilterOperator(str, Enum):
+class FieldFilterOperator(StrEnum):
     """Filter operators for different field types."""
 
     # Numeric (rating)
@@ -290,7 +290,7 @@ class AvailableFieldResponse(BaseModel):
     show_on_card: bool
 
     # Optional: For UI hints
-    config: dict = Field(
+    config: dict[str, Any] = Field(
         default_factory=dict
     )  # e.g., {'max_rating': 5} or {'options': ['bad', 'good']}
 
@@ -403,7 +403,7 @@ class BulkUploadResponse(BaseModel):
 
 
 # Resolve forward references after all schemas are defined
-def rebuild_schemas():
+def rebuild_schemas() -> None:
     """Rebuild schemas to resolve forward references (TagResponse)."""
     from .tag import TagResponse  # noqa: F401
 
@@ -412,3 +412,30 @@ def rebuild_schemas():
 
 # Call rebuild when module is imported
 rebuild_schemas()
+
+
+class VideoPageResponse(BaseModel):
+    items: list[VideoResponse]
+    total: int
+    offset: int
+    limit: int
+
+
+class VideoLookupRequest(BaseModel):
+    youtube_ids: list[str] = Field(..., min_length=1, max_length=100)
+
+
+class VideoLookupResponse(BaseModel):
+    existing_youtube_ids: list[str]
+
+
+class VideoImportStatusRequest(BaseModel):
+    video_ids: list[UUID] = Field(..., min_length=1, max_length=100)
+
+
+class VideoImportStatusResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    import_stage: str
+    import_progress: int
+    processing_status: str

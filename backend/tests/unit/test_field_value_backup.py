@@ -267,7 +267,7 @@ class TestRestoreFieldValues:
         When: restore_field_values is called
         Then: VideoFieldValue objects are created in DB and count is returned
         """
-        backup_path, video_id, category_id, backup_data = sample_backup_file
+        _backup_path, video_id, category_id, _backup_data = sample_backup_file
 
         with patch("app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir):
             restored_count = await restore_field_values(

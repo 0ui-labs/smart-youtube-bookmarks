@@ -337,7 +337,7 @@ async def test_update_tag_invalid_schema_id(client: AsyncClient, test_db, test_u
     )
 
     assert response.status_code == 404
-    assert "nicht gefunden" in response.json()["detail"].lower()
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -389,10 +389,7 @@ async def test_update_tag_schema_from_different_list(
     )
 
     assert response.status_code == 404
-    assert (
-        "nicht gefunden oder gehört zu anderer liste"
-        in response.json()["detail"].lower()
-    )
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio

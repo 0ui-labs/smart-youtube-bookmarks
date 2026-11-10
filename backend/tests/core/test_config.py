@@ -1,12 +1,33 @@
-"""Tests for configuration settings"""
+"""Configuration behavior without requiring real provider credentials."""
 
-from app.core.config import settings
+import pytest
+from pydantic import ValidationError
+
+from app.core.config import Settings
 
 
-def test_youtube_api_key_exists():
-    """Test that YouTube API key is configured"""
-    # Check that API key is set and not empty
-    # Empty string means key is missing (should fail in production)
-    assert settings.youtube_api_key, (
-        "YouTube API key must be configured (not empty or None)"
+def test_development_allows_missing_youtube_key():
+    assert Settings(env="development", youtube_api_key="").youtube_api_key == ""
+
+
+def test_production_rejects_missing_youtube_key():
+    with pytest.raises(ValidationError, match="YouTube API key is required"):
+        Settings(
+            env="production",
+            secret_key="x" * 32,
+            youtube_api_key="",
+            gemini_api_key="synthetic",
+        )
+
+
+def test_retired_hs256_secret_is_not_a_production_auth_requirement():
+    config = Settings(
+        env="production",
+        secret_key="",
+        youtube_api_key="synthetic",
+        gemini_api_key="synthetic",
     )
+    assert config.secret_key == ""
+    assert (
+        config.clerk_issuer == ""
+    )  # Missing Clerk remains fail-closed in the verifier.

@@ -7,6 +7,7 @@ offline and online migration modes.
 """
 
 import asyncio
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -17,6 +18,10 @@ from alembic import context
 
 # Import settings and models
 from app.core.config import settings
+from app.core.test_database import (
+    isolated_test_connect_args,
+    validated_test_database_url,
+)
 from app.models import Base
 
 # this is the Alembic Config object, which provides
@@ -25,7 +30,13 @@ config = context.config
 
 # Override sqlalchemy.url with the one from settings
 # This allows us to use environment variables for the database URL
-config.set_main_option("sqlalchemy.url", settings.database_url)
+test_migration_url = os.environ.get("TEST_MIGRATION_DATABASE_URL")
+config.set_main_option(
+    "sqlalchemy.url",
+    validated_test_database_url(test_migration_url, settings.database_url)
+    if test_migration_url
+    else settings.database_url,
+)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -84,6 +95,9 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=isolated_test_connect_args(test_migration_url)
+        if test_migration_url
+        else {},
     )
 
     async with connectable.connect() as connection:

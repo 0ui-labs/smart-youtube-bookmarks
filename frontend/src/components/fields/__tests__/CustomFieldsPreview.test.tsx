@@ -321,7 +321,7 @@ describe("CustomFieldsPreview - Field Type Rendering", () => {
     expect(screen.getByText("Notes:")).toBeInTheDocument();
 
     // Check value is displayed (TextSnippet renders input element)
-    expect(screen.getByDisplayValue("Great tutorial!")).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toHaveTextContent("Great tutorial!");
   });
 });
 

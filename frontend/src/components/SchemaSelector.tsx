@@ -46,6 +46,9 @@ export const SchemaSelector = ({
   const selectValue = value === null ? "__none__" : (value ?? "__none__");
 
   const handleValueChange = (newValue: string) => {
+    // Radix emits an empty native-select event while options refresh.
+    // Clearing is represented only by the explicit __none__ item.
+    if (newValue === "") return;
     // Convert "__none__" back to null for "Kein Schema"
     onChange(newValue === "__none__" ? null : newValue);
   };

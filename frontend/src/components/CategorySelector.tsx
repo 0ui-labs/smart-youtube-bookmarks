@@ -23,38 +23,39 @@
  * />
  * ```
  */
-import { useState } from 'react'
-import { useCategories } from '@/hooks/useTags'
-import { useSetVideoCategory } from '@/hooks/useVideos'
+
+import { FolderOpen } from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { FolderOpen } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { CategoryChangeWarning } from './CategoryChangeWarning'
-import type { VideoFieldValue } from '@/types/video'
+} from "@/components/ui/select";
+import { useCategories } from "@/hooks/useTags";
+import { useSetVideoCategory } from "@/hooks/useVideos";
+import type { VideoFieldValue } from "@/types/video";
+import { CategoryChangeWarning } from "./CategoryChangeWarning";
 
 interface FieldValueInfo {
-  id: string
-  fieldName: string
-  value: string | number | boolean | null
+  id: string;
+  fieldName: string;
+  value: string | number | boolean | null;
 }
 
 interface CategorySelectorProps {
   /** Video ID to assign category to */
-  videoId: string
+  videoId: string;
   /** Current category ID (null if no category assigned) */
-  currentCategoryId: string | null
+  currentCategoryId: string | null;
   /** Current field values for the video */
-  fieldValues?: VideoFieldValue[]
+  fieldValues?: VideoFieldValue[];
   /** Optional callback when category changes */
-  onCategoryChange?: (categoryId: string | null) => void
+  onCategoryChange?: (categoryId: string | null) => void;
   /** Whether the selector is disabled */
-  disabled?: boolean
+  disabled?: boolean;
 }
 
 export function CategorySelector({
@@ -64,108 +65,116 @@ export function CategorySelector({
   onCategoryChange,
   disabled = false,
 }: CategorySelectorProps) {
-  const { data: categories, isLoading: categoriesLoading } = useCategories()
-  const setCategory = useSetVideoCategory()
+  const { data: categories, isLoading: categoriesLoading } = useCategories();
+  const setCategory = useSetVideoCategory();
 
   // Warning dialog state
-  const [warningOpen, setWarningOpen] = useState(false)
-  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null)
+  const [warningOpen, setWarningOpen] = useState(false);
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(
+    null
+  );
 
-  const currentCategory = categories.find((c) => c.id === currentCategoryId) || null
-  const newCategory = categories.find((c) => c.id === pendingCategoryId) || null
+  const currentCategory =
+    categories.find((c) => c.id === currentCategoryId) || null;
+  const newCategory =
+    categories.find((c) => c.id === pendingCategoryId) || null;
 
   /**
    * Calculate which fields belong to the current category (will be backed up)
    * vs workspace fields (will persist)
    */
   const calculateFieldInfo = () => {
-    const fieldValuesToBackup: FieldValueInfo[] = []
-    const fieldValuesThatPersist: FieldValueInfo[] = []
+    const fieldValuesToBackup: FieldValueInfo[] = [];
+    const fieldValuesThatPersist: FieldValueInfo[] = [];
 
     // For now, treat all fields as category-specific if there's a current category
     // TODO: When workspace schemas are implemented, properly separate them
     fieldValues.forEach((fv) => {
       const fieldInfo: FieldValueInfo = {
         id: fv.id,
-        fieldName: fv.field_name || fv.field?.name || 'Unbekannt',
+        fieldName: fv.field_name || fv.field?.name || "Unbekannt",
         value: fv.value,
-      }
+      };
 
       // Simple heuristic: if field has a value and we're changing categories,
       // it will be backed up
       if (fv.value !== null && currentCategoryId) {
-        fieldValuesToBackup.push(fieldInfo)
+        fieldValuesToBackup.push(fieldInfo);
       } else if (fv.value !== null) {
-        fieldValuesThatPersist.push(fieldInfo)
+        fieldValuesThatPersist.push(fieldInfo);
       }
-    })
+    });
 
-    return { fieldValuesToBackup, fieldValuesThatPersist }
-  }
+    return { fieldValuesToBackup, fieldValuesThatPersist };
+  };
 
   const handleValueChange = (value: string) => {
-    const newCategoryId = value === 'none' ? null : value
+    const newCategoryId = value === "none" ? null : value;
 
     // Don't do anything if selecting the same category
-    if (newCategoryId === currentCategoryId) return
+    if (newCategoryId === currentCategoryId) return;
 
     // If there's a current category with field values, show warning
-    const hasFieldValues = fieldValues.some((fv) => fv.value !== null)
+    const hasFieldValues = fieldValues.some((fv) => fv.value !== null);
 
     if (currentCategoryId && hasFieldValues) {
       // Show warning dialog
-      setPendingCategoryId(newCategoryId)
-      setWarningOpen(true)
+      setPendingCategoryId(newCategoryId);
+      setWarningOpen(true);
     } else {
       // No warning needed, proceed directly
-      executeChange(newCategoryId)
+      executeChange(newCategoryId);
     }
-  }
+  };
 
   const executeChange = async (newCategoryId: string | null) => {
     try {
       await setCategory.mutateAsync({
         videoId,
         categoryId: newCategoryId,
-      })
-      onCategoryChange?.(newCategoryId)
+      });
+      onCategoryChange?.(newCategoryId);
     } catch (error) {
-      console.error('Failed to set category:', error)
+      console.error("Failed to set category:", error);
     }
-  }
+  };
 
   const handleConfirm = async (_restoreBackup: boolean) => {
-    setWarningOpen(false)
+    setWarningOpen(false);
     // TODO: Pass _restoreBackup to backend when implemented
-    await executeChange(pendingCategoryId)
-    setPendingCategoryId(null)
-  }
+    await executeChange(pendingCategoryId);
+    setPendingCategoryId(null);
+  };
 
   const handleCancel = () => {
-    setWarningOpen(false)
-    setPendingCategoryId(null)
-  }
+    setWarningOpen(false);
+    setPendingCategoryId(null);
+  };
 
-  const isDisabled = disabled || categoriesLoading || setCategory.isPending
+  const isDisabled = disabled || categoriesLoading || setCategory.isPending;
 
-  const { fieldValuesToBackup, fieldValuesThatPersist } = calculateFieldInfo()
+  const { fieldValuesToBackup, fieldValuesThatPersist } = calculateFieldInfo();
 
   return (
     <>
       <div className="flex items-center gap-2">
         <FolderOpen className="h-4 w-4 text-muted-foreground" />
         <Select
-          value={currentCategoryId || 'none'}
-          onValueChange={handleValueChange}
           disabled={isDisabled}
+          onValueChange={handleValueChange}
+          value={currentCategoryId || "none"}
         >
-          <SelectTrigger className="w-[200px]" data-testid="category-selector">
+          <SelectTrigger
+            aria-label="Kategorie auswählen"
+            className="w-[200px]"
+            data-testid="category-selector"
+          >
             <SelectValue placeholder="Kategorie wählen">
               {currentCategory ? (
                 <span className="flex items-center gap-2">
                   {currentCategory.color && (
                     <span
-                      className="w-2 h-2 rounded-full"
+                      className="h-2 w-2 rounded-full"
                       style={{ backgroundColor: currentCategory.color }}
                     />
                   )}
@@ -185,7 +194,7 @@ export function CategorySelector({
                 <span className="flex items-center gap-2">
                   {category.color && (
                     <span
-                      className="w-2 h-2 rounded-full"
+                      className="h-2 w-2 rounded-full"
                       style={{ backgroundColor: category.color }}
                     />
                   )}
@@ -196,25 +205,25 @@ export function CategorySelector({
           </SelectContent>
         </Select>
         {setCategory.isPending && (
-          <span className="text-sm text-muted-foreground">Speichert...</span>
+          <span className="text-muted-foreground text-sm">Speichert...</span>
         )}
       </div>
 
       {/* Category Change Warning Dialog */}
       <CategoryChangeWarning
-        open={warningOpen}
-        onOpenChange={setWarningOpen}
-        oldCategory={currentCategory}
-        newCategory={newCategory}
-        fieldValuesToBackup={fieldValuesToBackup}
         fieldValuesThatPersist={fieldValuesThatPersist}
-        hasBackup={false} // TODO: Check for existing backup
-        onConfirm={handleConfirm}
-        onCancel={handleCancel}
+        fieldValuesToBackup={fieldValuesToBackup}
+        hasBackup={false}
         isLoading={setCategory.isPending}
+        newCategory={newCategory}
+        oldCategory={currentCategory}
+        onCancel={handleCancel} // TODO: Check for existing backup
+        onConfirm={handleConfirm}
+        onOpenChange={setWarningOpen}
+        open={warningOpen}
       />
     </>
-  )
+  );
 }
 
 /**
@@ -225,28 +234,28 @@ export function CategorySelector({
  */
 interface CategoryBadgeProps {
   /** Category name */
-  name: string
+  name: string;
   /** Category color (hex) */
-  color?: string | null
+  color?: string | null;
 }
 
 export function CategoryBadge({ name, color }: CategoryBadgeProps) {
   return (
     <Badge
-      variant="outline"
       className="flex items-center gap-1.5"
       style={color ? { borderColor: color } : undefined}
+      variant="outline"
     >
       <FolderOpen className="h-3 w-3" />
       {color && (
         <span
-          className="w-2 h-2 rounded-full"
+          className="h-2 w-2 rounded-full"
           style={{ backgroundColor: color }}
         />
       )}
       {name}
     </Badge>
-  )
+  );
 }
 
 /**
@@ -257,18 +266,18 @@ export function CategoryBadge({ name, color }: CategoryBadgeProps) {
  */
 interface LabelBadgeProps {
   /** Label name */
-  name: string
+  name: string;
   /** Label color (hex) */
-  color?: string | null
+  color?: string | null;
 }
 
 export function LabelBadge({ name, color }: LabelBadgeProps) {
   return (
     <Badge
+      style={color ? { backgroundColor: color, color: "#fff" } : undefined}
       variant="secondary"
-      style={color ? { backgroundColor: color, color: '#fff' } : undefined}
     >
       {name}
     </Badge>
-  )
+  );
 }

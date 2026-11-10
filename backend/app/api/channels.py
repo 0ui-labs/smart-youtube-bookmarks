@@ -7,58 +7,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.database import get_db
 from app.models.channel import Channel
-from app.models.user import User
 from app.models.video import Video
 from app.schemas.channel import ChannelResponse, ChannelUpdate
+from app.services.access_service import authenticated_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/channels", tags=["channels"])
 
 
-async def get_user_for_testing(
-    db: AsyncSession,
-    user_id: UUID | None = Query(
-        None,
-        description="[TESTING ONLY] User ID - defaults to first user if not provided",
-    ),
-) -> User:
-    """Get user for testing purposes (same as tags.py)."""
-    if settings.env == "production":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Testing helper not available in production environment",
-        )
-
-    if user_id:
-        stmt = select(User).where(User.id == user_id)
-        result = await db.execute(stmt)
-        user = result.scalar_one_or_none()
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"User {user_id} not found",
-            )
-        return user
-
-    # Default to first user
-    stmt = select(User).limit(1)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="No users found in database"
-        )
-    return user
-
-
 @router.get("", response_model=list[ChannelResponse])
 async def get_channels(
     db: AsyncSession = Depends(get_db),
-    user_id: UUID | None = Query(None),
     include_hidden: bool = Query(False, description="Include hidden channels"),
 ) -> list[ChannelResponse]:
     """
@@ -67,7 +29,7 @@ async def get_channels(
     Channels are automatically created when videos are added.
     By default, hidden channels are excluded.
     """
-    user = await get_user_for_testing(db, user_id)
+    user = authenticated_user(db)
 
     # Query channels with video count
     query = (
@@ -110,14 +72,13 @@ async def update_channel(
     channel_id: UUID,
     update: ChannelUpdate,
     db: AsyncSession = Depends(get_db),
-    user_id: UUID | None = Query(None),
 ) -> ChannelResponse:
     """
     Update a channel (hide/unhide).
 
     Only is_hidden can be changed by the user.
     """
-    user = await get_user_for_testing(db, user_id)
+    user = authenticated_user(db)
 
     # Get channel
     result = await db.execute(
@@ -162,7 +123,6 @@ async def update_channel(
 async def delete_channel(
     channel_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: UUID | None = Query(None),
 ) -> None:
     """
     Delete a channel.
@@ -170,7 +130,7 @@ async def delete_channel(
     Videos linked to this channel will have channel_id set to NULL
     (via FK ON DELETE SET NULL).
     """
-    user = await get_user_for_testing(db, user_id)
+    user = authenticated_user(db)
 
     # Get channel
     result = await db.execute(

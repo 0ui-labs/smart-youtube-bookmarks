@@ -18,7 +18,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
@@ -271,20 +271,11 @@ export const usePauseJobApiJobsJobIdPausePost = <TError = HTTPValidationError,
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Get progress history for a job with pagination and filtering.
-
-Supports:
-- Filtering by 'since' timestamp for efficient reconnection
-- Pagination with offset/limit (max 100 per request)
-- Authorization: user can only access their own jobs
-
-Note: Uses user_id query param for temporary mock authentication.
-This will be replaced with proper JWT authentication later.
  * @summary Get Progress History
  */
 export const getProgressHistoryApiJobsJobIdProgressHistoryGet = (
     jobId: string,
-    params: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams,
+    params?: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams,
  signal?: AbortSignal
 ) => {
       
@@ -308,7 +299,7 @@ export const getGetProgressHistoryApiJobsJobIdProgressHistoryGetQueryKey = (jobI
 
     
 export const getGetProgressHistoryApiJobsJobIdProgressHistoryGetQueryOptions = <TData = Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError = HTTPValidationError>(jobId: string,
-    params: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError, TData>>, }
+    params?: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -332,7 +323,7 @@ export type GetProgressHistoryApiJobsJobIdProgressHistoryGetQueryError = HTTPVal
 
 export function useGetProgressHistoryApiJobsJobIdProgressHistoryGet<TData = Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError = HTTPValidationError>(
  jobId: string,
-    params: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError, TData>> & Pick<
+    params: undefined |  GetProgressHistoryApiJobsJobIdProgressHistoryGetParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>,
           TError,
@@ -343,7 +334,7 @@ export function useGetProgressHistoryApiJobsJobIdProgressHistoryGet<TData = Awai
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 export function useGetProgressHistoryApiJobsJobIdProgressHistoryGet<TData = Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError = HTTPValidationError>(
  jobId: string,
-    params: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError, TData>> & Pick<
+    params?: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>,
           TError,
@@ -354,7 +345,7 @@ export function useGetProgressHistoryApiJobsJobIdProgressHistoryGet<TData = Awai
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 export function useGetProgressHistoryApiJobsJobIdProgressHistoryGet<TData = Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError = HTTPValidationError>(
  jobId: string,
-    params: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError, TData>>, }
+    params?: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
@@ -363,7 +354,7 @@ export function useGetProgressHistoryApiJobsJobIdProgressHistoryGet<TData = Awai
 
 export function useGetProgressHistoryApiJobsJobIdProgressHistoryGet<TData = Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError = HTTPValidationError>(
  jobId: string,
-    params: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError, TData>>, }
+    params?: GetProgressHistoryApiJobsJobIdProgressHistoryGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProgressHistoryApiJobsJobIdProgressHistoryGet>>, TError, TData>>, }
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 

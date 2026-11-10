@@ -115,14 +115,14 @@ class VideoPreFilterService:
             async with _gemini_rate_limiter:
                 aclient = self._client.aio
                 response = await aclient.models.generate_content(
-                    model=self.model,
+                    model=self.model or "gemini-2.0-flash-exp",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         temperature=0.2,  # Low temperature for consistent results
                     ),
                 )
 
-            result = self._parse_batch_response(response.text)
+            result = self._parse_batch_response(response.text or "")
 
             filtered = [videos[i] for i in result.relevant_indices if i < len(videos)]
 
@@ -318,14 +318,14 @@ Nur das JSON, kein anderer Text."""
             async with _gemini_rate_limiter:
                 aclient = self._client.aio
                 response = await aclient.models.generate_content(
-                    model=self.model,
+                    model=self.model or "gemini-2.0-flash-exp",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         temperature=0.2,
                     ),
                 )
 
-            result = self._parse_detail_response(response.text)
+            result = self._parse_detail_response(response.text or "")
 
             logger.info(
                 f"Detail analysis for {video.youtube_id}: "

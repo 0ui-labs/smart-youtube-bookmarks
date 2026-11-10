@@ -73,7 +73,7 @@ function groupChannelsByLetter(channels: Channel[]): Map<string, Channel[]> {
  * iOS-style Alphabet Sidebar Component
  * Optimized for smooth touch scrubbing without lag
  */
-function AlphabetSidebar({
+export function AlphabetSidebar({
   letters,
   activeLetter,
   onLetterClick,
@@ -98,9 +98,11 @@ function AlphabetSidebar({
     const updateButtonRects = () => {
       if (!sidebarRef.current) return;
       const buttons = sidebarRef.current.querySelectorAll("button");
-      buttonRectsRef.current = Array.from(buttons).map((button, i) => {
+      buttonRectsRef.current = Array.from(buttons).flatMap((button, i) => {
+        const letter = letters[i];
+        if (letter === undefined) return [];
         const rect = button.getBoundingClientRect();
-        return { top: rect.top, bottom: rect.bottom, letter: letters[i] };
+        return [{ top: rect.top, bottom: rect.bottom, letter }];
       });
     };
 
@@ -126,7 +128,8 @@ function AlphabetSidebar({
 
     // Clamp to first/last letter if outside bounds
     const lastRect = rects.at(-1);
-    if (clientY < rects[0].top) return rects[0].letter;
+    const firstRect = rects[0];
+    if (firstRect && clientY < firstRect.top) return firstRect.letter;
     if (lastRect && clientY > lastRect.bottom) return lastRect.letter;
 
     return null;
@@ -140,9 +143,11 @@ function AlphabetSidebar({
         // Recalculate button positions at drag start (in case of scroll)
         if (sidebarRef.current) {
           const buttons = sidebarRef.current.querySelectorAll("button");
-          buttonRectsRef.current = Array.from(buttons).map((button, i) => {
+          buttonRectsRef.current = Array.from(buttons).flatMap((button, i) => {
+            const letter = letters[i];
+            if (letter === undefined) return [];
             const rect = button.getBoundingClientRect();
-            return { top: rect.top, bottom: rect.bottom, letter: letters[i] };
+            return [{ top: rect.top, bottom: rect.bottom, letter }];
           });
         }
       }

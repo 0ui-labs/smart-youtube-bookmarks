@@ -1,5 +1,5 @@
-from typing import Any
-from uuid import UUID
+from typing import TYPE_CHECKING, Any
+from uuid import UUID as PyUUID
 
 from sqlalchemy import ForeignKey, Index
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
@@ -13,7 +13,7 @@ class JobProgressEvent(BaseModel):
 
     __tablename__ = "job_progress_events"
 
-    job_id: Mapped[UUID] = mapped_column(
+    job_id: Mapped[PyUUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("processing_jobs.id", ondelete="CASCADE"),
         nullable=False,
@@ -28,3 +28,7 @@ class JobProgressEvent(BaseModel):
 
     def __repr__(self) -> str:
         return f"<JobProgressEvent(id={self.id}, job_id={self.job_id}, progress={self.progress_data.get('progress')}%)>"
+
+
+if TYPE_CHECKING:
+    from .job import ProcessingJob
