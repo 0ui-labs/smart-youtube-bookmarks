@@ -23,3 +23,9 @@ Installation meldet vorhandene Dependency-Sicherheitsbefunde (npm: 55; google-ge
 Kein pauschales Upgrade durchgeführt; gezielte Bewertung bleibt offen.
 `pytest tests/test_database_safety.py -q`: zunächst fehlendes Schutzmodul, danach **7 bestanden**.
 PostgreSQL 16 und Redis 7 laufen unter eigenem Compose-Projektnamen mit flüchtigem Speicher.
+
+### AP 2: Kanalnavigation
+
+Leere Listen und Ziehen außerhalb der Buchstaben über Komponententests geprüft (2 bestanden).
+Array-Zugriffe sind explizit abgesichert, strenge TypeScript-Konfiguration unverändert.
+`npm run build`: erfolgreich; Vite meldet große Bundles, kein Buildfehler.
