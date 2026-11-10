@@ -46,3 +46,13 @@ Nach MSW-WebSocket-Handler: vollständiger Frontend-Lauf endet regulär ohne lib
 HTTP-Prüfung legt zusätzliche fehlende Handler offen; Tests wurden nicht deaktiviert.
 AP 2 bleibt offen. Unabhängige AP-3/4/5-Regressionen werden während der Auswertung
 vorbereitet; diese Reihenfolge ändert keine Abnahmekriterien.
+
+### AP 4: CSV-Transaktionen
+
+PostgreSQL-Regression zunächst **3 fehlgeschlagen / 1 bestanden** (neue Zeilen gingen
+beim Duplikat verloren). Gezieltes `ON CONFLICT (list_id, youtube_id) DO NOTHING RETURNING`
+ersetzt globale Rollbacks. Andere Integritätsfehler werden nicht als Duplikate verschluckt.
+Wiederholte CSV-Zeilen werden für Feldwerte in Dateireihenfolge verarbeitet; ungültige
+Werte überschreiben keine vorherigen gültigen Werte.
+Gezielter Lauf inklusive bestehender Feldimport-/Export- und Roundtrip-Tests:
+**23 bestanden** in 8,23 s. Parallelimport und expliziter Letzte-gültige-Zeile-Test stehen noch aus.

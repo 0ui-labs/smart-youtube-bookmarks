@@ -1383,100 +1383,106 @@ async def _process_field_values(
     # Process field values for each video
     for video in created_videos:
         # Get CSV row for this video by youtube_id
-        row_data = csv_rows_map.get(video.youtube_id)
-        if not row_data:
-            continue
-        field_updates = []
+        rows = csv_rows_map.get(video.youtube_id, [])
+        if isinstance(rows, dict):
+            rows = [rows]
+        for row_data in rows:
+            field_updates = []
 
-        for column_name, field_data in field_columns.items():
-            raw_value = row_data.get(column_name, "").strip()
+            for column_name, field_data in field_columns.items():
+                raw_value = row_data.get(column_name, "").strip()
 
-            # Skip empty values (not an error, just unset)
-            if not raw_value:
-                continue
+                # Skip empty values (not an error, just unset)
+                if not raw_value:
+                    continue
 
-            # Parse value based on field type
-            try:
-                field_type = field_data["field_type"]
-                field_config = field_data["config"]
-                field_id = field_data["id"]
-                field_name = field_data["name"]
+                # Parse value based on field type
+                try:
+                    field_type = field_data["field_type"]
+                    field_config = field_data["config"]
+                    field_id = field_data["id"]
+                    field_name = field_data["name"]
 
-                if field_type == "rating":
-                    # Parse as float to support decimal ratings
-                    parsed_value = float(raw_value)
-                    validate_field_value(parsed_value, field_type, field_config)
-                    field_updates.append(
-                        FieldValueUpdate(field_id=field_id, value=parsed_value)
-                    )
-
-                elif field_type == "select":
-                    # Validate against options list (case-sensitive in validation)
-                    validate_field_value(raw_value, field_type, field_config)
-                    field_updates.append(
-                        FieldValueUpdate(field_id=field_id, value=raw_value)
-                    )
-
-                elif field_type == "text":
-                    # Validate max_length if configured
-                    validate_field_value(raw_value, field_type, field_config)
-                    field_updates.append(
-                        FieldValueUpdate(field_id=field_id, value=raw_value)
-                    )
-
-                elif field_type == "boolean":
-                    # Parse "true"/"false"/"1"/"0" (case-insensitive)
-                    lower_value = raw_value.lower()
-                    if lower_value in ("true", "1", "yes"):
-                        parsed_value = True
-                    elif lower_value in ("false", "0", "no", ""):
-                        parsed_value = False
-                    else:
-                        raise ValueError(
-                            f"Invalid boolean value: '{raw_value}'. Use 'true'/'false' or '1'/'0'."
+                    if field_type == "rating":
+                        # Parse as float to support decimal ratings
+                        parsed_value = float(raw_value)
+                        validate_field_value(parsed_value, field_type, field_config)
+                        field_updates.append(
+                            FieldValueUpdate(field_id=field_id, value=parsed_value)
                         )
-                    field_updates.append(
-                        FieldValueUpdate(field_id=field_id, value=parsed_value)
+
+                    elif field_type == "select":
+                        # Validate against options list (case-sensitive in validation)
+                        validate_field_value(raw_value, field_type, field_config)
+                        field_updates.append(
+                            FieldValueUpdate(field_id=field_id, value=raw_value)
+                        )
+
+                    elif field_type == "text":
+                        # Validate max_length if configured
+                        validate_field_value(raw_value, field_type, field_config)
+                        field_updates.append(
+                            FieldValueUpdate(field_id=field_id, value=raw_value)
+                        )
+
+                    elif field_type == "boolean":
+                        # Parse "true"/"false"/"1"/"0" (case-insensitive)
+                        lower_value = raw_value.lower()
+                        if lower_value in ("true", "1", "yes"):
+                            parsed_value = True
+                        elif lower_value in ("false", "0", "no", ""):
+                            parsed_value = False
+                        else:
+                            raise ValueError(
+                                f"Invalid boolean value: '{raw_value}'. Use 'true'/'false' or '1'/'0'."
+                            )
+                        field_updates.append(
+                            FieldValueUpdate(field_id=field_id, value=parsed_value)
+                        )
+
+                except (ValueError, FieldValidationError) as e:
+                    # Log validation error but continue processing
+                    logger.warning(
+                        f"Field validation error for video {video.youtube_id}, field '{field_name}': {e}"
                     )
 
-            except (ValueError, FieldValidationError) as e:
-                # Log validation error but continue processing
-                logger.warning(
-                    f"Field validation error for video {video.youtube_id}, field '{field_name}': {e}"
-                )
-
-        # Apply field updates via batch update helper
-        if field_updates:
-            try:
-                # Create batch update request
-                update_request = BatchUpdateFieldValuesRequest(
-                    field_values=field_updates
-                )
-
-                # Call batch update logic directly (avoid HTTP overhead)
-                await _apply_field_values_batch(db, video.id, update_request)
-
-                logger.info(
-                    f"Applied {len(field_updates)} field values for video {video.youtube_id}"
-                )
-
-            except (ValueError, KeyError, FieldValidationError, SQLAlchemyError) as e:
-                # ValueError: Invalid data/parsing errors
-                # KeyError: Missing keys in data structures
-                # FieldValidationError: Field validation errors
-                # SQLAlchemyError: Database errors (includes IntegrityError)
-
-                # Log error with stack trace but don't fail video creation
-                logger.exception(
-                    f"Failed to apply field values for video {video.youtube_id}"
-                )
-                failures.append(
-                    BulkUploadFailure(
-                        row=0,  # Row number not easily tracked here
-                        url=f"https://youtube.com/watch?v={video.youtube_id}",
-                        error=f"Video created, but field values failed: {e!s}",
+            # Apply field updates via batch update helper
+            if field_updates:
+                try:
+                    # Create batch update request
+                    update_request = BatchUpdateFieldValuesRequest(
+                        field_values=field_updates
                     )
-                )
+
+                    # Call batch update logic directly (avoid HTTP overhead)
+                    await _apply_field_values_batch(db, video.id, update_request)
+
+                    logger.info(
+                        f"Applied {len(field_updates)} field values for video {video.youtube_id}"
+                    )
+
+                except (
+                    ValueError,
+                    KeyError,
+                    FieldValidationError,
+                    SQLAlchemyError,
+                ) as e:
+                    # ValueError: Invalid data/parsing errors
+                    # KeyError: Missing keys in data structures
+                    # FieldValidationError: Field validation errors
+                    # SQLAlchemyError: Database errors (includes IntegrityError)
+
+                    # Log error with stack trace but don't fail video creation
+                    logger.exception(
+                        f"Failed to apply field values for video {video.youtube_id}"
+                    )
+                    failures.append(
+                        BulkUploadFailure(
+                            row=0,  # Row number not easily tracked here
+                            url=f"https://youtube.com/watch?v={video.youtube_id}",
+                            error=f"Video created, but field values failed: {e!s}",
+                        )
+                    )
 
 
 async def _apply_field_values_batch(
@@ -1684,6 +1690,8 @@ async def bulk_upload_videos(
             try:
                 youtube_id = extract_youtube_id(url)
 
+                csv_rows_map.setdefault(youtube_id, []).append(row)
+
                 # Check for duplicates in this batch
                 if any(v["youtube_id"] == youtube_id for v in videos_to_create):
                     failures.append(
@@ -1701,7 +1709,7 @@ async def bulk_upload_videos(
                     }
                 )
                 # Store raw CSV row by youtube_id for field value processing
-                csv_rows_map[youtube_id] = row
+                # Repeated rows are applied in order: last valid field value wins.
 
             except ValueError as e:
                 failures.append(BulkUploadFailure(row=row_num, url=url, error=str(e)))
@@ -1813,46 +1821,34 @@ async def bulk_upload_videos(
         # Bulk insert valid videos (all with pending status)
         created_videos = []  # Track successfully created videos
         if videos_to_create:
-            db.add_all(videos_to_create)
-            try:
-                await db.commit()
-                created_videos = videos_to_create  # All created successfully
-                # Refresh all video objects to prevent detached object issues
-                for video in created_videos:
-                    await db.refresh(video)
-            except IntegrityError:
-                # Handle duplicates with existing videos in DB
-                await db.rollback()
-                # Retry one by one to identify which failed
-                created_videos = []
-                existing_videos = []  # Track existing videos for field value updates
-                for video in videos_to_create:
-                    try:
-                        db.add(video)
-                        await db.flush()
-                        created_videos.append(video)
-                    except IntegrityError:
-                        await db.rollback()
-                        # Load existing video for field value update
-                        existing_stmt = select(Video).where(
-                            Video.list_id == list_id,
-                            Video.youtube_id == video.youtube_id,
-                        )
-                        existing_result = await db.execute(existing_stmt)
-                        existing_video = existing_result.scalar_one_or_none()
-                        if existing_video:
-                            existing_videos.append(existing_video)
-                            logger.info(
-                                f"Video {video.youtube_id} already exists, will update field values"
+            existing_videos = []
+            for candidate in videos_to_create:
+                values = {
+                    column.name: getattr(candidate, column.name)
+                    for column in Video.__table__.columns
+                    if getattr(candidate, column.name) is not None
+                }
+                statement = (
+                    pg_insert(Video)
+                    .values(**values)
+                    .on_conflict_do_nothing(index_elements=["list_id", "youtube_id"])
+                    .returning(Video)
+                )
+                inserted = (await db.execute(statement)).scalar_one_or_none()
+                if inserted is not None:
+                    created_videos.append(inserted)
+                else:
+                    existing_video = (
+                        await db.execute(
+                            select(Video).where(
+                                Video.list_id == list_id,
+                                Video.youtube_id == candidate.youtube_id,
                             )
-                await db.commit()
-
-                # Refresh all video objects to prevent detached object issues
-                for video in created_videos:
-                    await db.refresh(video)
-                if "existing_videos" in locals():
-                    for video in existing_videos:
-                        await db.refresh(video)
+                        )
+                    ).scalar_one()
+                    existing_videos.append(existing_video)
+            # The only tolerated conflict is the list/YouTube unique key.
+            # All other database failures propagate and roll back the request.
 
             # Separate videos by status for different handling
             pending_videos = [
