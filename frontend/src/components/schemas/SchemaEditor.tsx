@@ -87,7 +87,7 @@ export function SchemaEditor({
     },
   });
 
-  const { fields, append, remove, move, update } = useFieldArray({
+  const { fields, append, remove, move, update, replace } = useFieldArray({
     control: form.control,
     name: "fields",
   });
@@ -139,18 +139,16 @@ export function SchemaEditor({
   };
 
   const handleFieldsSelected = (fieldIds: string[]) => {
-    // Add newly selected fields to the form
-    // Calculate current max display_order
-    const maxOrder =
-      fields.length > 0 ? Math.max(...fields.map((f) => f.display_order)) : -1;
-
-    fieldIds.forEach((fieldId, index) => {
-      append({
+    const current = form.getValues("fields");
+    replace(
+      [...new Set(fieldIds)].map((fieldId, index) => ({
         field_id: fieldId,
-        display_order: maxOrder + index + 1,
-        show_on_card: false,
-      });
-    });
+        display_order: index,
+        show_on_card:
+          current.find((field) => field.field_id === fieldId)?.show_on_card ??
+          false,
+      }))
+    );
   };
 
   const handleFieldCreated = async (fieldData: any) => {
@@ -222,7 +220,6 @@ export function SchemaEditor({
   // Suppress unused variable warnings for future use
   void _handleReorder;
   void _handleToggleShowOnCard;
-  void _handleRemove;
 
   return (
     <form className="space-y-6" onSubmit={form.handleSubmit(handleSubmit)}>
@@ -324,6 +321,15 @@ export function SchemaEditor({
                     {field.field_type}
                   </div>
                 </div>
+                <Button
+                  aria-label={`${field.field_name} entfernen`}
+                  onClick={() => _handleRemove(field.id)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Entfernen
+                </Button>
               </div>
             ))}
           </div>

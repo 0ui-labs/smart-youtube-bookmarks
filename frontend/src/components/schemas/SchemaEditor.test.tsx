@@ -7,7 +7,20 @@ import { SchemaEditor } from "./SchemaEditor";
 // Mock useCustomFields hook and related exports
 vi.mock("@/hooks/useCustomFields", () => ({
   useCustomFields: () => ({
-    data: [],
+    data: [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "First field",
+        field_type: "text",
+        config: {},
+      },
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        name: "Second field",
+        field_type: "rating",
+        config: { max_rating: 5 },
+      },
+    ],
     isLoading: false,
   }),
   useCheckDuplicateField: () => ({
@@ -133,8 +146,10 @@ describe("SchemaEditor", () => {
 
     await user.click(screen.getByRole("button", { name: /neues feld/i }));
 
-    expect(screen.getByText(/neues feld erstellen/i)).toBeInTheDocument();
-    expect(screen.getByText(/newfieldform placeholder/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Add Field/i })
+    ).toBeInTheDocument();
   });
 
   it("hides new field form when close button clicked", async () => {
@@ -147,16 +162,14 @@ describe("SchemaEditor", () => {
 
     // Open form
     await user.click(screen.getByRole("button", { name: /neues feld/i }));
-    expect(screen.getByText(/neues feld erstellen/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
 
     // Close form
-    const closeButton = screen.getAllByRole("button", { name: /✕/i })[0];
+    const closeButton = screen.getByRole("button", { name: /^Cancel$/i });
     await user.click(closeButton);
 
     await waitFor(() => {
-      expect(
-        screen.queryByText(/neues feld erstellen/i)
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/field name/i)).not.toBeInTheDocument();
     });
   });
 
@@ -174,8 +187,16 @@ describe("SchemaEditor", () => {
   it("shows field count in header", () => {
     const initialData = {
       fields: [
-        { field_id: "f1", display_order: 0, show_on_card: false },
-        { field_id: "f2", display_order: 1, show_on_card: true },
+        {
+          field_id: "11111111-1111-4111-8111-111111111111",
+          display_order: 0,
+          show_on_card: false,
+        },
+        {
+          field_id: "22222222-2222-4222-8222-222222222222",
+          display_order: 1,
+          show_on_card: true,
+        },
       ],
     };
 
@@ -194,8 +215,16 @@ describe("SchemaEditor", () => {
       name: "Test Schema",
       description: "Test Description",
       fields: [
-        { field_id: "f1", display_order: 0, show_on_card: false },
-        { field_id: "f2", display_order: 1, show_on_card: true },
+        {
+          field_id: "11111111-1111-4111-8111-111111111111",
+          display_order: 0,
+          show_on_card: false,
+        },
+        {
+          field_id: "22222222-2222-4222-8222-222222222222",
+          display_order: 1,
+          show_on_card: true,
+        },
       ],
     };
 
@@ -206,8 +235,8 @@ describe("SchemaEditor", () => {
       initialData,
     });
 
-    expect(screen.getByText(/field 1 \(placeholder/i)).toBeInTheDocument();
-    expect(screen.getByText(/field 2 \(placeholder/i)).toBeInTheDocument();
+    expect(screen.getByText("First field")).toBeInTheDocument();
+    expect(screen.getByText("Second field")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Test Schema")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Test Description")).toBeInTheDocument();
   });
@@ -215,7 +244,13 @@ describe("SchemaEditor", () => {
   it("allows removing fields via remove button", async () => {
     const user = userEvent.setup();
     const initialData = {
-      fields: [{ field_id: "f1", display_order: 0, show_on_card: false }],
+      fields: [
+        {
+          field_id: "11111111-1111-4111-8111-111111111111",
+          display_order: 0,
+          show_on_card: false,
+        },
+      ],
     };
 
     renderSchemaEditor({
@@ -225,14 +260,12 @@ describe("SchemaEditor", () => {
       initialData,
     });
 
-    expect(screen.getByText(/field 1 \(placeholder/i)).toBeInTheDocument();
+    expect(screen.getByText("First field")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /entfernen/i }));
 
     await waitFor(() => {
-      expect(
-        screen.queryByText(/field 1 \(placeholder/i)
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("First field")).not.toBeInTheDocument();
       expect(screen.getByText(/noch keine felder/i)).toBeInTheDocument();
     });
   });
@@ -254,7 +287,13 @@ describe("SchemaEditor", () => {
       onCancel: mockOnCancel,
       initialData: {
         name: "Test Schema",
-        fields: [{ field_id: "f1", display_order: 0, show_on_card: false }],
+        fields: [
+          {
+            field_id: "11111111-1111-4111-8111-111111111111",
+            display_order: 0,
+            show_on_card: false,
+          },
+        ],
       },
     });
 
@@ -305,7 +344,13 @@ describe("SchemaEditor", () => {
       onSave: errorOnSave,
       onCancel: mockOnCancel,
       initialData: {
-        fields: [{ field_id: "f1", display_order: 0, show_on_card: false }],
+        fields: [
+          {
+            field_id: "11111111-1111-4111-8111-111111111111",
+            display_order: 0,
+            show_on_card: false,
+          },
+        ],
       },
     });
 
@@ -336,7 +381,13 @@ describe("SchemaEditor", () => {
       onSave: errorOnSave,
       onCancel: mockOnCancel,
       initialData: {
-        fields: [{ field_id: "f1", display_order: 0, show_on_card: false }],
+        fields: [
+          {
+            field_id: "11111111-1111-4111-8111-111111111111",
+            display_order: 0,
+            show_on_card: false,
+          },
+        ],
       },
     });
 
@@ -362,7 +413,13 @@ describe("SchemaEditor", () => {
       onSave: errorOnSave,
       onCancel: mockOnCancel,
       initialData: {
-        fields: [{ field_id: "f1", display_order: 0, show_on_card: false }],
+        fields: [
+          {
+            field_id: "11111111-1111-4111-8111-111111111111",
+            display_order: 0,
+            show_on_card: false,
+          },
+        ],
       },
     });
 
