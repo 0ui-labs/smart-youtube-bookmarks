@@ -34,7 +34,11 @@ class Settings(BaseSettings):
     enrichment_max_retries: int = 3
     enrichment_chunk_duration_minutes: int = 10  # Audio chunk duration
 
-    # Authentication (JWT)
+    clerk_issuer: str = ""
+    clerk_authorized_parties: str = ""  # Comma-separated exact origins
+    clerk_audience: str | None = None
+
+    # Legacy JWT settings (not used to authenticate protected HTTP requests)
     secret_key: str = "your-secret-key-here-change-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
