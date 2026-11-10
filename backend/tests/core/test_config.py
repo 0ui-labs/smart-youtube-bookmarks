@@ -18,3 +18,16 @@ def test_production_rejects_missing_youtube_key():
             youtube_api_key="",
             gemini_api_key="synthetic",
         )
+
+
+def test_retired_hs256_secret_is_not_a_production_auth_requirement():
+    config = Settings(
+        env="production",
+        secret_key="",
+        youtube_api_key="synthetic",
+        gemini_api_key="synthetic",
+    )
+    assert config.secret_key == ""
+    assert (
+        config.clerk_issuer == ""
+    )  # Missing Clerk remains fail-closed in the verifier.

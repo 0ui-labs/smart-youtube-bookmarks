@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     clerk_authorized_parties: str = ""  # Comma-separated exact origins
     clerk_audience: str | None = None
 
-    # Legacy JWT settings (not used to authenticate protected HTTP requests)
+    # Compatibility for existing .env files only; Clerk verification never uses these values.
     secret_key: str = "your-secret-key-here-change-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -50,55 +50,6 @@ class Settings(BaseSettings):
     db_pool_pre_ping: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-
-    @field_validator("secret_key")
-    @classmethod
-    def validate_secret_key(cls, v: str, info: ValidationInfo) -> str:
-        """
-        Validate JWT secret key.
-
-        In production, reject default value and require minimum 32 characters.
-        In development, allow default but log warning.
-
-        Args:
-            v: Secret key value
-            info: Validation context
-
-        Returns:
-            Validated secret key
-
-        Raises:
-            ValueError: If production uses default or short secret
-        """
-        # Get env from values being validated (might not be set yet)
-        env = info.data.get("env", "development")
-
-        # Check for default value
-        is_default = v == "your-secret-key-here-change-in-production"
-
-        # In production, reject default and enforce minimum length
-        if env == "production":
-            if is_default:
-                raise ValueError(
-                    "Cannot use default secret_key in production. "
-                    "Set SECRET_KEY environment variable to a secure random value."
-                )
-            if len(v) < 32:
-                raise ValueError(
-                    "secret_key must be at least 32 characters in production. "
-                    f"Current length: {len(v)}"
-                )
-
-        # In development, just warn if using default
-        if is_default and env == "development":
-            import logging
-
-            logging.warning(
-                "Using default secret_key in development. "
-                "This is insecure for production use."
-            )
-
-        return v
 
     @field_validator("youtube_api_key")
     @classmethod
@@ -121,7 +72,7 @@ class Settings(BaseSettings):
         """
         import logging
 
-        # Get env from values being validated (same pattern as secret_key validator)
+        # Validate provider configuration against the selected environment.
         env = info.data.get("env", "development")
 
         # Check if API key is empty
@@ -165,7 +116,7 @@ class Settings(BaseSettings):
         """
         import logging
 
-        # Get env from values being validated (same pattern as secret_key validator)
+        # Validate provider configuration against the selected environment.
         env = info.data.get("env", "development")
 
         # Check if API key is empty
