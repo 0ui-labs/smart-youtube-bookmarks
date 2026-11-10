@@ -8,7 +8,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, Request
-from sqlalchemy import and_, event, select
+from sqlalchemy import and_, event, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import ORMExecuteState, Session, with_loader_criteria
 
@@ -101,7 +101,7 @@ def scope_http_queries(execution: ORMExecuteState) -> None:
         execution.statement = execution.statement.options(
             *[
                 with_loader_criteria(model, condition, include_aliases=True)
-                for model, condition in ownership_policies(user.id)
+                for model, condition in ownership_policies(inspect(user).identity[0])
             ]
         )
 

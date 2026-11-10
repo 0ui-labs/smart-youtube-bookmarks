@@ -47,3 +47,15 @@ async def test_scoped_queries_never_expose_foreign_rows(test_db, test_list, test
         test_db.info.pop("user", None)
     await test_db.refresh(foreign_video)
     assert foreign_video.title is None
+
+
+async def test_scope_survives_expire_all_without_loading_the_principal(
+    test_db, test_user
+):
+    identity = test_user.id
+    test_db.info["user"] = test_user
+    test_db.expire_all()
+    try:
+        assert (await test_db.execute(select(User.id))).scalar_one() == identity
+    finally:
+        test_db.info.pop("user", None)
