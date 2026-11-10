@@ -30,8 +30,12 @@ async def test_bulk_assign_tags_to_videos(
     video2_id = video2_response.json()["id"]
 
     # Create 2 tags
-    tag1_response = await client.post("/api/tags", json={"name": "BulkTest1"})
-    tag2_response = await client.post("/api/tags", json={"name": "BulkTest2"})
+    tag1_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "BulkTest1"}
+    )
+    tag2_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "BulkTest2"}
+    )
     tag1_id = tag1_response.json()["id"]
     tag2_id = tag2_response.json()["id"]
 
@@ -55,7 +59,9 @@ async def test_bulk_assign_idempotency(
     video_id = str(test_video.id)
 
     # Create tag
-    tag_response = await client.post("/api/tags", json={"name": "IdempotentTag"})
+    tag_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "IdempotentTag"}
+    )
     tag_id = tag_response.json()["id"]
 
     # First bulk assign
@@ -85,7 +91,9 @@ async def test_bulk_assign_nonexistent_video(
     import uuid
 
     # Create tag
-    tag_response = await client.post("/api/tags", json={"name": "TestTag"})
+    tag_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "TestTag"}
+    )
     tag_id = tag_response.json()["id"]
 
     # Use fake video UUID
@@ -164,9 +172,15 @@ async def test_bulk_assign_partial_overlap(
     video_id = str(test_video.id)
 
     # Create 3 tags
-    tag1_response = await client.post("/api/tags", json={"name": "OverlapTag1"})
-    tag2_response = await client.post("/api/tags", json={"name": "OverlapTag2"})
-    tag3_response = await client.post("/api/tags", json={"name": "OverlapTag3"})
+    tag1_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "OverlapTag1"}
+    )
+    tag2_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "OverlapTag2"}
+    )
+    tag3_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "OverlapTag3"}
+    )
     tag1_id = tag1_response.json()["id"]
     tag2_id = tag2_response.json()["id"]
     tag3_id = tag3_response.json()["id"]

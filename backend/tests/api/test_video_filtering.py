@@ -11,10 +11,14 @@ async def test_filter_videos_by_tags_or(
 ):
     """Test filtering videos by tags with OR logic (any matching tag)."""
     # Arrange: Create tags
-    tag1_resp = await client.post("/api/tags", json={"name": "Python"})
+    tag1_resp = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "Python"}
+    )
     tag1_id = tag1_resp.json()["id"]
 
-    tag2_resp = await client.post("/api/tags", json={"name": "Tutorial"})
+    tag2_resp = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "Tutorial"}
+    )
     tag2_id = tag2_resp.json()["id"]
 
     # Create videos directly in database
@@ -50,10 +54,14 @@ async def test_filter_videos_by_tags_and(
 ):
     """Test filtering videos by tags with AND logic (all tags required)."""
     # Arrange: Create tags (use different names than OR test to avoid conflicts)
-    tag1_resp = await client.post("/api/tags", json={"name": "JavaScript"})
+    tag1_resp = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "JavaScript"}
+    )
     tag1_id = tag1_resp.json()["id"]
 
-    tag2_resp = await client.post("/api/tags", json={"name": "Expert"})
+    tag2_resp = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "Expert"}
+    )
     tag2_id = tag2_resp.json()["id"]
 
     # Create videos
@@ -95,10 +103,14 @@ async def test_filter_videos_by_tags_or_case_insensitive(
 ):
     """Test filtering videos by tags with OR logic is case-insensitive."""
     # Arrange: Create tags with UPPERCASE names
-    tag1_resp = await client.post("/api/tags", json={"name": "GOLANG"})
+    tag1_resp = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "GOLANG"}
+    )
     tag1_id = tag1_resp.json()["id"]
 
-    tag2_resp = await client.post("/api/tags", json={"name": "BEGINNERS"})
+    tag2_resp = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "BEGINNERS"}
+    )
     tag2_id = tag2_resp.json()["id"]
 
     # Create videos
@@ -136,10 +148,14 @@ async def test_filter_videos_by_tags_and_case_insensitive(
 ):
     """Test filtering videos by tags with AND logic is case-insensitive."""
     # Arrange: Create tags with MixedCase names
-    tag1_resp = await client.post("/api/tags", json={"name": "MachineLearning"})
+    tag1_resp = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "MachineLearning"}
+    )
     tag1_id = tag1_resp.json()["id"]
 
-    tag2_resp = await client.post("/api/tags", json={"name": "DeepDive"})
+    tag2_resp = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "DeepDive"}
+    )
     tag2_id = tag2_resp.json()["id"]
 
     # Create video with both tags
@@ -206,7 +222,9 @@ async def test_filter_videos_exactly_10_tags(
     # Arrange: Create 10 tags
     tag_ids = []
     for i in range(10):
-        tag_resp = await client.post("/api/tags", json={"name": f"BoundaryTag{i}"})
+        tag_resp = await client.post(
+            "/api/tags", json={"is_video_type": False, "name": f"BoundaryTag{i}"}
+        )
         tag_ids.append(tag_resp.json()["id"])
 
     # Create video with all 10 tags
@@ -830,7 +848,9 @@ async def test_filter_videos_tags_and_fields(
 ):
     """Filter videos with Tag 'Rust' AND Rating >= 4."""
     # Arrange: Create tag (use unique name to avoid conflicts with other tests)
-    tag_resp = await client.post("/api/tags", json={"name": "Rust"})
+    tag_resp = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "Rust"}
+    )
     tag_id = tag_resp.json()["id"]
 
     # Create videos

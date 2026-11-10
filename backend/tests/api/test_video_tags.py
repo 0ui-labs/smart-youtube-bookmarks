@@ -13,10 +13,12 @@ async def test_assign_tags_to_video(
     import uuid
 
     tag1_response = await client.post(
-        "/api/tags", json={"name": f"Tutorial-{uuid.uuid4().hex[:8]}"}
+        "/api/tags",
+        json={"is_video_type": False, "name": f"Tutorial-{uuid.uuid4().hex[:8]}"},
     )
     tag2_response = await client.post(
-        "/api/tags", json={"name": f"Python-{uuid.uuid4().hex[:8]}"}
+        "/api/tags",
+        json={"is_video_type": False, "name": f"Python-{uuid.uuid4().hex[:8]}"},
     )
     tag1_id = tag1_response.json()["id"]
     tag2_id = tag2_response.json()["id"]
@@ -42,7 +44,9 @@ async def test_assign_duplicate_tag(
     import uuid
 
     tag_name = f"DuplicateTest_{uuid.uuid4().hex[:8]}"
-    tag_response = await client.post("/api/tags", json={"name": tag_name})
+    tag_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": tag_name}
+    )
     tag_id = tag_response.json()["id"]
 
     # Assign tag twice
@@ -66,7 +70,9 @@ async def test_remove_tag_from_video(
     import uuid
 
     tag_name = f"RemoveTest_{uuid.uuid4().hex[:8]}"
-    tag_response = await client.post("/api/tags", json={"name": tag_name})
+    tag_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": tag_name}
+    )
     tag_id = tag_response.json()["id"]
     await client.post(f"/api/videos/{test_video.id}/tags", json={"tag_ids": [tag_id]})
 
@@ -98,8 +104,12 @@ async def test_remove_nonexistent_tag(
 async def test_get_video_tags(client: AsyncClient, test_user, test_list, test_video):
     """Test getting all tags for a video."""
     # Create and assign tags
-    tag1_response = await client.post("/api/tags", json={"name": "GetTest1"})
-    tag2_response = await client.post("/api/tags", json={"name": "GetTest2"})
+    tag1_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "GetTest1"}
+    )
+    tag2_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "GetTest2"}
+    )
     tag1_id = tag1_response.json()["id"]
     tag2_id = tag2_response.json()["id"]
     await client.post(
