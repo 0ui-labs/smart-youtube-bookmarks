@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
     analytics,
+    auth,
     channels,
     chat,
     custom_fields,
@@ -29,6 +30,7 @@ from app.api import (
 )
 from app.core.database import require_api_session
 from app.core.redis import close_arq_pool, close_redis_client, get_arq_pool
+from app.core.ticket_redaction import TicketRedactionMiddleware
 
 
 @asynccontextmanager
@@ -92,7 +94,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Redact connection credentials before the server logs accept/reject.
+app.add_middleware(TicketRedactionMiddleware)
+
 # Register routers
+app.include_router(auth.router, dependencies=[Depends(require_api_session)])
 app.include_router(lists.router, dependencies=[Depends(require_api_session)])
 app.include_router(videos.router, dependencies=[Depends(require_api_session)])
 app.include_router(processing.router, dependencies=[Depends(require_api_session)])
