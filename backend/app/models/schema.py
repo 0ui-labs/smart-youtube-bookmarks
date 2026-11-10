@@ -1,4 +1,4 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import JSONB
@@ -27,3 +27,7 @@ class Schema(BaseModel):
 
     def __repr__(self) -> str:
         return f"<Schema(id={self.id}, name={self.name!r})>"
+
+
+if TYPE_CHECKING:
+    from .list import BookmarkList

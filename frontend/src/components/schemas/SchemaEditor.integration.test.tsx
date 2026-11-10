@@ -10,7 +10,7 @@ vi.mock("@/hooks/useCustomFields", () => ({
   useCustomFields: () => ({
     data: [
       {
-        id: "field-1",
+        id: "11111111-1111-4111-8111-111111111111",
         name: "Existing Field",
         field_type: "select",
         config: { options: ["option1", "option2"] },
@@ -19,7 +19,7 @@ vi.mock("@/hooks/useCustomFields", () => ({
         updated_at: new Date().toISOString(),
       },
       {
-        id: "field-2",
+        id: "22222222-2222-4222-8222-222222222222",
         name: "Another Field",
         field_type: "rating",
         config: { max_rating: 5 },
@@ -87,7 +87,7 @@ describe("SchemaEditor Integration Tests", () => {
     expect(nameInput).toHaveValue("My Test Schema");
 
     // Step 2: Open FieldSelector and select a field
-    const fieldSelectorButton = screen.getByRole("button", {
+    const fieldSelectorButton = screen.getByRole("combobox", {
       name: /vorhandene felder/i,
     });
     await user.click(fieldSelectorButton);
@@ -102,7 +102,7 @@ describe("SchemaEditor Integration Tests", () => {
 
     // Verify field appears in form (via placeholder text)
     await waitFor(() => {
-      expect(screen.getByText(/field 1 \(placeholder/i)).toBeInTheDocument();
+      expect(screen.getAllByText("Existing Field").length).toBeGreaterThan(0);
     });
 
     // Step 3: Submit schema
@@ -119,7 +119,7 @@ describe("SchemaEditor Integration Tests", () => {
           description: "",
           fields: expect.arrayContaining([
             expect.objectContaining({
-              field_id: "field-1",
+              field_id: "11111111-1111-4111-8111-111111111111",
               display_order: 0,
               show_on_card: false,
             }),
@@ -129,118 +129,75 @@ describe("SchemaEditor Integration Tests", () => {
     });
   });
 
-  it("enforces max 3 show_on_card limit", async () => {
-    const user = userEvent.setup();
-
-    // Render with initial data: 4 fields (3 show_on_card=true, 1 false)
+  it("rejects more than three card fields before saving", async () => {
+    const fields = [1, 2, 3, 4].map((number) => ({
+      field_id: `${String(number).repeat(8)}-1111-4111-8111-111111111111`,
+      display_order: number - 1,
+      show_on_card: true,
+    }));
     render(
       <SchemaEditor
-        initialData={{
-          name: "Test Schema",
-          fields: [
-            { field_id: "f1", display_order: 0, show_on_card: true },
-            { field_id: "f2", display_order: 1, show_on_card: true },
-            { field_id: "f3", display_order: 2, show_on_card: true },
-            { field_id: "f4", display_order: 3, show_on_card: false },
-          ],
-        }}
+        initialData={{ name: "Schema", fields }}
         listId="list-1"
         onCancel={mockOnCancel}
         onSave={mockOnSave}
       />,
       { wrapper }
     );
-
-    // Verify all 4 fields are rendered
-    expect(screen.getByText(/field 1 \(placeholder/i)).toBeInTheDocument();
-    expect(screen.getByText(/field 2 \(placeholder/i)).toBeInTheDocument();
-    expect(screen.getByText(/field 3 \(placeholder/i)).toBeInTheDocument();
-    expect(screen.getByText(/field 4 \(placeholder/i)).toBeInTheDocument();
-
-    // NOTE: This test verifies that the component can RENDER 4 fields
-    // with 3 show_on_card=true without validation errors during initial load.
-    // The actual show_on_card toggle UI and enforcement is part of Task #83d (FieldOrderManager),
-    // which is not yet implemented. This test will be expanded once FieldOrderManager
-    // provides the switch UI to toggle show_on_card and enforces the 3-field limit.
-
-    // For now, we verify the form accepts this configuration
-    const submitButton = screen.getByRole("button", {
-      name: /schema erstellen/i,
-    });
-    expect(submitButton).toBeInTheDocument();
-
-    // Verify form does not show the max 3 validation error (only shown on submit)
+    await userEvent.click(
+      screen.getByRole("button", { name: /schema erstellen/i })
+    );
     expect(
-      screen.queryByText(
+      await screen.findByText(
         /maximal 3 felder können auf der karte angezeigt werden/i
       )
-    ).not.toBeInTheDocument();
-
-    // Try to submit - should trigger validation error
-    mockOnSave.mockResolvedValueOnce(undefined);
-    await user.click(submitButton);
-
-    // Verify validation error appears
-    await waitFor(() => {
-      expect(
-        screen.getByText(
-          /maximal 3 felder können auf der karte angezeigt werden/i
-        )
-      ).toBeInTheDocument();
-    });
-
-    // Verify onSave was NOT called due to validation failure
+    ).toBeVisible();
     expect(mockOnSave).not.toHaveBeenCalled();
   });
-
-  it("prevents duplicate field names via FieldSelector", async () => {
-    const user = userEvent.setup();
-
+  it("keeps the selection unique and supports deselection", async () => {
     render(
       <SchemaEditor
+        initialData={{ name: "Schema" }}
         listId="list-1"
         onCancel={mockOnCancel}
         onSave={mockOnSave}
       />,
       { wrapper }
     );
-
-    // Step 1: Open FieldSelector and select "Existing Field"
-    const fieldSelectorButton = screen.getByRole("button", {
-      name: /vorhandene felder/i,
-    });
-    await user.click(fieldSelectorButton);
-
-    await waitFor(() => {
-      expect(screen.getByText("Existing Field")).toBeInTheDocument();
-    });
-
-    const existingFieldOption = screen.getByText("Existing Field");
-    await user.click(existingFieldOption);
-
-    // Verify field was added
-    await waitFor(() => {
-      expect(screen.getByText(/field 1 \(placeholder/i)).toBeInTheDocument();
-    });
-
-    // Step 2: Try to add the same field again
-    // Click the FieldSelector button again
-    const selectorButton = screen.getByRole("button", {
-      name: /1 feld ausgewählt/i,
-    });
-    await user.click(selectorButton);
-
-    // Verify "Existing Field" is no longer in the available list (it's already selected)
-    await waitFor(() => {
-      // The popover should show "Alle verfügbaren Felder ausgewählt" or only show "Another Field"
-      // Because "Existing Field" is already selected, it should not appear in availableFields
-      const _existingFieldOptions = screen.queryAllByText("Existing Field");
-      // There might be text in field placeholder, but not in the dropdown
-      expect(screen.getByText("Another Field")).toBeInTheDocument();
-    });
-
-    // NOTE: The duplicate prevention at the NewFieldForm level (typing "Existing Field"
-    // and getting a warning) is tested in NewFieldForm.test.tsx. This integration test
-    // verifies that FieldSelector correctly filters out already-selected fields.
+    await userEvent.click(
+      screen.getByRole("combobox", { name: /vorhandene felder/i })
+    );
+    await userEvent.click(
+      screen.getByRole("option", { name: /Existing Field/i })
+    );
+    await userEvent.click(
+      screen.getByRole("option", { name: /Another Field/i })
+    );
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByText("Felder (2)")).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("combobox", { name: /vorhandene felder/i })
+    );
+    await userEvent.click(
+      screen.getByRole("option", { name: /Existing Field/i })
+    );
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByText("Felder (1)")).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: /schema erstellen/i })
+    );
+    await waitFor(() =>
+      expect(mockOnSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fields: [
+            {
+              field_id: "22222222-2222-4222-8222-222222222222",
+              display_order: 0,
+              show_on_card: false,
+            },
+          ],
+        })
+      )
+    );
   });
 });

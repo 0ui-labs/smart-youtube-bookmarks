@@ -244,8 +244,8 @@ class TestBatchUpdateVideoFieldValues:
             json={"field_values": [{"field_id": str(fake_field_id), "value": 5}]},
         )
 
-        assert response.status_code == 400
-        assert "invalid field_id" in response.json()["detail"].lower()
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Resource not found"
 
     @pytest.mark.asyncio
     async def test_error_duplicate_field_ids(
@@ -349,11 +349,13 @@ class TestBatchUpdateVideoFieldValues:
 
     @pytest.mark.asyncio
     async def test_batch_size_limit(
-        self, client: AsyncClient, test_video_for_fields: Video
+        self, client: AsyncClient, test_video_for_fields: Video, test_fields
     ):
         """Test 422 error when batch exceeds max size (50 fields)."""
         # Generate 51 fake field updates
-        fake_updates = [{"field_id": str(uuid4()), "value": i} for i in range(51)]
+        fake_updates = [
+            {"field_id": str(test_fields["rating"].id), "value": i} for i in range(51)
+        ]
 
         response = await client.put(
             f"/api/videos/{test_video_for_fields.id}/fields",

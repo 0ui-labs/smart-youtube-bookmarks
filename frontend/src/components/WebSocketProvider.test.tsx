@@ -5,12 +5,14 @@
 
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { WebSocketProvider } from "./WebSocketProvider";
 
 // Mock the useWebSocket hook
 const mockUseWebSocket = vi.fn();
-vi.mock("@/hooks/useWebSocket", () => ({
-  useWebSocket: () => mockUseWebSocket(),
+vi.mock("@/hooks/useWebSocket", async (original) => ({
+  ...(await original<typeof import("@/hooks/useWebSocket")>()),
+  useProgressConnection: () => mockUseWebSocket(),
 }));
 
 describe("WebSocketProvider", () => {
@@ -49,14 +51,18 @@ describe("WebSocketProvider", () => {
     expect(mockUseWebSocket).toHaveBeenCalled();
   });
 
-  it("provides connection context to children", () => {
-    // This test verifies the provider doesn't crash and children render
+  it("shares one connection with multiple consumers", () => {
+    function Consumer() {
+      const { isConnected } = useWebSocket();
+      return <span>{isConnected ? "Verbunden" : "Getrennt"}</span>;
+    }
     render(
       <WebSocketProvider>
-        <div>Content</div>
+        <Consumer />
+        <Consumer />
       </WebSocketProvider>
     );
-
-    expect(screen.getByText("Content")).toBeInTheDocument();
+    expect(screen.getAllByText("Verbunden")).toHaveLength(2);
+    expect(mockUseWebSocket).toHaveBeenCalledTimes(1);
   });
 });

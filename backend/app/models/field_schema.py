@@ -1,3 +1,4 @@
+import builtins
 from typing import TYPE_CHECKING
 from uuid import UUID as PyUUID
 
@@ -105,7 +106,7 @@ class FieldSchema(BaseModel):
         order_by="SchemaField.display_order",  # Ensure consistent ordering by display_order
     )
 
-    tags: Mapped[list["Tag"]] = relationship(
+    tags: Mapped[builtins.list["Tag"]] = relationship(
         "Tag",
         back_populates="schema",
         # No cascade! Tags exist independently of schemas (schema is optional)

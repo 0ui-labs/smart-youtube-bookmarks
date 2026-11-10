@@ -153,8 +153,8 @@ class TestCreateSchema:
 
         response = await client.post(f"/api/lists/{test_list.id}/schemas", json=data)
 
-        assert response.status_code == 400
-        assert "Invalid field_ids" in response.json()["detail"]
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Resource not found"
 
     async def test_create_schema_list_not_found(self, client: AsyncClient):
         """Should return 404 if list doesn't exist."""

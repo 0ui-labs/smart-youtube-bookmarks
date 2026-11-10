@@ -43,12 +43,14 @@ const mockFieldValuesToBackup = [
   {
     id: "fv-1",
     field_id: "field-1",
+    fieldName: "Kalorien",
     value: 500,
     field: { id: "field-1", name: "Kalorien", field_type: "number" as const },
   },
   {
     id: "fv-2",
     field_id: "field-2",
+    fieldName: "Bewertung",
     value: "Lecker",
     field: { id: "field-2", name: "Bewertung", field_type: "text" as const },
   },
@@ -59,6 +61,7 @@ const mockFieldValuesThatPersist = [
   {
     id: "fv-3",
     field_id: "field-3",
+    fieldName: "Notizen",
     value: "Notiz zum Video",
     field: { id: "field-3", name: "Notizen", field_type: "text" as const },
   },

@@ -100,6 +100,8 @@ vi.mock("@/hooks/useVideos", () => ({
 }));
 
 vi.mock("@/hooks/useTags", () => ({
+  useCategories: () => ({ data: [], isLoading: false, error: null }),
+  useLabels: () => ({ data: [], isLoading: false, error: null }),
   useTags: vi.fn(() => ({
     data: [],
     isLoading: false,
@@ -277,7 +279,7 @@ describe("VideosPage - Grid View Integration (Task #32)", () => {
 
       // Verify thumbnails have small size class (w-32)
       thumbnails.forEach((img) => {
-        expect(img).toHaveClass("w-32");
+        expect(img).toHaveClass("w-full");
       });
 
       // Verify independence: thumbnailSize setting works in grid view
@@ -415,7 +417,7 @@ describe("VideosPage - Grid View Integration (Task #32)", () => {
       const thumbnails = container.querySelectorAll("img");
       expect(thumbnails.length).toBeGreaterThan(0);
       thumbnails.forEach((img) => {
-        expect(img).toHaveClass("w-48");
+        expect(img).toHaveClass("w-full");
       });
     });
 

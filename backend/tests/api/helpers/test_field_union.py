@@ -428,9 +428,6 @@ class TestComputeFieldUnionWithConflicts:
 class TestGetAvailableFieldsForVideos:
     """Tests for batch loading with real database."""
 
-    @pytest.mark.skip(
-        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
-    )
     @pytest.mark.asyncio
     async def test_batch_load_multiple_videos(
         self, test_db: AsyncSession, test_list, test_user
@@ -508,9 +505,9 @@ class TestGetAvailableFieldsForVideos:
         await test_db.commit()
 
         # Refresh to load tags relationship
-        await test_db.refresh(video1)
-        await test_db.refresh(video2)
-        await test_db.refresh(video3)
+        await test_db.refresh(video1, attribute_names=["tags", "list"])
+        await test_db.refresh(video2, attribute_names=["tags", "list"])
+        await test_db.refresh(video3, attribute_names=["tags", "list"])
 
         videos = [video1, video2, video3]
 
@@ -537,9 +534,6 @@ class TestGetAvailableFieldsForVideos:
         video3_fields = fields_by_video[video3.id]
         assert len(video3_fields) == 2
 
-    @pytest.mark.skip(
-        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
-    )
     @pytest.mark.asyncio
     async def test_batch_load_videos_no_tags(self, test_db: AsyncSession, test_list):
         """Test videos without tags return empty fields list."""
@@ -554,8 +548,8 @@ class TestGetAvailableFieldsForVideos:
         await test_db.commit()
 
         # Refresh to ensure relationships are loaded
-        await test_db.refresh(video1)
-        await test_db.refresh(video2)
+        await test_db.refresh(video1, attribute_names=["tags", "list"])
+        await test_db.refresh(video2, attribute_names=["tags", "list"])
 
         videos = [video1, video2]
 
@@ -567,9 +561,6 @@ class TestGetAvailableFieldsForVideos:
         assert fields_by_video[video1.id] == []
         assert fields_by_video[video2.id] == []
 
-    @pytest.mark.skip(
-        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
-    )
     @pytest.mark.asyncio
     async def test_batch_load_videos_no_schema(
         self, test_db: AsyncSession, test_list, test_user
@@ -598,7 +589,7 @@ class TestGetAvailableFieldsForVideos:
         await test_db.commit()
 
         # Refresh to load tags relationship
-        await test_db.refresh(video)
+        await test_db.refresh(video, attribute_names=["tags", "list"])
 
         videos = [video]
 
@@ -608,9 +599,6 @@ class TestGetAvailableFieldsForVideos:
         # Verify: Empty fields (tag has no schema)
         assert fields_by_video[video.id] == []
 
-    @pytest.mark.skip(
-        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
-    )
     @pytest.mark.asyncio
     async def test_batch_load_single_query(
         self, test_db: AsyncSession, test_list, test_user
@@ -661,7 +649,7 @@ class TestGetAvailableFieldsForVideos:
 
         # Refresh all videos to load tags relationship
         for video in videos:
-            await test_db.refresh(video)
+            await test_db.refresh(video, attribute_names=["tags", "list"])
 
         # Execute (query count verification is implicit - function should complete fast)
         fields_by_video = await get_available_fields_for_videos(videos, test_db)
@@ -687,9 +675,6 @@ class TestGetAvailableFieldsForVideos:
 class TestGetAvailableFieldsForVideo:
     """Tests for single-video wrapper function."""
 
-    @pytest.mark.skip(
-        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
-    )
     @pytest.mark.asyncio
     async def test_single_video_wrapper(
         self, test_db: AsyncSession, test_list, test_user
@@ -734,7 +719,7 @@ class TestGetAvailableFieldsForVideo:
         await test_db.commit()
 
         # Refresh to load tags relationship
-        await test_db.refresh(video)
+        await test_db.refresh(video, attribute_names=["tags", "list"])
 
         # Execute
         available_fields = await get_available_fields_for_video(video, test_db)
@@ -746,9 +731,6 @@ class TestGetAvailableFieldsForVideo:
         assert available_fields[0][2] == 1  # display_order
         assert available_fields[0][3] is True  # show_on_card
 
-    @pytest.mark.skip(
-        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
-    )
     @pytest.mark.asyncio
     async def test_single_video_no_fields(self, test_db: AsyncSession, test_list):
         """Test single video with no tags returns empty list."""
@@ -761,7 +743,7 @@ class TestGetAvailableFieldsForVideo:
         await test_db.commit()
 
         # Refresh to ensure relationships are loaded
-        await test_db.refresh(video)
+        await test_db.refresh(video, attribute_names=["tags", "list"])
 
         # Execute
         available_fields = await get_available_fields_for_video(video, test_db)
@@ -769,9 +751,6 @@ class TestGetAvailableFieldsForVideo:
         # Verify: Empty list
         assert available_fields == []
 
-    @pytest.mark.skip(
-        reason="TODO: Fix SQLAlchemy async greenlet issue - MissingGreenlet when accessing schema_field.field"
-    )
     @pytest.mark.asyncio
     async def test_single_video_calls_batch(
         self, test_db: AsyncSession, test_list, test_user
@@ -813,7 +792,7 @@ class TestGetAvailableFieldsForVideo:
         await test_db.commit()
 
         # Refresh to load tags relationship
-        await test_db.refresh(video)
+        await test_db.refresh(video, attribute_names=["tags", "list"])
 
         # Execute single wrapper
         single_result = await get_available_fields_for_video(video, test_db)

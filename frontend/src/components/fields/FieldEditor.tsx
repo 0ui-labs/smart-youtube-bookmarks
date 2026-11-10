@@ -63,7 +63,7 @@ export const FieldEditor = ({
         debounceTimerRef.current = null;
       }
     },
-    []
+    [field.id, videoId]
   );
 
   // Auto-save with debounce

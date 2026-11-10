@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithRouter as render } from "@/test/renderWithRouter";
 import { ImportPreviewModal } from "./ImportPreviewModal";
 
 // Mock the useTags hook

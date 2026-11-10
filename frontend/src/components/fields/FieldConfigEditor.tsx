@@ -35,7 +35,7 @@ interface TextConfig {
   max_length?: number;
 }
 
-type BooleanConfig = {};
+type BooleanConfig = Record<string, never>;
 
 export type FieldConfig =
   | SelectConfig

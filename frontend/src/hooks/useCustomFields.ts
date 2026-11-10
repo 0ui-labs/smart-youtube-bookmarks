@@ -15,6 +15,7 @@ import {
   DuplicateCheckResponseSchema,
 } from "@/types/customFields";
 import { useSchemas } from "./useSchemas";
+import { invalidateVideoViews } from "./videos/cache";
 
 // ============================================================================
 // Query Key Factory
@@ -235,6 +236,7 @@ export const useCreateCustomField = (listId: string) => {
     },
     // Refetch to get real ID and server-generated fields
     onSettled: async () => {
+      void invalidateVideoViews(queryClient);
       // Invalidate and refetch to ensure UI consistency
       // This runs on both success and error to handle edge cases
       await queryClient.invalidateQueries({
@@ -330,6 +332,7 @@ export const useUpdateCustomField = (listId: string) => {
     },
     // Refetch to ensure server state is correct
     onSettled: async () => {
+      void invalidateVideoViews(queryClient);
       await queryClient.invalidateQueries({
         queryKey: customFieldKeys.list(listId),
       });
@@ -402,6 +405,7 @@ export const useDeleteCustomField = (listId: string) => {
     },
     // Refetch to ensure consistency after success or error
     onSettled: async () => {
+      void invalidateVideoViews(queryClient);
       await queryClient.invalidateQueries({
         queryKey: customFieldKeys.list(listId),
       });

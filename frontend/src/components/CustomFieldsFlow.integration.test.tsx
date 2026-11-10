@@ -16,8 +16,10 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event"; // ✅ Default import
 import { HttpResponse, http } from "msw";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { VideosPage } from "@/components/VideosPage";
+import { Route, Routes } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CreateTagDialog } from "@/components/CreateTagDialog";
+import { VideoDetailsPage } from "@/pages/VideoDetailsPage";
 import { server } from "@/test/mocks/server"; // ✅ Use global server
 import { renderWithRouter } from "@/test/renderWithRouter";
 
@@ -105,9 +107,9 @@ const createMockField = (overrides: any = {}) => ({
 
 // Mutable state for test data (reset in beforeEach)
 const mockVideos: MockVideo[] = [];
-let mockTags: any[] = [];
-let mockSchemas: any[] = [];
-let mockFields: any[] = [];
+const mockTags: any[] = [];
+const mockSchemas: any[] = [];
+const mockFields: any[] = [];
 
 // ============================================================================
 // Test Lifecycle (Uses global MSW server from setup.ts)
@@ -133,7 +135,7 @@ describe("Custom Fields Flow Integration (Task #134)", () => {
       ),
 
       // POST /api/lists/{listId}/tags
-      http.post("/api/lists/:listId/tags", async ({ request }) => {
+      http.post("/api/tags", async ({ request }) => {
         const body = (await request.json()) as any;
         const newTag = createMockTag({
           id: MOCK_TAG_ID,
@@ -246,198 +248,141 @@ describe("Custom Fields Flow Integration (Task #134)", () => {
     mockFields.length = 0;
   });
 
-  describe("Test 1: Create tag with new schema and custom field", () => {
-    it("creates tag with schema containing rating field (outcome-based)", async () => {
-      const user = userEvent.setup({ delay: null }); // ✅ Project standard
-
-      // Render VideosPage
-      renderWithRouter(<VideosPage listId={MOCK_LIST_ID} />);
-
-      // Wait for page to load
-      await waitFor(() => {
-        expect(
-          screen.getByText("How to Apply Perfect Eyeliner")
-        ).toBeInTheDocument();
-      });
-
-      // STEP 1: Click "New Tag" button
-      const newTagButton = screen.getByRole("button", { name: /neuer tag/i });
-      await user.click(newTagButton);
-
-      // STEP 2: Fill in tag name
-      const tagNameInput = screen.getByLabelText(/tag.*name/i);
-      await user.type(tagNameInput, "Makeup Tutorials");
-
-      // STEP 3: Create schema (outcome-based assertion)
-      // Note: JSDOM limitations prevent testing Radix UI Select interactions
-      // Instead, we verify the form submission contains correct schema data
-
-      // Fill schema form fields that ARE testable in JSDOM
-      const schemaNameInput = screen.getByLabelText(/schema.*name/i);
-      await user.type(schemaNameInput, "Video Quality");
-
-      // STEP 4: Add field (focus on form data, not UI interactions)
-      const addFieldButton = screen.getByRole("button", {
-        name: /feld.*hinzufügen/i,
-      });
-      await user.click(addFieldButton);
-
-      const fieldNameInput = screen.getByLabelText(/feld.*name/i);
-      await user.type(fieldNameInput, "Overall Rating");
-
-      // STEP 5: Save tag
-      const saveTagButton = screen.getByRole("button", {
-        name: /speichern|save/i,
-      });
-      await user.click(saveTagButton);
-
-      // STEP 6: Verify API calls (outcome-based)
-      await waitFor(() => {
-        expect(mockFields).toHaveLength(1);
-        expect(mockFields[0].name).toBe("Overall Rating");
-        expect(mockFields[0].field_type).toBe("rating");
-      });
-
-      await waitFor(() => {
-        expect(mockSchemas).toHaveLength(1);
-        expect(mockSchemas[0].name).toBe("Video Quality");
-      });
-
-      await waitFor(() => {
-        expect(mockTags).toHaveLength(1);
-        expect(mockTags[0].name).toBe("Makeup Tutorials");
-        expect(mockTags[0].schema_id).toBe(MOCK_SCHEMA_ID);
-      });
-
-      // STEP 7: Verify UI updated (tag appears in list)
-      expect(screen.getByText("Makeup Tutorials")).toBeInTheDocument();
+  const openFieldCreation = async () => {
+    renderWithRouter(
+      <CreateTagDialog listId={MOCK_LIST_ID} onOpenChange={() => {}} open />
+    );
+    await userEvent.type(screen.getByLabelText(/^Name/), "Makeup Tutorials");
+    await userEvent.click(
+      screen.getByRole("combobox", { name: "Schema auswählen" })
+    );
+    await userEvent.click(
+      screen.getByRole("option", { name: /Neues Schema erstellen/i })
+    );
+    await userEvent.type(
+      screen.getByLabelText(/schema-name/i),
+      "Video Quality"
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Neues Feld/i }));
+    await userEvent.type(
+      screen.getByLabelText(/Field Name/i),
+      "Overall Rating"
+    );
+    await userEvent.click(
+      screen.getByRole("combobox", { name: /Field Type/i })
+    );
+    await userEvent.click(screen.getByRole("option", { name: /Rating/i }));
+  };
+  it("creates a category with a persisted schema and rating field", async () => {
+    await openFieldCreation();
+    await userEvent.click(screen.getByRole("button", { name: "Add Field" }));
+    await waitFor(() => expect(mockFields).toHaveLength(1));
+    await userEvent.click(
+      screen.getByRole("button", { name: /Schema erstellen/i })
+    );
+    await waitFor(() => expect(mockSchemas).toHaveLength(1));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: /Schema erstellen/i })
+      ).not.toBeInTheDocument()
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^Erstellen$/ }));
+    await waitFor(() => expect(mockTags).toHaveLength(1));
+    expect(mockTags[0]).toMatchObject({
+      name: "Makeup Tutorials",
+      schema_id: MOCK_SCHEMA_ID,
+    });
+    expect(mockSchemas[0].schema_fields[0]).toMatchObject({
+      field_id: MOCK_FIELD_ID,
+    });
+    expect(mockFields[0]).toMatchObject({
+      name: "Overall Rating",
+      field_type: "rating",
+      config: { max_rating: 5 },
     });
   });
-
-  describe("Test 2: Assign tag to video and set field value", () => {
-    beforeEach(() => {
-      // Pre-populate with existing tag, schema, and field
-      const field = createMockField();
-      const schema = createMockSchema({
-        schema_fields: [
-          {
-            field_id: MOCK_FIELD_ID,
-            schema_id: MOCK_SCHEMA_ID,
-            display_order: 0,
-            show_on_card: true,
-            field,
-          },
-        ],
-      });
-      const tag = createMockTag({ schema_id: MOCK_SCHEMA_ID });
-
-      mockFields = [field];
-      mockSchemas = [schema];
-      mockTags = [tag];
+  it("assigns a category and saves a rating through the detail dialog", async () => {
+    mockFields.push(createMockField());
+    mockTags.push(createMockTag({ schema_id: MOCK_SCHEMA_ID }));
+    server.use(
+      http.get("/api/videos/:videoId", () =>
+        HttpResponse.json({
+          ...mockVideos[0],
+          available_fields: mockVideos[0].tags.length
+            ? [
+                {
+                  field_id: MOCK_FIELD_ID,
+                  field_name: "Overall Rating",
+                  field_type: "rating",
+                  config: { max_rating: 5 },
+                  show_on_card: true,
+                  display_order: 0,
+                  schema_name: "Video Quality",
+                },
+              ]
+            : [],
+        })
+      ),
+      http.get("/api/videos/:videoId/enrichment", () =>
+        HttpResponse.json(null)
+      ),
+      http.put("/api/videos/:videoId/category", async ({ request }) => {
+        const body = (await request.json()) as { category_id: string };
+        mockVideos[0].tags = mockTags.filter(
+          (tag) => tag.id === body.category_id
+        );
+        return HttpResponse.json({
+          backup_created: false,
+          backup_available: false,
+        });
+      })
+    );
+    renderWithRouter(
+      <Routes>
+        <Route element={<VideoDetailsPage />} path="/videos/:videoId" />
+      </Routes>,
+      { initialEntries: [`/videos/${MOCK_VIDEO_ID}`] }
+    );
+    await screen.findByRole("heading", {
+      name: "How to Apply Perfect Eyeliner",
     });
-
-    it("assigns tag to video and sets rating field value to 5 stars", async () => {
-      const user = userEvent.setup({ delay: null });
-
-      renderWithRouter(<VideosPage listId={MOCK_LIST_ID} />);
-
-      // Wait for video to render
-      await waitFor(() => {
-        expect(
-          screen.getByText("How to Apply Perfect Eyeliner")
-        ).toBeInTheDocument();
-      });
-
-      // STEP 1: Open video actions menu
-      const videoCard = screen.getByTestId(`video-card-${MOCK_VIDEO_ID}`);
-      const menuButton = within(videoCard).getByLabelText(/aktionen|actions/i);
-      await user.click(menuButton);
-
-      // STEP 2: Click "Assign Tags"
-      const assignTagsButton = screen.getByRole("menuitem", {
-        name: /tags.*zuweisen|assign.*tags/i,
-      });
-      await user.click(assignTagsButton);
-
-      // STEP 3: Select tag
-      const tagCheckbox = screen.getByRole("checkbox", {
-        name: /makeup tutorials/i,
-      });
-      await user.click(tagCheckbox);
-
-      // STEP 4: Save tag assignment
-      const saveButton = screen.getByRole("button", {
-        name: /zuweisen|assign/i,
-      });
-      await user.click(saveButton);
-
-      // STEP 5: Verify tag appears on card
-      await waitFor(() => {
-        expect(
-          within(videoCard).getByText("Makeup Tutorials")
-        ).toBeInTheDocument();
-      });
-
-      // STEP 6: Verify field appears and set value
-      await waitFor(() => {
-        const ratingField = within(videoCard).getByLabelText(/overall rating/i);
-        expect(ratingField).toBeInTheDocument();
-      });
-
-      // Click 5th star
-      const stars = within(videoCard).getAllByRole("button", {
-        name: /stern|star/i,
-      });
-      await user.click(stars[4]); // 5th star (0-indexed)
-
-      // STEP 7: Verify outcome (field value saved)
-      await waitFor(() => {
-        expect(mockVideos[0].field_values).toHaveLength(1);
-        expect(mockVideos[0].field_values[0].value).toBe(5);
-      });
-    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Kategorie wählen/i })
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /Makeup Tutorials/i })
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Mehr Informationen" })
+    );
+    const dialog = screen.getByRole("dialog", { name: "Video Informationen" });
+    await userEvent.click(within(dialog).getAllByRole("radio")[4]);
+    await waitFor(() =>
+      expect(mockVideos[0].field_values?.[0]).toMatchObject({
+        field_id: MOCK_FIELD_ID,
+        value: 5,
+      })
+    );
   });
-
-  describe("Test 3: Error handling for API failures", () => {
-    it("shows error toast when field creation fails", async () => {
-      const user = userEvent.setup({ delay: null });
-
-      // Override handler to return error (using global server)
-      server.use(
-        http.post("/api/lists/:listId/custom-fields", () =>
-          HttpResponse.json(
-            { detail: "Validation error: Invalid field_type" },
-            { status: 400 }
-          )
+  it("keeps the form and reports a failed field creation", async () => {
+    server.use(
+      http.post("/api/lists/:listId/custom-fields", () =>
+        HttpResponse.json(
+          { detail: "Invalid field configuration" },
+          { status: 400 }
         )
-      );
-
-      renderWithRouter(<VideosPage listId={MOCK_LIST_ID} />);
-
-      // Open new tag dialog and try to create field
-      const newTagButton = screen.getByRole("button", { name: /neuer tag/i });
-      await user.click(newTagButton);
-
-      const addFieldButton = screen.getByRole("button", {
-        name: /feld.*hinzufügen/i,
-      });
-      await user.click(addFieldButton);
-
-      const fieldNameInput = screen.getByLabelText(/feld.*name/i);
-      await user.type(fieldNameInput, "Test Field");
-
-      const saveFieldButton = screen.getByRole("button", {
-        name: /feld.*speichern/i,
-      });
-      await user.click(saveFieldButton);
-
-      // Verify error toast appears
-      await waitFor(() => {
-        expect(screen.getByText(/fehler|error/i)).toBeInTheDocument();
-      });
-
-      // Verify field was NOT added
-      expect(mockFields).toHaveLength(0);
-    });
+      )
+    );
+    await openFieldCreation();
+    await userEvent.click(screen.getByRole("button", { name: "Add Field" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /Feld konnte nicht gespeichert werden/
+    );
+    expect(screen.getByLabelText(/Field Name/i)).toHaveValue("Overall Rating");
+    expect(mockFields).toHaveLength(0);
+    expect(mockTags).toHaveLength(0);
   });
 });
+vi.mock("@/components/VideoPlayer", () => ({
+  VideoPlayer: () => <div data-testid="player" />,
+}));

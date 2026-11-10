@@ -18,7 +18,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
@@ -26,4 +26,13 @@ Currently uses a hardcoded user_id for development. Production deployment requir
 export type ListAllVideosApiVideosGetParams = {
 tags?: string[] | null;
 tags_all?: string[] | null;
+/**
+ * @minimum 0
+ */
+offset?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };

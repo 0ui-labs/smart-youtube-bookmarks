@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from groq import Groq
+from groq.types.audio import Transcription
 
 from ..exceptions import RateLimitError, TranscriptionError
 from ..utils.vtt_parser import VTTSegment, generate_vtt
@@ -110,7 +111,7 @@ class GroqTranscriber:
             response = await self._call_groq_api(chunk.path)
 
             # Handle both object and dict response formats from Groq API
-            raw_segments = response.segments or []
+            raw_segments = getattr(response, "segments", None) or []
             segments = []
             for seg in raw_segments:
                 # Support both dict and object access patterns
@@ -142,7 +143,7 @@ class GroqTranscriber:
                 raise RateLimitError(f"Groq rate limit exceeded: {e}") from e
             raise TranscriptionError(f"Transcription failed: {e}") from e
 
-    async def _call_groq_api(self, audio_path: Path):
+    async def _call_groq_api(self, audio_path: Path) -> Transcription:
         """Call Groq Whisper API.
 
         Args:
@@ -153,7 +154,7 @@ class GroqTranscriber:
         """
         loop = asyncio.get_running_loop()
 
-        def _sync_call():
+        def _sync_call() -> Transcription:
             with open(audio_path, "rb") as audio_file:
                 return self._client.audio.transcriptions.create(
                     file=(audio_path.name, audio_file.read()),

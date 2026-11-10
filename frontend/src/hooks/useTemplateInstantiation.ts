@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { SchemaTemplate } from "@/constants/schemaTemplates";
+import { authorizedFetch } from "@/lib/sessionTransport";
 import type { CustomField, FieldSchemaResponse } from "@/types/customFields";
 
 interface UseTemplateInstantiationOptions {
@@ -57,15 +58,18 @@ export function useTemplateInstantiation({
       const createdFields: CustomField[] = [];
 
       for (const fieldDef of template.fields) {
-        const response = await fetch(`/api/lists/${listId}/custom-fields`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: fieldDef.name,
-            field_type: fieldDef.field_type,
-            config: fieldDef.config,
-          }),
-        });
+        const response = await authorizedFetch(
+          `/api/lists/${listId}/custom-fields`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: fieldDef.name,
+              field_type: fieldDef.field_type,
+              config: fieldDef.config,
+            }),
+          }
+        );
 
         if (!response.ok) {
           const error = await response.json();
@@ -83,27 +87,30 @@ export function useTemplateInstantiation({
       // Step 2: Create schema with field associations
       setState((prev) => ({ ...prev, currentStep: "creating-schema" }));
 
-      const schemaResponse = await fetch(`/api/lists/${listId}/schemas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: template.name,
-          description: template.description,
-          fields: template.fields.map((fieldDef, index) => {
-            const field = createdFields[index];
-            if (!field) {
-              throw new Error(
-                `Field at index ${index} not found in createdFields`
-              );
-            }
-            return {
-              field_id: field.id,
-              display_order: fieldDef.display_order,
-              show_on_card: fieldDef.show_on_card,
-            };
+      const schemaResponse = await authorizedFetch(
+        `/api/lists/${listId}/schemas`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: template.name,
+            description: template.description,
+            fields: template.fields.map((fieldDef, index) => {
+              const field = createdFields[index];
+              if (!field) {
+                throw new Error(
+                  `Field at index ${index} not found in createdFields`
+                );
+              }
+              return {
+                field_id: field.id,
+                display_order: fieldDef.display_order,
+                show_on_card: fieldDef.show_on_card,
+              };
+            }),
           }),
-        }),
-      });
+        }
+      );
 
       if (!schemaResponse.ok) {
         const error = await schemaResponse.json();

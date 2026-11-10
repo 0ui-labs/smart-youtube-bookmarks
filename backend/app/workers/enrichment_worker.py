@@ -8,8 +8,10 @@ This worker handles video enrichment (captions, chapters) with:
 
 import json
 import logging
+from typing import Any
 from uuid import UUID
 
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,7 +47,7 @@ async def update_stage(
 
 
 async def publish_progress(
-    redis, user_id: str, video_id: str, progress: int, stage: str
+    redis: Redis, user_id: str, video_id: str, progress: int, stage: str
 ) -> None:
     """
     Publish import progress update via Redis Pub/Sub.
@@ -75,7 +77,7 @@ async def publish_progress(
         logger.error(f"✗ Failed to publish progress: {e}")
 
 
-async def enrich_video(ctx: dict, video_id: str) -> dict:
+async def enrich_video(ctx: dict[str, Any], video_id: str) -> dict[str, Any]:
     """
     Enrich a single video with captions, chapters, and thumbnails.
 

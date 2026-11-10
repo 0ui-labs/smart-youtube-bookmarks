@@ -30,8 +30,12 @@ async def test_bulk_assign_tags_to_videos(
     video2_id = video2_response.json()["id"]
 
     # Create 2 tags
-    tag1_response = await client.post("/api/tags", json={"name": "BulkTest1"})
-    tag2_response = await client.post("/api/tags", json={"name": "BulkTest2"})
+    tag1_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "BulkTest1"}
+    )
+    tag2_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "BulkTest2"}
+    )
     tag1_id = tag1_response.json()["id"]
     tag2_id = tag2_response.json()["id"]
 
@@ -55,7 +59,9 @@ async def test_bulk_assign_idempotency(
     video_id = str(test_video.id)
 
     # Create tag
-    tag_response = await client.post("/api/tags", json={"name": "IdempotentTag"})
+    tag_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "IdempotentTag"}
+    )
     tag_id = tag_response.json()["id"]
 
     # First bulk assign
@@ -85,7 +91,9 @@ async def test_bulk_assign_nonexistent_video(
     import uuid
 
     # Create tag
-    tag_response = await client.post("/api/tags", json={"name": "TestTag"})
+    tag_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "TestTag"}
+    )
     tag_id = tag_response.json()["id"]
 
     # Use fake video UUID
@@ -97,7 +105,7 @@ async def test_bulk_assign_nonexistent_video(
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "Some videos not found"
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -116,7 +124,7 @@ async def test_bulk_assign_nonexistent_tag(
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "Some tags not found"
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -140,12 +148,12 @@ async def test_bulk_assign_batch_too_large(
     client: AsyncClient, test_user, test_list, test_video
 ):
     """Test bulk assign rejects batches larger than 10,000 assignments."""
-    import uuid
-
-    # Create 101 fake video IDs and 101 fake tag IDs
-    # 101 × 101 = 10,201 assignments (exceeds limit)
-    fake_video_ids = [str(uuid.uuid4()) for _ in range(101)]
-    fake_tag_ids = [str(uuid.uuid4()) for _ in range(101)]
+    # Existing identities keep ownership validation independent of size validation.
+    tag = await client.post(
+        "/api/tags", json={"name": "Size test", "is_video_type": False}
+    )
+    fake_video_ids = [str(test_video.id)] * 101
+    fake_tag_ids = [tag.json()["id"]] * 101
 
     response = await client.post(
         "/api/videos/bulk/tags",
@@ -164,9 +172,15 @@ async def test_bulk_assign_partial_overlap(
     video_id = str(test_video.id)
 
     # Create 3 tags
-    tag1_response = await client.post("/api/tags", json={"name": "OverlapTag1"})
-    tag2_response = await client.post("/api/tags", json={"name": "OverlapTag2"})
-    tag3_response = await client.post("/api/tags", json={"name": "OverlapTag3"})
+    tag1_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "OverlapTag1"}
+    )
+    tag2_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "OverlapTag2"}
+    )
+    tag3_response = await client.post(
+        "/api/tags", json={"is_video_type": False, "name": "OverlapTag3"}
+    )
     tag1_id = tag1_response.json()["id"]
     tag2_id = tag2_response.json()["id"]
     tag3_id = tag3_response.json()["id"]

@@ -59,6 +59,13 @@ export const TiptapEditor = ({
         limit: maxLength,
       }),
     ],
+    editorProps: {
+      attributes: {
+        role: "textbox",
+        "aria-label": placeholder,
+        "aria-multiline": "true",
+      },
+    },
     content,
     editable: !disabled,
     onUpdate: ({ editor }) => {

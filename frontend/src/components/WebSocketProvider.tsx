@@ -11,8 +11,10 @@
  * the importProgressStore directly. This provider just ensures the hook
  * is called and the connection is active.
  */
+
 import type { ReactNode } from "react";
-import { useWebSocket } from "@/hooks/useWebSocket";
+import { useProgressConnection } from "@/hooks/useWebSocket";
+import { ProgressContext } from "@/lib/progressContext";
 
 interface WebSocketProviderProps {
   children: ReactNode;
@@ -21,9 +23,13 @@ interface WebSocketProviderProps {
 export function WebSocketProvider({ children }: WebSocketProviderProps) {
   // Establish WebSocket connection - this ensures messages are received
   // and routed to the appropriate stores (jobProgress, importProgressStore)
-  useWebSocket();
+  const progress = useProgressConnection();
 
   // Simply render children - the hook handles all the connection logic
   // and store updates. No context needed since stores are global.
-  return <>{children}</>;
+  return (
+    <ProgressContext.Provider value={progress}>
+      {children}
+    </ProgressContext.Provider>
+  );
 }

@@ -82,117 +82,58 @@ describe("CustomFieldsSection", () => {
     vi.clearAllMocks();
   });
 
-  it("renders schema sections with correct field counts", () => {
+  const showFields = (fields = mockAvailableFields) =>
     render(
       <CustomFieldsSection
-        availableFields={mockAvailableFields}
+        availableFields={fields}
         fieldValues={mockFieldValues}
         listId="list-1"
         onFieldChange={mockOnFieldChange}
         videoId="video-1"
       />
     );
-
-    // Should show "Tutorial Schema (2 Felder)"
-    expect(
-      screen.getByText(/Tutorial Schema \(2 Felder\)/)
-    ).toBeInTheDocument();
-    // Should show "Review Schema (1 Feld)"
-    expect(screen.getByText(/Review Schema \(1 Feld\)/)).toBeInTheDocument();
-    // Should show "Allgemeine Felder (1 Feld)"
-    expect(
-      screen.getByText(/Allgemeine Felder \(1 Feld\)/)
-    ).toBeInTheDocument();
+  it("renders all fields as an editable flat list", () => {
+    showFields();
+    for (const name of ["Rating", "Quality", "Notes", "Recommended"]) {
+      expect(screen.getByText(name)).toBeVisible();
+    }
+    expect(screen.getAllByTestId(/^field-display-/)).toHaveLength(4);
   });
-
-  it("groups fields by schema_name correctly", () => {
-    render(
-      <CustomFieldsSection
-        availableFields={mockAvailableFields}
-        fieldValues={mockFieldValues}
-        listId="list-1"
-        onFieldChange={mockOnFieldChange}
-        videoId="video-1"
-      />
-    );
-
-    // Tutorial Schema should have Rating and Quality
-    expect(screen.getByText("Rating")).toBeInTheDocument();
-    expect(screen.getByText("Quality")).toBeInTheDocument();
-
-    // Review Schema should have Notes
-    expect(screen.getByText("Notes")).toBeInTheDocument();
-
-    // Allgemeine Felder should have Recommended
-    expect(screen.getByText("Recommended")).toBeInTheDocument();
-  });
-
-  it('renders "Allgemeine Felder" for fields without schema_name', () => {
-    render(
-      <CustomFieldsSection
-        availableFields={mockAvailableFields}
-        fieldValues={mockFieldValues}
-        listId="list-1"
-        onFieldChange={mockOnFieldChange}
-        videoId="video-1"
-      />
-    );
-
+  it("sorts fields by display order across schemas", () => {
+    showFields();
     expect(
-      screen.getByText(/Allgemeine Felder \(1 Feld\)/)
-    ).toBeInTheDocument();
+      screen
+        .getAllByTestId(/^field-display-/)
+        .map((node) => node.dataset.testid)
+    ).toEqual([
+      "field-display-field-1",
+      "field-display-field-3",
+      "field-display-field-4",
+      "field-display-field-2",
+    ]);
   });
-
-  it("all schemas expanded by default (openSchemas empty = all open)", () => {
-    render(
-      <CustomFieldsSection
-        availableFields={mockAvailableFields}
-        fieldValues={mockFieldValues}
-        listId="list-1"
-        onFieldChange={mockOnFieldChange}
-        videoId="video-1"
-      />
-    );
-
-    // All fields should be visible (CollapsibleContent expanded)
-    expect(screen.getByText("Rating")).toBeVisible();
-    expect(screen.getByText("Quality")).toBeVisible();
-    expect(screen.getByText("Notes")).toBeVisible();
+  it("does not mutate the query cache array when sorting", () => {
+    const fields = Object.freeze([...mockAvailableFields].reverse());
+    const original = [...fields];
+    showFields(fields as unknown as AvailableFieldResponse[]);
+    expect(fields).toEqual(original);
+  });
+  it("renders fields without a schema", () => {
+    showFields([mockAvailableFields[3]]);
     expect(screen.getByText("Recommended")).toBeVisible();
-
-    // Check that 3 schema sections exist
-    expect(
-      screen.getByText(/Tutorial Schema \(2 Felder\)/)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Review Schema \(1 Feld\)/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Allgemeine Felder \(1 Feld\)/)
-    ).toBeInTheDocument();
   });
-
-  it("collapsible toggle works (ChevronDown ↔ ChevronUp)", () => {
-    render(
-      <CustomFieldsSection
-        availableFields={mockAvailableFields}
-        fieldValues={mockFieldValues}
-        listId="list-1"
-        onFieldChange={mockOnFieldChange}
-        videoId="video-1"
-      />
-    );
-
-    // Find Tutorial Schema button
-    const tutorialButton = screen.getByText(/Tutorial Schema \(2 Felder\)/);
-
-    // Click to collapse
-    fireEvent.click(tutorialButton);
-
-    // Fields should not be visible (collapsed)
-    // Note: Testing library may still render hidden elements, so we check CSS classes instead
-    const tutorialSection = tutorialButton.closest("[data-state]");
-    expect(tutorialSection).toBeTruthy();
+  it("updates every rendered field using its own identity", () => {
+    showFields();
+    screen
+      .getAllByText("Change Value")
+      .forEach((button) => fireEvent.click(button));
+    expect(mockOnFieldChange.mock.calls.map((call) => call[0])).toEqual([
+      "field-1",
+      "field-3",
+      "field-4",
+      "field-2",
+    ]);
   });
-
   it("FieldDisplay receives correct props (fieldValue, readonly, onChange)", () => {
     render(
       <CustomFieldsSection
@@ -232,38 +173,6 @@ describe("CustomFieldsSection", () => {
     expect(mockOnFieldChange).toHaveBeenCalledWith("field-1", 5);
   });
 
-  it("alphabetically sorts schema sections", () => {
-    render(
-      <CustomFieldsSection
-        availableFields={mockAvailableFields}
-        fieldValues={mockFieldValues}
-        listId="list-1"
-        onFieldChange={mockOnFieldChange}
-        videoId="video-1"
-      />
-    );
-
-    // Get all buttons and filter schema section buttons
-    const allButtons = screen.getAllByRole("button");
-    const headings = allButtons.filter((btn) => {
-      const text = btn.textContent || "";
-      return text.includes("Felder") || text.includes("Feld");
-    });
-
-    // Extract schema names from headings (just the name part before the count)
-    const schemaNames = headings.map((h) => {
-      const text = h.textContent || "";
-      return text.split(" (")[0];
-    });
-
-    // Should be sorted alphabetically: Allgemeine Felder, Review Schema, Tutorial Schema
-    expect(schemaNames).toEqual([
-      "Allgemeine Felder",
-      "Review Schema",
-      "Tutorial Schema",
-    ]);
-  });
-
   it("renders empty state when no fields available", () => {
     render(
       <CustomFieldsSection
@@ -276,7 +185,7 @@ describe("CustomFieldsSection", () => {
     );
 
     expect(
-      screen.getByText("Keine benutzerdefinierten Felder verfügbar.")
+      screen.getByText("Keine Informationen verfügbar.")
     ).toBeInTheDocument();
   });
 
@@ -347,8 +256,11 @@ describe("CustomFieldsSection", () => {
 
     // Check that fields are rendered in display_order (First before Second)
     // The field labels are rendered as "Field: First" and "Field: Second" in the mock
-    const allText = screen.getByText(/Test Schema/);
-    expect(allText).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByTestId(/^field-display-/)
+        .map((node) => node.dataset.testid)
+    ).toEqual(["field-display-field-2", "field-display-field-1"]);
 
     // Verify both fields exist
     expect(screen.getByText("First")).toBeInTheDocument();

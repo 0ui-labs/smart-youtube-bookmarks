@@ -73,6 +73,8 @@ class GeminiClient:
 
         self.api_key = api_key.strip()
         self.model = model
+        if max_retries < 1:
+            raise ValueError("max_retries must be positive")
         self.max_retries = max_retries
         self.base_delay = base_delay
 
@@ -140,7 +142,7 @@ class GeminiClient:
                 parsed_result = response.parsed
 
                 # Return parsed data as Pydantic model
-                return parsed_result
+                return schema_model.model_validate(parsed_result)
 
             except Exception as e:
                 logger.warning(
@@ -155,7 +157,7 @@ class GeminiClient:
                 delay = min((2**attempt) * self.base_delay + random.uniform(0, 1), 60)
                 await asyncio.sleep(delay)
 
-        # Unreachable: loop exits via return (success) or raise (final failure)
+        raise RuntimeError("Extraction exhausted without a result")
 
     async def count_tokens(self, text: str) -> int:
         """
@@ -179,7 +181,7 @@ class GeminiClient:
             model=self.model,
             contents=text,
         )
-        return result.total_tokens
+        return int(result.total_tokens or 0)
 
     def _build_extraction_prompt(
         self, transcript: str, schema_model: type[BaseModel]

@@ -437,7 +437,7 @@ async def test_delete_nonexistent_association(
     )
 
     assert response.status_code == 404
-    assert "not found in this schema" in response.json()["detail"]
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio

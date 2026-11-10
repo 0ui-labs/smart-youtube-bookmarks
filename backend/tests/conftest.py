@@ -1,4 +1,4 @@
-import asyncio
+import os
 from datetime import UTC
 from unittest.mock import AsyncMock, patch
 
@@ -10,43 +10,55 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.test_database import (
+    isolated_test_connect_args,
+    validated_test_database_url,
+)
 from app.main import app
 from app.models import Base
 from app.models.list import BookmarkList
 from app.models.user import User
 from app.models.video import Video
 
+
 # Test database URL
 # Replace the database name in the URL with _test suffix
-TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/youtube_bookmarks_test"
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """
-    Create an event loop for the test session.
-
-    This fixture overrides the default pytest-asyncio event loop fixture
-    to use session scope, allowing session-scoped async fixtures.
-    """
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+def safe_test_database_url():
+    return validated_test_database_url(
+        os.environ.get("TEST_DATABASE_URL"), settings.database_url
+    )
 
 
 @pytest.fixture(scope="session")
 async def test_engine():
-    """Create test database engine."""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    yield engine
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
+    """Protect the dedicated database against overlapping destructive suites."""
+    engine = create_async_engine(
+        safe_test_database_url(),
+        echo=False,
+        poolclass=NullPool,
+        connect_args=isolated_test_connect_args(safe_test_database_url()),
+    )
+    async with engine.connect() as suite_lock:
+        acquired = await suite_lock.scalar(
+            text("SELECT pg_try_advisory_lock(hashtextextended(current_database(), 1))")
+        )
+        if not acquired:
+            await engine.dispose()
+            raise RuntimeError("Another test suite already owns TEST_DATABASE_URL")
+        try:
+            async with engine.begin() as conn:
+                safe_test_database_url()
+                await conn.run_sync(Base.metadata.create_all)
+            yield engine
+            async with engine.begin() as conn:
+                safe_test_database_url()
+                await conn.run_sync(Base.metadata.drop_all)
+        finally:
+            await suite_lock.execute(
+                text(
+                    "SELECT pg_advisory_unlock(hashtextextended(current_database(), 1))"
+                )
+            )
     await engine.dispose()
 
 
@@ -60,17 +72,13 @@ async def test_db(test_engine):
     async with TestSessionLocal() as session:
         try:
             yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
         finally:
+            await session.rollback()
             # Clean up all data after each test to ensure isolation
             # Disable foreign key checks, truncate all tables, re-enable
-            await session.execute(text("SET session_replication_role = 'replica'"))
+            safe_test_database_url()
             for table in reversed(Base.metadata.sorted_tables):
                 await session.execute(text(f'TRUNCATE TABLE "{table.name}" CASCADE'))
-            await session.execute(text("SET session_replication_role = 'origin'"))
             await session.commit()
             await session.close()
 
@@ -87,6 +95,7 @@ async def mock_arq_pool():
 async def mock_redis_client():
     """Mock Redis client to avoid Redis connection in tests."""
     mock_redis = AsyncMock()
+    mock_redis.get.return_value = None
     mock_pubsub = AsyncMock()
     mock_pubsub.subscribe = AsyncMock()
     mock_pubsub.unsubscribe = AsyncMock()
@@ -96,13 +105,52 @@ async def mock_redis_client():
 
 
 @pytest.fixture
-async def client(test_db, mock_arq_pool, mock_redis_client):
+async def client(test_db, mock_arq_pool, mock_redis_client, monkeypatch):
     """Create test client with database override and mocked ARQ/Redis."""
 
-    async def override_get_db():
+    from fastapi import Request
+    from sqlalchemy import select
+
+    from app.core.database import get_public_db
+    from app.services.access_service import validate_request_references
+
+    async def override_get_db(request: Request):
+        # Legacy unit tests explicitly simulate a principal. The signed-session
+        # matrix uses isolated_api and never installs this dependency override.
+        from uuid import UUID
+
+        test_db.info.pop("user", None)
+        identity = request.query_params.get("user_id")
+        if not identity and request.headers.get("content-type", "").startswith(
+            "application/json"
+        ):
+            try:
+                identity = (await request.json()).get("user_id")
+            except (ValueError, AttributeError):
+                pass
+        statement = select(User)
+        if identity:
+            statement = statement.where(User.id == UUID(identity))
+        user = (await test_db.execute(statement)).scalars().first()
+        if user is None:
+            user = User(
+                email="synthetic-unit-principal@test.invalid", hashed_password="!test"
+            )
+            test_db.add(user)
+            await test_db.commit()
+        test_db.info["user"] = user
+        try:
+            await validate_request_references(request, test_db)
+            yield test_db
+        finally:
+            test_db.info.pop("user", None)
+
+    async def override_public_db():
         yield test_db
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_public_db] = override_public_db
+    monkeypatch.setattr(settings, "youtube_api_key", "synthetic-offline-test-key")
 
     # Mock both get_arq_pool and get_redis_client to avoid Redis connection
     # FIX: Patch at all import locations including app.core.redis for app startup
@@ -110,9 +158,27 @@ async def client(test_db, mock_arq_pool, mock_redis_client):
     # at the source module (app.core.redis) in addition to where it's imported.
     with (
         patch("app.core.redis.get_arq_pool", return_value=mock_arq_pool),
-        patch("app.api.videos.get_arq_pool", return_value=mock_arq_pool),
-        patch("app.api.processing.get_arq_pool", return_value=mock_arq_pool),
         patch("app.core.redis.get_redis_client", return_value=mock_redis_client),
+        patch(
+            "app.services.video_creation_service.get_redis_client",
+            return_value=mock_redis_client,
+        ),
+        patch("app.api.subscriptions.get_redis_client", return_value=mock_redis_client),
+        patch(
+            "app.clients.youtube.YouTubeClient.get_video_metadata",
+            new_callable=AsyncMock,
+            return_value={
+                "title": "Synthetic video",
+                "channel": "Synthetic channel",
+                "duration": "PT3M",
+                "published_at": "2026-01-01T00:00:00Z",
+            },
+        ),
+        patch(
+            "app.clients.youtube.YouTubeClient.get_channel_info",
+            new_callable=AsyncMock,
+            return_value={"thumbnail_url": None, "description": None},
+        ),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -290,3 +356,25 @@ async def reset_redis_singleton():
         except Exception:
             pass
         redis_module._arq_pool = None
+
+
+@pytest.fixture(autouse=True)
+def reject_application_database_connections():
+    """Also block accidental app-engine use outside the injected HTTP session."""
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine, make_url
+
+    def guard_connection(dialect, connection_record, cargs, cparams):
+        target = make_url(safe_test_database_url())
+        if (
+            cparams.get("database"),
+            cparams.get("port", 5432),
+            cparams.get("host", "localhost"),
+        ) != (target.database, target.port or 5432, target.host or "localhost"):
+            raise RuntimeError("Test attempted connection outside TEST_DATABASE_URL")
+
+    event.listen(Engine, "do_connect", guard_connection)
+    try:
+        yield
+    finally:
+        event.remove(Engine, "do_connect", guard_connection)

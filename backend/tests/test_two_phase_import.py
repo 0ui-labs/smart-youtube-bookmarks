@@ -16,8 +16,11 @@ async def test_video_created_with_initial_import_state(client, test_list):
     """Test that new video has import_stage='created' and import_progress=0."""
     # Arrange: Mock YouTube client to simulate metadata fetch failure
     with (
-        patch("app.api.videos.get_redis_client", new_callable=AsyncMock) as mock_redis,
-        patch("app.api.videos.YouTubeClient") as mock_yt_class,
+        patch(
+            "app.services.video_creation_service.get_redis_client",
+            new_callable=AsyncMock,
+        ) as mock_redis,
+        patch("app.services.video_creation_service.YouTubeClient") as mock_yt_class,
     ):
         mock_redis.return_value = AsyncMock()
         mock_yt = AsyncMock()
@@ -42,8 +45,11 @@ async def test_video_created_with_initial_import_state(client, test_list):
 async def test_video_has_thumbnail_immediately(client, test_list):
     """Test that video has thumbnail URL even before metadata fetch."""
     with (
-        patch("app.api.videos.get_redis_client", new_callable=AsyncMock) as mock_redis,
-        patch("app.api.videos.YouTubeClient") as mock_yt_class,
+        patch(
+            "app.services.video_creation_service.get_redis_client",
+            new_callable=AsyncMock,
+        ) as mock_redis,
+        patch("app.services.video_creation_service.YouTubeClient") as mock_yt_class,
     ):
         mock_redis.return_value = AsyncMock()
         mock_yt = AsyncMock()
@@ -66,8 +72,11 @@ async def test_video_has_thumbnail_immediately(client, test_list):
 async def test_successful_metadata_fetch_sets_metadata_stage(client, test_list):
     """Test that successful sync metadata fetch sets import_stage='metadata'."""
     with (
-        patch("app.api.videos.get_redis_client", new_callable=AsyncMock) as mock_redis,
-        patch("app.api.videos.YouTubeClient") as mock_yt_class,
+        patch(
+            "app.services.video_creation_service.get_redis_client",
+            new_callable=AsyncMock,
+        ) as mock_redis,
+        patch("app.services.video_creation_service.YouTubeClient") as mock_yt_class,
     ):
         mock_redis.return_value = AsyncMock()
         mock_yt = AsyncMock()

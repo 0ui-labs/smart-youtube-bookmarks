@@ -1,16 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { server } from "@/test/mocks/server";
 import type { Tag } from "@/types/tag";
 import { ConfirmDeleteTagDialog } from "./ConfirmDeleteTagDialog";
 
@@ -25,13 +17,15 @@ const mockTag: Tag = {
   updated_at: "2025-11-18T10:00:00Z",
 };
 
-const server = setupServer(
-  http.delete("/api/tags/:tagId", () => new HttpResponse(null, { status: 204 }))
-);
+const handlers = [
+  http.delete(
+    "/api/tags/:tagId",
+    () => new HttpResponse(null, { status: 204 })
+  ),
+];
 
-beforeAll(() => server.listen());
+beforeEach(() => server.use(...handlers));
 afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 const createWrapper = () => {
   const queryClient = new QueryClient({

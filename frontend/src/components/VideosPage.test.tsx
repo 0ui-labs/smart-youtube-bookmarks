@@ -143,23 +143,25 @@ vi.mock("@/hooks/useCustomFields", () => ({
   })),
 }));
 
-vi.mock("@/stores/tableSettingsStore", () => ({
-  useTableSettingsStore: vi.fn((selector) => {
-    const state = {
-      visibleColumns: {
-        thumbnail: true,
-        title: true,
-        duration: true,
-        actions: true,
-      },
-      thumbnailSize: "medium",
-      viewMode: "list",
-      setViewMode: vi.fn(),
-      gridColumns: 3,
-    };
-    return selector ? selector(state) : state;
-  }),
-}));
+vi.mock("@/stores/tableSettingsStore", () => {
+  const state = {
+    visibleColumns: {
+      thumbnail: true,
+      title: true,
+      duration: true,
+      actions: true,
+    },
+    thumbnailSize: "medium",
+    viewMode: "list",
+    setViewMode: vi.fn(),
+    gridColumns: 3,
+  };
+  return {
+    useTableSettingsStore: vi.fn((selector) =>
+      selector ? selector(state) : state
+    ),
+  };
+});
 
 vi.mock("@/hooks/useWebSocket", () => ({
   useWebSocket: vi.fn(() => ({

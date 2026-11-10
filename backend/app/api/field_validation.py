@@ -44,7 +44,7 @@ class FieldValidationError(ValueError):
 
 
 def validate_field_value(
-    value: Any, field_type: str, config: dict, field_name: str = "(unnamed)"
+    value: Any, field_type: str, config: dict[str, Any], field_name: str = "(unnamed)"
 ) -> None:
     """
     Validate field value against field type and configuration.

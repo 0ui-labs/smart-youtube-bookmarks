@@ -92,7 +92,9 @@ async def search_transcripts(
     total = total_result.scalar() or 0
 
     # Apply ordering, limit, and offset
-    results_query = base_query.order_by(rank.desc()).limit(limit).offset(offset)
+    results_query = (
+        base_query.order_by(rank.desc(), Video.id).limit(limit).offset(offset)
+    )
 
     result = await db.execute(results_query)
     rows = result.all()

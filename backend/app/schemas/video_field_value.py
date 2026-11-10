@@ -83,8 +83,8 @@ class BatchUpdateFieldValuesRequest(BaseModel):
         Raises:
             ValueError: If duplicate field_id found
         """
-        seen: set = set()
-        duplicates: set = set()
+        seen: set[UUID] = set()
+        duplicates: set[UUID] = set()
         for update in v:
             if update.field_id in seen:
                 duplicates.add(update.field_id)

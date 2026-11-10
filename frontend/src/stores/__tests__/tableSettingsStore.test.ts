@@ -34,9 +34,9 @@ describe("tableSettingsStore", () => {
       });
     });
 
-    it('should have default view mode of "list"', () => {
+    it('should have default view mode of "grid"', () => {
       const { result } = renderHook(() => useTableSettingsStore());
-      expect(result.current.viewMode).toBe("list");
+      expect(result.current.viewMode).toBe("grid");
     });
 
     it("should have default grid columns of 3", () => {

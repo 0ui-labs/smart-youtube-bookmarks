@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { videoKeys } from "@/lib/videoKeys";
 import type { VideoResponse } from "@/types/video";
 
 /**
@@ -22,18 +24,12 @@ import type { VideoResponse } from "@/types/video";
  */
 export const useVideoDetail = (videoId: string | null, enabled = true) => {
   return useQuery<VideoResponse>({
-    queryKey: ["video-detail", videoId],
+    queryKey: videoKeys.detail(videoId),
     queryFn: async () => {
       if (!videoId) throw new Error("Video ID is required");
 
-      const response = await fetch(`/api/videos/${videoId}`);
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to fetch video details");
-      }
-
-      return response.json();
+      const { data } = await api.get<VideoResponse>(`/videos/${videoId}`);
+      return data;
     },
     enabled: enabled && !!videoId,
     // Cache for 5 minutes

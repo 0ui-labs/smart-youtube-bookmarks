@@ -12,61 +12,20 @@ import json
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from sqlalchemy import select
 
 from app.api.deps import get_current_ws_user
-from app.core.config import settings
-from app.core.database import AsyncSessionLocal
 from app.core.redis import get_redis_client
-from app.models.user import User
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-async def get_default_user() -> User | None:
-    """Get the first user for development mode (no auth)."""
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(User).limit(1))
-        return result.scalar_one_or_none()
-
-
 @router.websocket("/ws/progress")
-async def websocket_progress_endpoint(
-    websocket: WebSocket,
-    token: str | None = None,
-):
-    """
-    WebSocket endpoint for real-time progress updates.
-
-    Authenticates via token query parameter OR uses first user in dev mode.
-    Subscribes to user-specific Redis channel and forwards progress messages.
-
-    Args:
-        websocket: WebSocket connection
-        token: Optional JWT authentication token (query parameter)
-
-    Flow:
-        1. Authenticate user via JWT token OR use default user (dev mode)
-        2. Accept WebSocket connection
-        3. Subscribe to Redis channel: progress:user:{user_id}
-        4. Forward all messages from Redis to WebSocket client
-        5. Handle disconnection and cleanup
-    """
-    # Authenticate or get default user
-    if token:
-        user = await get_current_ws_user(websocket, token)
-    elif settings.env != "production":
-        # Development mode: use first user
-        user = await get_default_user()
-        if not user:
-            logger.error("No users found in database for WebSocket connection")
-            await websocket.close(code=1008)
-            return
-        logger.warning(f"WebSocket using default user (no auth): {user.id}")
-    else:
-        logger.error("WebSocket connection without token in production")
-        await websocket.close(code=1008)
+async def websocket_progress_endpoint(websocket: WebSocket) -> None:
+    user = await get_current_ws_user(
+        websocket, websocket.scope.get("connection_ticket")
+    )
+    if user is None:
         return
 
     # Accept connection after authentication
@@ -86,7 +45,7 @@ async def websocket_progress_endpoint(
     # Flag to signal shutdown to both tasks
     shutdown_event = asyncio.Event()
 
-    async def handle_redis_messages():
+    async def handle_redis_messages() -> None:
         """Listen for progress updates from Redis and forward to WebSocket."""
         try:
             await pubsub.subscribe(channel)
@@ -127,7 +86,7 @@ async def websocket_progress_endpoint(
         finally:
             shutdown_event.set()
 
-    async def handle_websocket_messages():
+    async def handle_websocket_messages() -> None:
         """Listen for client messages (ping/pong heartbeat, auth)."""
         try:
             while not shutdown_event.is_set():
@@ -152,7 +111,7 @@ async def websocket_progress_endpoint(
                     # Log unknown message types for debugging
                     logger.debug(f"Received unknown message type: {msg_type}")
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # No message received, check shutdown and continue
                     continue
                 except json.JSONDecodeError:
@@ -166,20 +125,22 @@ async def websocket_progress_endpoint(
         finally:
             shutdown_event.set()
 
+    tasks = [
+        asyncio.create_task(handle_redis_messages()),
+        asyncio.create_task(handle_websocket_messages()),
+    ]
     try:
-        # Run both handlers concurrently
-        # When either exits, the other will be cancelled
-        await asyncio.gather(
-            handle_redis_messages(),
-            handle_websocket_messages(),
-        )
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected for user {user.id}")
     except Exception as e:
         logger.error(f"WebSocket error for user {user.id}: {e}")
     finally:
-        # Cleanup: unsubscribe and close pubsub
+        # Either reader finishing must also stop a blocked Redis listen call.
         shutdown_event.set()
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         try:
             await pubsub.unsubscribe(channel)
             await pubsub.close()

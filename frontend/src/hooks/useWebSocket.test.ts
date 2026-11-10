@@ -1,6 +1,8 @@
 import { act, renderHook } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useWebSocket } from "./useWebSocket";
+import { api } from "@/lib/api";
+import { useProgressConnection as useWebSocket } from "./useWebSocket";
 
 // Mock react-use-websocket
 let mockLastJsonMessage: any = null;
@@ -13,6 +15,7 @@ let mockUrl: string | null = null;
 vi.mock("react-use-websocket", () => {
   return {
     default: (url: string | null, options: any) => {
+      const [, setTick] = useState(0);
       mockUrl = url;
 
       // Store callbacks
@@ -28,6 +31,7 @@ vi.mock("react-use-websocket", () => {
         if (url && mockReadyState === 0) {
           mockReadyState = 1; // OPEN
           mockOnOpenCallback?.();
+          setTick((tick) => tick + 1);
         }
       }, 0);
 
@@ -113,19 +117,20 @@ describe("useWebSocket", () => {
       expect(result.current.isConnected).toBe(true);
     });
 
-    it("sends auth message AFTER connection opens", async () => {
-      const { result } = renderHook(() => useWebSocket());
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
-
-      // Should have called sendJsonMessage with auth message
-      expect(mockSendJsonMessage).toHaveBeenCalledWith({
-        type: "auth",
-        token: "test-token-123",
-      });
-      expect(result.current.isConnected).toBe(true);
+    it("uses fresh one-use tickets without sending a bearer message", async () => {
+      const post = vi
+        .spyOn(api, "post")
+        .mockResolvedValueOnce({ data: { ticket: "ticket-a" } })
+        .mockResolvedValueOnce({ data: { ticket: "ticket-b" } });
+      renderHook(() => useWebSocket());
+      const getUrl = mockUrl as unknown as () => Promise<string>;
+      expect(await getUrl()).toContain("ticket=ticket-a");
+      expect(await getUrl()).toContain("ticket=ticket-b");
+      expect(post).toHaveBeenNthCalledWith(1, "/auth/ws-ticket");
+      expect(mockSendJsonMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: "auth" })
+      );
+      post.mockRestore();
     });
 
     it("updates authStatus to authenticated on auth confirmation", async () => {
@@ -502,7 +507,7 @@ describe("useWebSocket", () => {
         .getState()
         .getProgress("video-123");
       expect(storeProgress).toBeDefined();
-      expect(storeProgress?.progress).toBe(60);
+      expect(storeProgress?.realProgress).toBe(60);
       expect(storeProgress?.stage).toBe("captions");
     });
 
@@ -546,8 +551,8 @@ describe("useWebSocket", () => {
 
       // Both videos should be tracked
       const store = useImportProgressStore.getState();
-      expect(store.getProgress("video-1")?.progress).toBe(25);
-      expect(store.getProgress("video-2")?.progress).toBe(90);
+      expect(store.getProgress("video-1")?.realProgress).toBe(25);
+      expect(store.getProgress("video-2")?.realProgress).toBe(90);
     });
 
     it("clears import progress when stage is complete", async () => {
@@ -614,18 +619,10 @@ describe("useWebSocket", () => {
       expect(result.current.isConnected).toBe(true);
     });
 
-    it("handles missing token gracefully and sets auth status to failed", async () => {
-      localStorage.clear(); // No token
-
-      const { result } = renderHook(() => useWebSocket());
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
-
-      // Should not connect without token
-      expect(result.current.isConnected).toBe(false);
-      expect(mockUrl).toBeNull(); // react-use-websocket called with null URL
+    it("provides a ticket URL factory regardless of legacy localStorage tokens", () => {
+      localStorage.removeItem("token");
+      renderHook(() => useWebSocket());
+      expect(typeof mockUrl).toBe("function");
     });
 
     it("sets historyError when history API fails", async () => {

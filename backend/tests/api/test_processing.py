@@ -88,7 +88,7 @@ async def test_get_job_status_not_found(client):
     fake_job_id = str(uuid4())
     response = await client.get(f"/api/jobs/{fake_job_id}")
     assert response.status_code == 404
-    assert response.json()["detail"] == "Job not found"
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -123,7 +123,7 @@ async def test_pause_job_not_found(client):
     fake_job_id = str(uuid4())
     response = await client.post(f"/api/jobs/{fake_job_id}/pause")
     assert response.status_code == 404
-    assert response.json()["detail"] == "Job not found"
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -380,6 +380,6 @@ async def test_get_progress_history_unauthorized(client, test_db, test_user, tes
         params={"user_id": str(test_user.id)},
     )
 
-    # Should return 403 Forbidden
-    assert response.status_code == 403
-    assert response.json()["detail"] == "Not authorized to access this job"
+    # Foreign and absent resources have the same 404 contract
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Resource not found"

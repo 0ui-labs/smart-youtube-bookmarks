@@ -1,16 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { server } from "@/test/mocks/server";
 import type { Tag } from "@/types/tag";
 import { EditTagDialog } from "./EditTagDialog";
 
@@ -46,7 +38,7 @@ const mockSchemas = [
   },
 ];
 
-const server = setupServer(
+const handlers = [
   http.put("/api/tags/:tagId", async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({
@@ -57,12 +49,11 @@ const server = setupServer(
         body.schema_id !== undefined ? body.schema_id : mockTag.schema_id,
     });
   }),
-  http.get("/api/lists/:listId/schemas", () => HttpResponse.json(mockSchemas))
-);
+  http.get("/api/lists/:listId/schemas", () => HttpResponse.json(mockSchemas)),
+];
 
-beforeAll(() => server.listen());
+beforeEach(() => server.use(...handlers));
 afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -105,9 +96,11 @@ describe("EditTagDialog", () => {
 
     const nameInput = screen.getByLabelText(/name/i);
     fireEvent.change(nameInput, { target: { value: "" } });
-    fireEvent.click(screen.getByText("Save"));
+    fireEvent.click(screen.getByText("Speichern"));
 
-    expect(await screen.findByText(/name is required/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Name ist erforderlich/i)
+    ).toBeInTheDocument();
   });
 
   it("shows validation error for invalid color hex", async () => {
@@ -128,10 +121,10 @@ describe("EditTagDialog", () => {
     );
     if (textColorInput) {
       fireEvent.change(textColorInput, { target: { value: "invalid" } });
-      fireEvent.click(screen.getByText("Save"));
+      fireEvent.click(screen.getByText("Speichern"));
 
       expect(
-        await screen.findByText(/invalid color format/i)
+        await screen.findByText(/Ungültiges Farbformat/i)
       ).toBeInTheDocument();
     }
   });
@@ -150,7 +143,7 @@ describe("EditTagDialog", () => {
 
     const nameInput = screen.getByLabelText(/name/i);
     fireEvent.change(nameInput, { target: { value: "Updated Name" } });
-    fireEvent.click(screen.getByText("Save"));
+    fireEvent.click(screen.getByText("Speichern"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
@@ -176,13 +169,13 @@ describe("EditTagDialog", () => {
 
     const nameInput = screen.getByLabelText(/name/i);
     fireEvent.change(nameInput, { target: { value: "Updated Name" } });
-    fireEvent.click(screen.getByText("Save"));
+    fireEvent.click(screen.getByText("Speichern"));
 
     // Should show loading text
-    expect(await screen.findByText("Saving...")).toBeInTheDocument();
+    expect(await screen.findByText("Speichert...")).toBeInTheDocument();
   });
 
-  it("displays schema dropdown with No Schema option", async () => {
+  it("shows the field editor empty state when no schema is assigned", async () => {
     render(
       <EditTagDialog
         listId="list-1"
@@ -193,10 +186,7 @@ describe("EditTagDialog", () => {
       { wrapper: createWrapper() }
     );
 
-    // The Select component should show "No Schema" as the default value
-    // Find it within the select trigger button
-    const selectTrigger = screen.getByRole("combobox");
-    expect(selectTrigger).toHaveTextContent("No Schema");
+    expect(screen.getByText(/Keine Felder konfiguriert/)).toBeInTheDocument();
   });
 
   it("resets form when dialog closes", async () => {
@@ -263,7 +253,7 @@ describe("EditTagDialog", () => {
 
     const nameInput = screen.getByLabelText(/name/i);
     fireEvent.change(nameInput, { target: { value: "Duplicate Name" } });
-    fireEvent.click(screen.getByText("Save"));
+    fireEvent.click(screen.getByText("Speichern"));
 
     // Should show error message and NOT close
     await waitFor(() => {

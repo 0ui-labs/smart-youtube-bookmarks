@@ -24,7 +24,8 @@ def test_worker_has_lifecycle_hooks():
 def test_worker_has_registered_functions():
     """Test worker has process_video function registered."""
     assert len(WorkerSettings.functions) > 0
-    assert WorkerSettings.functions[0].__name__ == "process_video"
+    names = {function.name for function in WorkerSettings.functions}
+    assert {"process_video", "run_durable_job", "dispatch_outbox"} <= names
 
 
 @pytest.mark.asyncio

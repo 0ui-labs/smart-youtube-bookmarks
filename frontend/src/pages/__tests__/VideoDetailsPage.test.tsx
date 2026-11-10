@@ -169,3 +169,8 @@ describe("VideoDetailsPage Integration with VideoPlayer", () => {
     );
   });
 });
+
+vi.mock("@/hooks/useVideoEnrichment", () => ({
+  useVideoEnrichment: () => ({ data: null, isLoading: false, error: null }),
+  useRetryEnrichment: () => ({ mutate: vi.fn(), isPending: false }),
+}));

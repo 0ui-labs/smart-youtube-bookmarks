@@ -1,0 +1,260 @@
+"""Stable collection-wide ordering and bounded hydration on PostgreSQL."""
+
+from datetime import UTC, datetime
+from uuid import uuid4
+
+from sqlalchemy import insert
+
+from app.models import Tag, Video
+from app.models.tag import video_tags
+
+
+async def test_all_pages_reachable_with_stable_tie_breaker(client, test_db, test_list):
+    identities = [uuid4() for _ in range(103)]
+    await test_db.execute(
+        insert(Video),
+        [
+            {
+                "id": identity,
+                "list_id": test_list.id,
+                "youtube_id": f"v{index:010d}",
+                "title": "Same title",
+                "created_at": datetime(2026, 1, 1, tzinfo=UTC),
+            }
+            for index, identity in enumerate(identities)
+        ],
+    )
+    await test_db.commit()
+    received = []
+    for offset, expected in [(0, 50), (50, 50), (100, 3)]:
+        response = await client.get(
+            f"/api/lists/{test_list.id}/videos/page",
+            params={"offset": offset, "sort_by": "title"},
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert (data["total"], data["offset"], data["limit"]) == (103, offset, 50)
+        assert len(data["items"]) == expected
+        received.extend(item["id"] for item in data["items"])
+    assert received == sorted(str(identity) for identity in identities)
+    assert len(set(received)) == 103
+
+
+async def test_page_bounds_and_legacy_limit(client, test_db, test_list):
+    await test_db.execute(
+        insert(Video),
+        [
+            {"list_id": test_list.id, "youtube_id": f"v{index:010d}"}
+            for index in range(105)
+        ],
+    )
+    await test_db.commit()
+    for parameters in [{"limit": 101}, {"limit": 0}, {"offset": -1}]:
+        assert (
+            await client.get(
+                f"/api/lists/{test_list.id}/videos/page", params=parameters
+            )
+        ).status_code == 422
+    response = await client.get(f"/api/lists/{test_list.id}/videos")
+    assert len(response.json()) <= 100
+    maximum = (
+        await client.get(
+            f"/api/lists/{test_list.id}/videos/page", params={"limit": 100}
+        )
+    ).json()
+    assert len(maximum["items"]) == 100
+
+
+async def test_filter_count_covers_entire_collection(
+    client, test_db, test_list, test_user
+):
+    tag = Tag(user_id=test_user.id, name="Selected")
+    test_db.add(tag)
+    await test_db.flush()
+    identities = [uuid4() for _ in range(120)]
+    await test_db.execute(
+        insert(Video),
+        [
+            {
+                "id": identity,
+                "list_id": test_list.id,
+                "youtube_id": f"v{index:010d}",
+                "duration": index,
+            }
+            for index, identity in enumerate(identities)
+        ],
+    )
+    await test_db.execute(
+        insert(video_tags),
+        [
+            {"video_id": identity, "tag_id": tag.id}
+            for index, identity in enumerate(identities)
+            if index % 2 == 0
+        ],
+    )
+    await test_db.commit()
+    response = await client.post(
+        f"/api/lists/{test_list.id}/videos/filter/page?offset=50&limit=10",
+        json={"tags": ["selected"], "sort_by": "duration", "sort_order": "desc"},
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["total"] == 60
+    assert [item["duration"] for item in data["items"]] == list(range(18, -1, -2))
+
+
+async def test_duplicate_lookup_reaches_records_outside_first_page(
+    client, test_db, test_list
+):
+    await test_db.execute(
+        insert(Video),
+        [
+            {"list_id": test_list.id, "youtube_id": f"v{index:010d}"}
+            for index in range(150)
+        ],
+    )
+    await test_db.commit()
+    response = await client.post(
+        f"/api/lists/{test_list.id}/videos/lookup",
+        json={"youtube_ids": ["v0000000149", "not-present"]},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"existing_youtube_ids": ["v0000000149"]}
+    too_many = await client.post(
+        f"/api/lists/{test_list.id}/videos/lookup",
+        json={"youtube_ids": ["synthetic"] * 101},
+    )
+    assert too_many.status_code == 422
+
+
+async def test_import_status_is_bounded_and_scoped(client, test_db, test_list):
+    identities = [uuid4() for _ in range(101)]
+    await test_db.execute(
+        insert(Video),
+        [
+            {
+                "id": identity,
+                "list_id": test_list.id,
+                "youtube_id": f"v{index:010d}",
+                "import_stage": "complete",
+                "import_progress": 100,
+            }
+            for index, identity in enumerate(identities)
+        ],
+    )
+    await test_db.commit()
+    response = await client.post(
+        f"/api/lists/{test_list.id}/videos/import-status",
+        json={"video_ids": [str(identity) for identity in identities[:100]]},
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 100
+    assert all(
+        set(item) == {"id", "import_stage", "import_progress", "processing_status"}
+        for item in response.json()
+    )
+    assert (
+        await client.post(
+            f"/api/lists/{test_list.id}/videos/import-status",
+            json={"video_ids": [str(identity) for identity in identities]},
+        )
+    ).status_code == 422
+
+
+async def test_export_includes_all_filtered_matches_not_only_visible_page(
+    client, test_db, test_list, test_user
+):
+    import csv
+    import io
+
+    tag = Tag(user_id=test_user.id, name="Export selected")
+    test_db.add(tag)
+    await test_db.flush()
+    identities = [uuid4() for _ in range(160)]
+    await test_db.execute(
+        insert(Video),
+        [
+            {
+                "id": identity,
+                "list_id": test_list.id,
+                "youtube_id": f"v{index:010d}",
+                "duration": index,
+            }
+            for index, identity in enumerate(identities)
+        ],
+    )
+    await test_db.execute(
+        insert(video_tags),
+        [{"video_id": identity, "tag_id": tag.id} for identity in identities[:120]],
+    )
+    await test_db.commit()
+    filters = {"tags": ["Export selected"], "sort_by": "duration", "sort_order": "desc"}
+    page = await client.post(
+        f"/api/lists/{test_list.id}/videos/filter/page", json=filters
+    )
+    assert (page.json()["total"], len(page.json()["items"])) == (120, 50)
+    response = await client.post(f"/api/lists/{test_list.id}/export/csv", json=filters)
+    assert response.status_code == 200
+    lines = [line for line in response.text.splitlines() if not line.startswith("#")]
+    rows = list(csv.DictReader(io.StringIO("\n".join(lines))))
+    assert len(rows) == 120
+    assert [row["url"] for row in rows] == [
+        f"https://www.youtube.com/watch?v=v{index:010d}" for index in range(119, -1, -1)
+    ]
+
+
+async def test_custom_field_order_is_stable_across_pages_in_both_directions(
+    client, test_db, test_list
+):
+    from app.models import CustomField, VideoFieldValue
+
+    field = CustomField(
+        list_id=test_list.id,
+        name="Page rating",
+        field_type="rating",
+        config={"max_rating": 5},
+    )
+    test_db.add(field)
+    await test_db.flush()
+    identities = [uuid4() for _ in range(120)]
+    await test_db.execute(
+        insert(Video),
+        [
+            {"id": id_, "list_id": test_list.id, "youtube_id": f"f{i:010d}"}
+            for i, id_ in enumerate(identities)
+        ],
+    )
+    values = {id_: (None if i % 3 == 0 else i % 3) for i, id_ in enumerate(identities)}
+    await test_db.execute(
+        insert(VideoFieldValue),
+        [
+            {"video_id": id_, "field_id": field.id, "value_numeric": value}
+            for id_, value in values.items()
+            if value is not None
+        ],
+    )
+    await test_db.commit()
+    for order in ["asc", "desc"]:
+        received = []
+        for offset in [0, 50, 100]:
+            response = await client.get(
+                f"/api/lists/{test_list.id}/videos/page",
+                params={
+                    "sort_by": f"field:{field.id}",
+                    "sort_order": order,
+                    "offset": offset,
+                },
+            )
+            assert response.status_code == 200, response.text
+            assert response.json()["total"] == 120
+            received.extend(item["id"] for item in response.json()["items"])
+        expected = sorted(
+            identities,
+            key=lambda id_: (
+                values[id_] is None,
+                (values[id_] or 0) * (1 if order == "asc" else -1),
+                str(id_),
+            ),
+        )
+        assert received == [str(id_) for id_ in expected]
+        assert len(set(received)) == 120

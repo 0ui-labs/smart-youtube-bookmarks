@@ -39,6 +39,7 @@ from app.schemas.custom_field import (
     DuplicateCheckRequest,
     DuplicateCheckResponse,
     SmartDuplicateCheckResponse,
+    SmartSuggestion,
 )
 from app.services.duplicate_detection import DuplicateDetector
 
@@ -111,10 +112,10 @@ async def list_custom_fields(
         .where(CustomField.list_id == list_id)
         .order_by(CustomField.created_at.desc())
     )
-    result = await db.execute(stmt)
-    fields = result.scalars().all()
+    fields_result = await db.execute(stmt)
+    fields = fields_result.scalars().all()
 
-    return list(fields)
+    return [CustomFieldResponse.model_validate(field) for field in fields]
 
 
 @router.post(
@@ -193,7 +194,7 @@ async def create_custom_field(
     await db.commit()
     await db.refresh(new_field)
 
-    return new_field
+    return CustomFieldResponse.model_validate(new_field)
 
 
 @router.put(
@@ -257,8 +258,8 @@ async def update_custom_field(
     stmt = select(CustomField).where(
         CustomField.id == field_id, CustomField.list_id == list_id
     )
-    result = await db.execute(stmt)
-    field = result.scalar_one_or_none()
+    field_result = await db.execute(stmt)
+    field = field_result.scalar_one_or_none()
 
     if not field:
         raise HTTPException(
@@ -306,7 +307,7 @@ async def update_custom_field(
     await db.commit()
     await db.refresh(field)
 
-    return field
+    return CustomFieldResponse.model_validate(field)
 
 
 @router.delete(
@@ -362,8 +363,8 @@ async def delete_custom_field(
     stmt = select(CustomField).where(
         CustomField.id == field_id, CustomField.list_id == list_id
     )
-    result = await db.execute(stmt)
-    field = result.scalar_one_or_none()
+    field_result = await db.execute(stmt)
+    field = field_result.scalar_one_or_none()
 
     if not field:
         raise HTTPException(
@@ -379,7 +380,7 @@ async def delete_custom_field(
     )
     usage_count = await db.scalar(usage_stmt)
 
-    if usage_count > 0:
+    if (usage_count or 0) > 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Cannot delete field '{field.name}' - used in {usage_count} schema(s). Remove field from schemas first.",
@@ -511,7 +512,9 @@ async def check_duplicate_field(
             suggestions = [s for s in suggestions if s["score"] >= 0.60]
 
             return SmartDuplicateCheckResponse(
-                exists=len(suggestions) > 0, suggestions=suggestions, mode="smart"
+                exists=len(suggestions) > 0,
+                suggestions=[SmartSuggestion.model_validate(s) for s in suggestions],
+                mode="smart",
             )
 
         finally:

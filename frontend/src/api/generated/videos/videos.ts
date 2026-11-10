@@ -18,7 +18,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
@@ -49,6 +49,9 @@ import type {
   BulkAssignTagsRequest,
   BulkAssignTagsToVideosApiVideosBulkTagsPost200,
   BulkUploadResponse,
+  FilterVideosInListApiListsListIdVideosFilterPostParams,
+  GetFilteredVideoPageApiListsListIdVideosFilterPagePostParams,
+  GetVideoPageApiListsListIdVideosPageGetParams,
   GetVideosInListApiListsListIdVideosGetParams,
   HTTPValidationError,
   ListAllVideosApiVideosGetParams,
@@ -60,6 +63,11 @@ import type {
   UpdateWatchProgressResponse,
   VideoAdd,
   VideoFilterRequest,
+  VideoImportStatusRequest,
+  VideoImportStatusResponse,
+  VideoLookupRequest,
+  VideoLookupResponse,
+  VideoPageResponse,
   VideoResponse
 } from '.././model';
 
@@ -69,114 +77,6 @@ import { customInstance } from '../../../lib/axios-instance';
 
 
 /**
- * Add a video to a bookmark list with ARQ background processing (Option B).
-
-- Validates list exists (404 if not found)
-- Extracts YouTube video ID from URL
-- Creates video with pending status
-- Queues ARQ background task for metadata fetching
-- Checks for duplicates (409 if already in list)
-
-This approach is production-ready for large batches and prevents request timeouts.
-
-Args:
-    list_id: UUID of the bookmark list
-    video_data: Video data with YouTube URL
-    db: Database session
-
-Returns:
-    VideoResponse: Created video with pending status
-
-Raises:
-    HTTPException 404: List not found
-    HTTPException 409: Video already in list
-    HTTPException 422: Invalid YouTube URL
- * @summary Add Video To List
- */
-export const addVideoToListApiListsListIdVideosPost = (
-    listId: string,
-    videoAdd: VideoAdd,
- signal?: AbortSignal
-) => {
-      
-      
-      return customInstance<VideoResponse>(
-      {url: `/api/lists/${listId}/videos`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: videoAdd, signal
-    },
-      );
-    }
-  
-
-
-export const getAddVideoToListApiListsListIdVideosPostMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>, TError,{listId: string;data: VideoAdd}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>, TError,{listId: string;data: VideoAdd}, TContext> => {
-
-const mutationKey = ['addVideoToListApiListsListIdVideosPost'];
-const {mutation: mutationOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }};
-
-      
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>, {listId: string;data: VideoAdd}> = (props) => {
-          const {listId,data} = props ?? {};
-
-          return  addVideoToListApiListsListIdVideosPost(listId,data,)
-        }
-
-        
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AddVideoToListApiListsListIdVideosPostMutationResult = NonNullable<Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>>
-    export type AddVideoToListApiListsListIdVideosPostMutationBody = VideoAdd
-    export type AddVideoToListApiListsListIdVideosPostMutationError = HTTPValidationError
-
-    /**
- * @summary Add Video To List
- */
-export const useAddVideoToListApiListsListIdVideosPost = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>, TError,{listId: string;data: VideoAdd}, TContext>, }
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>,
-        TError,
-        {listId: string;data: VideoAdd},
-        TContext
-      > => {
-
-      const mutationOptions = getAddVideoToListApiListsListIdVideosPostMutationOptions(options);
-
-      return useMutation(mutationOptions, queryClient);
-    }
-    /**
- * Get all videos in a bookmark list with optional tag filtering and sorting.
-
-Args:
-    list_id: UUID of the bookmark list
-    tags: Optional list of tag names for OR filtering (case-insensitive)
-    sort_by: Sort column (standard column or 'field:<field_id>')
-    sort_order: Sort direction ('asc' or 'desc')
-    db: Database session
-
-Returns:
-    List[VideoResponse]: List of videos in the bookmark list
-
-Raises:
-    HTTPException 404: List not found or custom field not found
-    HTTPException 400: Invalid sort_by parameter
-
-Examples:
-    - /api/lists/{id}/videos - All videos in list (default: created_at DESC)
-    - /api/lists/{id}/videos?tags=Python&tags=Tutorial - Videos with Python OR Tutorial tags
-    - /api/lists/{id}/videos?sort_by=title&sort_order=asc - Videos sorted by title A-Z
-    - /api/lists/{id}/videos?sort_by=field:uuid-rating-field&sort_order=desc - Videos sorted by rating field
  * @summary Get Videos In List
  */
 export const getVideosInListApiListsListIdVideosGet = (
@@ -277,39 +177,77 @@ export function useGetVideosInListApiListsListIdVideosGet<TData = Awaited<Return
 
 
 /**
- * Filter videos in a bookmark list by tags and/or custom field values.
+ * @summary Add Video To List
+ */
+export const addVideoToListApiListsListIdVideosPost = (
+    listId: string,
+    videoAdd: VideoAdd,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<VideoResponse>(
+      {url: `/api/lists/${listId}/videos`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: videoAdd, signal
+    },
+      );
+    }
+  
 
-Filtering Logic:
-- Tags: OR logic (video matches ANY selected tag)
-- Field filters: AND logic (video matches ALL field filters)
-- Tags + Field filters: Combined with AND
 
-Examples:
-    POST /api/lists/{id}/videos/filter
-    Body: {"tags": ["Python"], "field_filters": [{"field_id": "...", "operator": "gte", "value": 4}]}
-    -> Videos with tag "Python" AND rating >= 4
+export const getAddVideoToListApiListsListIdVideosPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>, TError,{listId: string;data: VideoAdd}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>, TError,{listId: string;data: VideoAdd}, TContext> => {
 
-    Body: {"field_filters": [{"field_id": "...", "operator": "contains", "value": "tutorial"}]}
-    -> Videos where field contains "tutorial"
+const mutationKey = ['addVideoToListApiListsListIdVideosPost'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
 
-    Body: {"tags": ["Python", "JavaScript"]}
-    -> Videos with Python OR JavaScript tags
+      
 
-Args:
-    list_id: UUID of the bookmark list
-    filter_request: Filter criteria (tags and/or field filters)
-    db: Database session
 
-Returns:
-    List[VideoResponse]: Filtered videos
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>, {listId: string;data: VideoAdd}> = (props) => {
+          const {listId,data} = props ?? {};
 
-Raises:
-    HTTPException 404: List not found
+          return  addVideoToListApiListsListIdVideosPost(listId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddVideoToListApiListsListIdVideosPostMutationResult = NonNullable<Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>>
+    export type AddVideoToListApiListsListIdVideosPostMutationBody = VideoAdd
+    export type AddVideoToListApiListsListIdVideosPostMutationError = HTTPValidationError
+
+    /**
+ * @summary Add Video To List
+ */
+export const useAddVideoToListApiListsListIdVideosPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>, TError,{listId: string;data: VideoAdd}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof addVideoToListApiListsListIdVideosPost>>,
+        TError,
+        {listId: string;data: VideoAdd},
+        TContext
+      > => {
+
+      const mutationOptions = getAddVideoToListApiListsListIdVideosPostMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * @summary Filter Videos In List
  */
 export const filterVideosInListApiListsListIdVideosFilterPost = (
     listId: string,
     videoFilterRequest: VideoFilterRequest,
+    params?: FilterVideosInListApiListsListIdVideosFilterPostParams,
  signal?: AbortSignal
 ) => {
       
@@ -317,7 +255,8 @@ export const filterVideosInListApiListsListIdVideosFilterPost = (
       return customInstance<VideoResponse[]>(
       {url: `/api/lists/${listId}/videos/filter`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: videoFilterRequest, signal
+      data: videoFilterRequest,
+        params, signal
     },
       );
     }
@@ -325,8 +264,8 @@ export const filterVideosInListApiListsListIdVideosFilterPost = (
 
 
 export const getFilterVideosInListApiListsListIdVideosFilterPostMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof filterVideosInListApiListsListIdVideosFilterPost>>, TError,{listId: string;data: VideoFilterRequest}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof filterVideosInListApiListsListIdVideosFilterPost>>, TError,{listId: string;data: VideoFilterRequest}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof filterVideosInListApiListsListIdVideosFilterPost>>, TError,{listId: string;data: VideoFilterRequest;params?: FilterVideosInListApiListsListIdVideosFilterPostParams}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof filterVideosInListApiListsListIdVideosFilterPost>>, TError,{listId: string;data: VideoFilterRequest;params?: FilterVideosInListApiListsListIdVideosFilterPostParams}, TContext> => {
 
 const mutationKey = ['filterVideosInListApiListsListIdVideosFilterPost'];
 const {mutation: mutationOptions} = options ?
@@ -338,10 +277,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof filterVideosInListApiListsListIdVideosFilterPost>>, {listId: string;data: VideoFilterRequest}> = (props) => {
-          const {listId,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof filterVideosInListApiListsListIdVideosFilterPost>>, {listId: string;data: VideoFilterRequest;params?: FilterVideosInListApiListsListIdVideosFilterPostParams}> = (props) => {
+          const {listId,data,params} = props ?? {};
 
-          return  filterVideosInListApiListsListIdVideosFilterPost(listId,data,)
+          return  filterVideosInListApiListsListIdVideosFilterPost(listId,data,params,)
         }
 
         
@@ -357,11 +296,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Filter Videos In List
  */
 export const useFilterVideosInListApiListsListIdVideosFilterPost = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof filterVideosInListApiListsListIdVideosFilterPost>>, TError,{listId: string;data: VideoFilterRequest}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof filterVideosInListApiListsListIdVideosFilterPost>>, TError,{listId: string;data: VideoFilterRequest;params?: FilterVideosInListApiListsListIdVideosFilterPostParams}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof filterVideosInListApiListsListIdVideosFilterPost>>,
         TError,
-        {listId: string;data: VideoFilterRequest},
+        {listId: string;data: VideoFilterRequest;params?: FilterVideosInListApiListsListIdVideosFilterPostParams},
         TContext
       > => {
 
@@ -545,95 +484,6 @@ export const useDeleteVideoApiVideosVideoIdDelete = <TError = HTTPValidationErro
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Update watch progress for a video (video player integration).
-
-Saves the current playback position so users can resume watching later.
-Called periodically (debounced) by the video player and on pause.
-
-Args:
-    video_id: UUID of the video
-    request: UpdateWatchProgressRequest with position in seconds
-    db: Database session
-
-Returns:
-    UpdateWatchProgressResponse with video_id, watch_position, updated_at
-
-Raises:
-    HTTPException 404: Video not found
- * @summary Update Watch Progress
- */
-export const updateWatchProgressApiVideosVideoIdProgressPatch = (
-    videoId: string,
-    updateWatchProgressRequest: UpdateWatchProgressRequest,
- ) => {
-      
-      
-      return customInstance<UpdateWatchProgressResponse>(
-      {url: `/api/videos/${videoId}/progress`, method: 'PATCH',
-      headers: {'Content-Type': 'application/json', },
-      data: updateWatchProgressRequest
-    },
-      );
-    }
-  
-
-
-export const getUpdateWatchProgressApiVideosVideoIdProgressPatchMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>, TError,{videoId: string;data: UpdateWatchProgressRequest}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>, TError,{videoId: string;data: UpdateWatchProgressRequest}, TContext> => {
-
-const mutationKey = ['updateWatchProgressApiVideosVideoIdProgressPatch'];
-const {mutation: mutationOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }};
-
-      
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>, {videoId: string;data: UpdateWatchProgressRequest}> = (props) => {
-          const {videoId,data} = props ?? {};
-
-          return  updateWatchProgressApiVideosVideoIdProgressPatch(videoId,data,)
-        }
-
-        
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type UpdateWatchProgressApiVideosVideoIdProgressPatchMutationResult = NonNullable<Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>>
-    export type UpdateWatchProgressApiVideosVideoIdProgressPatchMutationBody = UpdateWatchProgressRequest
-    export type UpdateWatchProgressApiVideosVideoIdProgressPatchMutationError = HTTPValidationError
-
-    /**
- * @summary Update Watch Progress
- */
-export const useUpdateWatchProgressApiVideosVideoIdProgressPatch = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>, TError,{videoId: string;data: UpdateWatchProgressRequest}, TContext>, }
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>,
-        TError,
-        {videoId: string;data: UpdateWatchProgressRequest},
-        TContext
-      > => {
-
-      const mutationOptions = getUpdateWatchProgressApiVideosVideoIdProgressPatchMutationOptions(options);
-
-      return useMutation(mutationOptions, queryClient);
-    }
-    /**
- * List all videos with optional tag filtering.
-
-Query params:
-- tags: OR filter (any matching tag) - can be specified multiple times
-- tags_all: AND filter (all tags required) - can be specified multiple times
-
-Examples:
-- /api/videos - All videos
-- /api/videos?tags=Python&tags=Tutorial - Videos with Python OR Tutorial tags
-- /api/videos?tags_all=Python&tags_all=Advanced - Videos with BOTH Python AND Advanced tags
  * @summary List All Videos
  */
 export const listAllVideosApiVideosGet = (
@@ -727,37 +577,303 @@ export function useListAllVideosApiVideosGet<TData = Awaited<ReturnType<typeof l
 
 
 /**
- * Bulk upload videos from CSV file with optional custom field values.
+ * @summary Get Video Page
+ */
+export const getVideoPageApiListsListIdVideosPageGet = (
+    listId: string,
+    params?: GetVideoPageApiListsListIdVideosPageGetParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<VideoPageResponse>(
+      {url: `/api/lists/${listId}/videos/page`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
 
-**CSV Format (Extended):**
-```
-url,field_Overall_Rating,field_Presentation
-https://youtube.com/watch?v=dQw4w9WgXcQ,5,great
-https://youtu.be/jNQXAC9IVRw,3,good
-```
 
-**Field Columns:**
-- Format: `field_<field_name>` (case-insensitive matching)
-- Values validated per field type (rating: int, select: option, text: max_length, boolean: true/false)
-- Invalid field values logged as warnings, video still created
-- Field updates applied via batch update endpoint (Task #72)
 
-**Validation:**
-- URL column required (422 if missing)
-- Field columns optional (videos created even if field validation fails)
-- Row-level error handling: Continue processing on field errors
+export const getGetVideoPageApiListsListIdVideosPageGetQueryKey = (listId?: string,
+    params?: GetVideoPageApiListsListIdVideosPageGetParams,) => {
+    return [
+    `/api/lists/${listId}/videos/page`, ...(params ? [params]: [])
+    ] as const;
+    }
 
-Args:
-    list_id: UUID of the bookmark list
-    file: CSV file with YouTube URLs and optional field columns
-    db: Database session
+    
+export const getGetVideoPageApiListsListIdVideosPageGetQueryOptions = <TData = Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError = HTTPValidationError>(listId: string,
+    params?: GetVideoPageApiListsListIdVideosPageGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError, TData>>, }
+) => {
 
-Returns:
-    BulkUploadResponse: Statistics with created_count, failed_count, failures list
+const {query: queryOptions} = options ?? {};
 
-Raises:
-    HTTPException 404: List not found
-    HTTPException 422: Invalid CSV header or file format
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoPageApiListsListIdVideosPageGetQueryKey(listId,params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>> = ({ signal }) => getVideoPageApiListsListIdVideosPageGet(listId,params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(listId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetVideoPageApiListsListIdVideosPageGetQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>>
+export type GetVideoPageApiListsListIdVideosPageGetQueryError = HTTPValidationError
+
+
+export function useGetVideoPageApiListsListIdVideosPageGet<TData = Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError = HTTPValidationError>(
+ listId: string,
+    params: undefined |  GetVideoPageApiListsListIdVideosPageGetParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>,
+          TError,
+          Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetVideoPageApiListsListIdVideosPageGet<TData = Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError = HTTPValidationError>(
+ listId: string,
+    params?: GetVideoPageApiListsListIdVideosPageGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>,
+          TError,
+          Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetVideoPageApiListsListIdVideosPageGet<TData = Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError = HTTPValidationError>(
+ listId: string,
+    params?: GetVideoPageApiListsListIdVideosPageGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+/**
+ * @summary Get Video Page
+ */
+
+export function useGetVideoPageApiListsListIdVideosPageGet<TData = Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError = HTTPValidationError>(
+ listId: string,
+    params?: GetVideoPageApiListsListIdVideosPageGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPageApiListsListIdVideosPageGet>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+
+  const queryOptions = getGetVideoPageApiListsListIdVideosPageGetQueryOptions(listId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * @summary Get Filtered Video Page
+ */
+export const getFilteredVideoPageApiListsListIdVideosFilterPagePost = (
+    listId: string,
+    videoFilterRequest: VideoFilterRequest,
+    params?: GetFilteredVideoPageApiListsListIdVideosFilterPagePostParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<VideoPageResponse>(
+      {url: `/api/lists/${listId}/videos/filter/page`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: videoFilterRequest,
+        params, signal
+    },
+      );
+    }
+  
+
+
+export const getGetFilteredVideoPageApiListsListIdVideosFilterPagePostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getFilteredVideoPageApiListsListIdVideosFilterPagePost>>, TError,{listId: string;data: VideoFilterRequest;params?: GetFilteredVideoPageApiListsListIdVideosFilterPagePostParams}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof getFilteredVideoPageApiListsListIdVideosFilterPagePost>>, TError,{listId: string;data: VideoFilterRequest;params?: GetFilteredVideoPageApiListsListIdVideosFilterPagePostParams}, TContext> => {
+
+const mutationKey = ['getFilteredVideoPageApiListsListIdVideosFilterPagePost'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getFilteredVideoPageApiListsListIdVideosFilterPagePost>>, {listId: string;data: VideoFilterRequest;params?: GetFilteredVideoPageApiListsListIdVideosFilterPagePostParams}> = (props) => {
+          const {listId,data,params} = props ?? {};
+
+          return  getFilteredVideoPageApiListsListIdVideosFilterPagePost(listId,data,params,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GetFilteredVideoPageApiListsListIdVideosFilterPagePostMutationResult = NonNullable<Awaited<ReturnType<typeof getFilteredVideoPageApiListsListIdVideosFilterPagePost>>>
+    export type GetFilteredVideoPageApiListsListIdVideosFilterPagePostMutationBody = VideoFilterRequest
+    export type GetFilteredVideoPageApiListsListIdVideosFilterPagePostMutationError = HTTPValidationError
+
+    /**
+ * @summary Get Filtered Video Page
+ */
+export const useGetFilteredVideoPageApiListsListIdVideosFilterPagePost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getFilteredVideoPageApiListsListIdVideosFilterPagePost>>, TError,{listId: string;data: VideoFilterRequest;params?: GetFilteredVideoPageApiListsListIdVideosFilterPagePostParams}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof getFilteredVideoPageApiListsListIdVideosFilterPagePost>>,
+        TError,
+        {listId: string;data: VideoFilterRequest;params?: GetFilteredVideoPageApiListsListIdVideosFilterPagePostParams},
+        TContext
+      > => {
+
+      const mutationOptions = getGetFilteredVideoPageApiListsListIdVideosFilterPagePostMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * @summary Lookup Video Imports
+ */
+export const lookupVideoImportsApiListsListIdVideosLookupPost = (
+    listId: string,
+    videoLookupRequest: VideoLookupRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<VideoLookupResponse>(
+      {url: `/api/lists/${listId}/videos/lookup`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: videoLookupRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getLookupVideoImportsApiListsListIdVideosLookupPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lookupVideoImportsApiListsListIdVideosLookupPost>>, TError,{listId: string;data: VideoLookupRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof lookupVideoImportsApiListsListIdVideosLookupPost>>, TError,{listId: string;data: VideoLookupRequest}, TContext> => {
+
+const mutationKey = ['lookupVideoImportsApiListsListIdVideosLookupPost'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof lookupVideoImportsApiListsListIdVideosLookupPost>>, {listId: string;data: VideoLookupRequest}> = (props) => {
+          const {listId,data} = props ?? {};
+
+          return  lookupVideoImportsApiListsListIdVideosLookupPost(listId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LookupVideoImportsApiListsListIdVideosLookupPostMutationResult = NonNullable<Awaited<ReturnType<typeof lookupVideoImportsApiListsListIdVideosLookupPost>>>
+    export type LookupVideoImportsApiListsListIdVideosLookupPostMutationBody = VideoLookupRequest
+    export type LookupVideoImportsApiListsListIdVideosLookupPostMutationError = HTTPValidationError
+
+    /**
+ * @summary Lookup Video Imports
+ */
+export const useLookupVideoImportsApiListsListIdVideosLookupPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lookupVideoImportsApiListsListIdVideosLookupPost>>, TError,{listId: string;data: VideoLookupRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof lookupVideoImportsApiListsListIdVideosLookupPost>>,
+        TError,
+        {listId: string;data: VideoLookupRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getLookupVideoImportsApiListsListIdVideosLookupPostMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * @summary Get Video Import Status
+ */
+export const getVideoImportStatusApiListsListIdVideosImportStatusPost = (
+    listId: string,
+    videoImportStatusRequest: VideoImportStatusRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<VideoImportStatusResponse[]>(
+      {url: `/api/lists/${listId}/videos/import-status`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: videoImportStatusRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getGetVideoImportStatusApiListsListIdVideosImportStatusPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getVideoImportStatusApiListsListIdVideosImportStatusPost>>, TError,{listId: string;data: VideoImportStatusRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof getVideoImportStatusApiListsListIdVideosImportStatusPost>>, TError,{listId: string;data: VideoImportStatusRequest}, TContext> => {
+
+const mutationKey = ['getVideoImportStatusApiListsListIdVideosImportStatusPost'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getVideoImportStatusApiListsListIdVideosImportStatusPost>>, {listId: string;data: VideoImportStatusRequest}> = (props) => {
+          const {listId,data} = props ?? {};
+
+          return  getVideoImportStatusApiListsListIdVideosImportStatusPost(listId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GetVideoImportStatusApiListsListIdVideosImportStatusPostMutationResult = NonNullable<Awaited<ReturnType<typeof getVideoImportStatusApiListsListIdVideosImportStatusPost>>>
+    export type GetVideoImportStatusApiListsListIdVideosImportStatusPostMutationBody = VideoImportStatusRequest
+    export type GetVideoImportStatusApiListsListIdVideosImportStatusPostMutationError = HTTPValidationError
+
+    /**
+ * @summary Get Video Import Status
+ */
+export const useGetVideoImportStatusApiListsListIdVideosImportStatusPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getVideoImportStatusApiListsListIdVideosImportStatusPost>>, TError,{listId: string;data: VideoImportStatusRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof getVideoImportStatusApiListsListIdVideosImportStatusPost>>,
+        TError,
+        {listId: string;data: VideoImportStatusRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getGetVideoImportStatusApiListsListIdVideosImportStatusPostMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * @summary Bulk Upload Videos
  */
 export const bulkUploadVideosApiListsListIdVideosBulkPost = (
@@ -825,36 +941,6 @@ export const useBulkUploadVideosApiListsListIdVideosBulkPost = <TError = HTTPVal
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Export all videos in a list to CSV format with custom field values.
-
-**CSV Format (Extended):**
-```
-# Custom Fields: Overall Rating (rating, 1-5), Presentation (select: bad|good|great)
-youtube_id,status,created_at,field_Overall_Rating,field_Presentation
-dQw4w9WgXcQ,completed,2025-11-08T10:00:00,5,great
-jNQXAC9IVRw,pending,2025-11-08T11:00:00,,
-```
-
-**Field Columns:**
-- Named `field_<field_name>` (e.g., "field_Overall_Rating")
-- Sorted alphabetically after standard columns
-- Empty values exported as empty string (not "NULL")
-- Metadata comment line includes field types for reference
-
-**Performance:**
-- Optimized for lists up to 1000 videos × 20 fields
-- Single query with eager loading (prevents N+1)
-- Target: < 2s for 100 videos × 10 fields
-
-Args:
-    list_id: UUID of the bookmark list
-    db: Database session
-
-Returns:
-    StreamingResponse: CSV file download
-
-Raises:
-    HTTPException 404: List not found
  * @summary Export Videos Csv
  */
 export const exportVideosCsvApiListsListIdExportCsvGet = (
@@ -947,6 +1033,150 @@ export function useExportVideosCsvApiListsListIdExportCsvGet<TData = Awaited<Ret
 
 
 /**
+ * @summary Export Filtered Videos Csv
+ */
+export const exportFilteredVideosCsvApiListsListIdExportCsvPost = (
+    listId: string,
+    videoFilterRequest: VideoFilterRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<unknown>(
+      {url: `/api/lists/${listId}/export/csv`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: videoFilterRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getExportFilteredVideosCsvApiListsListIdExportCsvPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportFilteredVideosCsvApiListsListIdExportCsvPost>>, TError,{listId: string;data: VideoFilterRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof exportFilteredVideosCsvApiListsListIdExportCsvPost>>, TError,{listId: string;data: VideoFilterRequest}, TContext> => {
+
+const mutationKey = ['exportFilteredVideosCsvApiListsListIdExportCsvPost'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof exportFilteredVideosCsvApiListsListIdExportCsvPost>>, {listId: string;data: VideoFilterRequest}> = (props) => {
+          const {listId,data} = props ?? {};
+
+          return  exportFilteredVideosCsvApiListsListIdExportCsvPost(listId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExportFilteredVideosCsvApiListsListIdExportCsvPostMutationResult = NonNullable<Awaited<ReturnType<typeof exportFilteredVideosCsvApiListsListIdExportCsvPost>>>
+    export type ExportFilteredVideosCsvApiListsListIdExportCsvPostMutationBody = VideoFilterRequest
+    export type ExportFilteredVideosCsvApiListsListIdExportCsvPostMutationError = HTTPValidationError
+
+    /**
+ * @summary Export Filtered Videos Csv
+ */
+export const useExportFilteredVideosCsvApiListsListIdExportCsvPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportFilteredVideosCsvApiListsListIdExportCsvPost>>, TError,{listId: string;data: VideoFilterRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof exportFilteredVideosCsvApiListsListIdExportCsvPost>>,
+        TError,
+        {listId: string;data: VideoFilterRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getExportFilteredVideosCsvApiListsListIdExportCsvPostMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Update watch progress for a video (video player integration).
+
+Saves the current playback position so users can resume watching later.
+Called periodically (debounced) by the video player and on pause.
+
+Args:
+    video_id: UUID of the video
+    request: UpdateWatchProgressRequest with position in seconds
+    db: Database session
+
+Returns:
+    UpdateWatchProgressResponse with video_id, watch_position, updated_at
+
+Raises:
+    HTTPException 404: Video not found
+ * @summary Update Watch Progress
+ */
+export const updateWatchProgressApiVideosVideoIdProgressPatch = (
+    videoId: string,
+    updateWatchProgressRequest: UpdateWatchProgressRequest,
+ ) => {
+      
+      
+      return customInstance<UpdateWatchProgressResponse>(
+      {url: `/api/videos/${videoId}/progress`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: updateWatchProgressRequest
+    },
+      );
+    }
+  
+
+
+export const getUpdateWatchProgressApiVideosVideoIdProgressPatchMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>, TError,{videoId: string;data: UpdateWatchProgressRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>, TError,{videoId: string;data: UpdateWatchProgressRequest}, TContext> => {
+
+const mutationKey = ['updateWatchProgressApiVideosVideoIdProgressPatch'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>, {videoId: string;data: UpdateWatchProgressRequest}> = (props) => {
+          const {videoId,data} = props ?? {};
+
+          return  updateWatchProgressApiVideosVideoIdProgressPatch(videoId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWatchProgressApiVideosVideoIdProgressPatchMutationResult = NonNullable<Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>>
+    export type UpdateWatchProgressApiVideosVideoIdProgressPatchMutationBody = UpdateWatchProgressRequest
+    export type UpdateWatchProgressApiVideosVideoIdProgressPatchMutationError = HTTPValidationError
+
+    /**
+ * @summary Update Watch Progress
+ */
+export const useUpdateWatchProgressApiVideosVideoIdProgressPatch = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>, TError,{videoId: string;data: UpdateWatchProgressRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateWatchProgressApiVideosVideoIdProgressPatch>>,
+        TError,
+        {videoId: string;data: UpdateWatchProgressRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateWatchProgressApiVideosVideoIdProgressPatchMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Bulk assign tags to multiple videos (cartesian product).
 
 Creates all possible video-tag associations for the given video_ids and tag_ids.

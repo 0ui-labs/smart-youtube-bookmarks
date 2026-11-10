@@ -8,10 +8,13 @@ Groq has a 25MB file size limit, so we:
 import asyncio
 import shutil
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from types import TracebackType
+from typing import TYPE_CHECKING, cast
 
-from pydub import AudioSegment
+from pydub.audio_segment import AudioSegment
 
 # Constants for audio chunking
 CHUNK_DURATION_MS = 10 * 60 * 1000  # 10 minutes in milliseconds
@@ -45,13 +48,18 @@ class AudioChunker:
         # Cleanup happens automatically
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._temp_dir: str | None = None
 
     async def __aenter__(self) -> "AudioChunker":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         self.cleanup()
 
     def _ensure_temp_dir(self) -> str:
@@ -83,9 +91,9 @@ class AudioChunker:
         """
 
         url = f"https://www.youtube.com/watch?v={youtube_id}"
-        output_template = str(Path(self._temp_dir) / "audio.%(ext)s")
+        output_template = str(Path(self._ensure_temp_dir()) / "audio.%(ext)s")
 
-        ydl_opts = {
+        ydl_opts: _YoutubeDLOptions = {
             "format": "bestaudio/best",
             "outtmpl": output_template,
             "postprocessors": [
@@ -103,13 +111,13 @@ class AudioChunker:
         await asyncio.to_thread(self._download_sync, url, ydl_opts)
 
         # Find the downloaded file
-        audio_path = Path(self._temp_dir) / "audio.mp3"
+        audio_path = Path(self._ensure_temp_dir()) / "audio.mp3"
         if not audio_path.exists():
             raise FileNotFoundError(f"Downloaded audio not found at {audio_path}")
 
         return audio_path
 
-    def _download_sync(self, url: str, ydl_opts: dict) -> None:
+    def _download_sync(self, url: str, ydl_opts: "_YoutubeDLOptions") -> None:
         """Synchronous yt-dlp download (runs in thread pool)."""
         import yt_dlp
 
@@ -125,7 +133,9 @@ class AudioChunker:
         Returns:
             List of AudioChunk objects
         """
-        audio = AudioSegment.from_mp3(str(audio_path))
+        audio = cast("Callable[[str], AudioSegment]", AudioSegment.from_mp3)(
+            str(audio_path)
+        )
         total_duration_ms = len(audio)
 
         chunks: list[AudioChunk] = []
@@ -139,7 +149,7 @@ class AudioChunker:
             chunk_audio = audio[start_ms:end_ms]
 
             # Save chunk
-            chunk_path = Path(self._temp_dir) / f"chunk_{chunk_index:04d}.mp3"
+            chunk_path = Path(self._ensure_temp_dir()) / f"chunk_{chunk_index:04d}.mp3"
             chunk_audio.export(str(chunk_path), format="mp3", bitrate=AUDIO_BITRATE)
 
             # Create chunk object
@@ -162,3 +172,7 @@ class AudioChunker:
         if self._temp_dir is not None:
             shutil.rmtree(self._temp_dir, ignore_errors=True)
             self._temp_dir = None
+
+
+if TYPE_CHECKING:
+    from yt_dlp import _YoutubeDLOptions

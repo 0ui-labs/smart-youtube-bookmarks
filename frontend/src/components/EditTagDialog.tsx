@@ -376,6 +376,12 @@ export function EditTagDialog({
             </div>
           </div>
 
+          {form.formState.errors.color && (
+            <p className="text-red-600 text-sm" role="alert">
+              {form.formState.errors.color.message}
+            </p>
+          )}
+
           {/* Fields Section */}
           <div className="border-t pt-4">
             <div className="mb-3 flex items-center justify-between">

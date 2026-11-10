@@ -301,3 +301,10 @@ async def test_redis_connection_error_handled(mock_httpx_response):
 
     # Should still work via API even if cache fails
     assert result["@fallback"] == "UCfallback12345678901234"
+
+
+@pytest.fixture(autouse=True)
+def synthetic_provider_configuration(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "youtube_api_key", "synthetic-offline-test-key")

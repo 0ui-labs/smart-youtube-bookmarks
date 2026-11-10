@@ -1,7 +1,7 @@
 """VideoEnrichment model for storing video captions, chapters, and transcripts."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 from uuid import UUID as PyUUID
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .video import Video
 
 
-class EnrichmentStatus(str, Enum):
+class EnrichmentStatus(StrEnum):
     """Status of video enrichment processing."""
 
     pending = "pending"
@@ -86,4 +86,4 @@ class VideoEnrichment(BaseModel):
     )
 
     def __repr__(self) -> str:
-        return f"<VideoEnrichment(id={self.id}, video_id={self.video_id}, status={self.status.value})>"
+        return f"<VideoEnrichment(id={self.id}, video_id={self.video_id}, status={self.status})>"

@@ -152,7 +152,7 @@ class ChannelResolverService:
                         logger.info(
                             f"Resolved handle {name} to channel ID: {channel_id}"
                         )
-                        return channel_id
+                        return channel_id if isinstance(channel_id, str) else None
 
                     logger.warning(f"Channel handle not found: {name}")
                     return None
@@ -178,7 +178,7 @@ class ChannelResolverService:
                         logger.info(
                             f"Resolved channel name '{name}' to ID: {channel_id}"
                         )
-                        return channel_id
+                        return channel_id if isinstance(channel_id, str) else None
 
                     logger.warning(f"Channel not found: {name}")
                     return None
