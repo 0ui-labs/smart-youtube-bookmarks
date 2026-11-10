@@ -358,3 +358,26 @@ describe("TextSnippet Component", () => {
     });
   });
 });
+
+it("sanitizes stored HTML and preserves safe formatting", () => {
+  const { container } = render(
+    <TextSnippet
+      truncateAt={500}
+      value={
+        '<p><strong>Safe</strong><img src=x onerror="alert(1)"></p><script>alert(1)</script>'
+      }
+    />
+  );
+  expect(container.querySelector("script")).toBeNull();
+  expect(container.querySelector("[onerror]")).toBeNull();
+  expect(container.querySelector("strong")).toHaveTextContent("Safe");
+});
+it("renders truncated HTML text as text without interpreting decoded tags", () => {
+  const { container } = render(
+    <TextSnippet
+      truncateAt={35}
+      value={"<p>&lt;img src=x onerror=alert(1)&gt; rest</p>"}
+    />
+  );
+  expect(container.querySelector("img")).toBeNull();
+});

@@ -52,7 +52,7 @@ export const CustomFieldsSection = ({
 
   return (
     <div className="space-y-4">
-      {availableFields
+      {[...availableFields]
         .sort((a, b) => a.display_order - b.display_order)
         .map((field) => {
           // Find existing value from field_values

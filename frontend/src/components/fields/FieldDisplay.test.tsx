@@ -299,9 +299,9 @@ describe("FieldDisplay", () => {
       render(<FieldDisplay fieldValue={fieldValue} readonly={false} />);
 
       // TextSnippet in editable mode renders input
-      const input = screen.getByDisplayValue("Great tutorial!");
+      const input = screen.getByRole("textbox");
       expect(input).toBeInTheDocument();
-      expect(input.tagName).toBe("INPUT");
+      expect(input).toHaveTextContent("Great tutorial!");
     });
 
     it("truncates long text at 50 characters with truncateAt prop (readonly)", () => {
@@ -330,7 +330,7 @@ describe("FieldDisplay", () => {
       );
 
       // TextSnippet in editable mode renders input
-      const input = screen.getByDisplayValue("Initial text");
+      const input = screen.getByRole("textbox");
       input.focus();
 
       // Simulate typing
@@ -352,7 +352,9 @@ describe("FieldDisplay", () => {
       );
 
       // TextSnippet shows expand button for truncated text
-      const expandButton = screen.getByRole("button", { name: /expand text/i });
+      const expandButton = screen.getByRole("button", {
+        name: /Text erweitern/i,
+      });
       expandButton.click();
 
       expect(onExpand).toHaveBeenCalledTimes(1);
@@ -373,7 +375,7 @@ describe("FieldDisplay", () => {
       // TextSnippet in editable mode shows empty input
       const input = screen.getByRole("textbox");
       expect(input).toBeInTheDocument();
-      expect(input).toHaveValue("");
+      expect(input).toHaveTextContent("");
     });
 
     it("passes maxLength from config to TextSnippet", () => {
@@ -381,8 +383,8 @@ describe("FieldDisplay", () => {
       render(<FieldDisplay fieldValue={fieldValue} readonly={false} />);
 
       // TextSnippet in editable mode passes maxLength to input
-      const input = screen.getByDisplayValue("Short text");
-      expect(input).toHaveAttribute("maxLength", "500");
+      expect(screen.getByRole("textbox")).toHaveTextContent("Short text");
+      expect(screen.getByText("10 / 500")).toBeInTheDocument();
     });
 
     it("passes className to TextSnippet", () => {
@@ -442,7 +444,7 @@ describe("FieldDisplay", () => {
 
       // No expand button when onExpand is not provided
       const expandButton = screen.queryByRole("button", {
-        name: /expand text/i,
+        name: /Text erweitern/i,
       });
       expect(expandButton).not.toBeInTheDocument();
     });
