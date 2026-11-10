@@ -28,21 +28,31 @@ def safe_test_database_url():
 
 @pytest.fixture(scope="session")
 async def test_engine():
-    """Create test database engine."""
+    """Protect the dedicated database against overlapping destructive suites."""
     engine = create_async_engine(
         safe_test_database_url(), echo=False, poolclass=NullPool
     )
-
-    async with engine.begin() as conn:
-        safe_test_database_url()
-        await conn.run_sync(Base.metadata.create_all)
-
-    yield engine
-
-    async with engine.begin() as conn:
-        safe_test_database_url()
-        await conn.run_sync(Base.metadata.drop_all)
-
+    async with engine.connect() as suite_lock:
+        acquired = await suite_lock.scalar(
+            text("SELECT pg_try_advisory_lock(hashtextextended(current_database(), 1))")
+        )
+        if not acquired:
+            await engine.dispose()
+            raise RuntimeError("Another test suite already owns TEST_DATABASE_URL")
+        try:
+            async with engine.begin() as conn:
+                safe_test_database_url()
+                await conn.run_sync(Base.metadata.create_all)
+            yield engine
+            async with engine.begin() as conn:
+                safe_test_database_url()
+                await conn.run_sync(Base.metadata.drop_all)
+        finally:
+            await suite_lock.execute(
+                text(
+                    "SELECT pg_advisory_unlock(hashtextextended(current_database(), 1))"
+                )
+            )
     await engine.dispose()
 
 
@@ -301,3 +311,25 @@ async def reset_redis_singleton():
         except Exception:
             pass
         redis_module._arq_pool = None
+
+
+@pytest.fixture(autouse=True)
+def reject_application_database_connections():
+    """Also block accidental app-engine use outside the injected HTTP session."""
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine, make_url
+
+    def guard_connection(dialect, connection_record, cargs, cparams):
+        target = make_url(safe_test_database_url())
+        if (
+            cparams.get("database"),
+            cparams.get("port", 5432),
+            cparams.get("host", "localhost"),
+        ) != (target.database, target.port or 5432, target.host or "localhost"):
+            raise RuntimeError("Test attempted connection outside TEST_DATABASE_URL")
+
+    event.listen(Engine, "do_connect", guard_connection)
+    try:
+        yield
+    finally:
+        event.remove(Engine, "do_connect", guard_connection)
