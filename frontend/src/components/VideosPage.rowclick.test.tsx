@@ -3,6 +3,13 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithRouter } from "@/test/renderWithRouter";
+
+const mockNavigate = vi.fn();
+vi.mock("react-router-dom", async () => ({
+  ...(await vi.importActual("react-router-dom")),
+  useNavigate: () => mockNavigate,
+}));
+
 import { VideosPage } from "./VideosPage";
 
 // Mock hooks
@@ -72,6 +79,8 @@ vi.mock("@/hooks/useVideos", () => ({
 }));
 
 vi.mock("@/hooks/useTags", () => ({
+  useCategories: () => ({ data: [], isLoading: false }),
+  useLabels: () => ({ data: [], isLoading: false }),
   useTags: vi.fn(() => ({
     data: [],
     isLoading: false,
@@ -129,7 +138,7 @@ describe("VideosPage - Row Click & Menu Interaction", () => {
   });
 
   describe("Row Click Behavior", () => {
-    it("should open video in new tab when clicking row", async () => {
+    it("navigates to the video page when clicking a row", async () => {
       renderVideosPage();
 
       await waitFor(() => {
@@ -139,11 +148,7 @@ describe("VideosPage - Row Click & Menu Interaction", () => {
       const row = screen.getByRole("button", { name: /test video/i });
       fireEvent.click(row);
 
-      expect(window.open).toHaveBeenCalledWith(
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        "_blank",
-        "noopener,noreferrer"
-      );
+      expect(mockNavigate).toHaveBeenCalledWith("/videos/video-1");
     });
 
     it("should open video when pressing Enter on row", async () => {
@@ -157,11 +162,7 @@ describe("VideosPage - Row Click & Menu Interaction", () => {
       row.focus();
       fireEvent.keyDown(row, { key: "Enter" });
 
-      expect(window.open).toHaveBeenCalledWith(
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        "_blank",
-        "noopener,noreferrer"
-      );
+      expect(mockNavigate).toHaveBeenCalledWith("/videos/video-1");
     });
 
     it("should open video when pressing Space on row", async () => {
@@ -175,11 +176,7 @@ describe("VideosPage - Row Click & Menu Interaction", () => {
       row.focus();
       fireEvent.keyDown(row, { key: " " });
 
-      expect(window.open).toHaveBeenCalledWith(
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        "_blank",
-        "noopener,noreferrer"
-      );
+      expect(mockNavigate).toHaveBeenCalledWith("/videos/video-1");
     });
   });
 
@@ -195,7 +192,7 @@ describe("VideosPage - Row Click & Menu Interaction", () => {
       const menuButton = screen.getByLabelText("Aktionen");
       await user.click(menuButton);
 
-      expect(window.open).not.toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalled();
 
       // Menu should be open
       await waitFor(() => {
@@ -240,11 +237,17 @@ describe("VideosPage - Row Click & Menu Interaction", () => {
 
       // Delete mutation called
       await waitFor(() => {
-        expect(mockMutate).toHaveBeenCalledWith("video-1");
+        expect(mockMutate).toHaveBeenCalledWith(
+          "video-1",
+          expect.objectContaining({
+            onSuccess: expect.any(Function),
+            onError: expect.any(Function),
+          })
+        );
       });
 
       // Video NOT opened
-      expect(window.open).not.toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
 
     it("should close menu when pressing Escape", async () => {
@@ -272,7 +275,7 @@ describe("VideosPage - Row Click & Menu Interaction", () => {
       });
 
       // Video should NOT open
-      expect(window.open).not.toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
   });
 
@@ -287,7 +290,7 @@ describe("VideosPage - Row Click & Menu Interaction", () => {
       const title = screen.getByText("Test Video");
 
       // Should be span, not <a>
-      expect(title.tagName).toBe("SPAN");
+      expect(title.tagName).toBe("H3");
 
       // Should not have href
       expect(title).not.toHaveAttribute("href");

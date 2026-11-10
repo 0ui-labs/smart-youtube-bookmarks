@@ -6,13 +6,17 @@
 import "@testing-library/jest-dom/vitest";
 
 // Import vi from vitest for mocking
-import { afterAll, afterEach, beforeAll, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 
 // Import MSW server
 import { server } from "./mocks/server";
 
 // Auto-mock Zustand for test isolation (uses __mocks__/zustand.ts)
 vi.mock("zustand");
+
+beforeEach(() => {
+  window.history.replaceState({}, "", "/");
+});
 
 // Start MSW server before all tests
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
