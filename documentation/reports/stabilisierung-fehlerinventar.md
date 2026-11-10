@@ -1,12 +1,26 @@
-> Fortschreibung 10.11.2026: Die folgende Liste dokumentiert die ursprüngliche
-> rote Abnahme. Die bekannten Frontend-Fehlergruppen sind inzwischen bearbeitet;
-> Lint hat keine Fehler mehr. Der vollständige Lauf endete mit 1.288 bestanden
-> und einer inzwischen gezielt behobenen neuen Cache-Regression. Stabile
-> Gesamtabnahme steht nach weiteren AP-Änderungen aus. Mypy aktuell 205 Fehler
-> in 41 Dateien; Einzelheiten im Abnahmeprotokoll. Keine Tests stillgelegt und
-> keine strengen Regeln abgeschwächt.
+# Aktuelle Auswertung
 
-# Offene Prüfungsbefunde
+Die historischen Frontend-Fehlergruppen und alle mypy-Fehler sind bearbeitet.
+Frontend vollständig: **1.311 bestanden**, regulär beendet. Build erfolgreich.
+Biome: **0 Fehler / 169 Warnungen**. Strenges mypy: **125 Dateien ohne Fehler**.
+Ruff erfolgreich. Keine Tests neu übersprungen und keine Regeln abgeschwächt.
+
+Backend-Schlusslauf: **1.001 bestanden / 10 vorhandene Skips**, keine Fehler,
+196,74 s. Ein vorheriger zusätzlicher Lauf zeigte eine abgewiesene SSL-Negotiation
+am Nicht-TLS-Testcontainer und einen Folgefehler beim Fixture-Commit. Die strengere
+Rollback-Fixture deckte anschließend echte ORM-Korruption durch überschriebenen
+Relationship-Zustand auf. Testtransport und Cleanup sind repariert, Response-DTOs
+vom ORM getrennt und konkurrierende Erstanmeldungen serialisiert. 41 + 65 gezielte
+Prüfungen sowie der abschließende volle Lauf sind danach grün.
+
+Verbleibend: zehn bestehende Skips (7 echte Providerprüfungen ohne Key, 3 nicht
+implementierter Legacy-Extraktionspfad), externe Clerk-/Browser-/Providerabnahme,
+Lint-/Deprecation-Warnungen und dokumentierte Dependency-Risiken.
+Verbindlich ist der [Abnahmebericht](codebase-stabilisierung-abnahme.md).
+
+---
+
+# Historisches Fehlerinventar
 
 Frontend-Snapshot: unveränderte Frontend-Dateien aus `7184630`, Backend-Schlussbasis `238f7df`.
 

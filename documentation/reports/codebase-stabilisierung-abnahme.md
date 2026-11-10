@@ -1,48 +1,124 @@
-# Stabilisierungsstand – Teilimplementierung, keine Gesamtabnahme
+# Stabilisierung – lokale Implementierung und getrennte externe Abnahme
 
-Plan: `docs/plans/2026-11-09-codebase-stabilisierung.md`. Basis: `0ddbd6f`.
-Isolierter Checkout `t3/stabilize-youtube-bookmarks`, bei Start sauber.
+Plan: `docs/plans/2026-11-09-codebase-stabilisierung.md`, Plan-Commit `0ddbd6f`.
+Bestehender isolierter Worktree `t3/stabilize-youtube-bookmarks`. Die ursprünglichen
+33 Commits bis `73eb20e` sind unverändert Vorfahren des aktuellen Heads; keine
+weiteren Worktrees, Subagents, Pushes, Merges, Deployments oder Providerressourcen.
+Anwendungsdaten und die uncommittete Arbeit im ursprünglichen Projekt blieben unberührt.
 
-## Verbindlicher Stand
+## Verbindlicher aktueller Stand
 
-Codebasis für die Schlussprüfungen: `238f7df` (ausgehend von `0ddbd6f`).
-Der Auftrag zur vollständigen Umsetzung von AP 1–11 ist **nicht abgeschlossen**.
-Die offenen Punkte umfassen noch Implementierung, nicht nur fehlende externe Nachweise.
+AP 1–10 sind lokal implementiert; die lokalen AP-11-Prüfungen sind abgeschlossen.
+CI, Dokumentation, Typprüfung, Generator-Drift und Readiness sind implementiert.
+Der vollständige Backend-Schlusslauf nach Transport-/ORM-Reparatur ist grün. **Keine vollständige reale Gesamtabnahme oder öffentliche
+Betriebsfreigabe:** Clerk-/Provider-/Browsernachweise fehlen; bekannte Dependency-
+Risiken und bestehende Legacy-Skips werden unten ausdrücklich ausgewiesen.
 
-| AP | Status | Umgesetzt / verbleibend |
+| AP | Lokaler Stand | Nachweis / externer Rest |
 | --- | --- | --- |
-| 1 | Lokal umgesetzt | Python 3.11, Root-npm-Lockfile, separate PostgreSQL-/Redis-Services, DB-Ziel-/Verbindungs-/Suite-Schutz, reguläre vollständige Testläufe. |
-| 2 | Teilweise | Build repariert, mehrere Produktfehler und Testverträge korrigiert. Bekannte Frontend-Fehlergruppen behoben, Lint ohne Fehler. Stabile abschließende Gesamtsuite nach den weiteren Änderungen ausstehend. |
-| 3 | Teilweise | Auth-bestätigter Reconnect, paginierte History, monotone Zusammenführung, Retry-UI und Origin-URL lokal getestet. History ist sitzungsgebunden und teilt stabile Eventidentitäten mit Live-Zustellung. Finale Gesamt-/Browserabnahme noch offen. |
-| 4 | Lokal abgeschlossen | PostgreSQL-Upsert statt Zeilen-Rollback, letzte gültige Feldzeile, Parallelimport und CSV-Roundtrip nachgewiesen. Provider gemockt. |
-| 5 | Teilweise | Create verändert keine fremden Filter-/Sortiercaches, inaktive Varianten werden stale. Detail-/Schema-/Feldwert-Invalidierung ergänzt; Pagination und endgültige Integrationsprüfung bleiben offen. |
-| 6 | Weitgehend lokal implementiert, nicht vollständig abgenommen | Outbox, Dispatcher, Leases/Backoff, stabile ARQ-ID, dauerhafte Worker-Claims, Ziel-Lock und Commit vor Bestätigung; fachliche Produzenten/Recovery umgestellt. Einige geforderte Crash-/Doppeldispatch-Fälle und Oberflächen für verwaiste/finale Fehler fehlen. |
-| 7 | Lokal implementiert, Gesamtabnahme offen | Signierte synthetische A/B-Matrix, HTTP-Scope/Referenzprüfung, expliziter Legacy-Transfer und WebSub-Schutz vorhanden. Echte Clerk-/Hub-Abnahme und finale Gesamtsuite fehlen. |
-| 8 | Lokal implementiert, externe Abnahme offen | Clerk-Frontend, aktueller zentraler Token-Transport, Einmal-Tickets und Cache-/Store-Isolation getestet. Echter Browserablauf mit bestehender Clerk-Konfiguration fehlt. |
-| 9 | Teilweise | CSV-Persistenz/Feldimport-Service und eigenständige Thumbnail-Komponente extrahiert. Router-/Query-Service-Aufteilung, weitere Page-/Hook-Extraktionen fehlen. |
-| 10 | Nicht implementiert | Serverpagination, Migration der Aufrufer und Messung 100/1.000/10.000 fehlen. |
-| 11 | Teilweise | CI-Datei, reparierte Migrationskette samt synthetischem Upgrade, Worker-Start und aktualisierte Anleitung. Frontend-/Typprüfungen, API-Generator-Drift, Readiness und vollständiger realer Ablauf offen. |
+| 1 | Umgesetzt | Reproduzierbare Runtimes, Root-Lockfile, separate Dienste, DB-/Alias-/Suite-Schutz; lokaler Compose-Transport explizit, fehlgeschlagene Testtransaktionen sauber zurückgerollt. |
+| 2 | Umgesetzt, Frontend gesamt grün | 1.311 Tests, Produktionsbuild, Biome ohne Fehler; strenge TS-Regeln unverändert. 169 Warnungen bleiben. |
+| 3 | Umgesetzt | Reconnect/History/Retry, gemeinsame Event-IDs, monotone Zusammenführung und Abbruch alter Generationen; echter lokaler Socket/Redis separat, reale Clerk-Browser-Recovery noch offen. |
+| 4 | Umgesetzt | PostgreSQL-Upsert, Parallelimporte, letzte gültige Feldzeile, atomare äußere Transaktion und Export/Reimport; Providerantworten simuliert. |
+| 5 | Umgesetzt | Gemeinsame Query-Keys, korrekte aktive/inaktive Auswahlcaches, Details/Felder/Schemas und Statistikinvalidierung; paginierte Antwortformen bleiben erhalten. |
+| 6 | Umgesetzt | Dauerhafte Absichten aller Produzenten/Recovery, atomarer Workerabschluss, konkurrierende Claims/Dispatcher/Retry, Crashfenster, Diagnose/30-Tage-Retention/Fehlerbudget und Readiness. Provider-Absturzfenster ohne externe Idempotenz dokumentiert. |
+| 7 | Lokal umgesetzt | Signierte A/B-Matrix über sämtliche Business-Routen, Alias-/Aggregatscope, atomare Referenzprüfung, expliziter Legacy-Transfer und signierter WebSub-Replay-Schutz. Echte Clerk-/Hub-Konfiguration fehlt. |
+| 8 | Lokal umgesetzt | Clerk-Gating, zentraler Token-Transport, Einmal-Tickets, Cache-/Store-Trennung und späte Antwort nach Token-Erneuerung; echte zwei Benutzer am lokalen Socket nachgewiesen, Clerk-Identitäten synthetisch. Echte Browseranmeldung offen. |
+| 9 | Umgesetzt | Fokussierte Video-Router/Anlage-/CSV-/Query-/Metadaten-/Jobservices; Query-/Mutation-/Transfer-/Import-/Polling-Hooks, Tabelle/Filter/Recovery separat. Unerreichbare Settings-Flows entfernt. Bestehende Architektur und URLs erhalten. |
+| 10 | Umgesetzt und gemessen | Seiten 50/max.100, Count/Filter/Sortierung/Export gleicher Auswahlvertrag, ID-Tie-Breaker auch bei Feldsortierung/Nullwerten, Abbruch/Seitenkorrektur, vollständiger Export, begrenztes Polling und Duplikatsuche. 100/1.000/10.000-Rohdaten vorhanden. |
+| 11 | Lokal implementiert und geprüft; externe Abnahme offen | Alle lokalen Pflichtprüfungen erfolgreich. Echte Clerk-/Provider-/Browserabnahme und gehosteter CI-Lauf fehlen; bekannte Dependency-Risiken separat bewertet. |
 
-Clerk wurde anhand der offiziellen [Token-Verifikation](https://clerk.com/docs/guides/sessions/manual-jwt-verification),
-[Session-Claims](https://clerk.com/docs/guides/sessions/session-tokens) und des
-[React-Quickstarts](https://clerk.com/docs/react/getting-started/quickstart) geprüft.
-Es wurde keine vorhandene Instanzkonfiguration nachgewiesen und keine reale Anmeldung durchgeführt.
-Keine Secrets angefordert oder in Chat/Repository übernommen. Fehlende Konfiguration erklärt
-nicht die noch fehlende lokale Auth-Implementierung.
+## Aktuelle Prüfungen
 
-## Nachweisarten
+Alle Datenbankbefehle verwenden eigene `_test`-Datenbanken. Keine Migration wurde
+auf bestehenden Benutzerdaten ausgeführt. Grundlage: Python 3.11.15, Node 22.22.3,
+PostgreSQL 16, Redis 7, macOS 27.2 arm64 / Apple M1 Max / 32 GiB.
 
-- **Echt lokal:** PostgreSQL-Transaktionen, parallele CSV-Imports, DB-Leases/-Claims/-Locks,
-  Redis/ARQ-Transport, Alembic auf neuer Datenbank und synthetischem Altstand, Worker-Burst-Start,
-  npm-Produktionsbuild, pytest/Vitest/Ruff/mypy-Ausführung.
-- **Simuliert:** YouTube-/KI-Antworten, Redis-Ausfalltest, WebSocket-Verbindungsabläufe und
-  Providerarbeit im ARQ-Transporttest. Diese Tests sind keine echte Provider-/Browserabnahme.
-- **Nicht nachgewiesen:** Clerk-Login, Tokenablauf, Benutzerwechsel, produktive WebSocket-Tickets,
-  vollständige Zwei-Benutzer-Isolation, echte Providerantworten, Lastmessung und gehosteter CI-Lauf.
+| Prüfung | Ausgeführtes Ergebnis |
+| --- | --- |
+| `frontend: npm test -- --run` | **1.311 bestanden**, 122 Dateien, regulär beendet, 137,93 s. Zuvor 1.308/3 mit veraltetem Provider-Mock; dieser wurde fachlich korrigiert und anschließend die volle Suite grün ausgeführt. |
+| `frontend: npm run build` | Erfolgreich nach gezielten Dependency-Updates; Vite-Bundle-Warnung bleibt. |
+| `frontend: npm run lint` | Erfolgreich, keine Fehler; 169 Warnungen, keine Regelabschwächung. |
+| `backend: mypy app` | **125 Quelldateien ohne Fehler**, `strict=true`; keine pauschalen Ignores/Ausschlüsse. |
+| `backend: ruff check app tests` | Erfolgreich, Regeln unverändert. |
+| Vollständige Backend-Suite vor letzten Prüfungsfällen | **988 bestanden / 11 bestehende Skips**, 203,48 s. |
+| Zusätzlicher Backend-Schlusslauf | 992 bestanden / 10 Skips; ein Verbindungsfehler beim SSL-Upgrade und ein daraus folgender Fixturefehler. Nicht als grün gewertet. Nachfolgend Fixture-/Transportreparatur und erneuter vollständiger Lauf. |
+| Fixture-/Transportregression | Cleanup zunächst reproduzierbar rot (Commit einer nach Flush fehlgeschlagenen Transaktion), dann grün; 38 relevante Prüfungen. 250 unabhängige echte Verbindungen zum isolierten lokalen Dienst erfolgreich. |
+| Backend-Schlusslauf nach Reparatur | **1.001 bestanden / 10 bestehende Skips**, keine Fehler, 196,74 s. Vorher durch striktes Rollback aufgedeckte ORM-Korruption (7 Test-/7 Cleanup-Fehler) wurde durch separate Antwortmodelle und korrekte Collection-Instrumentierung behoben. |
+| Signierter kontinuierlicher API-Abnahmeablauf | Bestanden: A → Liste → Video → CSV/Duplikat → Tag/Feld → Auswahl/Sortierung → Export/Reimport → Redis-Ausfall/Worker-Replay → anonymer Zugriff → B. RSA/HTTP/PostgreSQL echt; Provider und Ausfall simuliert. |
+| Tatsächlicher lokaler WebSocket | Signierte HTTP-Sitzung → Redis-Einmal-Ticket → Uvicorn/TCP → private A/B-Kanäle; Wiederverwendung HTTP 403. Bestanden. Keine echte Clerk-Anmeldung. |
+| Zusatzfälle Pagination/Retry/Readiness | 19 gezielte Tests bestanden: Feldsortierung über alle Seiten in beiden Richtungen, paralleler expliziter Retry, echte DB/Redis/Dispatcher-Readiness sowie bisherige Grenzen/Retention. |
+| Migration auf neuer leerer Testdatenbank | `bookmarks_final_transport_test`: komplette Kette und Upgrade synthetischer Altdaten erfolgreich. Kein ORM-only-Nachweis. |
+| Workerstart | `arq app.workers.settings.WorkerSettings --burst` auf eigens migriertem `bookmarks_final_20261110_0434_test`, Redis-DB 2: erfolgreich, 18 Funktionen/Cronjobs; keine Providerarbeit. |
+| Operator-CLI | `scripts/outbox_status.py` auf derselben synthetischen DB: erfolgreich, leere Diagnose, ohne Mutationsflags. |
+| API-Drift | `scripts/check_api_client.py`: eigener laufender Test-Backend-Prozess, 249 erzeugte Dateien stimmen byteweise überein. Neuer Client aus Orval, keine manuellen Änderungen. |
+| Pagination-Messung | Je 3 Backend-/Frontendfälle bestanden; Rohdaten und Grenzen unter [pagination/](pagination/README.md). |
 
-Die Workflow-Datei ist lokal erstellt und syntaktisch als YAML geprüft. Es erfolgten kein Push,
-Merge, Deployment oder externer CI-Lauf. Bestehende Benutzerdaten wurden nicht migriert.
-Die ursprünglichen uncommitteten Projektdateien außerhalb dieses Worktrees wurden nicht übernommen.
+Backend-Reproduktion (`backend/`):
+
+```sh
+export TEST_DATABASE_URL=postgresql+asyncpg://test:test@localhost:55438/bookmarks_test
+export TEST_REDIS_URL=redis://localhost:56388/3
+export REDIS_URL=redis://localhost:56388/0
+.venv/bin/python -m pytest -q -rs --tb=short
+.venv/bin/ruff check app tests
+.venv/bin/mypy app
+.venv/bin/python scripts/check_api_client.py
+```
+
+Der lokale Compose-Dienst hat `SHOW ssl = off`. Nur für Loopback/Port 55438 mit
+`_test`-Datenbank wird SSL-Negotiation explizit ausgeschaltet; Anwendung und entfernte
+Datenbanken erhalten keine solche Überschreibung. Test-URL-Prüfung bleibt davor
+obligatorisch. Der genaue frühere einmalige Verbindungsabbruch wird dadurch nicht
+rückwirkend als vollständig erklärte Ursache behauptet.
+
+## Nachweisarten und verbleibende Grenzen
+
+**Echt lokal:** PostgreSQL-Transaktionen/Constraints/Locks, parallele Imports,
+Redis/ARQ-Transport, RSA-Signaturen/JWKS-Parser, ASGI-Routen, tatsächlicher TCP-
+WebSocket, Readiness, Alembic, Workerstart, Compiler/Linter/Tests und Messwerte.
+**Simuliert:** Clerk-Sitzungszustand im Frontend, signierte synthetische Clerk-
+Subjects, YouTube-/Gemini-/Groq-Antworten und injizierter Redis-Ausfall. UI-Tests
+laufen in jsdom; die Renderdaten messen keine Browser-Paint-Zeit.
+
+Es wurden 21 frühere Skips durch ausgeführte Prüfungen abgedeckt (11 Abo-Worker,
+7 Feldunion, 1 kombinierte Sortierung, 1 Socket-Authentifizierung,
+1 lokale Transcript-Validierung). Zehn vorher bestehende
+Skips bleiben ausdrücklich sichtbar: zwei echte Gemini-Clienttests und fünf
+Provider-Integrationstests ohne `GEMINI_API_KEY`; drei Tests für einen bislang
+nicht implementierten direkten Legacy-Gemini-Extraktionspfad im Video-Worker.
+Letztere sind keine durch fehlende Secrets erklärte Implementierung. Eine neue
+Extraktionsfunktion liegt gemäß Planabschnitt 5 außerhalb der Stabilisierung;
+sie wird nicht als bereits vorhandene Produktfunktion ausgegeben.
+
+Folgende reale Abnahmen sind **nicht erledigt**:
+
+1. Bestehende Clerk-Anwendung im Browser: Login, Ablauf/Refresh, Logout, A→B,
+   Cache-/Store-/Socket-Trennung und Wiederverbindung. Erforderlich sind
+   `VITE_CLERK_PUBLISHABLE_KEY`, `CLERK_ISSUER`, exakte
+   `CLERK_AUTHORIZED_PARTIES` und gegebenenfalls die tatsächlich konfigurierte
+   Audience sowie zwei verwendbare Testidentitäten. Die private Secret-Anfrage
+   lief ohne Eingabe ab. Kein Clerk Secret Key ist für JWKS-Verifikation nötig.
+2. Echte YouTube-/Gemini-/Groq-/Hub-Antworten mit vorhandenen privaten Keys und
+   bestehender erreichbarer Callback-Konfiguration. Es wurde keine kostenpflichtige
+   Ressource eingerichtet. Eine durchgehende echte Browser-/Providerreise bleibt offen.
+3. Gehosteter CI-Lauf: Workflow lokal implementiert, kein Push/Deployment ausgelöst.
+
+Die offizielle [Clerk-Tokenprüfung](https://clerk.com/docs/guides/sessions/manual-jwt-verification),
+[Session-Claims](https://clerk.com/docs/guides/sessions/session-tokens) und
+[React-Einrichtung](https://clerk.com/docs/react/getting-started/quickstart) wurden geprüft.
+Tokens/Secrets wurden nicht in Chat, Git oder localStorage übernommen.
+
+Bekannte verbleibende [Dependency-Risiken](dependency-bewertung.md) sind separat
+bewertet; grüne Verhaltenstests sind keine Security-Freigabe. Ein externer Provider
+kann ohne Idempotenz nach Antwort plus lokalem Absturz erneut aufgerufen werden.
+Weitere Betriebsgrenzen: [Auth](../AUTH_SETUP.md), [Queue](../QUEUE_OPERATIONS.md),
+[Routeninventar](../security/routeninventar.md), [Architektur](../ARCHITECTURE.md).
+
+## Historische Arbeitsstände
+
+Die folgenden Einträge bewahren rote Läufe und Zwischenstände. Sie ersetzen nicht
+die aktuelle Matrix und Prüfungen oben.
 
 ## Arbeitsprotokoll
 
@@ -335,3 +411,75 @@ Clerk-/Hub-Abnahmen stehen aus. Details und Betriebsgrenzen:
 `documentation/AUTH_SETUP.md`, `documentation/security/routeninventar.md`.
 AP 6: zusätzliche Ausfallfälle jetzt geprüft; Sichtbarkeit/Retention und verbleibende
 Recovery-Fälle werden noch vervollständigt. AP 9/10/11 bleiben in Arbeit.
+
+## Abschließende Selbstprüfung und Commit-Nachweis
+
+Die zuletzt aufgedeckten Fehler wurden nicht durch tolerantere Fixtures verdeckt:
+`6ecd3de` erzwingt einen sauberen Rollback; dadurch aufgedeckte Modellkorruption
+wird in `3de1a22` tatsächlich behoben. `9b7a2a0` serialisiert Erstanmeldungen,
+ohne Konten anhand der Platzhalter-E-Mail zu verbinden. Danach: vollständige Suite
+1.001/10, strenges mypy über 125 Dateien und Ruff grün. Die API-Driftprüfung blieb
+auch nach der DTO-Trennung unverändert grün. Die alten roten Läufe bleiben oben
+als solche dokumentiert.
+
+Selbstreview entsprechend dem ausdrücklichen Subagent-Verbot: Diff-/Whitespace-
+Prüfung, lokale Dokumentationslinks, Enqueue-Inventar (einzige direkte fachliche
+ARQ-Übergabe im Dispatcher), Commit-Abstammung und Betriebsanleitungen geprüft.
+Keine unabhängige Review- oder gehostete CI-Abnahme behauptet. Der private Clerk-
+Konfigurationskanal endete mit `timed_out`; keine lokale Aufgabe wurde deshalb
+vorzeitig beendet. Zusätzlich nötige reale Eingaben/Nachweise stehen oben.
+
+Alle 33 Ausgangscommits bis `73eb20e401553d9c9ea628ceeb28553d52c25921` sind erhalten.
+Folgende 50 Fortsetzungscommits liegen danach; der abschließende Protokollcommit
+ist zusätzlich über den Repository-Head nachvollziehbar:
+
+- `ddeaa1a` fix: type model relationships and timestamp inheritance correctly
+- `7c3bb73` fix: resolve frontend lint errors without weakening rules
+- `3cad882` fix: cover category actions and recoverable settings errors
+- `0a7bfbe` fix: expose sorting controls and align interaction test fixtures
+- `ed16b7a` fix: preserve field cache order and sanitize rich text output
+- `8b1c32a` test: verify player and information dialog detail flows
+- `bd9b37c` fix: reconcile schema field selection and enable removal
+- `91c8e7e` test: verify animated import progress and category table contract
+- `96e895f` fix: preserve new schema selection and recover field creation failures
+- `4ffe443` fix: unify video detail keys and invalidate dependent field views
+- `7603bbb` docs: record frontend repairs and remaining stabilization acceptance
+- `9cbb968` fix: persist progress delivery and acknowledge parent work atomically
+- `624e5cf` feat: verify Clerk signatures and map external identities explicitly
+- `27607dd` feat: protect business routes and enforce user ownership in queries
+- `237a0e1` feat: authenticate realtime connections with single-use tickets
+- `61325f9` feat: gate app sessions and isolate tokens caches and realtime state
+- `a113bba` feat: verify WebSub deliveries and persist replay-safe channel intents
+- `0914e97` feat: add explicit dry-run legacy ownership administration
+- `9d15ddf` test: cover dispatcher crashes and worker acknowledgement failure windows
+- `5c6e9e7` docs: record local identity isolation and durable progress proofs
+- `a4b4e8d` fix: persist subscription imports and exercise formerly skipped worker cases
+- `c9214f0` fix: retain ownership criteria when ORM state expires
+- `f5d8a18` refactor: split video routes and extract metadata jobs and queries
+- `01fc3c1` refactor: separate video hooks and share one progress connection
+- `f2e73ff` feat: paginate collection queries with stable ordering and totals
+- `87336df` feat: browse server pages and reconcile totals after filter and deletion
+- `b20758d` fix: bound import polling and detect duplicates beyond the current page
+- `fff1ff3` feat: export every matching video with the shared selection contract
+- `f083344` refactor: move video creation and CSV orchestration behind transaction-owned services
+- `62cb7d0` refactor: separate video table and field editing from page coordination
+- `23842fa` refactor: remove unreachable settings flows and their redundant queries
+- `e7b0119` refactor: extract video filters recovery display and import controller
+- `e0f2e41` fix: enforce strict backend contracts and validate provider cache responses
+- `8100d24` feat: expose durable operation recovery retention and dependency readiness
+- `df1248b` fix: adapt ownership criteria to aliased field queries
+- `975b863` test: enforce hidden-resource and atomic progress failure contracts
+- `25f4105` test: activate field regressions and verify real socket user isolation
+- `db503c8` fix: reject stale responses after token-refresh user changes
+- `ca3e05c` test: verify page cancellation and refresh field-dependent statistics
+- `a09e0a6` ci: regenerate API clients and reject drift against a running test backend
+- `12a7a70` test: assert a single progress connection shared by consumers
+- `e869e5b` chore: retire unused legacy JWT configuration validation
+- `21cfe96` chore: update exposed transport editor sanitizer and token dependencies
+- `1c905b3` test: verify signed acceptance flow recovery and stable field pagination
+- `207b7ca` test: validate empty transcripts without requiring provider secrets
+- `6ecd3de` fix: stabilize local test transport and roll back failed fixture transactions
+- `3de1a22` fix: keep response DTOs separate from instrumented ORM relationships
+- `9b7a2a0` fix: serialize first identity creation across both unique indexes
+- `d96fe6f` docs: describe verified setup ownership boundaries and dependency limits
+- `db7a29b` docs: record bounded pagination measurements and their limits
