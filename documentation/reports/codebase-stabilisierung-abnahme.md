@@ -13,12 +13,12 @@ Die offenen Punkte umfassen noch Implementierung, nicht nur fehlende externe Nac
 | --- | --- | --- |
 | 1 | Lokal umgesetzt | Python 3.11, Root-npm-Lockfile, separate PostgreSQL-/Redis-Services, DB-Ziel-/Verbindungs-/Suite-Schutz, reguläre vollständige Testläufe. |
 | 2 | Teilweise | Build repariert, mehrere Produktfehler und Testverträge korrigiert. Bekannte Frontend-Fehlergruppen behoben, Lint ohne Fehler. Stabile abschließende Gesamtsuite nach den weiteren Änderungen ausstehend. |
-| 3 | Teilweise | Auth-bestätigter Reconnect, paginierte History, monotone Zusammenführung, Retry-UI und Origin-URL lokal getestet. Der HTTP-Vertrag verlangt noch `user_id`; produktive History-/Clerk-Integration und stabile serverseitige Eventidentitäten fehlen. |
+| 3 | Teilweise | Auth-bestätigter Reconnect, paginierte History, monotone Zusammenführung, Retry-UI und Origin-URL lokal getestet. History ist sitzungsgebunden und teilt stabile Eventidentitäten mit Live-Zustellung. Finale Gesamt-/Browserabnahme noch offen. |
 | 4 | Lokal abgeschlossen | PostgreSQL-Upsert statt Zeilen-Rollback, letzte gültige Feldzeile, Parallelimport und CSV-Roundtrip nachgewiesen. Provider gemockt. |
 | 5 | Teilweise | Create verändert keine fremden Filter-/Sortiercaches, inaktive Varianten werden stale. Detail-/Schema-/Feldwert-Invalidierung ergänzt; Pagination und endgültige Integrationsprüfung bleiben offen. |
 | 6 | Weitgehend lokal implementiert, nicht vollständig abgenommen | Outbox, Dispatcher, Leases/Backoff, stabile ARQ-ID, dauerhafte Worker-Claims, Ziel-Lock und Commit vor Bestätigung; fachliche Produzenten/Recovery umgestellt. Einige geforderte Crash-/Doppeldispatch-Fälle und Oberflächen für verwaiste/finale Fehler fehlen. |
-| 7 | Nicht implementiert | Clerk-Tokens, alle HTTP-Eigentumsprüfungen, Zwei-Benutzer-Matrix, Altdatenzuordnung und verifizierte WebSub-Ausnahmen fehlen. |
-| 8 | Nicht implementiert | Clerk-Frontend, zentrale Tokens, Einmal-Tickets und vollständige Bereinigung beim Benutzerwechsel fehlen. |
+| 7 | Lokal implementiert, Gesamtabnahme offen | Signierte synthetische A/B-Matrix, HTTP-Scope/Referenzprüfung, expliziter Legacy-Transfer und WebSub-Schutz vorhanden. Echte Clerk-/Hub-Abnahme und finale Gesamtsuite fehlen. |
+| 8 | Lokal implementiert, externe Abnahme offen | Clerk-Frontend, aktueller zentraler Token-Transport, Einmal-Tickets und Cache-/Store-Isolation getestet. Echter Browserablauf mit bestehender Clerk-Konfiguration fehlt. |
 | 9 | Teilweise | CSV-Persistenz/Feldimport-Service und eigenständige Thumbnail-Komponente extrahiert. Router-/Query-Service-Aufteilung, weitere Page-/Hook-Extraktionen fehlen. |
 | 10 | Nicht implementiert | Serverpagination, Migration der Aufrufer und Messung 100/1.000/10.000 fehlen. |
 | 11 | Teilweise | CI-Datei, reparierte Migrationskette samt synthetischem Upgrade, Worker-Start und aktualisierte Anleitung. Frontend-/Typprüfungen, API-Generator-Drift, Readiness und vollständiger realer Ablauf offen. |
@@ -295,3 +295,43 @@ unverändert. AP 2: bekannte Fehlergruppen bearbeitet, stabile Gesamtprüfung
 noch ausstehend. AP 5: Detail-/Schema-/Feldinvalidierung ergänzt; die spätere
 Pagination muss die Cacheverträge erneut absichern. AP 3/6–11 bleiben gemäß
 obiger Matrix weiter in Arbeit.
+
+### Fortsetzung: Authentifizierung, Echtzeit und Ausfallfenster
+
+- `9cbb968`: History und Live-Zustellung teilen dieselbe Event-ID; Zähler,
+  History und Sendeabsicht liegen in einer Transaktion. Individuelle Videojobs
+  schließen nun ihren Elternjob mit ab. Finale DB-Änderung und Outbox-Bestätigung
+  werden gemeinsam committet. 26 gezielte Backendtests inklusive realem Redis/ARQ,
+  paralleler Fortschrittsupdates und Rollback; 28 WebSocket-/Recoverytests bestanden.
+- `624e5cf`, `27607dd`: Clerk-Signaturen/JWKS/Rotation, Issuer/exp/nbf/iat/azp/aud,
+  parallele lokale Identitätsanlage und obligatorischer HTTP-Benutzerscope.
+  Signierte synthetische A/B-Matrix über alle fachlichen Routen und Fremd-ID-Pfade
+  bestanden. Keine Identität aus Client-`user_id`, kein erster Benutzer als Fallback.
+  Gezielt 47 von 48 älteren/neu ergänzten Tests bestanden; der letzte Unterschied
+  im vereinheitlichten 404-Fehlertext wurde danach einzeln grün geprüft.
+- `237a0e1`: Einmal-Tickets statt Legacy-JWT/Default-Benutzer am WebSocket,
+  Hashspeicherung/TTL/atomisches GETDEL auf echter isolierter Redis-Instanz.
+  Ticketredaktion und Abbruch blockierter Listener geprüft.
+- `61325f9`: Vorhandenes Clerk-React-SDK lokal installiert, private Oberfläche
+  gegated, aktuelles Token zentral im Transport, einmalige Erneuerung nach 401,
+  Abbruch/Generationsprüfung und neuer Cache pro Sitzung. 36 gezielte Tests und
+  Produktionsbuild bestanden. Clerk-Zustand in Frontendtests simuliert.
+- `a113bba`: Signierte und begrenzte WebSub-Zustellung mit permanenten
+  Replay-Digests und atomarer Outbox. Hub-Abgleich nach Commit, gemeinsame Kanäle
+  werden bei verbleibenden Abonnenten nicht abgemeldet. 68 gezielte Tests bestanden,
+  11 bereits zuvor vorhandene Worker-Skips; zusätzlicher Shared-Channel-Test grün.
+  Keine neuen Skips. Replay-Rollback und parallele identische Zustellungen geprüft.
+- `0914e97`: Explizites Legacy-Transfer-Skript mit Dry-Run, Backup-Anforderung
+  und wiederholbarem synthetischem Transfer (2 Tests). Migrationskette auf neuem
+  `bookmarks_auth_migration_test` inklusive synthetischer Altdaten erfolgreich.
+- `9d15ddf`: 12 Outbox-Tests einschließlich Absturz nach Enqueue, konkurrierender
+  Dispatcher und Abbruch zwischen Providerantwort und finalem Commit bestanden.
+  **Begrenzung:** Ein externer Provider ohne Idempotenz kann nach solchem Abbruch
+  erneut aufgerufen werden. Der Test zeigt absichtlich zwei simulierte Antworten,
+  aber nur einen final persistierten Datensatz. Keine Exactly-once-Providerzusage.
+
+AP 7/8 sind lokal implementiert; zusätzliche Gesamt-/Integrationsprüfung und echte
+Clerk-/Hub-Abnahmen stehen aus. Details und Betriebsgrenzen:
+`documentation/AUTH_SETUP.md`, `documentation/security/routeninventar.md`.
+AP 6: zusätzliche Ausfallfälle jetzt geprüft; Sichtbarkeit/Retention und verbleibende
+Recovery-Fälle werden noch vervollständigt. AP 9/10/11 bleiben in Arbeit.
