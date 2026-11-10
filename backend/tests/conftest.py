@@ -1,4 +1,3 @@
-import asyncio
 import os
 from datetime import UTC
 from unittest.mock import AsyncMock, patch
@@ -25,19 +24,6 @@ def safe_test_database_url():
     return validated_test_database_url(
         os.environ.get("TEST_DATABASE_URL"), settings.database_url
     )
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """
-    Create an event loop for the test session.
-
-    This fixture overrides the default pytest-asyncio event loop fixture
-    to use session scope, allowing session-scoped async fixtures.
-    """
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture(scope="session")
@@ -75,6 +61,7 @@ async def test_db(test_engine):
             await session.rollback()
             raise
         finally:
+            await session.rollback()
             # Clean up all data after each test to ensure isolation
             # Disable foreign key checks, truncate all tables, re-enable
             safe_test_database_url()
