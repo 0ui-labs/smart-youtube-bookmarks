@@ -67,3 +67,15 @@ WebSocket-URL folgt Origin und ws/wss; Proxy nutzt `/api` einschließlich WebSoc
 Gezielte Reconnect-Regression rot → grün. Bestehender Hook-Testvertrag korrigiert:
 Socket-Mock löst bei Öffnen wie die echte Library ein Render aus; Store liefert `realProgress`.
 HTTP-History-Authentifizierung und persistente Eventidentität bleiben Teil der offenen AP-7/8-Arbeit.
+
+AP 4 ergänzend: Parallelimporte desselben Videos und letzte gültige Feldwerte in
+wiederholten CSV-Zeilen explizit geprüft: **6/6 bestanden**, echte PostgreSQL-Transaktionen,
+YouTube-/Queue-Seiteneffekte simuliert.
+
+### AP 5: Create-Cache
+
+Regression mit ungefiltertem, zwei Tagfiltern und absteigender Sortierung rot → grün.
+Create hängt keine Datensätze mehr in abgeleitete Caches; vorhandene Daten bleiben bis
+zum Refetch erhalten, inaktive Varianten werden stale. Mutationsergebnis steht sofort bereit.
+Gemeinsamer gezielter Hook-Lauf (Cache + WebSocket): **26/26 bestanden**.
+Weitere Detail-/Schema-/Feldwert-Regressionen stehen noch aus.

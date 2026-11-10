@@ -251,41 +251,10 @@ export const useCreateVideo = (listId: string) => {
       );
       return data;
     },
-    // Optimistic update: add new video immediately to cache
-    onSuccess: (newVideo) => {
-      // Update cache directly instead of invalidating (prevents re-fetch flicker)
-      queryClient.setQueryData<VideoResponse[]>(
-        videoKeys.list(listId),
-        (old = []) => {
-          // Check if video already exists (prevent duplicates)
-          const exists = old?.some((v) => v.id === newVideo.id);
-          if (exists) return old;
-          return [...(old || []), newVideo];
-        }
-      );
-
-      // Also update filtered queries if they exist
-      const queryCache = queryClient.getQueryCache();
-      queryCache.findAll({ queryKey: videoKeys.lists() }).forEach((query) => {
-        if (
-          query.queryKey.length >= 3 &&
-          query.queryKey[1] === "list" &&
-          query.queryKey[2] === listId
-        ) {
-          queryClient.setQueryData<VideoResponse[]>(
-            query.queryKey as any,
-            (old = []) => {
-              // Check if video already exists (prevent duplicates)
-              const exists = old?.some((v) => v.id === newVideo.id);
-              if (exists) return old;
-              return [...(old || []), newVideo];
-            }
-          );
-        }
-      });
-
-      // YouTube Channels Feature: Invalidate channels query to show new/updated channels
-      // Creating a video may create a new channel or update video counts
+    onSuccess: () => {
+      // Membership, order, and totals are server-owned. Preserve existing data
+      // during refetch and mark inactive variants stale for their next mount.
+      queryClient.invalidateQueries({ queryKey: videoKeys.list(listId) });
       queryClient.invalidateQueries({ queryKey: ["channels"] });
     },
   });
