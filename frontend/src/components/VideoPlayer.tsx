@@ -1,7 +1,9 @@
 import {
+  isYouTubeProvider,
   MediaPlayer,
   type MediaPlayerInstance,
   MediaProvider,
+  type MediaProviderAdapter,
   Poster,
   Track,
 } from "@vidstack/react";
@@ -222,6 +224,15 @@ export const VideoPlayer = ({
     }
   }, [setPlaybackRate]);
 
+  // Avoid Vidstack's fixed English embed/caption preference. YouTube still
+  // controls audio selection; an empty language does not guarantee original audio.
+  const handleProviderChange = useCallback(
+    (provider: MediaProviderAdapter | null) => {
+      if (isYouTubeProvider(provider)) provider.language = "";
+    },
+    []
+  );
+
   // Error fallback UI
   if (error) {
     return (
@@ -282,6 +293,7 @@ export const VideoPlayer = ({
         onError={handleError}
         onPause={handlePause}
         onPlay={handlePlay}
+        onProviderChange={handleProviderChange}
         onRateChange={handleRateChange}
         onSeeked={handleSeeked}
         onTimeUpdate={handleTimeUpdate}

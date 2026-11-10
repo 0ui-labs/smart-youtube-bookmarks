@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock Vidstack before importing VideoPlayer
 vi.mock("@vidstack/react", () => ({
+  isYouTubeProvider: (provider: { type?: string } | null) =>
+    provider?.type === "youtube",
   MediaPlayer: vi.fn(({ children, src, className, title }) => (
     <div
       className={className}
@@ -51,6 +53,8 @@ vi.mock("@/hooks/useWatchProgress", () => ({
 // Mock Vidstack CSS imports
 vi.mock("@vidstack/react/player/styles/default/theme.css", () => ({}));
 vi.mock("@vidstack/react/player/styles/default/layouts/video.css", () => ({}));
+
+import { MediaPlayer } from "@vidstack/react";
 
 import { VideoPlayer } from "../VideoPlayer";
 
@@ -214,5 +218,41 @@ describe("VideoPlayer", () => {
       "English"
     );
     expect(screen.getByTestId("track-chapters")).toBeInTheDocument();
+  });
+});
+
+describe("YouTube language configuration", () => {
+  function providerChange() {
+    render(<VideoPlayer videoId="test-uuid" youtubeId="dQw4w9WgXcQ" />, {
+      wrapper: createWrapper(),
+    });
+    const props = vi.mocked(MediaPlayer).mock.calls.at(-1)?.[0];
+    const change = props?.onProviderChange;
+    if (!change) throw new Error("Missing provider-change handler");
+    return change;
+  }
+
+  it("removes the fixed English preference on each YouTube provider", () => {
+    const change = providerChange();
+    const first = { type: "youtube", language: "en" };
+    const next = { type: "youtube", language: "en" };
+    act(() => {
+      change(first as never, undefined as never);
+      change(next as never, undefined as never);
+    });
+    expect(first.language).toBe("");
+    expect(next.language).toBe("");
+  });
+
+  it("leaves non-YouTube provider settings intact", () => {
+    const change = providerChange();
+    const other = { type: "video", language: "de" };
+    act(() => change(other as never, undefined as never));
+    expect(other.language).toBe("de");
+  });
+
+  it("handles provider teardown without throwing", () => {
+    const change = providerChange();
+    expect(() => act(() => change(null, undefined as never))).not.toThrow();
   });
 });
