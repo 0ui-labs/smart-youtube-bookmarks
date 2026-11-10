@@ -229,3 +229,106 @@ async def test_individual_video_delivery_advances_parent_once(
             }
     await test_db.refresh(job)
     assert (job.processed_count, job.status) == (1, "completed")
+
+
+async def test_dispatch_crash_after_enqueue_preserves_stable_delivery_id(test_db):
+    from datetime import UTC, datetime, timedelta
+
+    class ProcessCrash(BaseException):
+        pass
+
+    operation = await record_job(
+        test_db, "enrich_video", "synthetic-crash", ["synthetic-crash"]
+    )
+    await test_db.commit()
+    operation_id = operation.id
+    queue = AsyncMock()
+    queue.enqueue_job.side_effect = ProcessCrash()
+    import pytest
+
+    with pytest.raises(ProcessCrash):
+        await dispatch_jobs(test_db, queue)
+    await test_db.rollback()
+    operation = await test_db.get(JobOutbox, operation_id)
+    assert operation.status == "dispatching"
+    operation.lease_until = datetime.now(UTC) - timedelta(seconds=1)
+    await test_db.commit()
+    queue.enqueue_job.side_effect = None
+    await dispatch_jobs(test_db, queue)
+    assert [call.kwargs["_job_id"] for call in queue.enqueue_job.call_args_list] == [
+        f"outbox:{operation_id}"
+    ] * 2
+
+
+async def test_two_dispatchers_claim_each_intent_once(test_db, test_engine):
+    import asyncio
+
+    await record_job(
+        test_db, "enrich_video", "synthetic-concurrent", ["synthetic-concurrent"]
+    )
+    await test_db.commit()
+    sessions = async_sessionmaker(test_engine, expire_on_commit=False)
+    queue = AsyncMock()
+    async with sessions() as first, sessions() as second:
+        counts = await asyncio.gather(
+            dispatch_jobs(first, queue), dispatch_jobs(second, queue)
+        )
+    assert sum(counts) == 1
+    queue.enqueue_job.assert_awaited_once()
+
+
+async def test_worker_abort_after_provider_response_replays_uncommitted_business(
+    test_db, test_engine, test_user, monkeypatch
+):
+    from unittest.mock import patch
+
+    import pytest
+    from sqlalchemy import func
+
+    from app.models.list import BookmarkList
+    from app.workers.outbox_dispatcher import run_durable_job
+
+    operation = await record_job(
+        test_db, "enrich_video", "synthetic-abort", ["synthetic-abort"]
+    )
+    await test_db.commit()
+    sessions = async_sessionmaker(test_engine, expire_on_commit=False)
+    provider_calls = []
+
+    async def handler(ctx, video_id):
+        provider_calls.append(video_id)  # External providers may repeat this window.
+        ctx["db"].add(BookmarkList(name="Atomic final result", user_id=test_user.id))
+        await ctx["db"].flush()
+        return {"status": "completed"}
+
+    async with sessions() as business:
+        real_commit = business.commit
+        monkeypatch.setattr(
+            business,
+            "commit",
+            AsyncMock(side_effect=ConnectionError("injected before acknowledgement")),
+        )
+        with patch(
+            "app.workers.outbox_dispatcher.job_handlers",
+            return_value={"enrich_video": handler},
+        ):
+            with pytest.raises(ConnectionError):
+                await run_durable_job(
+                    {"outbox_session_factory": sessions, "db": business},
+                    str(operation.id),
+                )
+            await business.rollback()
+            monkeypatch.setattr(business, "commit", real_commit)
+            await run_durable_job(
+                {"outbox_session_factory": sessions, "db": business}, str(operation.id)
+            )
+    await test_db.refresh(operation)
+    assert operation.status == "completed"
+    assert len(provider_calls) == 2
+    assert (
+        await test_db.execute(
+            select(func.count())
+            .select_from(BookmarkList)
+            .where(BookmarkList.name == "Atomic final result")
+        )
+    ).scalar_one() == 1
