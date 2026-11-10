@@ -1,140 +1,138 @@
-"""
-Webhook endpoints for external service integrations.
+"""Public WebSub callbacks, limited to expected topics and signed deliveries."""
 
-Currently handles:
-- PubSubHubbub (WebSub) notifications from YouTube for channel updates
-"""
-
-import logging
-from typing import Any
+import hashlib
+import hmac
+from typing import Any, Literal
+from urllib.parse import parse_qs, urlsplit
 
 import feedparser
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_public_db
+from app.models.job_outbox import JobOutbox
+from app.models.subscription import Subscription
+from app.models.webhook_delivery import WebhookDelivery
 from app.services.job_dispatch_service import DurableJobQueue
 
-logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
+MAX_DELIVERY_BYTES = 256 * 1024
+
+
+async def expected_channel(db: AsyncSession, channel_id: str) -> bool:
+    return (
+        await db.execute(
+            select(Subscription.id)
+            .where(
+                Subscription.is_active.is_(True),
+                Subscription.channel_ids.any(channel_id),
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none() is not None
 
 
 @router.get("/pubsubhubbub")
 async def verify_pubsub(
-    hub_mode: str = Query(..., alias="hub.mode"),
-    hub_topic: str = Query(..., alias="hub.topic"),
-    hub_challenge: str = Query(..., alias="hub.challenge"),
-    hub_lease_seconds: int | None = Query(None, alias="hub.lease_seconds"),
+    hub_mode: Literal["subscribe", "unsubscribe"] = Query(..., alias="hub.mode"),
+    hub_topic: str = Query(..., alias="hub.topic", max_length=2048),
+    hub_challenge: str = Query(
+        ...,
+        alias="hub.challenge",
+        min_length=1,
+        max_length=512,
+        pattern=r"^[A-Za-z0-9._~+=/-]+$",
+    ),
+    hub_lease_seconds: int | None = Query(
+        None, alias="hub.lease_seconds", ge=1, le=864000
+    ),
+    db: AsyncSession = Depends(get_public_db),
 ) -> Response:
-    """
-    Verification callback for PubSubHubbub subscriptions.
-
-    When we subscribe to a YouTube channel feed, Google's hub sends a GET
-    request to verify we control this callback URL. We must echo back the
-    hub.challenge to confirm the subscription.
-
-    Args:
-        hub_mode: Either "subscribe" or "unsubscribe"
-        hub_topic: The feed URL we're subscribing to
-        hub_challenge: Random string we must echo back
-        hub_lease_seconds: How long the subscription will last
-
-    Returns:
-        The hub.challenge value as plain text
-    """
-    # Verify this is a YouTube feed topic we expect
-    if not hub_topic.startswith("https://www.youtube.com/xml/feeds/videos.xml"):
-        logger.warning(f"PubSubHubbub verification for unknown topic: {hub_topic}")
+    topic = urlsplit(hub_topic)
+    query = parse_qs(topic.query)
+    channels = query.get("channel_id", [])
+    if (
+        topic.scheme != "https"
+        or topic.netloc != "www.youtube.com"
+        or topic.path not in {"/xml/feeds/videos.xml", "/feeds/videos.xml"}
+        or topic.fragment
+        or set(query) != {"channel_id"}
+        or len(channels) != 1
+    ):
         raise HTTPException(status_code=404, detail="Unknown topic")
-
-    # Extract channel_id from topic for logging
-    channel_id = (
-        hub_topic.split("channel_id=")[-1] if "channel_id=" in hub_topic else "unknown"
+    expected = await expected_channel(db, channels[0])
+    if hub_mode == "unsubscribe":
+        expected = (
+            await db.execute(
+                select(JobOutbox.id)
+                .where(
+                    JobOutbox.kind == "sync_pubsub_channel",
+                    JobOutbox.target_id == channels[0],
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none() is not None
+    if not expected:
+        raise HTTPException(status_code=404, detail="Unknown topic")
+    return Response(
+        content=hub_challenge,
+        media_type="application/octet-stream",
+        headers={"X-Content-Type-Options": "nosniff"},
     )
-
-    logger.info(
-        f"PubSubHubbub verification: mode={hub_mode}, "
-        f"channel={channel_id}, lease={hub_lease_seconds}s"
-    )
-
-    # Echo the challenge to confirm subscription
-    return Response(content=hub_challenge, media_type="text/plain")
 
 
 @router.post("/pubsubhubbub")
 async def receive_pubsub_notification(
     request: Request, db: AsyncSession = Depends(get_public_db)
 ) -> dict[str, Any]:
-    """
-    Receive new video notifications from YouTube.
-
-    YouTube's PubSubHubbub hub sends POST requests with Atom XML
-    containing information about newly uploaded videos. We parse
-    the feed and queue background jobs to process each video.
-
-    The Atom feed contains entries like:
-    ```xml
-    <entry>
-        <yt:videoId>VIDEO_ID</yt:videoId>
-        <yt:channelId>CHANNEL_ID</yt:channelId>
-        <title>Video Title</title>
-        <published>2024-01-01T00:00:00+00:00</published>
-    </entry>
-    ```
-
-    Returns:
-        Status and count of processed entries
-    """
-    body = await request.body()
-
-    if not body:
-        logger.warning("PubSubHubbub received empty notification body")
-        return {"status": "empty", "processed": 0}
-
-    # Parse Atom feed
-    feed = feedparser.parse(body)
-
-    if feed.bozo:
-        # feedparser sets bozo=1 for malformed feeds
-        logger.warning(f"PubSubHubbub received malformed feed: {feed.bozo_exception}")
-        return {"status": "malformed", "processed": 0}
-
-    if not feed.entries:
-        logger.debug("PubSubHubbub notification contained no entries")
-        return {"status": "no_entries", "processed": 0}
-
-    processed_count = 0
-    for entry in feed.entries:
-        # YouTube Atom feeds use custom namespaces
-        # feedparser normalizes them to yt_videoid, yt_channelid
-        video_id = entry.get("yt_videoid")
-        channel_id = entry.get("yt_channelid")
-
-        if not video_id or not channel_id:
-            logger.warning(
-                f"PubSubHubbub entry missing video_id or channel_id: {entry}"
-            )
-            continue
-
-        # Log the notification
-        title = entry.get("title", "Unknown")
-        logger.info(
-            f"PubSubHubbub notification: video={video_id}, "
-            f"channel={channel_id}, title={title!r}"
+    secret = settings.pubsub_signing_secret.get_secret_value()
+    if not secret:
+        raise HTTPException(
+            status_code=503, detail="Webhook verification not configured"
         )
-
-        # Queue background job to process this notification
-        try:
-            await DurableJobQueue(db).enqueue_job(
-                "process_pubsub_notification",
-                video_id=video_id,
-                channel_id=channel_id,
-            )
-            processed_count += 1
-        except Exception as e:
-            logger.error(f"Failed to queue job for video {video_id}: {e}")
-
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > MAX_DELIVERY_BYTES:
+            raise HTTPException(status_code=413, detail="Delivery too large")
+    method, _, signature = request.headers.get("x-hub-signature", "").partition("=")
+    if (
+        method not in {"sha1", "sha256", "sha384", "sha512"}
+        or len(signature) > 128
+        or not hmac.compare_digest(
+            hmac.new(secret.encode(), body, method).hexdigest(), signature
+        )
+    ):
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    if not body:
+        return {"status": "empty", "processed": 0}
+    feed = feedparser.parse(bytes(body))
+    if feed.bozo:
+        return {"status": "malformed", "processed": 0}
+    entries = [
+        (entry.get("yt_videoid"), entry.get("yt_channelid")) for entry in feed.entries
+    ]
+    valid = [(video, channel) for video, channel in entries if video and channel]
+    for channel in {channel for _, channel in valid}:
+        if not await expected_channel(db, channel):
+            raise HTTPException(status_code=404, detail="Unknown topic")
+    digest = hashlib.sha256(body).hexdigest()
+    accepted = (
+        await db.execute(
+            insert(WebhookDelivery)
+            .values(digest=digest)
+            .on_conflict_do_nothing(index_elements=[WebhookDelivery.digest])
+            .returning(WebhookDelivery.id)
+        )
+    ).scalar_one_or_none()
+    if accepted is None:
+        return {"status": "duplicate", "processed": 0}
+    for video_id, channel_id in valid:
+        await DurableJobQueue(db).enqueue_job(
+            "process_pubsub_notification", video_id=video_id, channel_id=channel_id
+        )
     await db.commit()
-    logger.info(f"PubSubHubbub processed {processed_count} entries")
-    return {"status": "ok", "processed": processed_count}
+    return {"status": "ok" if entries else "no_entries", "processed": len(valid)}

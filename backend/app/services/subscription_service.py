@@ -19,7 +19,6 @@ from app.schemas.subscription import (
     SubscriptionFilters,
     SubscriptionUpdate,
 )
-from app.services.pubsub_service import PubSubHubbubService
 
 logger = logging.getLogger(__name__)
 
@@ -303,50 +302,17 @@ class SubscriptionService:
     async def _subscribe_channels(
         self, subscription: Subscription, channel_ids: list[str]
     ) -> None:
-        """
-        Subscribe to PubSubHubbub for a list of channels.
-
-        Updates the subscription's pubsub_expires_at on success.
-
-        Args:
-            subscription: The subscription to update
-            channel_ids: List of YouTube channel IDs to subscribe to
-        """
-        if not channel_ids:
-            return
-
-        async with PubSubHubbubService() as pubsub:
-            results = await pubsub.subscribe_channels(channel_ids)
-
-            success_count = sum(1 for success in results.values() if success)
-            if success_count > 0:
-                # Set expiry to 10 days from now
-                subscription.pubsub_expires_at = datetime.utcnow() + timedelta(days=10)
-                logger.info(
-                    f"Subscribed to {success_count}/{len(channel_ids)} channels "
-                    f"for subscription {subscription.id}"
-                )
-            else:
-                logger.warning(
-                    f"Failed to subscribe to any channels for subscription {subscription.id}"
-                )
+        await self._queue_channel_sync(channel_ids)
 
     async def _unsubscribe_channels(self, channel_ids: list[str]) -> None:
-        """
-        Unsubscribe from PubSubHubbub for a list of channels.
+        await self._queue_channel_sync(channel_ids)
 
-        Args:
-            channel_ids: List of YouTube channel IDs to unsubscribe from
-        """
-        if not channel_ids:
-            return
+    async def _queue_channel_sync(self, channel_ids: list[str]) -> None:
+        from app.services.job_dispatch_service import DurableJobQueue
 
-        async with PubSubHubbubService() as pubsub:
-            results = await pubsub.unsubscribe_channels(channel_ids)
-
-            success_count = sum(1 for success in results.values() if success)
-            logger.info(
-                f"Unsubscribed from {success_count}/{len(channel_ids)} channels"
+        for channel_id in set(channel_ids):
+            await DurableJobQueue(self.db).enqueue_job(
+                "sync_pubsub_channel", channel_id
             )
 
     async def _update_channel_subscriptions(

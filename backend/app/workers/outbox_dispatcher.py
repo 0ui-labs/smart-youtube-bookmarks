@@ -19,12 +19,14 @@ def job_handlers() -> dict[str, Callable[..., Awaitable[Any]]]:
     from app.workers.subscription_worker import (
         poll_subscription,
         process_pubsub_notification,
+        sync_pubsub_channel,
     )
     from app.workers.video_processor import process_video, process_video_list
 
     return {
         handler.__name__: handler
         for handler in (
+            sync_pubsub_channel,
             publish_job_progress,
             enrich_video,
             poll_subscription,

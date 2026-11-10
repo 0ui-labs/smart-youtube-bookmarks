@@ -684,3 +684,33 @@ class TestPollSubscription:
         # Check match_count updated
         await test_db.refresh(sub)
         assert sub.match_count == 2
+
+
+async def test_channel_reconciliation_keeps_other_users_subscribed(
+    test_db, test_list, test_user
+):
+    from unittest.mock import AsyncMock, patch
+
+    from app.models.subscription import Subscription
+    from app.workers.subscription_worker import sync_pubsub_channel
+
+    subscription = Subscription(
+        user_id=test_user.id,
+        list_id=test_list.id,
+        name="Remaining subscriber",
+        channel_ids=["UCshared"],
+    )
+    test_db.add(subscription)
+    await test_db.commit()
+    service = AsyncMock()
+    service.subscribe.return_value = True
+    service.unsubscribe.return_value = True
+    with patch("app.workers.subscription_worker.PubSubHubbubService") as factory:
+        factory.return_value.__aenter__.return_value = service
+        await sync_pubsub_channel({"db": test_db}, "UCshared")
+        service.subscribe.assert_awaited_once_with("UCshared")
+        service.unsubscribe.assert_not_awaited()
+        await test_db.delete(subscription)
+        await test_db.commit()
+        await sync_pubsub_channel({"db": test_db}, "UCshared")
+        service.unsubscribe.assert_awaited_once_with("UCshared")

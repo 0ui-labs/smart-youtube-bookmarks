@@ -668,3 +668,32 @@ def _apply_search_filters(
         result = [v for v in result if (v.view_count or 0) >= min_views]
 
     return result
+
+
+async def sync_pubsub_channel(ctx: dict, channel_id: str) -> dict:
+    """Reconcile the shared hub callback after committed subscription changes."""
+    db: AsyncSession = ctx["db"]
+    subscriptions = (
+        (
+            await db.execute(
+                select(Subscription).where(
+                    Subscription.is_active.is_(True),
+                    Subscription.channel_ids.any(channel_id),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    async with PubSubHubbubService() as pubsub:
+        accepted = (
+            await pubsub.subscribe(channel_id)
+            if subscriptions
+            else await pubsub.unsubscribe(channel_id)
+        )
+    if not accepted:
+        raise RuntimeError("Hub reconciliation unavailable")
+    for subscription in subscriptions:
+        subscription.pubsub_expires_at = datetime.utcnow() + timedelta(days=10)
+    await db.flush()
+    return {"status": "completed"}

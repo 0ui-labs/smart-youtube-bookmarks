@@ -3,12 +3,21 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from pydantic import SecretStr
 
+from app.core.config import settings
 from app.services.pubsub_service import (
     PubSubHubbubService,
     subscribe_to_channel,
     unsubscribe_from_channel,
 )
+
+
+@pytest.fixture(autouse=True)
+def configured_signing_secret(monkeypatch):
+    monkeypatch.setattr(
+        settings, "pubsub_signing_secret", SecretStr("synthetic-websub-test-only")
+    )
 
 
 class TestPubSubHubbubService:

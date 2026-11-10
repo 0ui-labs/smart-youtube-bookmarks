@@ -6,7 +6,7 @@ including database connection strings, API keys, and environment configuration.
 Settings can be overridden via environment variables or a .env file.
 """
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
 
     # PubSubHubbub (YouTube channel notifications)
+    pubsub_signing_secret: SecretStr = SecretStr("")
     pubsub_callback_url: str = "http://localhost:8000"
 
     # Enrichment settings

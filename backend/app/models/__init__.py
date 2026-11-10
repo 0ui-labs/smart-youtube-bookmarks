@@ -13,6 +13,7 @@ from .user import User
 from .video import Video
 from .video_enrichment import EnrichmentStatus, VideoEnrichment
 from .video_field_value import VideoFieldValue
+from .webhook_delivery import WebhookDelivery
 
 __all__ = [
     "Base",
@@ -32,6 +33,7 @@ __all__ = [
     "Tag",
     "User",
     "Video",
+    "WebhookDelivery",
     "VideoEnrichment",
     "VideoFieldValue",
     "video_tags",

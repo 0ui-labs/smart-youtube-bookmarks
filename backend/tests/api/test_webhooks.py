@@ -1,11 +1,51 @@
 """Tests for webhook endpoints."""
 
+import hashlib
+import hmac
 from unittest.mock import patch
 
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import select
 
+from app.core.config import settings
+from app.models import BookmarkList, Subscription
 from app.models.job_outbox import JobOutbox
+from app.services.job_dispatch_service import record_job
+
+
+@pytest.fixture(autouse=True)
+async def signed_webhook_requests(client, test_db, test_user, monkeypatch):
+    """Happy paths use actual HMAC bytes; negative tests override the signature."""
+    secret = "synthetic-websub-test-only"
+    monkeypatch.setattr(settings, "pubsub_signing_secret", SecretStr(secret))
+    collection = BookmarkList(name="Synthetic webhook owner", user_id=test_user.id)
+    test_db.add(collection)
+    await test_db.flush()
+    test_db.add(
+        Subscription(
+            user_id=test_user.id,
+            list_id=collection.id,
+            name="Synthetic channel subscription",
+            channel_ids=["UCxxxxxx"],
+        )
+    )
+    await test_db.commit()
+
+    async def sign(request):
+        if (
+            request.method == "POST"
+            and request.url.path == "/api/webhooks/pubsubhubbub"
+            and "x-hub-signature" not in request.headers
+        ):
+            request.headers["x-hub-signature"] = (
+                "sha256="
+                + hmac.new(secret.encode(), request.content, hashlib.sha256).hexdigest()
+            )
+
+    client.event_hooks["request"].append(sign)
+    yield
+    client.event_hooks["request"].remove(sign)
 
 
 class TestPubSubHubbubVerification:
@@ -26,11 +66,13 @@ class TestPubSubHubbubVerification:
 
         assert response.status_code == 200
         assert response.text == "test-challenge-12345"
-        assert response.headers["content-type"] == "text/plain; charset=utf-8"
+        assert response.headers["content-type"] == "application/octet-stream"
 
     @pytest.mark.asyncio
-    async def test_verification_unsubscribe(self, client):
-        """Verification works for unsubscribe mode."""
+    async def test_verification_unsubscribe(self, client, test_db):
+        """Verification works for a durably intended unsubscribe."""
+        await record_job(test_db, "sync_pubsub_channel", "UCxxxxxx", ["UCxxxxxx"])
+        await test_db.commit()
         response = await client.get(
             "/api/webhooks/pubsubhubbub",
             params={
@@ -230,3 +272,104 @@ class TestPubSubHubbubNotification:
         assert (
             await test_db.execute(select(JobOutbox))
         ).scalar_one().status == "pending"
+
+
+@pytest.mark.parametrize("signature", ["", "sha256=invalid", "md5=invalid"])
+async def test_forged_or_missing_signature_is_rejected(client, signature, test_db):
+    response = await client.post(
+        "/api/webhooks/pubsubhubbub",
+        content=b"synthetic",
+        headers={"x-hub-signature": signature},
+    )
+    assert response.status_code == 401
+    assert (await test_db.execute(select(JobOutbox))).scalars().all() == []
+
+
+async def test_replayed_notification_has_one_durable_intent(client, test_db):
+    body = b'<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom"><entry><yt:videoId>dQw4w9WgXcQ</yt:videoId><yt:channelId>UCxxxxxx</yt:channelId></entry></feed>'
+    first = await client.post("/api/webhooks/pubsubhubbub", content=body)
+    second = await client.post("/api/webhooks/pubsubhubbub", content=body)
+    assert first.json() == {"status": "ok", "processed": 1}
+    assert second.json() == {"status": "duplicate", "processed": 0}
+    assert len((await test_db.execute(select(JobOutbox))).scalars().all()) == 1
+
+
+async def test_oversized_notification_rejected_before_parsing(client):
+    response = await client.post(
+        "/api/webhooks/pubsubhubbub", content=b"x" * (256 * 1024 + 1)
+    )
+    assert response.status_code == 413
+
+
+async def test_unknown_subscription_cannot_trigger_work(client, test_db):
+    body = b'<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom"><entry><yt:videoId>dQw4w9WgXcQ</yt:videoId><yt:channelId>UCunknown</yt:channelId></entry></feed>'
+    response = await client.post("/api/webhooks/pubsubhubbub", content=body)
+    assert response.status_code == 404
+    assert (await test_db.execute(select(JobOutbox))).scalars().all() == []
+
+
+async def test_missing_signing_configuration_fails_closed(client, monkeypatch):
+    monkeypatch.setattr(settings, "pubsub_signing_secret", SecretStr(""))
+    response = await client.post("/api/webhooks/pubsubhubbub", content=b"synthetic")
+    assert response.status_code == 503
+
+
+async def test_replay_guard_rolls_back_with_failed_intent(
+    client, test_db, test_engine, monkeypatch
+):
+    from unittest.mock import AsyncMock
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from app.core.database import get_public_db
+    from app.main import app
+    from app.models.webhook_delivery import WebhookDelivery
+
+    override = app.dependency_overrides.pop(get_public_db)
+    monkeypatch.setattr(
+        "app.core.database.AsyncSessionLocal",
+        async_sessionmaker(test_engine, expire_on_commit=False),
+    )
+    body = b'<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom"><entry><yt:videoId>dQw4w9WgXcQ</yt:videoId><yt:channelId>UCxxxxxx</yt:channelId></entry></feed>'
+    try:
+        with patch(
+            "app.api.webhooks.DurableJobQueue.enqueue_job",
+            new=AsyncMock(side_effect=RuntimeError("injected")),
+        ):
+            with pytest.raises(RuntimeError):
+                await client.post("/api/webhooks/pubsubhubbub", content=body)
+        assert (await test_db.execute(select(WebhookDelivery))).scalars().all() == []
+        response = await client.post("/api/webhooks/pubsubhubbub", content=body)
+        assert response.json() == {"status": "ok", "processed": 1}
+    finally:
+        app.dependency_overrides[get_public_db] = override
+
+
+async def test_parallel_duplicate_deliveries_have_one_intent(
+    client, test_db, test_engine, monkeypatch
+):
+    import asyncio
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from app.core.database import get_public_db
+    from app.main import app
+
+    override = app.dependency_overrides.pop(get_public_db)
+    monkeypatch.setattr(
+        "app.core.database.AsyncSessionLocal",
+        async_sessionmaker(test_engine, expire_on_commit=False),
+    )
+    body = b'<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom"><entry><yt:videoId>dQw4w9WgXcQ</yt:videoId><yt:channelId>UCxxxxxx</yt:channelId></entry></feed>'
+    try:
+        responses = await asyncio.gather(
+            *[client.post("/api/webhooks/pubsubhubbub", content=body) for _ in range(3)]
+        )
+        assert sorted(response.json()["processed"] for response in responses) == [
+            0,
+            0,
+            1,
+        ]
+        assert len((await test_db.execute(select(JobOutbox))).scalars().all()) == 1
+    finally:
+        app.dependency_overrides[get_public_db] = override

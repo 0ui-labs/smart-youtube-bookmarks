@@ -131,7 +131,7 @@ async def test_create_subscription_invalid_list(client: AsyncClient, test_user):
         },
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
 

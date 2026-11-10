@@ -93,6 +93,7 @@ async def mock_arq_pool():
 async def mock_redis_client():
     """Mock Redis client to avoid Redis connection in tests."""
     mock_redis = AsyncMock()
+    mock_redis.get.return_value = None
     mock_pubsub = AsyncMock()
     mock_pubsub.subscribe = AsyncMock()
     mock_pubsub.unsubscribe = AsyncMock()
@@ -157,6 +158,7 @@ async def client(test_db, mock_arq_pool, mock_redis_client, monkeypatch):
         patch("app.core.redis.get_arq_pool", return_value=mock_arq_pool),
         patch("app.core.redis.get_redis_client", return_value=mock_redis_client),
         patch("app.api.videos.get_redis_client", return_value=mock_redis_client),
+        patch("app.api.subscriptions.get_redis_client", return_value=mock_redis_client),
         patch(
             "app.clients.youtube.YouTubeClient.get_video_metadata",
             new_callable=AsyncMock,

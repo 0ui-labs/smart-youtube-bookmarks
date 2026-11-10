@@ -93,6 +93,9 @@ class PubSubHubbubService:
         Returns:
             True if subscription request was accepted (202 status)
         """
+        secret = settings.pubsub_signing_secret.get_secret_value()
+        if not secret:
+            return False  # Never create an unsigned webhook subscription.
         callback = callback_url or self.callback_url
         topic = self._get_topic_url(channel_id)
 
@@ -101,6 +104,7 @@ class PubSubHubbubService:
             "hub.topic": topic,
             "hub.callback": callback,
             "hub.verify": "async",
+            "hub.secret": secret,
             "hub.lease_seconds": str(lease_seconds),
         }
 
