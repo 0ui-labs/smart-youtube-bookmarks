@@ -3,7 +3,7 @@
 import asyncio
 import os
 import tempfile
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..exceptions import CaptionExtractionError
 from .base import CaptionProvider, CaptionResult
@@ -62,6 +62,8 @@ class YoutubeCaptionProvider(CaptionProvider):
 
     def _fetch_sync(self, youtube_id: str) -> CaptionResult | None:
         """Synchronous yt-dlp fetch (runs in thread pool)."""
+        from typing import cast
+
         import yt_dlp
 
         url = f"https://www.youtube.com/watch?v={youtube_id}"
@@ -71,17 +73,22 @@ class YoutubeCaptionProvider(CaptionProvider):
             output_template = os.path.join(tmpdir, "%(id)s")
 
             # First, extract info to find available subtitles
-            info_opts = {
+            # Published stub incorrectly declares skip_download as str; yt-dlp uses bool.
+            info_opts: dict[str, bool] = {
                 "skip_download": True,
                 "quiet": True,
                 "no_warnings": True,
             }
 
-            with yt_dlp.YoutubeDL(info_opts) as ydl:
+            with yt_dlp.YoutubeDL(cast("_YoutubeDLOptions", info_opts)) as ydl:
                 info = ydl.extract_info(url, download=False)
 
-            subtitles = info.get("subtitles", {})
-            auto_captions = info.get("automatic_captions", {})
+            subtitles: dict[str, list[dict[str, str]]] = dict(
+                info.get("subtitles") or {}
+            )
+            auto_captions: dict[str, list[dict[str, str]]] = dict(
+                info.get("automatic_captions") or {}
+            )
 
             # Determine which language to download
             selection = self._select_best_caption_language(subtitles, auto_captions)
@@ -91,7 +98,7 @@ class YoutubeCaptionProvider(CaptionProvider):
             language, is_auto = selection
 
             # Download subtitles with yt-dlp (uses its rate limiting)
-            download_opts = {
+            download_opts: dict[str, object] = {
                 "skip_download": True,
                 "writesubtitles": not is_auto,
                 "writeautomaticsub": is_auto,
@@ -104,7 +111,7 @@ class YoutubeCaptionProvider(CaptionProvider):
                 "sleep_interval_subtitles": 1,  # 1 second between subtitle requests
             }
 
-            with yt_dlp.YoutubeDL(download_opts) as ydl:
+            with yt_dlp.YoutubeDL(cast("_YoutubeDLOptions", download_opts)) as ydl:
                 ydl.download([url])
 
             # Find and read the downloaded VTT file
@@ -190,3 +197,7 @@ class YoutubeCaptionProvider(CaptionProvider):
             return lang
 
         return None
+
+
+if TYPE_CHECKING:
+    from yt_dlp import _YoutubeDLOptions

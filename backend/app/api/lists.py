@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/lists", tags=["lists"])
 
 
 @router.get("", response_model=list[ListResponse])
-async def get_lists(db: AsyncSession = Depends(get_db)):
+async def get_lists(db: AsyncSession = Depends(get_db)) -> list[ListResponse]:
     # First get all lists with video counts
     result = await db.execute(
         select(
@@ -60,7 +60,9 @@ async def get_lists(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", response_model=ListResponse, status_code=201)
-async def create_list(list_data: ListCreate, db: AsyncSession = Depends(get_db)):
+async def create_list(
+    list_data: ListCreate, db: AsyncSession = Depends(get_db)
+) -> ListResponse:
     from app.services.access_service import authenticated_user
 
     values = list_data.model_dump(exclude={"user_id"})
@@ -84,7 +86,7 @@ async def create_list(list_data: ListCreate, db: AsyncSession = Depends(get_db))
 
 
 @router.get("/{list_id}", response_model=ListResponse)
-async def get_list(list_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_list(list_id: UUID, db: AsyncSession = Depends(get_db)) -> ListResponse:
     result = await db.execute(
         select(
             BookmarkList.id,
@@ -131,7 +133,7 @@ async def get_list(list_id: UUID, db: AsyncSession = Depends(get_db)):
 @router.put("/{list_id}", response_model=ListResponse)
 async def update_list(
     list_id: UUID, list_update: ListUpdate, db: AsyncSession = Depends(get_db)
-):
+) -> ListResponse:
     """Update a list (name, description, or default_schema_id)."""
     # Fetch list
     result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
@@ -181,7 +183,7 @@ async def update_list(
 
 
 @router.delete("/{list_id}", status_code=204)
-async def delete_list(list_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_list(list_id: UUID, db: AsyncSession = Depends(get_db)) -> None:
     result = await db.execute(select(BookmarkList).where(BookmarkList.id == list_id))
     list_obj = result.scalar_one_or_none()
 

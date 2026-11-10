@@ -1,6 +1,7 @@
 """Service for aggregating available fields for videos."""
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -31,7 +32,7 @@ async def get_available_fields(video: "Video", db: AsyncSession) -> list[CustomF
     Returns:
         List of CustomField objects available for this video
     """
-    field_ids: set = set()
+    field_ids: set[UUID] = set()
     fields: list[CustomField] = []
 
     # Step 2.10: Get workspace (default schema) fields

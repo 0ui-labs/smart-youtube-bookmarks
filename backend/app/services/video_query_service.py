@@ -2,13 +2,13 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, selectinload
+from sqlalchemy.orm import InstrumentedAttribute, aliased, selectinload
 from sqlalchemy.sql import Select
 
 from app.api.helpers.field_union import get_available_fields_for_videos
@@ -43,8 +43,8 @@ async def _load_channel_thumbnails(videos: Sequence[Video], db: AsyncSession) ->
         set(v.channel for v in videos if not v.channel_id and v.channel)
     )
 
-    channels_by_id: dict = {}
-    channels_by_name: dict = {}
+    channels_by_id: dict[UUID, Channel] = {}
+    channels_by_name: dict[str, Channel] = {}
 
     # Fetch channels by ID
     if channel_ids:
@@ -72,7 +72,9 @@ async def _load_channel_thumbnails(videos: Sequence[Video], db: AsyncSession) ->
             video.__dict__["channel_thumbnail_url"] = None
 
 
-async def _apply_sorting(stmt, sort_by: str | None, sort_order: str, db: AsyncSession):
+async def _apply_sorting(
+    stmt: Select[Any], sort_by: str | None, sort_order: str, db: AsyncSession
+) -> Select[Any]:
     """
     Apply sorting to a video query statement.
 
@@ -126,6 +128,7 @@ async def _apply_sorting(stmt, sort_by: str | None, sort_order: str, db: AsyncSe
             ),
         )
 
+        sort_column: InstrumentedAttribute[Any]
         # Determine sort column based on field type
         if field.field_type == "rating":
             sort_column = VideoFieldValue.value_numeric
@@ -149,7 +152,7 @@ async def _apply_sorting(stmt, sort_by: str | None, sort_order: str, db: AsyncSe
 
     else:
         # Standard column sorting (title, duration, created_at, channel)
-        valid_columns = {
+        valid_columns: dict[str, InstrumentedAttribute[Any]] = {
             "title": Video.title,
             "duration": Video.duration,
             "created_at": Video.created_at,
@@ -343,7 +346,7 @@ async def hydrate_videos(db: AsyncSession, videos: Sequence[Video]) -> list[Vide
         tags_by_id = {}
 
     # Group tags by video_id
-    tags_by_video: dict = {}
+    tags_by_video: dict[UUID, list[Tag]] = {}
     for assoc in associations:
         video_id = assoc.video_id
         tag_id = assoc.tag_id
@@ -415,7 +418,7 @@ async def hydrate_videos(db: AsyncSession, videos: Sequence[Video]) -> list[Vide
                 # Only include fields that have values (not None)
                 if field_value:
                     # ✅ REF #3: Extract value based on field type (float not int)
-                    value = None
+                    value: float | str | bool | None = None
                     if field.field_type == "rating":
                         value = field_value.value_numeric  # Can be float
                     elif field.field_type in ("select", "text"):
@@ -481,14 +484,16 @@ async def query_videos_in_list(
     list_id: UUID,
     tags: list[str] | None = None,
     sort_by: str | None = None,
-    sort_order: str | None = "asc",
+    sort_order: Literal["asc", "desc"] | None = "asc",
     offset: int = 0,
     limit: int = 100,
 ) -> list[Video]:
     selection = await build_video_selection(
         db,
         list_id,
-        VideoFilterRequest(tags=tags, sort_by=sort_by, sort_order=sort_order),
+        VideoFilterRequest.model_validate(
+            {"tags": tags, "sort_by": sort_by, "sort_order": sort_order}
+        ),
     )
     return await hydrate_videos(
         db, (await db.execute(selection.offset(offset).limit(limit))).scalars().all()

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.websocket("/ws/progress")
-async def websocket_progress_endpoint(websocket: WebSocket):
+async def websocket_progress_endpoint(websocket: WebSocket) -> None:
     user = await get_current_ws_user(
         websocket, websocket.scope.get("connection_ticket")
     )
@@ -45,7 +45,7 @@ async def websocket_progress_endpoint(websocket: WebSocket):
     # Flag to signal shutdown to both tasks
     shutdown_event = asyncio.Event()
 
-    async def handle_redis_messages():
+    async def handle_redis_messages() -> None:
         """Listen for progress updates from Redis and forward to WebSocket."""
         try:
             await pubsub.subscribe(channel)
@@ -86,7 +86,7 @@ async def websocket_progress_endpoint(websocket: WebSocket):
         finally:
             shutdown_event.set()
 
-    async def handle_websocket_messages():
+    async def handle_websocket_messages() -> None:
         """Listen for client messages (ping/pong heartbeat, auth)."""
         try:
             while not shutdown_event.is_set():

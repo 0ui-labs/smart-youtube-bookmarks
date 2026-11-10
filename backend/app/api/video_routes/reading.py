@@ -1,7 +1,8 @@
 """Video reading endpoints."""
 
 import logging
-from typing import Annotated, Literal
+from collections.abc import Sequence
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -83,7 +84,9 @@ async def filter_videos_in_list(
 
 
 @router.get("/videos/{video_id}", response_model=VideoResponse)
-async def get_video_by_id(video_id: UUID, db: AsyncSession = Depends(get_db)) -> Video:
+async def get_video_by_id(
+    video_id: UUID, db: AsyncSession = Depends(get_db)
+) -> dict[str, Any]:
     """
     Get single video with complete field information (detail view).
 
@@ -169,7 +172,7 @@ async def get_video_by_id(video_id: UUID, db: AsyncSession = Depends(get_db)) ->
         # Only include fields that have values (not None)
         if field_value:
             # Extract value based on field type
-            value = None
+            value: float | str | bool | None = None
             if field.field_type == "rating":
                 value = field_value.value_numeric
             elif field.field_type in ("select", "text"):
@@ -269,11 +272,13 @@ async def get_video_page(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await query_video_page(
         db,
         list_id,
-        VideoFilterRequest(tags=tags, sort_by=sort_by, sort_order=sort_order),
+        VideoFilterRequest.model_validate(
+            {"tags": tags, "sort_by": sort_by, "sort_order": sort_order}
+        ),
         offset,
         limit,
     )
@@ -286,14 +291,14 @@ async def get_filtered_video_page(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     return await query_video_page(db, list_id, filters, offset, limit)
 
 
 @router.post("/lists/{list_id}/videos/lookup", response_model=VideoLookupResponse)
 async def lookup_video_imports(
     list_id: UUID, request: VideoLookupRequest, db: AsyncSession = Depends(get_db)
-):
+) -> dict[str, list[str]]:
     existing = (
         (
             await db.execute(
@@ -314,7 +319,7 @@ async def lookup_video_imports(
 )
 async def get_video_import_status(
     list_id: UUID, request: VideoImportStatusRequest, db: AsyncSession = Depends(get_db)
-):
+) -> Sequence[Video]:
     videos = (
         (
             await db.execute(

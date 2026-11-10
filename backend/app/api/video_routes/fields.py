@@ -237,7 +237,7 @@ async def batch_update_video_field_values(
     for fv in updated_values_raw:
         # Determine value based on field type
         if fv.field.field_type == "rating":
-            value = fv.value_numeric
+            value: float | str | bool | None = fv.value_numeric
         elif fv.field.field_type in ("select", "text"):
             value = fv.value_text
         elif fv.field.field_type == "boolean":

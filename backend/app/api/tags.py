@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/tags", tags=["tags"])
 async def create_tag(
     tag: TagCreate,
     db: AsyncSession = Depends(get_db),
-):
+) -> Tag:
     """Create a new tag."""
     current_user = authenticated_user(db)
 
@@ -90,7 +90,7 @@ async def create_tag(
 @router.get("", response_model=list[TagResponse])
 async def list_tags(
     db: AsyncSession = Depends(get_db),
-):
+) -> list[Tag]:
     """List all tags for current user."""
     current_user = authenticated_user(db)
 
@@ -109,7 +109,7 @@ async def list_tags(
 async def get_tag(
     tag_id: UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> Tag:
     """Get a specific tag by ID."""
     current_user = authenticated_user(db)
 
@@ -132,7 +132,7 @@ async def update_tag(
     tag_id: UUID,
     tag_update: TagUpdate,
     db: AsyncSession = Depends(get_db),
-):
+) -> Tag:
     """Update a tag (rename, change color, or bind/unbind schema)."""
     current_user = authenticated_user(db)
 
@@ -220,7 +220,7 @@ async def update_tag(
 async def delete_tag(
     tag_id: UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> None:
     """Delete a tag."""
     current_user = authenticated_user(db)
 

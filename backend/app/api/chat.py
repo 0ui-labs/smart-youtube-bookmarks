@@ -181,9 +181,7 @@ async def create_subscription_from_chat(
 
     # Build filters from config
     filters_dict = config.get("filters", {})
-    filters = (
-        SubscriptionFilters(**filters_dict) if filters_dict else SubscriptionFilters()
-    )
+    filters = SubscriptionFilters.model_validate(filters_dict)
 
     # Build SubscriptionCreate
     create_data = SubscriptionCreate(
@@ -200,6 +198,6 @@ async def create_subscription_from_chat(
 
     try:
         subscription = await service.create_subscription(create_data)
-        return subscription
+        return SubscriptionResponse.model_validate(subscription)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

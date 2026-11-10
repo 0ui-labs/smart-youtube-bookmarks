@@ -27,7 +27,7 @@ router = APIRouter()
 @router.post("/videos/bulk/tags", response_model=dict)
 async def bulk_assign_tags_to_videos(
     request: BulkAssignTagsRequest, db: AsyncSession = Depends(get_db)
-):
+) -> dict[str, int]:
     """
     Bulk assign tags to multiple videos (cartesian product).
 
@@ -91,7 +91,7 @@ async def bulk_assign_tags_to_videos(
 @router.post("/videos/{video_id}/tags", response_model=list[TagResponse])
 async def assign_tags_to_video(
     video_id: UUID, request: AssignTagsRequest, db: AsyncSession = Depends(get_db)
-):
+) -> list[Tag]:
     """Assign tags to a video (many-to-many). Returns the updated list of tags."""
     from app.services.category_validation import (
         CategoryValidationError,
@@ -169,7 +169,7 @@ async def assign_tags_to_video(
 )
 async def remove_tag_from_video(
     video_id: UUID, tag_id: UUID, db: AsyncSession = Depends(get_db)
-):
+) -> None:
     """Remove a tag from a video."""
     # Verify video exists
     video_stmt = select(Video).where(Video.id == video_id)
@@ -199,7 +199,9 @@ async def remove_tag_from_video(
 
 
 @router.get("/videos/{video_id}/tags", response_model=list[TagResponse])
-async def get_video_tags(video_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_video_tags(
+    video_id: UUID, db: AsyncSession = Depends(get_db)
+) -> list[Tag]:
     """Get all tags for a video."""
     # Verify video exists
     video_stmt = select(Video).where(Video.id == video_id)

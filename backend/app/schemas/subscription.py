@@ -94,7 +94,8 @@ class SubscriptionCreate(BaseModel):
     )
     keywords: list[str] | None = Field(None, description="Keywords to search for")
     filters: SubscriptionFilters = Field(
-        default_factory=SubscriptionFilters, description="Video matching filters"
+        default_factory=lambda: SubscriptionFilters.model_validate({}),
+        description="Video matching filters",
     )
     poll_interval: Literal["daily", "twice_daily"] = Field(
         "daily", description="How often to poll for new videos"

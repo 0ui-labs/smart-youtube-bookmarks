@@ -18,6 +18,7 @@ Example:
 import logging
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 from uuid import UUID
 
 try:
@@ -58,7 +59,7 @@ class SimilarityResult:
     similarity_type: SimilarityType
     explanation: str
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to API response format."""
         return {
             "field": {
@@ -322,7 +323,7 @@ class DuplicateDetector:
 
         return results
 
-    async def _get_embedding(self, text: str) -> np.ndarray:
+    async def _get_embedding(self, text: str) -> np.ndarray[Any, np.dtype[np.float32]]:
         """
         Get embedding vector for text with Redis caching.
 
@@ -357,7 +358,9 @@ class DuplicateDetector:
 
         return embedding
 
-    async def _call_gemini_embedding_api(self, text: str) -> np.ndarray:
+    async def _call_gemini_embedding_api(
+        self, text: str
+    ) -> np.ndarray[Any, np.dtype[np.float32]]:
         """
         Call Gemini embeddings API directly using REST.
 
@@ -376,7 +379,7 @@ class DuplicateDetector:
         # CORRECTED: Use header auth with x-goog-api-key
         headers = {
             "Content-Type": "application/json",
-            "x-goog-api-key": self.gemini_client.api_key,
+            "x-goog-api-key": self._embedding_api_key(),
         }
 
         # CORRECTED: Include task_type and output_dimensionality
@@ -399,7 +402,16 @@ class DuplicateDetector:
 
             return np.array(embedding, dtype=np.float32)
 
-    def _cosine_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
+    def _embedding_api_key(self) -> str:
+        if self.gemini_client is None:
+            raise ValueError("Semantic duplicate detection requires a Gemini client")
+        return self.gemini_client.api_key
+
+    def _cosine_similarity(
+        self,
+        vec1: np.ndarray[Any, np.dtype[np.float32]],
+        vec2: np.ndarray[Any, np.dtype[np.float32]],
+    ) -> float:
         """
         Calculate cosine similarity between two vectors.
 

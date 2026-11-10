@@ -4,13 +4,15 @@ import asyncio
 import json
 import logging
 import random
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TypedDict
+from typing import Any, cast
 
 import httpx
-from aiogoogle import Aiogoogle
+from aiogoogle.client import Aiogoogle
 from aiogoogle.excs import HTTPError
+from pydantic import TypeAdapter
 from redis.asyncio import Redis
 from tenacity import (
     retry,
@@ -18,7 +20,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
-from youtube_transcript_api import YouTubeTranscriptApi
+from typing_extensions import TypedDict
+from youtube_transcript_api._api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
     NoTranscriptFound,
     TranscriptsDisabled,
@@ -35,7 +38,7 @@ TRANSIENT_ERRORS = (
 )
 
 
-def _should_retry(exception: Exception) -> bool:
+def _should_retry(exception: BaseException) -> bool:
     """Check if exception should trigger retry (transient errors or HTTP 429)"""
     # Retry on transient network errors
     if isinstance(exception, TRANSIENT_ERRORS):
@@ -59,27 +62,27 @@ class VideoMetadata(TypedDict, total=False):
     video_id: str
     title: str
     channel: str
-    channel_id: str  # YouTube channel ID (e.g., UCX6OQ3DkcsbYNE6H8uQQuVA)
+    channel_id: str | None  # YouTube channel ID (e.g., UCX6OQ3DkcsbYNE6H8uQQuVA)
     published_at: str
     thumbnail_url: str
     duration: str
     # Extended metadata (snippet)
     description: str
     youtube_tags: list[str]
-    youtube_category_id: str
-    default_language: str
+    youtube_category_id: str | None
+    default_language: str | None
     # Content details
-    dimension: str
-    definition: str
+    dimension: str | None
+    definition: str | None
     has_captions: bool
-    region_restriction: dict
+    region_restriction: dict[str, Any] | None
     # Statistics
-    view_count: int
-    like_count: int
-    comment_count: int
+    view_count: int | None
+    like_count: int | None
+    comment_count: int | None
     # Status
-    privacy_status: str
-    is_embeddable: bool
+    privacy_status: str | None
+    is_embeddable: bool | None
 
 
 @dataclass
@@ -144,12 +147,14 @@ class YouTubeClient:
             cached = await self.redis.get(cache_key)
             if cached:
                 logger.debug(f"Cache HIT for video metadata: {video_id}")
-                return json.loads(cached)
+                return TypeAdapter(VideoMetadata).validate_json(cached)
             logger.debug(f"Cache MISS for video metadata: {video_id}")
 
         # Cache miss - fetch from API
         try:
-            async with Aiogoogle(api_key=self.api_key) as aiogoogle:
+            async with cast("Callable[..., Aiogoogle]", Aiogoogle)(
+                api_key=self.api_key
+            ) as aiogoogle:
                 youtube_v3 = await aiogoogle.discover("youtube", "v3")
 
                 request = youtube_v3.videos.list(
@@ -277,11 +282,13 @@ class YouTubeClient:
             cached = await self.redis.get(cache_key)
             if cached:
                 logger.info(f"Cache HIT for channel info: {channel_id}")
-                return json.loads(cached)
+                return TypeAdapter(ChannelInfo).validate_json(cached)
             logger.info(f"Cache MISS for channel info: {channel_id}")
 
         try:
-            async with Aiogoogle(api_key=self.api_key) as aiogoogle:
+            async with cast("Callable[..., Aiogoogle]", Aiogoogle)(
+                api_key=self.api_key
+            ) as aiogoogle:
                 youtube_v3 = await aiogoogle.discover("youtube", "v3")
 
                 request = youtube_v3.channels.list(part="snippet", id=channel_id)
@@ -351,7 +358,7 @@ class YouTubeClient:
             cached = await self.redis.get(cache_key)
             if cached:
                 logger.debug(f"Cache HIT for transcript: {video_id}")
-                return json.loads(cached) if cached else None
+                return TypeAdapter(str).validate_json(cached)
             logger.debug(f"Cache MISS for transcript: {video_id}")
 
         # Try multiple languages with fallback
@@ -391,7 +398,7 @@ class YouTubeClient:
 
         return None
 
-    async def get_batch_metadata(self, video_ids: list[str]) -> list[dict]:
+    async def get_batch_metadata(self, video_ids: list[str]) -> list[dict[str, Any]]:
         """
         Fetch metadata for multiple videos in one API call.
 
@@ -457,7 +464,7 @@ class YouTubeClient:
                     ids_param = ",".join(uncached_ids)
 
                     url = "https://www.googleapis.com/youtube/v3/videos"
-                    params = {
+                    params: dict[str, str | int | bool] = {
                         "part": "snippet,contentDetails,statistics,status",
                         "id": ids_param,
                         "key": self.api_key,
@@ -584,7 +591,7 @@ class YouTubeClient:
         """
         query = " ".join(keywords)
 
-        params = {
+        params: dict[str, str | int | bool] = {
             "part": "snippet",
             "q": query,
             "type": "video",

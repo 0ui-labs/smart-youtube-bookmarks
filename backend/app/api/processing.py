@@ -1,6 +1,7 @@
 """Processing job API and progress history."""
 
 import logging
+from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
@@ -22,7 +23,9 @@ router = APIRouter(prefix="/api", tags=["processing"])
 
 
 @router.post("/lists/{list_id}/process", response_model=JobResponse, status_code=201)
-async def start_processing(list_id: UUID, db: AsyncSession = Depends(get_db)):
+async def start_processing(
+    list_id: UUID, db: AsyncSession = Depends(get_db)
+) -> JobResponse:
     try:
         # Verify list exists
         result = await db.execute(
@@ -122,7 +125,9 @@ async def start_processing(list_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatus)
-async def get_job_status(job_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_job_status(
+    job_id: UUID, db: AsyncSession = Depends(get_db)
+) -> ProcessingJob:
     try:
         result = await db.execute(
             select(ProcessingJob).where(ProcessingJob.id == job_id)
@@ -141,7 +146,7 @@ async def get_job_status(job_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/jobs/{job_id}/pause", status_code=204)
-async def pause_job(job_id: UUID, db: AsyncSession = Depends(get_db)):
+async def pause_job(job_id: UUID, db: AsyncSession = Depends(get_db)) -> None:
     try:
         result = await db.execute(
             select(ProcessingJob).where(ProcessingJob.id == job_id)
@@ -178,7 +183,7 @@ async def get_progress_history(
     offset: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, gt=0, le=100, description="Maximum records to return"),
     db: AsyncSession = Depends(get_db),
-):
+) -> Sequence[JobProgressEvent]:
 
     try:
         # Verify job exists and load list relationship (with eager loading)
@@ -208,8 +213,8 @@ async def get_progress_history(
             .limit(limit)
         )
 
-        result = await db.execute(query)
-        events = result.scalars().all()
+        events_result = await db.execute(query)
+        events = events_result.scalars().all()
 
         return events
     except HTTPException:

@@ -3,6 +3,7 @@
 import csv
 import io
 import logging
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile, status
@@ -142,8 +143,10 @@ async def import_csv_videos(
                         f"Unknown field column '{column_name}' (no matching custom field), will be ignored"
                     )
 
-        videos_to_create = []
-        csv_rows_map = {}  # Store raw CSV rows by youtube_id for field value processing
+        videos_to_create: list[dict[str, Any]] = []
+        csv_rows_map: dict[
+            str, list[dict[str, str]]
+        ] = {}  # Store raw CSV rows by youtube_id for field value processing
         failures = []
         row_num = 1  # Start at 1 (header is row 0)
 
@@ -191,9 +194,8 @@ async def import_csv_videos(
         SYNC_BATCH_THRESHOLD = 5
         use_sync_fetch = len(videos_to_create) <= SYNC_BATCH_THRESHOLD
 
+        video_objects: list[Video] = []
         if videos_to_create:
-            video_objects = []
-
             if use_sync_fetch:
                 # SYNC PATH: Fetch metadata immediately for small batches
                 logger.info(
@@ -287,13 +289,12 @@ async def import_csv_videos(
                     video_objects.append(video)
 
             # Update videos_to_create to actual Video objects
-            videos_to_create = video_objects
 
         # Bulk insert valid videos (all with pending status)
-        created_videos = []  # Track successfully created videos
+        created_videos: list[Video] = []  # Track successfully created videos
         if videos_to_create:
             created_videos, existing_videos = await persist_csv_videos(
-                db, videos_to_create
+                db, video_objects
             )
 
             # Separate videos by status for different handling

@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -32,7 +33,7 @@ class BackupInfo:
     value_count: int
 
 
-def _serialize_field_value(value: VideoFieldValue) -> dict:
+def _serialize_field_value(value: VideoFieldValue) -> dict[str, Any]:
     """Serialize a VideoFieldValue to a dict for JSON backup."""
     return {
         "field_id": str(value.field_id),
@@ -88,7 +89,7 @@ async def backup_field_values(
     field_ids = [sf.field_id for sf in schema_with_fields.schema_fields]
 
     # Query field values for this video and these fields
-    stmt = (
+    values_stmt = (
         select(VideoFieldValue)
         .where(
             VideoFieldValue.video_id == video_id,
@@ -97,8 +98,8 @@ async def backup_field_values(
         .options(selectinload(VideoFieldValue.field))
     )
 
-    result = await db.execute(stmt)
-    values = result.scalars().all()
+    values_result = await db.execute(values_stmt)
+    values = values_result.scalars().all()
 
     # Step 2.4: Return None if no values to backup
     if not values:

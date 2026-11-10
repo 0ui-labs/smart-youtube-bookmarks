@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Task 5.1: Function Definitions für Gemini
 # ============================================================================
 
-SUBSCRIPTION_FUNCTIONS = [
+SUBSCRIPTION_FUNCTIONS: list[dict[str, Any]] = [
     {
         "name": "set_channels",
         "description": "Setzt die Kanäle für das Abo. Leeres Array bedeutet alle Kanäle.",
@@ -220,28 +220,28 @@ WICHTIG:
                 # Map JSON Schema types to Gemini Schema
                 if prop_type == "array":
                     schema = types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
+                        type="ARRAY",
+                        items=types.Schema(type="STRING"),
                         description=prop_def.get("description", ""),
                     )
                 elif prop_type == "integer":
                     schema = types.Schema(
-                        type=types.Type.INTEGER,
+                        type="INTEGER",
                         description=prop_def.get("description", ""),
                     )
                 elif prop_type == "number":
                     schema = types.Schema(
-                        type=types.Type.NUMBER,
+                        type="NUMBER",
                         description=prop_def.get("description", ""),
                     )
                 elif prop_type == "boolean":
                     schema = types.Schema(
-                        type=types.Type.BOOLEAN,
+                        type="BOOLEAN",
                         description=prop_def.get("description", ""),
                     )
                 else:
                     schema = types.Schema(
-                        type=types.Type.STRING,
+                        type="STRING",
                         description=prop_def.get("description", ""),
                     )
 
@@ -252,7 +252,7 @@ WICHTIG:
                     name=func["name"],
                     description=func["description"],
                     parameters=types.Schema(
-                        type=types.Type.OBJECT,
+                        type="OBJECT",
                         properties=properties,
                         required=func["parameters"].get("required", []),
                     ),
@@ -289,7 +289,7 @@ AKTUELLE KONFIGURATION:
 ZIELLISTE: {list_id}"""
 
         # Convert history to Gemini format
-        contents = []
+        contents: list[types.ContentUnion] = []
 
         # Add previous messages
         for msg in conversation_history:
@@ -317,7 +317,7 @@ ZIELLISTE: {list_id}"""
                 model=self.model,
                 contents=contents,
                 config=types.GenerateContentConfig(
-                    tools=tools,
+                    tools=[*tools],
                     temperature=0.7,
                 ),
             )
@@ -326,8 +326,10 @@ ZIELLISTE: {list_id}"""
             updated_config = current_config.copy()
             text_response = ""
 
-            for candidate in response.candidates:
-                for part in candidate.content.parts:
+            for candidate in response.candidates or []:
+                if candidate.content is None:
+                    continue
+                for part in candidate.content.parts or []:
                     # Handle function calls
                     if part.function_call:
                         updated_config = self._apply_function_call(
@@ -426,7 +428,7 @@ ZIELLISTE: {list_id}"""
         """Check if enough information is present to create subscription."""
         has_source = config.get("channel_names") or config.get("keywords")
         has_name = bool(config.get("name"))
-        return has_source and has_name
+        return bool(has_source) and has_name
 
     def _generate_summary(self, config: dict[str, Any]) -> str:
         """Generate a summary of the current configuration."""

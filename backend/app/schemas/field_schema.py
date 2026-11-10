@@ -10,6 +10,7 @@ tracks display_order and show_on_card settings for each field in a schema.
 """
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -31,7 +32,7 @@ class FieldInSchemaResponse(BaseModel):
     list_id: UUID
     name: str
     field_type: str  # 'select' | 'rating' | 'text' | 'boolean'
-    config: dict  # Type-specific configuration
+    config: dict[str, Any]  # Type-specific configuration
     created_at: datetime
     updated_at: datetime
 
@@ -335,7 +336,7 @@ class FieldSchemaResponse(FieldSchemaBase):
 
     @field_validator("schema_fields", mode="before")
     @classmethod
-    def convert_none_to_empty_list(cls, value):
+    def convert_none_to_empty_list(cls, value: Any) -> Any:
         """
         Convert None or single object to list for schema_fields.
 

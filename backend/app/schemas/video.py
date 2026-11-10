@@ -290,7 +290,7 @@ class AvailableFieldResponse(BaseModel):
     show_on_card: bool
 
     # Optional: For UI hints
-    config: dict = Field(
+    config: dict[str, Any] = Field(
         default_factory=dict
     )  # e.g., {'max_rating': 5} or {'options': ['bad', 'good']}
 
@@ -403,7 +403,7 @@ class BulkUploadResponse(BaseModel):
 
 
 # Resolve forward references after all schemas are defined
-def rebuild_schemas():
+def rebuild_schemas() -> None:
     """Rebuild schemas to resolve forward references (TagResponse)."""
     from .tag import TagResponse  # noqa: F401
 

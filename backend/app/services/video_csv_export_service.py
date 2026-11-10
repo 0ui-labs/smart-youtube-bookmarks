@@ -75,12 +75,15 @@ async def build_csv_export(
 
     # === STEP 3: Get all videos with field values (eager loading) ===
     videos_stmt = (
-        await build_video_selection(db, list_id, filters or VideoFilterRequest())
+        await build_video_selection(
+            db, list_id, filters or VideoFilterRequest.model_validate({})
+        )
     ).options(selectinload(Video.field_values))
     videos_result = await db.execute(videos_stmt)
     videos = list(videos_result.scalars().all())
 
     # === STEP 3.5: Load all field values for all videos in one query (performance optimization) ===
+    video_field_values_map: dict[UUID, list[VideoFieldValue]] = {}
     if videos:
         video_ids = [v.id for v in videos]
         field_values_stmt = select(VideoFieldValue).where(
@@ -90,13 +93,10 @@ async def build_csv_export(
         all_field_values = field_values_result.scalars().all()
 
         # Build a map of video_id -> list of field values
-        video_field_values_map = {}
         for fv in all_field_values:
             if fv.video_id not in video_field_values_map:
                 video_field_values_map[fv.video_id] = []
             video_field_values_map[fv.video_id].append(fv)
-    else:
-        video_field_values_map = {}
 
     # === STEP 4: Generate CSV with dynamic field columns ===
     output = io.StringIO()
@@ -150,7 +150,7 @@ async def build_csv_export(
             else:
                 # Extract value based on field type
                 if field.field_type == "rating":
-                    value = field_value.value_numeric
+                    value: float | str | bool | None = field_value.value_numeric
                     # Preserve float precision (e.g., 4.5) - do not cast to int
                     row.append(str(value) if value is not None else "")
                 elif field.field_type in ("select", "text"):

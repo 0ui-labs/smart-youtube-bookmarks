@@ -2,7 +2,9 @@
 
 import logging
 import re
-from datetime import datetime
+from collections.abc import Callable
+from datetime import datetime, timedelta
+from typing import cast
 
 from isodate import parse_duration
 
@@ -14,7 +16,7 @@ def parse_youtube_duration(iso_duration: str | None) -> int | None:
     if not iso_duration:
         return None
     try:
-        duration_obj = parse_duration(iso_duration)
+        duration_obj = cast("Callable[[str], timedelta]", parse_duration)(iso_duration)
         return int(duration_obj.total_seconds())
     except (ValueError, AttributeError, TypeError) as e:
         # ValueError: Invalid ISO 8601 format

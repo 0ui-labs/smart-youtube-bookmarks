@@ -2,12 +2,14 @@
 
 import hashlib
 import hmac
-from typing import Any, Literal
+from collections.abc import Callable
+from typing import Any, Literal, cast
 from urllib.parse import parse_qs, urlsplit
 
-import feedparser
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from sqlalchemy import select
+from feedparser.api import parse
+from feedparser.util import FeedParserDict
+from sqlalchemy import any_, literal, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,7 +30,7 @@ async def expected_channel(db: AsyncSession, channel_id: str) -> bool:
             select(Subscription.id)
             .where(
                 Subscription.is_active.is_(True),
-                Subscription.channel_ids.any(channel_id),
+                literal(channel_id) == any_(Subscription.channel_ids),
             )
             .limit(1)
         )
@@ -109,7 +111,7 @@ async def receive_pubsub_notification(
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
     if not body:
         return {"status": "empty", "processed": 0}
-    feed = feedparser.parse(bytes(body))
+    feed = cast("Callable[[bytes], FeedParserDict]", parse)(bytes(body))
     if feed.bozo:
         return {"status": "malformed", "processed": 0}
     entries = [

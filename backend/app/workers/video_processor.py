@@ -2,11 +2,13 @@
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime
+from typing import Any, TypeVar
 from uuid import UUID
 
 from arq import Retry
-from isodate import parse_duration
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +21,7 @@ from app.models.list import BookmarkList
 from app.services.channel_service import get_or_create_channel
 from app.services.job_dispatch_service import DurableJobQueue
 from app.services.rate_limiter import AdaptiveRateLimiter
+from app.services.video_metadata_service import parse_youtube_duration
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +32,7 @@ _enrichment_rate_limiter = AdaptiveRateLimiter(
 )
 
 
-def _parse_duration(iso_duration: str | None) -> int | None:
-    """Parse ISO 8601 duration to seconds."""
-    if not iso_duration:
-        return None
-    try:
-        duration_obj = parse_duration(iso_duration)
-        return int(duration_obj.total_seconds())
-    except Exception as e:
-        logger.debug(f"Invalid duration format '{iso_duration}': {e}")
-        return None
+_parse_duration = parse_youtube_duration
 
 
 def _parse_timestamp(timestamp: str | None) -> datetime | None:
@@ -52,9 +46,16 @@ def _parse_timestamp(timestamp: str | None) -> datetime | None:
         return None
 
 
+T = TypeVar("T")
+
+
 async def fetch_with_retry(
-    func, *args, max_retries: int = 3, base_delay: float = 1.0, **kwargs
-):
+    func: Callable[..., Awaitable[T]],
+    *args: Any,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    **kwargs: Any,
+) -> T:
     """
     Execute async function with exponential backoff retry.
 
@@ -89,7 +90,9 @@ async def fetch_with_retry(
             await asyncio.sleep(delay)
 
     # Should not reach here, but just in case
-    raise last_exception
+    if last_exception is not None:
+        raise last_exception
+    raise ValueError("max_retries must be non-negative")
 
 
 async def update_stage(
@@ -110,7 +113,7 @@ async def update_stage(
 
 
 async def publish_progress(
-    redis, user_id: str, video_id: str, progress: int, stage: str
+    redis: Redis, user_id: str, video_id: str, progress: int, stage: str
 ) -> None:
     """
     Publish import progress update via Redis Pub/Sub.
@@ -138,7 +141,7 @@ async def publish_progress(
     )
 
 
-async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
+async def enrich_video_staged(ctx: dict[str, Any], video_id: str) -> dict[str, Any]:
     """
     Enrich a video with captions and chapters, updating progress through stages.
 
@@ -237,8 +240,12 @@ async def enrich_video_staged(ctx: dict, video_id: str) -> dict:
 
 
 async def process_video(
-    ctx: dict, video_id: str, list_id: str, schema: dict, job_id: str
-) -> dict:
+    ctx: dict[str, Any],
+    video_id: str,
+    list_id: str,
+    schema: dict[str, Any],
+    job_id: str,
+) -> dict[str, Any]:
     """
     Process a single video:
     1. Fetch YouTube metadata
@@ -421,8 +428,12 @@ async def process_video(
 
 
 async def process_video_list(
-    ctx: dict, job_id: str, list_id: str, video_ids: list[str], schema: dict
-) -> dict:
+    ctx: dict[str, Any],
+    job_id: str,
+    list_id: str,
+    video_ids: list[str],
+    schema: dict[str, Any],
+) -> dict[str, Any]:
     """
     Process a list of videos in batch (for CSV bulk upload).
 
@@ -506,7 +517,9 @@ async def process_video_list(
     }
 
 
-async def _publish_video_update(redis_client, video, job_id: str, user_id: str) -> None:
+async def _publish_video_update(
+    redis_client: Redis, video: Video, job_id: str, user_id: str
+) -> None:
     """
     Publish WebSocket update when video processing completes.
 
@@ -543,7 +556,7 @@ async def _publish_video_update(redis_client, video, job_id: str, user_id: str) 
 
 
 async def _update_job_progress(
-    db: AsyncSession, job_id: str, success: bool, redis_client=None
+    db: AsyncSession, job_id: str, success: bool, redis_client: Redis | None = None
 ) -> None:
     from app.services.job_progress_service import advance_job_progress
 

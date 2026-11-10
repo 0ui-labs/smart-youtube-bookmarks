@@ -86,3 +86,9 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+# Inspect the installed implementation when a dependency has no PEP 561 marker.
+# This enables analysis rather than suppressing missing-import/type diagnostics.
+[[tool.mypy.overrides]]
+module = ["google", "google.genai.*", "isodate.*", "pydub.*", "feedparser.*", "youtube_transcript_api.*"]
+follow_untyped_imports = true

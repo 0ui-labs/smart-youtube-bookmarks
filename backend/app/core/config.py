@@ -6,7 +6,7 @@ including database connection strings, API keys, and environment configuration.
 Settings can be overridden via environment variables or a .env file.
 """
 
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
 
     @field_validator("secret_key")
     @classmethod
-    def validate_secret_key(cls, v: str, info) -> str:
+    def validate_secret_key(cls, v: str, info: ValidationInfo) -> str:
         """
         Validate JWT secret key.
 
@@ -102,7 +102,7 @@ class Settings(BaseSettings):
 
     @field_validator("youtube_api_key")
     @classmethod
-    def validate_youtube_api_key(cls, v: str, info) -> str:
+    def validate_youtube_api_key(cls, v: str, info: ValidationInfo) -> str:
         """
         Validate YouTube API key at startup.
 
@@ -146,7 +146,7 @@ class Settings(BaseSettings):
 
     @field_validator("gemini_api_key")
     @classmethod
-    def validate_gemini_api_key(cls, v: str, info) -> str:
+    def validate_gemini_api_key(cls, v: str, info: ValidationInfo) -> str:
         """
         Validate Gemini API key at startup.
 

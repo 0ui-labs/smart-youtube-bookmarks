@@ -62,10 +62,10 @@ async def _enqueue_video_processing(
     if bookmark_list.schema_id:
         from app.models.schema import Schema
 
-        result = await db.execute(
+        schema_result = await db.execute(
             select(Schema).where(Schema.id == bookmark_list.schema_id)
         )
-        schema = result.scalar_one_or_none()
+        schema = schema_result.scalar_one_or_none()
         if schema:
             schema_fields = schema.fields  # JSONB dict
 
@@ -75,12 +75,12 @@ async def _enqueue_video_processing(
     await db.flush()
 
     if video_ids is None:
-        result = await db.execute(
+        videos_result = await db.execute(
             select(Video.id).where(
                 Video.list_id == list_id, Video.processing_status == "pending"
             )
         )
-        video_ids = [str(video_id) for video_id in result.scalars().all()]
+        video_ids = [str(video_id) for video_id in videos_result.scalars().all()]
     # Each video has its own durable target claim, shared with manual processing
     # and recovery. A CSV import only schedules its newly created pending videos.
     for video_id in video_ids:

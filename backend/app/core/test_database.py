@@ -1,6 +1,6 @@
 """Fail closed before opening a connection used by destructive test fixtures."""
 
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL, make_url
 
 
 def validated_test_database_url(target: str | None, application_url: str) -> str:
@@ -17,7 +17,7 @@ def validated_test_database_url(target: str | None, application_url: str) -> str
     if test.query:
         raise ValueError("Test database URL query overrides are forbidden")
 
-    def identity(url):
+    def identity(url: URL) -> tuple[str, int, str | None]:
         return (url.host or "localhost", url.port or 5432, url.database)
 
     if test.database == application.database or identity(test) == identity(application):

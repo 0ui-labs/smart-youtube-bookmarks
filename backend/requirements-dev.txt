@@ -1,3 +1,5 @@
 -r requirements.txt
 pytest-benchmark==4.0.0
 mypy==1.19.1
+types-python-jose==3.5.0.20260408
+types-yt-dlp==2026.8.19.20261030

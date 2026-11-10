@@ -12,6 +12,7 @@ from app.models.schema_field import SchemaField
 from app.schemas.field_schema import (
     SchemaFieldBatchUpdateRequest,
     SchemaFieldBatchUpdateResponse,
+    SchemaFieldResponse as BatchFieldResponse,
 )
 from app.schemas.schema_field import (
     SchemaFieldCreate,
@@ -51,7 +52,7 @@ async def validate_max_show_on_card(
     result = await db.execute(stmt)
     count = result.scalar()
 
-    if count >= 3:
+    if (count or 0) >= 3:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Maximum 3 fields can be shown on card per schema",
@@ -61,7 +62,7 @@ async def validate_max_show_on_card(
 @router.get("", response_model=list[SchemaFieldResponse])
 async def get_schema_fields(
     list_id: UUID, schema_id: UUID, db: AsyncSession = Depends(get_db)
-):
+) -> list[SchemaField]:
     """
     Get all fields in a schema, ordered by display_order.
 
@@ -91,7 +92,7 @@ async def get_schema_fields(
     result = await db.execute(stmt)
     schema_fields = result.scalars().all()
 
-    return schema_fields
+    return list(schema_fields)
 
 
 @router.post(
@@ -102,7 +103,7 @@ async def add_field_to_schema(
     schema_id: UUID,
     schema_field: SchemaFieldCreate,
     db: AsyncSession = Depends(get_db),
-):
+) -> SchemaField:
     """
     Add a field to a schema.
 
@@ -195,7 +196,7 @@ async def batch_update_schema_fields(
     schema_id: UUID,
     request: SchemaFieldBatchUpdateRequest,
     db: AsyncSession = Depends(get_db),
-):
+) -> SchemaFieldBatchUpdateResponse:
     """
     Batch update schema_fields (display_order + show_on_card).
 
@@ -322,7 +323,8 @@ async def batch_update_schema_fields(
     updated_fields = updated_result.scalars().all()
 
     return SchemaFieldBatchUpdateResponse(
-        updated_count=len(request.fields), fields=updated_fields
+        updated_count=len(request.fields),
+        fields=[BatchFieldResponse.model_validate(field) for field in updated_fields],
     )
 
 
@@ -333,7 +335,7 @@ async def update_schema_field(
     field_id: UUID,
     schema_field_update: SchemaFieldUpdate,
     db: AsyncSession = Depends(get_db),
-):
+) -> SchemaField:
     """
     Update display_order or show_on_card for a field in a schema.
 
@@ -391,7 +393,7 @@ async def update_schema_field(
 @router.delete("/{field_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_field_from_schema(
     list_id: UUID, schema_id: UUID, field_id: UUID, db: AsyncSession = Depends(get_db)
-):
+) -> None:
     """
     Remove a field from a schema.
 
