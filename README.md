@@ -171,7 +171,7 @@ Frontend runs at **http://localhost:5173**
 ```bash
 cd backend
 source .venv/bin/activate
-arq app.workers.video_processor.WorkerSettings
+arq app.workers.settings.WorkerSettings
 ```
 
 ---
@@ -385,3 +385,9 @@ MIT License – see LICENSE file for details.
 ---
 
 **Built with ❤️ using FastAPI, React, and TypeScript**
+
+
+Der Zwischenstand der Codebase-Stabilisierung und die noch offenen Pflichtnachweise stehen
+in [der Abnahmeübersicht](documentation/reports/codebase-stabilisierung-abnahme.md).
+Für isolierte Tests gilt [Tooling Setup](documentation/TOOLING_SETUP.md#isolierte-stabilisierungsprüfungen).
+HTTP-Benutzerisolation und Clerk-Sessions sind weiterhin nicht implementiert; keine öffentliche Freigabe.

@@ -730,11 +730,12 @@ verwaltet den npm-Workspace; `npm ci` im Projektroot ausführen.
 
 ```bash
 uv venv --python 3.11 backend/.venv
-uv pip install --python backend/.venv/bin/python -r backend/requirements.txt
+uv pip install --python backend/.venv/bin/python -r backend/requirements-dev.txt
 docker compose -p syb-stabilization-test -f docker-compose.test.yml up -d --wait
 cd backend
 export TEST_DATABASE_URL=postgresql+asyncpg://test:test@localhost:55438/bookmarks_test
-export REDIS_URL=redis://localhost:56388
+export REDIS_URL=redis://localhost:56388/0
+export TEST_REDIS_URL=redis://localhost:56388/3
 .venv/bin/python -m pytest -q
 ```
 
@@ -743,3 +744,17 @@ Anwendungsvolume. `TEST_DATABASE_URL` ist zwingend explizit anzugeben. Vor Aufba
 Abbau und Tabellenbereinigung prüft die Fixture PostgreSQL, `_test`-Suffix und
 Abweichung von der Anwendungsdatenbank. URL-Query-Overrides sind nicht erlaubt.
 Keine Alembic-Migration gegen eine vorhandene Benutzerdatenbank ausführen.
+
+Gleichzeitige pytest-Läufe auf derselben Datenbank werden vor `create_all` abgewiesen.
+Auch versehentliche Verbindungen über den Anwendungsengine werden in Tests blockiert.
+Für echte Queue-Integration wird ausschließlich der isolierte Redis auf Port 56388/DB 3 verwendet.
+
+Worker: `backend/.venv/bin/arq app.workers.settings.WorkerSettings`. Der Dispatcher ist
+als Zehn-Sekunden-Cronjob darin registriert; getrennte Dispatcher-Prozesse sind nicht nötig.
+
+Migrationsnachweis: eine **neue leere** Datenbank mit `_test`-Suffix bereitstellen,
+`TEST_MIGRATION_DATABASE_URL` explizit setzen und in `backend/`
+`.venv/bin/python scripts/check_migrations.py` ausführen. Das Skript lehnt vorhandene
+Tabellen ab und prüft Basismigrationen sowie das Upgrade eines synthetischen Bestands.
+Der aktuelle Abnahmebericht dokumentiert weiterhin rote Gesamtprüfungen; diese Anleitung
+ist keine Zusage einer abgeschlossenen Stabilisierung oder öffentlichen Betriebsfreigabe.

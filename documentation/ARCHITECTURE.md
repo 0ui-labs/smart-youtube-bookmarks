@@ -405,3 +405,17 @@ User edits field value
 | **Frontend Unit** | Vitest | Components, Hooks |
 | **Frontend Integration** | Testing Library | User Flows |
 | **API Mocking** | MSW | External Services |
+
+
+## Lokaler Stabilisierungsstand vom 10.11.2026
+
+Fachliche Hintergrundaufträge werden nun als PostgreSQL-Outbox-Einträge gemeinsam
+mit ihren fachlichen Änderungen gespeichert. Der Worker-Dispatcher übergibt begrenzte
+Batches an ARQ; Operation-IDs, Leases und PostgreSQL-Ziel-Locks sichern Wiederholung
+und konkurrierende Zustellung ab. Worker-Daten werden vor der Abschlussmarkierung
+committet. Ein Provider-Absturzfenster ohne externe Idempotenz bleibt möglich.
+
+CSV-Feldimport und Persistenz liegen in `services/video_import_service.py`;
+Thumbnails in `components/videos/VideoThumbnail.tsx`. HTTP-/Clerk-Benutzerisolation
+und serverseitige Video-Pagination fehlen weiterhin. Der verbindliche Teilstatus und
+die offenen Pflichtnachweise stehen im [Abnahmebericht](reports/codebase-stabilisierung-abnahme.md).
