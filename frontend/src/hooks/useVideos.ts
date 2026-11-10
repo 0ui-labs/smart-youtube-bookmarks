@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { api } from "@/lib/api";
+import { videoKeys } from "@/lib/videoKeys";
 import { TagSchema } from "@/types/tag";
 import type { VideoCreate, VideoResponse } from "@/types/video";
 
@@ -70,41 +71,7 @@ export interface UseVideosOptions {
  * queryClient.invalidateQueries({ queryKey: videoKeys.filtered(listId, ['Python']) })
  * ```
  */
-export const videoKeys = {
-  /** Base key for all video queries */
-  all: ["videos"] as const,
-  /** Key factory for list-scoped queries */
-  lists: () => [...videoKeys.all, "list"] as const,
-  /** Key for unfiltered videos in a specific list */
-  list: (listId: string) => [...videoKeys.lists(), listId] as const,
-  /** Key for tag-filtered videos in a specific list */
-  filtered: (listId: string, tagNames: string[]) =>
-    // Sort tagNames alphabetically for consistent cache keys regardless of selection order
-    [...videoKeys.list(listId), { tags: [...tagNames].sort() }] as const,
-  /** Key for videos with filtering and/or sorting options */
-  withOptions: (listId: string, options: UseVideosOptions) => {
-    const { tags, sortBy, sortOrder } = options;
-    const queryParams: Record<string, any> = {};
-
-    // Include tags in query key (sorted for consistency)
-    if (tags && tags.length > 0) {
-      queryParams.tags = [...tags].sort();
-    }
-
-    // Include sort params in query key
-    if (sortBy) {
-      queryParams.sortBy = sortBy;
-      queryParams.sortOrder = sortOrder || "asc";
-    }
-
-    return [...videoKeys.list(listId), queryParams] as const;
-  },
-  /** Base key for all field values queries */
-  fieldValues: () => [...videoKeys.all, "field-values"] as const,
-  /** Key for field values of a specific video */
-  videoFieldValues: (videoId: string) =>
-    [...videoKeys.fieldValues(), videoId] as const,
-};
+export { videoKeys } from "@/lib/videoKeys";
 
 /**
  * Represents a single failed video upload in a bulk operation
@@ -461,15 +428,15 @@ export const useUpdateVideoFieldValues = (videoId: string) => {
 
     // Optimistic update pattern (same as useDeleteVideo)
     onMutate: async (request) => {
-      await queryClient.cancelQueries({ queryKey: videoKeys.all });
+      await queryClient.cancelQueries({ queryKey: videoKeys.lists() });
       const previousVideos = queryClient.getQueriesData({
-        queryKey: videoKeys.all,
+        queryKey: videoKeys.lists(),
       });
 
       // Note: Using type assertion due to complex VideoFieldValue union type
       // The optimistic update logic is correct, but TypeScript struggles with Zod unions
       queryClient.setQueriesData(
-        { queryKey: videoKeys.all },
+        { queryKey: videoKeys.lists() },
         (oldVideos: VideoResponse[] | undefined) => {
           if (!oldVideos) return oldVideos;
 
@@ -633,16 +600,16 @@ export const useSetVideoCategory = () => {
     // Step 3.9: Optimistic update
     onMutate: async ({ videoId, categoryId }) => {
       // Cancel outgoing queries to prevent overwrites
-      await queryClient.cancelQueries({ queryKey: videoKeys.all });
+      await queryClient.cancelQueries({ queryKey: videoKeys.lists() });
 
       // Snapshot previous state for rollback
       const previousVideos = queryClient.getQueriesData<VideoResponse[]>({
-        queryKey: videoKeys.all,
+        queryKey: videoKeys.lists(),
       });
 
       // Optimistically update the video's tags
       queryClient.setQueriesData<VideoResponse[]>(
-        { queryKey: videoKeys.all },
+        { queryKey: videoKeys.lists() },
         (oldVideos) => {
           // Guard against non-array data (setQueriesData iterates all matching queries)
           if (!(oldVideos && Array.isArray(oldVideos))) return oldVideos;

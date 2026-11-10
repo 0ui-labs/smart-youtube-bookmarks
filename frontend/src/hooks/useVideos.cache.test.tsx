@@ -37,3 +37,36 @@ it("preserves filtered and sorted caches until the server recomputes them", asyn
   client.clear();
   post.mockRestore();
 });
+
+it("updates field list caches without treating a detail object as an array", async () => {
+  const client = new QueryClient({
+    defaultOptions: { mutations: { retry: false } },
+  });
+  const listKey = videoKeys.list("list-1");
+  const detailKey = ["videos", "detail", "video-1"];
+  const detail = { id: "video-1", field_values: [] };
+  client.setQueryData(listKey, [detail]);
+  client.setQueryData(detailKey, detail);
+  const put = vi
+    .spyOn(api, "put")
+    .mockResolvedValueOnce({ data: { updated_count: 1, field_values: [] } });
+  const wrapper = ({ children }: PropsWithChildren) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  const { useUpdateVideoFieldValues } = await import("./useVideos");
+  const { result, unmount } = renderHook(
+    () => useUpdateVideoFieldValues("video-1"),
+    { wrapper }
+  );
+  await act(async () => {
+    await result.current.mutateAsync({
+      field_values: [{ field_id: "field-1", value: 4 }],
+    });
+  });
+  expect(client.getQueryData(detailKey)).toEqual(detail);
+  expect(client.getQueryState(detailKey)?.isInvalidated).toBe(true);
+  expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
+  unmount();
+  client.clear();
+  put.mockRestore();
+});

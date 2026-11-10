@@ -328,7 +328,7 @@ describe("VideoDetailsPage", () => {
     show();
     mockUseMutation.mock.calls[0][0].onSuccess();
     expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["videos", "test-video-id"],
+      queryKey: ["videos"],
     });
   });
   it("returns to the video overview", async () => {

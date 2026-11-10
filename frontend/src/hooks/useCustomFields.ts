@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/useDebounce";
 import { customFieldsApi } from "@/lib/customFieldsApi";
+import { videoKeys } from "@/lib/videoKeys";
 import {
   type CustomField,
   type CustomFieldCreate,
@@ -235,6 +236,7 @@ export const useCreateCustomField = (listId: string) => {
     },
     // Refetch to get real ID and server-generated fields
     onSettled: async () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
       // Invalidate and refetch to ensure UI consistency
       // This runs on both success and error to handle edge cases
       await queryClient.invalidateQueries({
@@ -330,6 +332,7 @@ export const useUpdateCustomField = (listId: string) => {
     },
     // Refetch to ensure server state is correct
     onSettled: async () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
       await queryClient.invalidateQueries({
         queryKey: customFieldKeys.list(listId),
       });
@@ -402,6 +405,7 @@ export const useDeleteCustomField = (listId: string) => {
     },
     // Refetch to ensure consistency after success or error
     onSettled: async () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
       await queryClient.invalidateQueries({
         queryKey: customFieldKeys.list(listId),
       });

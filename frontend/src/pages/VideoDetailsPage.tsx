@@ -15,6 +15,7 @@ import {
 import { useSetVideoCategory } from "@/hooks/useVideos";
 import { api } from "@/lib/api";
 import { getLanguageLabel } from "@/lib/enrichmentUtils";
+import { videoKeys } from "@/lib/videoKeys";
 import type { TextTrack } from "@/types/player";
 import { VideoResponseSchema } from "@/types/video";
 
@@ -57,7 +58,7 @@ export const VideoDetailsPage = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["videos", videoId],
+    queryKey: videoKeys.detail(videoId),
     queryFn: async () => {
       const { data } = await api.get(`/videos/${videoId}`);
       return VideoResponseSchema.parse(data);
@@ -148,7 +149,7 @@ export const VideoDetailsPage = () => {
     onSuccess: () => {
       setUpdateError(null);
       // Invalidate to refetch latest data
-      queryClient.invalidateQueries({ queryKey: ["videos", videoId] });
+      queryClient.invalidateQueries({ queryKey: videoKeys.all });
     },
     onError: (error: any) => {
       console.error("Failed to update field value:", error);

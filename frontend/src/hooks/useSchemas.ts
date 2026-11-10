@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { schemasApi } from "@/lib/schemasApi";
+import { videoKeys } from "@/lib/videoKeys";
 import type {
   FieldSchemaCreate,
   FieldSchemaResponse,
@@ -229,6 +230,7 @@ export function useCreateSchema(listId: string) {
     mutationFn: async (schemaData: FieldSchemaCreate) =>
       schemasApi.createSchema(listId, schemaData),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
       // Invalidate schemas list to show new schema
       queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) });
     },
@@ -253,6 +255,7 @@ export function useCreateSchema(listId: string) {
  *   const handleSubmit = (updates: FieldSchemaUpdate) => {
  *     updateSchema.mutate({ schemaId, updates }, {
  *       onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
  *         toast.success('Schema updated')
  *       }
  *     })
@@ -312,6 +315,7 @@ export function useUpdateSchema(listId: string) {
     // ✅ v5 signature: includes context
     onSettled: (...args) => {
       const [, , variables, , context] = args;
+      void context.client.invalidateQueries({ queryKey: videoKeys.all });
       context.client.invalidateQueries({ queryKey: schemasKeys.list(listId) });
       context.client.invalidateQueries({
         queryKey: schemasKeys.detail(variables.schemaId),
@@ -345,6 +349,7 @@ export function useUpdateSchema(listId: string) {
  *     if (confirmed) {
  *       deleteSchema.mutate({ schemaId }, {
  *         onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
  *           toast.success('Schema deleted')
  *           navigate('/schemas')
  *         },
@@ -398,6 +403,7 @@ export function useDeleteSchema(listId: string) {
     // ✅ v5 signature: includes context
     onSettled: (...args) => {
       const [, , variables, , context] = args;
+      void context.client.invalidateQueries({ queryKey: videoKeys.all });
       context.client.invalidateQueries({ queryKey: schemasKeys.list(listId) });
       context.client.removeQueries({
         queryKey: schemasKeys.detail(variables.schemaId),
@@ -474,6 +480,7 @@ export function useDuplicateSchema(listId: string) {
       console.error("Failed to duplicate schema:", err);
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
       queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) });
     },
   });
@@ -569,6 +576,7 @@ export function useAddFieldToSchema(listId: string, schemaId: string) {
     mutationFn: async (fieldData: SchemaFieldCreate) =>
       schemasApi.addFieldToSchema(listId, schemaId, fieldData),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
       // Only invalidate schema details (list doesn't show fields)
       queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) });
     },
@@ -591,6 +599,7 @@ export function useAddFieldToSchema(listId: string, schemaId: string) {
  *   const handleRemove = () => {
  *     removeField.mutate(fieldId, {
  *       onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
  *         toast.success('Field removed from schema')
  *       }
  *     })
@@ -608,6 +617,7 @@ export function useRemoveFieldFromSchema(listId: string, schemaId: string) {
     mutationFn: async (fieldId: string) =>
       schemasApi.removeFieldFromSchema(listId, schemaId, fieldId),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
       queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) });
     },
   });
@@ -657,6 +667,7 @@ export function useUpdateSchemaField(listId: string, schemaId: string) {
       updates: SchemaFieldUpdate;
     }) => schemasApi.updateSchemaField(listId, schemaId, fieldId, updates),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
       queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) });
     },
   });
@@ -759,6 +770,7 @@ export function useReorderSchemaFields(listId: string, schemaId: string) {
     },
     // Refetch after success or error to ensure consistency
     onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
       queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) });
     },
   });
@@ -796,6 +808,7 @@ export function useReorderSchemaFields(listId: string, schemaId: string) {
  *       }))
  *     }, {
  *       onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
  *         toast.success('Order saved')
  *       },
  *       onError: (error) => {
@@ -838,6 +851,7 @@ export function useUpdateSchemaFieldsBatch(listId: string, schemaId: string) {
     mutationFn: async (request: SchemaFieldBatchUpdateRequest) =>
       schemasApi.updateSchemaFieldsBatch(listId, schemaId, request),
     onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: videoKeys.all });
       // Invalidate ALL schema queries for this list (Task #80 pattern)
       queryClient.invalidateQueries({ queryKey: schemasKeys.list(listId) });
       queryClient.invalidateQueries({ queryKey: schemasKeys.detail(schemaId) });
