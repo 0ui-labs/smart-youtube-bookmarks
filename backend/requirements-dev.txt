@@ -1,0 +1,3 @@
+-r requirements.txt
+pytest-benchmark==4.0.0
+mypy==1.19.1

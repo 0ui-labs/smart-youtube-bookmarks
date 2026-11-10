@@ -6,7 +6,7 @@ Includes enhanced URL validation with security checks.
 
 import re
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 # Import for circular dependency resolution (TYPE_CHECKING)
 from typing import TYPE_CHECKING, Annotated, Any, Literal
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 from .custom_field import CustomFieldResponse
 
 
-class FieldFilterOperator(str, Enum):
+class FieldFilterOperator(StrEnum):
     """Filter operators for different field types."""
 
     # Numeric (rating)

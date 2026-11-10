@@ -152,7 +152,7 @@ async def websocket_progress_endpoint(
                     # Log unknown message types for debugging
                     logger.debug(f"Received unknown message type: {msg_type}")
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # No message received, check shutdown and continue
                     continue
                 except json.JSONDecodeError:

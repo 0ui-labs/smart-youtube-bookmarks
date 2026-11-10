@@ -17,7 +17,7 @@ Example:
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 try:
@@ -40,7 +40,7 @@ from app.models.custom_field import CustomField
 logger = logging.getLogger(__name__)
 
 
-class SimilarityType(str, Enum):
+class SimilarityType(StrEnum):
     """Type of similarity match detected."""
 
     EXACT = "exact"  # 100% - case-insensitive exact match

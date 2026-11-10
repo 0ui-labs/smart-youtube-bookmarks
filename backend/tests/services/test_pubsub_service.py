@@ -5,8 +5,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.services.pubsub_service import (
-    DEFAULT_LEASE_SECONDS,
-    HUB_URL,
     PubSubHubbubService,
     subscribe_to_channel,
     unsubscribe_from_channel,
@@ -23,7 +21,10 @@ class TestPubSubHubbubService:
 
         topic = service._get_topic_url(channel_id)
 
-        assert topic == f"https://www.youtube.com/xml/feeds/videos.xml?channel_id={channel_id}"
+        assert (
+            topic
+            == f"https://www.youtube.com/xml/feeds/videos.xml?channel_id={channel_id}"
+        )
 
     def test_callback_url_default(self):
         """Default callback URL uses settings."""
@@ -31,7 +32,9 @@ class TestPubSubHubbubService:
             mock_settings.pubsub_callback_url = "https://example.com"
             service = PubSubHubbubService()
 
-            assert service.callback_url == "https://example.com/api/webhooks/pubsubhubbub"
+            assert (
+                service.callback_url == "https://example.com/api/webhooks/pubsubhubbub"
+            )
 
     def test_callback_url_override(self):
         """Callback URL can be overridden."""
@@ -48,7 +51,9 @@ class TestPubSubHubbubService:
         mock_response = AsyncMock()
         mock_response.status_code = 202
 
-        with patch.object(service.client, "post", return_value=mock_response) as mock_post:
+        with patch.object(
+            service.client, "post", return_value=mock_response
+        ) as mock_post:
             result = await service.subscribe("UCxxxxxx", "https://callback.example.com")
 
             assert result is True
@@ -58,7 +63,10 @@ class TestPubSubHubbubService:
             call_args = mock_post.call_args
             assert call_args.kwargs["data"]["hub.mode"] == "subscribe"
             assert "UCxxxxxx" in call_args.kwargs["data"]["hub.topic"]
-            assert call_args.kwargs["data"]["hub.callback"] == "https://callback.example.com"
+            assert (
+                call_args.kwargs["data"]["hub.callback"]
+                == "https://callback.example.com"
+            )
 
         await service.close()
 
@@ -102,8 +110,12 @@ class TestPubSubHubbubService:
         mock_response = AsyncMock()
         mock_response.status_code = 202
 
-        with patch.object(service.client, "post", return_value=mock_response) as mock_post:
-            result = await service.unsubscribe("UCxxxxxx", "https://callback.example.com")
+        with patch.object(
+            service.client, "post", return_value=mock_response
+        ) as mock_post:
+            result = await service.unsubscribe(
+                "UCxxxxxx", "https://callback.example.com"
+            )
 
             assert result is True
 
@@ -147,9 +159,7 @@ class TestConvenienceFunctions:
     @pytest.mark.asyncio
     async def test_subscribe_to_channel(self):
         """Convenience function subscribes to single channel."""
-        with patch(
-            "app.services.pubsub_service.PubSubHubbubService"
-        ) as MockService:
+        with patch("app.services.pubsub_service.PubSubHubbubService") as MockService:
             mock_instance = AsyncMock()
             mock_instance.subscribe = AsyncMock(return_value=True)
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
@@ -164,9 +174,7 @@ class TestConvenienceFunctions:
     @pytest.mark.asyncio
     async def test_unsubscribe_from_channel(self):
         """Convenience function unsubscribes from single channel."""
-        with patch(
-            "app.services.pubsub_service.PubSubHubbubService"
-        ) as MockService:
+        with patch("app.services.pubsub_service.PubSubHubbubService") as MockService:
             mock_instance = AsyncMock()
             mock_instance.unsubscribe = AsyncMock(return_value=True)
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)

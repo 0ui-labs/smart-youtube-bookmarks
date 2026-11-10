@@ -1,13 +1,13 @@
 """Pydantic schemas for Video Enrichment API endpoints."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 
-class EnrichmentStatus(str, Enum):
+class EnrichmentStatus(StrEnum):
     """Status of video enrichment processing."""
 
     pending = "pending"
