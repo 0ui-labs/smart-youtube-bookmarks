@@ -13,6 +13,7 @@ import {
   useVideoEnrichment,
 } from "@/hooks/useVideoEnrichment";
 import { useSetVideoCategory } from "@/hooks/useVideos";
+import { invalidateVideoViews } from "@/hooks/videos/cache";
 import { api } from "@/lib/api";
 import { getLanguageLabel } from "@/lib/enrichmentUtils";
 import { videoKeys } from "@/lib/videoKeys";
@@ -149,7 +150,7 @@ export const VideoDetailsPage = () => {
     onSuccess: () => {
       setUpdateError(null);
       // Invalidate to refetch latest data
-      queryClient.invalidateQueries({ queryKey: videoKeys.all });
+      void invalidateVideoViews(queryClient);
     },
     onError: (error: any) => {
       console.error("Failed to update field value:", error);

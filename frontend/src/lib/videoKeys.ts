@@ -31,6 +31,23 @@ export const videoKeys = {
 
     return [...videoKeys.list(listId), queryParams] as const;
   },
+  page: (
+    listId: string,
+    selection: {
+      tags?: string[];
+      channelId?: string;
+      fieldFilters?: unknown[];
+      sortBy?: string;
+      sortOrder?: "asc" | "desc";
+      offset: number;
+      limit: number;
+    }
+  ) =>
+    [
+      ...videoKeys.list(listId),
+      "page",
+      { ...selection, tags: [...(selection.tags ?? [])].sort() },
+    ] as const,
   /** Base key for all field values queries */
   fieldValues: () => [...videoKeys.all, "field-values"] as const,
   /** Key for field values of a specific video */

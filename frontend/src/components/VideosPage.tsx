@@ -45,6 +45,7 @@ import {
 } from "@/hooks/useVideos";
 import { useVideosFilter } from "@/hooks/useVideosFilter";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useVideoPageState } from "@/hooks/videos/useVideoPageState";
 import { api } from "@/lib/api";
 import { useFieldFilterStore } from "@/stores/fieldFilterStore";
 import { useImportDropStore } from "@/stores/importDropStore";
@@ -59,6 +60,7 @@ import { TableSettingsDropdown } from "./TableSettingsDropdown";
 import { VideoDetailsModal } from "./VideoDetailsModal";
 import { VideoGrid } from "./VideoGrid";
 import { ViewModeToggle } from "./ViewModeToggle";
+import { VideoPagination } from "./videos/VideoPagination";
 import { VideoThumbnail } from "./videos/VideoThumbnail";
 
 // Note: VideoResponse type has optional field_values, but TanStack Table needs explicit type
@@ -331,6 +333,17 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     });
   }, [activeFilters.forEach, removeFilter]); // Run once on mount to clean up stale data
 
+  const selectionKey = JSON.stringify({
+    listId,
+    tags: selectedTagNames,
+    channel: selectedChannelId,
+    fields: activeFilters,
+    sortBy,
+    sortOrder,
+  });
+  const { page, setPage } = useVideoPageState(selectionKey);
+  const pageSize = 50;
+
   // Fetch videos with both tag filters and field filters
   // Falls back to useVideos if no field filters are active
   const hasFieldFilters = activeFilters.length > 0;
@@ -340,10 +353,13 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   // Use new filter hook if any filters are active, otherwise fallback to old hook
   const {
     data: filteredVideos = [],
+    total: filteredTotal,
     isLoading: filterLoading,
     error: filterError,
   } = useVideosFilter({
     listId,
+    offset: page * pageSize,
+    limit: pageSize,
     tags: hasTagFilters ? selectedTagNames : undefined,
     channelId: hasChannelFilter ? selectedChannelId : undefined,
     fieldFilters: hasFieldFilters ? activeFilters : undefined,
@@ -355,9 +371,13 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   const {
     data: allVideos = [],
+    total: allTotal,
     isLoading: allLoading,
     error: allError,
   } = useVideos(listId, {
+    offset: page * pageSize,
+    limit: pageSize,
+    enabled: !(hasFieldFilters || hasTagFilters || hasChannelFilter),
     tags: undefined,
     sortBy,
     sortOrder,
@@ -369,6 +389,12 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const videos = hasAnyFilter ? filteredVideos : allVideos;
   const isLoading = hasAnyFilter ? filterLoading : allLoading;
   const error = hasAnyFilter ? filterError : allError;
+  const serverTotal = hasAnyFilter ? filteredTotal : allTotal;
+  const totalVideos = serverTotal ?? videos.length;
+  useEffect(() => {
+    if (serverTotal !== undefined && page > 0 && page * pageSize >= serverTotal)
+      setPage(Math.max(0, Math.ceil(serverTotal / pageSize) - 1));
+  }, [serverTotal, page, setPage]);
   const createVideo = useCreateVideo(listId);
   const assignTags = useAssignTags();
   const bulkUpload = useBulkUploadVideos(listId);
@@ -541,6 +567,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       const params = new URLSearchParams(searchParams);
       params.set("sort_by", newSortBy);
       params.set("sort_order", newSortOrder);
+      params.delete("page");
       setSearchParams(params, { replace: true });
     },
     [searchParams, setSearchParams]
@@ -550,6 +577,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     const params = new URLSearchParams(searchParams);
     params.delete("sort_by");
     params.delete("sort_order");
+    params.delete("page");
     setSearchParams(params, { replace: true });
   };
 
@@ -588,8 +616,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     if (selectedTags.length === 0) {
       // Remove tags param if no tags selected
       if (searchParams.has("tags")) {
-        searchParams.delete("tags");
-        setSearchParams(searchParams, { replace: true });
+        setSearchParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            next.delete("tags");
+            next.delete("page");
+            return next;
+          },
+          { replace: true }
+        );
       }
     } else {
       // Set tags param with comma-separated tag names
@@ -600,8 +635,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       const currentTagsParam = searchParams.get("tags");
 
       if (currentTagsParam !== tagNames) {
-        searchParams.set("tags", tagNames);
-        setSearchParams(searchParams, { replace: true });
+        setSearchParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            next.set("tags", tagNames);
+            next.delete("page");
+            return next;
+          },
+          { replace: true }
+        );
       }
     }
   }, [selectedTags, searchParams, setSearchParams]); // Run when selected tags change
@@ -1045,8 +1087,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                   "Kanal"}
               </h1>
               <p className="mt-1 text-muted-foreground text-sm">
-                {videos.length} {videos.length === 1 ? "Video" : "Videos"} in
-                dieser Liste
+                {totalVideos} {totalVideos === 1 ? "Video" : "Videos"} in dieser
+                Liste
               </p>
             </div>
           ) : selectedTags.length > 0 ? (
@@ -1055,8 +1097,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                 {selectedTags.map((t) => t.name).join(", ")}
               </h1>
               <p className="mt-1 text-muted-foreground text-sm">
-                {videos.length} {videos.length === 1 ? "Video" : "Videos"} in
-                dieser Liste
+                {totalVideos} {totalVideos === 1 ? "Video" : "Videos"} in dieser
+                Liste
               </p>
             </div>
           ) : (
@@ -1065,8 +1107,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                 Alle Videos
               </h1>
               <p className="mt-1 text-muted-foreground text-sm">
-                {videos.length} {videos.length === 1 ? "Video" : "Videos"} in
-                dieser Liste
+                {totalVideos} {totalVideos === 1 ? "Video" : "Videos"} in dieser
+                Liste
               </p>
             </div>
           )}
@@ -1385,6 +1427,14 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           </table>
         </div>
       )}
+
+      <VideoPagination
+        onPage={setPage}
+        page={page}
+        pageSize={pageSize}
+        shown={videos.length}
+        total={totalVideos}
+      />
 
       {/* Confirm Delete Modal */}
       <ConfirmDeleteModal

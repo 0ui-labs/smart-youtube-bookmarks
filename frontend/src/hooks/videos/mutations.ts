@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { videoKeys } from "@/lib/videoKeys";
 import type { VideoCreate, VideoResponse } from "@/types/video";
+import { invalidateVideoViews } from "./cache";
 import type {
   BatchUpdateFieldValuesRequest,
   BatchUpdateFieldValuesResponse,
@@ -24,7 +25,7 @@ export const useCreateVideo = (listId: string) => {
     onSuccess: () => {
       // Membership, order, and totals are server-owned. Preserve existing data
       // during refetch and mark inactive variants stale for their next mount.
-      queryClient.invalidateQueries({ queryKey: videoKeys.list(listId) });
+      void invalidateVideoViews(queryClient, listId);
       queryClient.invalidateQueries({ queryKey: ["channels"] });
     },
   });
@@ -86,7 +87,7 @@ export const useDeleteVideo = (_listId: string) => {
     // and to remove auto-deleted empty channels
     onSettled: () => {
       // Invalidate ALL video queries (both useVideos and useVideosFilter)
-      queryClient.invalidateQueries({ queryKey: ["videos"] });
+      void invalidateVideoViews(queryClient);
       queryClient.invalidateQueries({ queryKey: ["channels"] });
     },
   });
@@ -111,7 +112,7 @@ export const useBulkUploadVideos = (listId: string) => {
     },
     onSuccess: () => {
       // Invalidate ALL video queries for this list (filtered and unfiltered)
-      queryClient.invalidateQueries({ queryKey: videoKeys.list(listId) });
+      void invalidateVideoViews(queryClient);
     },
   });
 };
@@ -134,7 +135,7 @@ export const useAssignTags = () => {
     },
     onSuccess: () => {
       // Invalidate all video queries to refetch with updated tags
-      queryClient.invalidateQueries({ queryKey: videoKeys.all });
+      void invalidateVideoViews(queryClient);
     },
   });
 };
@@ -163,7 +164,7 @@ export const useUpdateVideoFieldValues = (videoId: string) => {
       queryClient.setQueriesData(
         { queryKey: videoKeys.lists() },
         (oldVideos: VideoResponse[] | undefined) => {
-          if (!oldVideos) return oldVideos;
+          if (!Array.isArray(oldVideos)) return oldVideos;
 
           return oldVideos.map((video) => {
             if (video.id !== videoId) return video;
@@ -230,7 +231,7 @@ export const useUpdateVideoFieldValues = (videoId: string) => {
     },
 
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: videoKeys.all });
+      void invalidateVideoViews(queryClient);
     },
   });
 };
@@ -320,9 +321,9 @@ export const useSetVideoCategory = () => {
     // Step 3.11: Query invalidation
     onSettled: (_data, _error, { videoId }) => {
       // Invalidate all video queries to refetch with updated category
-      queryClient.invalidateQueries({ queryKey: videoKeys.all });
+      void invalidateVideoViews(queryClient);
       // Also invalidate the single video detail query (used by VideoDetailsModal)
-      queryClient.invalidateQueries({ queryKey: ["video-detail", videoId] });
+      queryClient.invalidateQueries({ queryKey: videoKeys.detail(videoId) });
       // Also invalidate field values as they may have changed
       queryClient.invalidateQueries({
         queryKey: videoKeys.videoFieldValues(videoId),

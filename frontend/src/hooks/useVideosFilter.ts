@@ -1,10 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { videoKeys } from "@/lib/videoKeys";
 import type { ActiveFilter } from "@/stores/fieldFilterStore";
-import type { VideoResponse } from "@/types/video";
+import { VideoPageSchema } from "./videos/page";
 
 interface UseVideosFilterOptions {
   listId: string;
+  offset?: number;
+  limit?: number;
   tags?: string[];
   channelId?: string; // Filter by channel (YouTube Channels feature)
   fieldFilters?: ActiveFilter[];
@@ -166,6 +169,8 @@ function isFilterComplete(filter: ActiveFilter): boolean {
 
 export function useVideosFilter({
   listId,
+  offset = 0,
+  limit = 50,
   tags,
   channelId,
   fieldFilters,
@@ -176,18 +181,17 @@ export function useVideosFilter({
 }: UseVideosFilterOptions) {
   const isQueryEnabled = enabled && !!listId;
 
-  return useQuery({
-    queryKey: [
-      "videos",
-      "filter",
-      listId,
+  const query = useQuery({
+    queryKey: videoKeys.page(listId, {
       tags,
       channelId,
       fieldFilters,
       sortBy,
       sortOrder,
-    ],
-    queryFn: async () => {
+      offset,
+      limit,
+    }),
+    queryFn: async ({ signal }) => {
       const requestBody: {
         tags?: string[];
         channel_id?: string;
@@ -225,12 +229,13 @@ export function useVideosFilter({
         requestBody.sort_order = sortOrder;
       }
 
-      const response = await api.post<VideoResponse[]>(
-        `/lists/${listId}/videos/filter`,
-        requestBody
+      const response = await api.post(
+        `/lists/${listId}/videos/filter/page?offset=${offset}&limit=${limit}`,
+        requestBody,
+        { signal }
       );
 
-      return response.data;
+      return VideoPageSchema.parse(response.data);
     },
     enabled: isQueryEnabled, // Only run if enabled and listId exists
     staleTime: 30 * 1000, // 30 seconds - filters don't change often
@@ -240,4 +245,5 @@ export function useVideosFilter({
     refetchOnReconnect: false,
     refetchInterval, // Polling for real-time updates (undefined = disabled)
   });
+  return { ...query, data: query.data?.items, total: query.data?.total };
 }

@@ -78,6 +78,24 @@ export const videosHandlers = [
     return HttpResponse.json([]);
   }),
 
+  http.get("/api/lists/:listId/videos/page", ({ request }) => {
+    const url = new URL(request.url);
+    return HttpResponse.json({
+      items: [],
+      total: 0,
+      offset: Number(url.searchParams.get("offset") ?? 0),
+      limit: Number(url.searchParams.get("limit") ?? 50),
+    });
+  }),
+  http.post("/api/lists/:listId/videos/filter/page", ({ request }) => {
+    const url = new URL(request.url);
+    return HttpResponse.json({
+      items: [],
+      total: 0,
+      offset: Number(url.searchParams.get("offset") ?? 0),
+      limit: Number(url.searchParams.get("limit") ?? 50),
+    });
+  }),
   // GET /api/lists/:listId/videos - Returns list of videos
   http.get("/api/lists/:listId/videos", () => {
     // Return empty array by default - tests can override with server.use()

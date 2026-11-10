@@ -1,4 +1,7 @@
 export interface UseVideosOptions {
+  offset?: number;
+  limit?: number;
+  enabled?: boolean;
   /** Array of tag names for OR filtering (videos with ANY of the specified tags) */
   tags?: string[];
   /** Field to sort by: "title" | "duration" | "created_at" | "field:<field_id>" */
