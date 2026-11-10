@@ -155,3 +155,40 @@ async def test_worker_commits_business_data_before_marking_operation_complete(
                 .where(BookmarkList.name == "Durable business probe")
             )
         ).scalar_one() == 1
+
+
+async def test_parallel_processing_requests_do_not_create_orphan_parent_jobs(
+    test_db, test_engine, test_video, test_list
+):
+    import asyncio
+
+    from fastapi import HTTPException
+    from sqlalchemy import func
+
+    from app.api.processing import start_processing
+    from app.models.job import ProcessingJob
+
+    sessions = async_sessionmaker(test_engine, expire_on_commit=False)
+
+    async def start():
+        async with sessions() as db:
+            try:
+                return await start_processing(test_list.id, db)
+            except HTTPException as error:
+                await db.rollback()
+                return error
+
+    results = await asyncio.gather(start(), start())
+    assert (
+        sum(
+            isinstance(result, HTTPException) and result.status_code == 409
+            for result in results
+        )
+        == 1
+    )
+    assert (
+        await test_db.execute(select(func.count()).select_from(ProcessingJob))
+    ).scalar_one() == 1
+    assert (
+        await test_db.execute(select(func.count()).select_from(JobOutbox))
+    ).scalar_one() == 1

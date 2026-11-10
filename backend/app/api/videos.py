@@ -178,7 +178,10 @@ router = APIRouter(prefix="/api", tags=["videos"])
 
 
 async def _enqueue_video_processing(
-    db: AsyncSession, list_id: int, total_videos: int
+    db: AsyncSession,
+    list_id: UUID,
+    total_videos: int,
+    video_ids: list[str] | None = None,
 ) -> ProcessingJob | None:
     """
     Helper to create ProcessingJob and enqueue ARQ task.
@@ -212,22 +215,19 @@ async def _enqueue_video_processing(
     db.add(job)
     await db.flush()
 
-    # Query pending video IDs
-    result = await db.execute(
-        select(Video.id).where(
-            Video.list_id == list_id, Video.processing_status == "pending"
+    if video_ids is None:
+        result = await db.execute(
+            select(Video.id).where(
+                Video.list_id == list_id, Video.processing_status == "pending"
+            )
         )
-    )
-    video_ids = [str(vid) for vid in result.scalars().all()]
-
-    # Enqueue ARQ job with schema
-    await DurableJobQueue(db).enqueue_job(
-        "process_video_list",
-        str(job.id),
-        str(list_id),
-        video_ids,
-        schema_fields,  # CRITICAL: Pass schema to worker
-    )
+        video_ids = [str(video_id) for video_id in result.scalars().all()]
+    # Each video has its own durable target claim, shared with manual processing
+    # and recovery. A CSV import only schedules its newly created pending videos.
+    for video_id in video_ids:
+        await DurableJobQueue(db).enqueue_job(
+            "process_video", video_id, str(list_id), schema_fields, str(job.id)
+        )
 
     return job
 
@@ -1637,7 +1637,12 @@ async def bulk_upload_videos(
 
             # Create processing job only for pending videos
             if pending_videos:
-                await _enqueue_video_processing(db, list_id, len(pending_videos))
+                await _enqueue_video_processing(
+                    db,
+                    list_id,
+                    len(pending_videos),
+                    [str(video.id) for video in pending_videos],
+                )
 
             # Trigger enrichment for videos that were processed synchronously
             if completed_videos:

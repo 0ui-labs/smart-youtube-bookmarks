@@ -3,6 +3,7 @@
 import os
 from unittest.mock import patch
 from urllib.parse import urlparse
+from uuid import uuid4
 
 from arq import create_pool
 from arq.connections import RedisSettings
@@ -24,7 +25,10 @@ async def test_real_redis_dispatch_and_worker_completion(test_db, test_engine):
         raise ValueError(
             "TEST_REDIS_URL must explicitly name isolated compose Redis on port 56388 database 3"
         )
-    queue = await create_pool(RedisSettings.from_dsn(target))
+    queue_name = f"arq:stabilization-test:{uuid4()}"
+    queue = await create_pool(
+        RedisSettings.from_dsn(target), default_queue_name=queue_name
+    )
     operation = await record_job(
         test_db, "enrich_video", "synthetic-transport", ["synthetic-transport"]
     )
@@ -41,6 +45,7 @@ async def test_real_redis_dispatch_and_worker_completion(test_db, test_engine):
             functions=[func(run_durable_job, keep_result=0)],
             redis_pool=queue,
             burst=True,
+            queue_name=queue_name,
             handle_signals=False,
             ctx={
                 "outbox_session_factory": async_sessionmaker(

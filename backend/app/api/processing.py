@@ -26,11 +26,28 @@ async def start_processing(list_id: UUID, db: AsyncSession = Depends(get_db)):
     try:
         # Verify list exists
         result = await db.execute(
-            select(BookmarkList).where(BookmarkList.id == list_id)
+            select(BookmarkList)
+            .where(BookmarkList.id == list_id)
+            .with_for_update(of=BookmarkList)
         )
         list_obj = result.scalar_one_or_none()
         if not list_obj:
             raise HTTPException(status_code=404, detail="List not found")
+
+        active_job = (
+            await db.execute(
+                select(ProcessingJob.id)
+                .where(
+                    ProcessingJob.list_id == list_id,
+                    ProcessingJob.status.in_(["running", "paused"]),
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if active_job is not None:
+            raise HTTPException(
+                status_code=409, detail="A processing job is already active"
+            )
 
         # Count pending videos efficiently
         count_result = await db.execute(
