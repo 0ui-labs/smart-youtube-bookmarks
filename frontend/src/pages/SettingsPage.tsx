@@ -80,7 +80,12 @@ export function SettingsPage() {
   const usageCounts = useFieldUsageCounts(listId);
 
   // Fetch tags for current user
-  const { data: tags = [], isLoading: isTagsLoading } = useTags();
+  const {
+    data: tags = [],
+    isLoading: isTagsLoading,
+    isError: isTagsError,
+    refetch: refetchTags,
+  } = useTags();
 
   // Schema creation dialog state
   const [schemaDialogOpen, setSchemaDialogOpen] = useState(false);
@@ -335,7 +340,14 @@ export function SettingsPage() {
                 />
               )}
 
-              {isTagsLoading ? (
+              {isTagsError ? (
+                <div role="alert">
+                  Kategorien konnten nicht geladen werden.{" "}
+                  <Button onClick={() => void refetchTags()}>
+                    Erneut versuchen
+                  </Button>
+                </div>
+              ) : isTagsLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <p className="text-muted-foreground">Lade Kategorien...</p>
                 </div>

@@ -1,390 +1,157 @@
-/**
- * Unit Tests for CategorySelector Component
- * Phase 5 Step 5.1-5.3 (TDD)
- *
- * Tests the CategorySelector dropdown that allows users to:
- * - Select a category for a video
- * - Clear the category selection
- * - See loading states during data fetch or mutations
- */
-
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
+import type { VideoFieldValue } from "@/types/video";
 import { CategorySelector } from "./CategorySelector";
 
-// Mock useCategories hook
-const mockCategories = [
-  {
-    id: "cat-1",
-    name: "Keto Rezepte",
-    color: "#FF5722",
-    schema_id: null,
-    is_video_type: true,
-    user_id: "user-1",
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "cat-2",
-    name: "Vegan",
-    color: "#4CAF50",
-    schema_id: null,
-    is_video_type: true,
-    user_id: "user-1",
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z",
-  },
-];
-
-// We'll set this in beforeEach to control the mock per test
-let mockUseCategoriesReturn = {
-  data: mockCategories,
-  isLoading: false,
-  error: null,
-};
-
-vi.mock("@/hooks/useTags", () => ({
-  useCategories: vi.fn(() => mockUseCategoriesReturn),
+const state = vi.hoisted(() => ({
+  loading: false,
+  pending: false,
+  mutate: vi.fn(),
 }));
-
-// Test wrapper with QueryClient
-function renderWithProviders(ui: React.ReactElement) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+const categories = [
+  { id: "a", name: "Keto", color: "#ff0000" },
+  { id: "b", name: "Vegan", color: null },
+];
+vi.mock("@/hooks/useTags", () => ({
+  useCategories: () => ({ data: categories, isLoading: state.loading }),
+}));
+vi.mock("@/hooks/useVideos", () => ({
+  useSetVideoCategory: () => ({
+    mutateAsync: state.mutate,
+    isPending: state.pending,
+  }),
+}));
+beforeEach(() => {
+  state.loading = false;
+  state.pending = false;
+  state.mutate.mockReset().mockResolvedValue({});
+});
+const fields = [
+  { id: "v1", field_id: "f1", field_name: "Kalorien", value: 500 },
+] as VideoFieldValue[];
+const show = (
+  props: Partial<React.ComponentProps<typeof CategorySelector>> = {}
+) =>
+  render(
+    <CategorySelector currentCategoryId={null} videoId="video" {...props} />
   );
-}
-
-describe("CategorySelector", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Reset mock to default state
-    mockUseCategoriesReturn = {
-      data: mockCategories,
-      isLoading: false,
-      error: null,
-    };
+const choose = async (name: string) => {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("combobox"));
+  await user.click(screen.getByRole("option", { name }));
+};
+it("labels the category selector accessibly", () => {
+  show();
+  expect(screen.getByLabelText("Kategorie auswählen")).toHaveRole("combobox");
+});
+it("shows an empty selection", () => {
+  show();
+  expect(screen.getByRole("combobox")).toHaveTextContent("Keine Kategorie");
+});
+it("shows the selected category", () => {
+  show({ currentCategoryId: "a" });
+  expect(screen.getByRole("combobox")).toHaveTextContent("Keto");
+});
+it("disables the selector during category loading", () => {
+  state.loading = true;
+  show();
+  expect(screen.getByRole("combobox")).toBeDisabled();
+});
+it("disables the selector during a mutation", () => {
+  state.pending = true;
+  show();
+  expect(screen.getByRole("combobox")).toBeDisabled();
+  expect(screen.getByText("Speichert...")).toBeVisible();
+});
+it("respects explicit disabled state", () => {
+  show({ disabled: true });
+  expect(screen.getByRole("combobox")).toBeDisabled();
+});
+it("assigns the first category without a backup warning", async () => {
+  const change = vi.fn();
+  show({ onCategoryChange: change });
+  await choose("Keto");
+  await waitFor(() => expect(change).toHaveBeenCalledWith("a"));
+  expect(state.mutate).toHaveBeenCalledWith({
+    videoId: "video",
+    categoryId: "a",
   });
-
-  // Step 5.1: Skeleton tests
-  describe("Skeleton (Step 5.1)", () => {
-    it('renders with "Keine Kategorie" placeholder when value is null', () => {
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId={null}
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      expect(screen.getByRole("combobox")).toBeInTheDocument();
-      expect(screen.getByText("Keine Kategorie")).toBeInTheDocument();
-    });
-
-    it("renders dropdown trigger with category label", () => {
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId={null}
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      expect(screen.getByLabelText("Kategorie auswählen")).toBeInTheDocument();
-    });
-
-    it("shows selected category name when currentCategoryId is set", () => {
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId="cat-1"
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      expect(screen.getByRole("combobox")).toBeInTheDocument();
-      // Selected value should show the category name
-      expect(screen.getByText("Keto Rezepte")).toBeInTheDocument();
-    });
-
-    it("shows color indicator for selected category", () => {
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId="cat-1"
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      // Color dot should be visible
-      const colorDot = screen.getByTestId("category-color-dot");
-      expect(colorDot).toHaveStyle({ backgroundColor: "#FF5722" });
-    });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+it("does not mutate when choosing the existing category", async () => {
+  show({ currentCategoryId: "a" });
+  await choose("Keto");
+  expect(state.mutate).not.toHaveBeenCalled();
+});
+it("changes an empty category without a warning", async () => {
+  show({ currentCategoryId: "a" });
+  await choose("Vegan");
+  await waitFor(() =>
+    expect(state.mutate).toHaveBeenCalledWith({
+      videoId: "video",
+      categoryId: "b",
+    })
+  );
+});
+it("removes a category without field values directly", async () => {
+  show({ currentCategoryId: "a" });
+  await choose("Keine Kategorie");
+  await waitFor(() =>
+    expect(state.mutate).toHaveBeenCalledWith({
+      videoId: "video",
+      categoryId: null,
+    })
+  );
+});
+it("warns before changing a category with stored field values", async () => {
+  show({ currentCategoryId: "a", fieldValues: fields });
+  await choose("Vegan");
+  expect(screen.getByRole("dialog")).toHaveTextContent("Kalorien");
+  expect(state.mutate).not.toHaveBeenCalled();
+});
+it("warns before removing a category with stored values", async () => {
+  show({ currentCategoryId: "a", fieldValues: fields });
+  await choose("Keine Kategorie");
+  expect(screen.getByRole("dialog")).toHaveTextContent("Kategorie entfernen");
+  expect(state.mutate).not.toHaveBeenCalled();
+});
+it("confirms a category change before notifying the parent", async () => {
+  const change = vi.fn();
+  show({
+    currentCategoryId: "a",
+    fieldValues: fields,
+    onCategoryChange: change,
   });
-
-  // Step 5.2: Clear Button tests
-  describe("Clear Button (Step 5.2)", () => {
-    it("shows clear button when category is selected", () => {
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId="cat-1"
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      expect(
-        screen.getByRole("button", { name: /kategorie entfernen/i })
-      ).toBeInTheDocument();
-    });
-
-    it("does not show clear button when no category is selected", () => {
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId={null}
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      expect(
-        screen.queryByRole("button", { name: /kategorie entfernen/i })
-      ).not.toBeInTheDocument();
-    });
-
-    it("shows warning dialog when clear button is clicked (onCategoryChange called after confirm)", async () => {
-      const user = userEvent.setup();
-      const onCategoryChange = vi.fn();
-
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId="cat-1"
-          onCategoryChange={onCategoryChange}
-          videoId="video-1"
-        />
-      );
-
-      const clearButton = screen.getByRole("button", {
-        name: /kategorie entfernen/i,
-      });
-      await user.click(clearButton);
-
-      // Warning dialog should appear (not direct call)
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
-      expect(onCategoryChange).not.toHaveBeenCalled();
-
-      // Confirm to actually remove
-      const confirmButton = screen.getByRole("button", {
-        name: /kategorie entfernen/i,
-      });
-      await user.click(confirmButton);
-
-      expect(onCategoryChange).toHaveBeenCalledWith(null, false);
-    });
+  await choose("Vegan");
+  await userEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", {
+      name: /Kategorie ändern/i,
+    })
+  );
+  await waitFor(() => expect(change).toHaveBeenCalledWith("b"));
+});
+it("cancels a category change without changing server state", async () => {
+  show({ currentCategoryId: "a", fieldValues: fields });
+  await choose("Vegan");
+  await userEvent.click(screen.getByRole("button", { name: /Abbrechen/i }));
+  expect(state.mutate).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+it("does not notify the parent after a failed mutation", async () => {
+  const change = vi.fn();
+  state.mutate.mockRejectedValueOnce(new Error("offline"));
+  show({ onCategoryChange: change });
+  await choose("Keto");
+  await waitFor(() => expect(state.mutate).toHaveBeenCalled());
+  expect(change).not.toHaveBeenCalled();
+});
+it("treats null field values as empty when changing categories", async () => {
+  show({
+    currentCategoryId: "a",
+    fieldValues: [{ ...fields[0], value: null }] as VideoFieldValue[],
   });
-
-  // Step 5.3: Loading and Disabled States
-  describe("Loading and Disabled States (Step 5.3)", () => {
-    it("shows loading spinner when categories are loading", () => {
-      // Override mock for this test
-      mockUseCategoriesReturn = {
-        data: [],
-        isLoading: true,
-        error: null,
-      };
-
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId={null}
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      expect(screen.getByText("Lade Kategorien...")).toBeInTheDocument();
-    });
-
-    it("disables selector when disabled prop is true", () => {
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId={null}
-          disabled={true}
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      const combobox = screen.getByRole("combobox");
-      expect(combobox).toHaveAttribute("data-disabled", "");
-    });
-
-    it("shows loading state during mutation", () => {
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId={null}
-          isMutating={true}
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      expect(screen.getByText("Ändere Kategorie...")).toBeInTheDocument();
-    });
-
-    it("disables clear button when disabled", () => {
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId="cat-1"
-          disabled={true}
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      const clearButton = screen.getByRole("button", {
-        name: /kategorie entfernen/i,
-      });
-      expect(clearButton).toBeDisabled();
-    });
-  });
-
-  // Step 5.7: Integration with Warning Dialog
-  describe("Warning Dialog Integration (Step 5.7)", () => {
-    it("shows warning dialog when changing from one category to another", async () => {
-      const user = userEvent.setup();
-
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId="cat-1"
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      // Open dropdown and select different category
-      const trigger = screen.getByRole("combobox");
-      await user.click(trigger);
-
-      // Select "Vegan" category
-      const veganOption = screen.getByRole("option", { name: /vegan/i });
-      await user.click(veganOption);
-
-      // Warning dialog should appear
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: /kategorie ändern/i })
-      ).toBeInTheDocument();
-    });
-
-    it("shows warning dialog when removing category", async () => {
-      const user = userEvent.setup();
-
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId="cat-1"
-          onCategoryChange={vi.fn()}
-          videoId="video-1"
-        />
-      );
-
-      // Click clear button
-      const clearButton = screen.getByRole("button", {
-        name: /kategorie entfernen/i,
-      });
-      await user.click(clearButton);
-
-      // Warning dialog should appear
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: /kategorie entfernen/i })
-      ).toBeInTheDocument();
-    });
-
-    it("does not show warning when assigning first category", async () => {
-      const user = userEvent.setup();
-      const onCategoryChange = vi.fn();
-
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId={null}
-          onCategoryChange={onCategoryChange}
-          videoId="video-1"
-        />
-      );
-
-      // Open dropdown and select category
-      const trigger = screen.getByRole("combobox");
-      await user.click(trigger);
-
-      const ketoOption = screen.getByRole("option", { name: /keto/i });
-      await user.click(ketoOption);
-
-      // No warning dialog - direct assignment
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      expect(onCategoryChange).toHaveBeenCalledWith("cat-1");
-    });
-
-    it("calls onCategoryChange when warning is confirmed", async () => {
-      const user = userEvent.setup();
-      const onCategoryChange = vi.fn();
-
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId="cat-1"
-          onCategoryChange={onCategoryChange}
-          videoId="video-1"
-        />
-      );
-
-      // Open dropdown and select different category
-      const trigger = screen.getByRole("combobox");
-      await user.click(trigger);
-
-      const veganOption = screen.getByRole("option", { name: /vegan/i });
-      await user.click(veganOption);
-
-      // Confirm in warning dialog
-      const confirmButton = screen.getByRole("button", {
-        name: /kategorie ändern/i,
-      });
-      await user.click(confirmButton);
-
-      expect(onCategoryChange).toHaveBeenCalledWith("cat-2", false);
-    });
-
-    it("does not call onCategoryChange when warning is cancelled", async () => {
-      const user = userEvent.setup();
-      const onCategoryChange = vi.fn();
-
-      renderWithProviders(
-        <CategorySelector
-          currentCategoryId="cat-1"
-          onCategoryChange={onCategoryChange}
-          videoId="video-1"
-        />
-      );
-
-      // Open dropdown and select different category
-      const trigger = screen.getByRole("combobox");
-      await user.click(trigger);
-
-      const veganOption = screen.getByRole("option", { name: /vegan/i });
-      await user.click(veganOption);
-
-      // Cancel in warning dialog
-      const cancelButton = screen.getByRole("button", { name: /abbrechen/i });
-      await user.click(cancelButton);
-
-      expect(onCategoryChange).not.toHaveBeenCalled();
-      // Dialog should be closed
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    });
-  });
+  await choose("Vegan");
+  await waitFor(() => expect(state.mutate).toHaveBeenCalled());
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });

@@ -1,258 +1,117 @@
-import { screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderWithRouter } from "@/test/renderWithRouter";
-import type { FieldSchemaResponse } from "@/types/schema";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { beforeEach, expect, it, vi } from "vitest";
 import { SettingsPage } from "./SettingsPage";
 
-// Mock useSchemas and useLists hooks
-vi.mock("@/hooks/useSchemas", () => ({
-  useSchemas: vi.fn(),
-  useSchema: vi.fn(() => ({ data: undefined, isLoading: false, error: null })),
-  usePrefetchSchema: vi.fn(() => vi.fn()),
-  useCreateSchema: vi.fn(() => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isPending: false,
-  })),
-  useUpdateSchema: vi.fn(() => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isPending: false,
-  })),
-  useDeleteSchema: vi.fn(() => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isPending: false,
-  })),
-  useDuplicateSchema: vi.fn(() => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isPending: false,
-  })),
-  useAddFieldToSchema: vi.fn(() => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isPending: false,
-  })),
-  useRemoveFieldFromSchema: vi.fn(() => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isPending: false,
-  })),
-  useUpdateSchemaField: vi.fn(() => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isPending: false,
-  })),
-  useReorderSchemaFields: vi.fn(() => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isPending: false,
-  })),
-  useUpdateSchemaFieldsBatch: vi.fn(() => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isPending: false,
-  })),
-  useSchemaUsageStats: vi.fn(() => ({ count: 0, tagNames: [] })),
-  schemasOptions: vi.fn(),
-  schemaOptions: vi.fn(),
-  schemasKeys: {
-    all: () => ["schemas"],
-    lists: () => ["schemas", "list"],
-    list: (listId: string) => ["schemas", "list", listId],
-    details: () => ["schemas", "detail"],
-    detail: (schemaId: string) => ["schemas", "detail", schemaId],
-  },
+const state = vi.hoisted(() => ({
+  listLoading: false,
+  tagLoading: false,
+  tagError: false,
+  tags: [] as any[],
+  refetch: vi.fn(),
 }));
-
 vi.mock("@/hooks/useLists", () => ({
-  useLists: vi.fn(),
+  useLists: () => ({
+    data: [{ id: "list-1", name: "Sammlung" }],
+    isLoading: state.listLoading,
+  }),
+  useUpdateList: () => ({ mutateAsync: vi.fn() }),
 }));
-
+vi.mock("@/hooks/useTags", () => ({
+  useTags: () => ({
+    data: state.tags,
+    isLoading: state.tagLoading,
+    isError: state.tagError,
+    refetch: state.refetch,
+  }),
+  useCreateTag: () => ({ mutateAsync: vi.fn() }),
+  useUpdateTag: () => ({ mutateAsync: vi.fn() }),
+  useDeleteTag: () => ({ mutateAsync: vi.fn() }),
+}));
+vi.mock("@/hooks/useSchemas", async () => ({
+  ...(await vi.importActual("@/hooks/useSchemas")),
+  useSchemas: () => ({ data: [], isLoading: false }),
+  useSchema: () => ({ data: undefined }),
+  useSchemaUsageStats: () => ({ count: 0, tagNames: [] }),
+}));
 vi.mock("@/hooks/useCustomFields", () => ({
-  useCustomFields: vi.fn(() => ({
-    data: [],
-    isLoading: false,
-    error: null,
-  })),
-  useUpdateCustomField: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useDeleteCustomField: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useFieldUsageCounts: vi.fn(() => new Map()),
+  useCustomFields: () => ({ data: [], isLoading: false }),
+  useCreateCustomField: () => ({ mutateAsync: vi.fn() }),
+  useUpdateCustomField: () => ({ mutate: vi.fn() }),
+  useDeleteCustomField: () => ({ mutate: vi.fn() }),
+  useFieldUsageCounts: () => new Map(),
 }));
-
-import { useLists } from "@/hooks/useLists";
-import { useSchemas } from "@/hooks/useSchemas";
-
-const mockLists = [
-  {
-    id: "list-1",
-    name: "My List",
-    created_at: "2025-01-01",
-    updated_at: "2025-01-01",
-  },
-];
-
-const mockSchemas: FieldSchemaResponse[] = [
-  {
-    id: "schema-1",
-    list_id: "list-1",
-    name: "Makeup Tutorial Criteria",
-    description: "Fields for rating makeup tutorials",
-    created_at: "2025-11-08T10:00:00Z",
-    updated_at: "2025-11-08T10:00:00Z",
-    schema_fields: [
-      {
-        field_id: "field-1",
-        schema_id: "schema-1",
-        display_order: 1,
-        show_on_card: true,
-        field: {
-          id: "field-1",
-          list_id: "list-1",
-          name: "Presentation Quality",
-          field_type: "rating",
-          config: { max_rating: 5 },
-          created_at: "2025-11-08T09:00:00Z",
-          updated_at: "2025-11-08T09:00:00Z",
-        },
-      },
-    ],
-  },
-];
-
-describe("SettingsPage", () => {
-  // ✨ FIX #2: Added afterEach cleanup
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  beforeEach(() => {
-    // Default mock setup
-    vi.mocked(useLists).mockReturnValue({
-      data: mockLists,
-      isLoading: false,
-      isError: false,
-    } as any);
-  });
-
-  it("renders page header", () => {
-    vi.mocked(useSchemas).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-    } as any);
-
-    renderWithRouter(<SettingsPage />);
-
-    expect(screen.getByText("Settings")).toBeInTheDocument();
-  });
-
-  it("renders tabs navigation", () => {
-    vi.mocked(useSchemas).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-    } as any);
-
-    renderWithRouter(<SettingsPage />);
-
-    expect(screen.getByRole("tab", { name: /schemas/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /fields/i })).toBeInTheDocument();
-  });
-
-  it("renders schemas tab by default", () => {
-    vi.mocked(useSchemas).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-    } as any);
-
-    renderWithRouter(<SettingsPage />);
-
-    expect(screen.getByRole("tabpanel")).toBeInTheDocument();
-  });
-
-  it("renders create schema button", () => {
-    vi.mocked(useSchemas).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-    } as any);
-
-    renderWithRouter(<SettingsPage />);
-
-    expect(
-      screen.getByRole("button", { name: /create schema/i })
-    ).toBeInTheDocument();
-  });
-
-  // ✨ FIX #4: Test useLists loading state
-  it("displays loading state when lists are loading", () => {
-    vi.mocked(useLists).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-    } as any);
-
-    vi.mocked(useSchemas).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: false,
-    } as any);
-
-    renderWithRouter(<SettingsPage />);
-
-    expect(screen.getByText(/loading/i)).toBeInTheDocument();
-  });
-
-  it("displays loading state when schemas are loading", () => {
-    vi.mocked(useSchemas).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-    } as any);
-
-    renderWithRouter(<SettingsPage />);
-
-    expect(screen.getByText(/loading schemas/i)).toBeInTheDocument();
-  });
-
-  it("displays error state", () => {
-    vi.mocked(useSchemas).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-    } as any);
-
-    renderWithRouter(<SettingsPage />);
-
-    expect(screen.getByText(/error loading schemas/i)).toBeInTheDocument();
-  });
-
-  it("displays empty state when no schemas exist", () => {
-    vi.mocked(useSchemas).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-    } as any);
-
-    renderWithRouter(<SettingsPage />);
-
-    expect(screen.getByText(/no schemas yet/i)).toBeInTheDocument();
-  });
-
-  it("renders SchemasList when schemas exist", async () => {
-    vi.mocked(useSchemas).mockReturnValue({
-      data: mockSchemas,
-      isLoading: false,
-      isError: false,
-    } as any);
-
-    renderWithRouter(<SettingsPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Makeup Tutorial Criteria")).toBeInTheDocument();
-    });
-  });
+const showSettings = () =>
+  render(
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+beforeEach(() => {
+  state.listLoading = false;
+  state.tagLoading = false;
+  state.tagError = false;
+  state.tags = [];
+  state.refetch.mockClear();
+});
+it("renders the German settings heading", () => {
+  showSettings();
+  expect(screen.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+});
+it("exposes the current categories subscriptions and design tabs", () => {
+  showSettings();
+  for (const name of ["Kategorien", "Abos", "Design"])
+    expect(screen.getByRole("tab", { name })).toBeVisible();
+});
+it("selects categories by default", () => {
+  showSettings();
+  expect(screen.getByRole("tab", { name: "Kategorien" })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+});
+it("offers creating a category", () => {
+  showSettings();
+  expect(screen.getByRole("button", { name: "Neue Kategorie" })).toBeEnabled();
+});
+it("waits for the collection before rendering its controls", () => {
+  state.listLoading = true;
+  showSettings();
+  expect(screen.getByText("Lade Daten...")).toBeVisible();
+});
+it("shows category loading separately", () => {
+  state.tagLoading = true;
+  showSettings();
+  expect(screen.getByText("Lade Kategorien...")).toBeVisible();
+});
+it("reports category failures instead of showing an empty collection", () => {
+  state.tagError = true;
+  showSettings();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Kategorien konnten nicht geladen werden"
+  );
+});
+it("shows the category empty state", () => {
+  showSettings();
+  expect(screen.getByText(/Keine Kategorien/i)).toBeVisible();
+});
+it("renders persisted categories", () => {
+  state.tags = [
+    {
+      id: "cat-1",
+      name: "Tutorial",
+      is_video_type: true,
+      color: null,
+      schema_id: null,
+    },
+  ];
+  showSettings();
+  expect(screen.getByText("Tutorial")).toBeVisible();
 });
