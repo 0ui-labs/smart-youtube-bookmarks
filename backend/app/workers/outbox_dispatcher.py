@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.database import AsyncSessionLocal
@@ -15,6 +15,7 @@ from app.services.job_dispatch_service import dispatch_jobs
 
 def job_handlers() -> dict[str, Callable[..., Awaitable[Any]]]:
     from app.workers.enrichment_worker import enrich_video
+    from app.workers.progress_delivery import publish_job_progress
     from app.workers.subscription_worker import (
         poll_subscription,
         process_pubsub_notification,
@@ -24,6 +25,7 @@ def job_handlers() -> dict[str, Callable[..., Awaitable[Any]]]:
     return {
         handler.__name__: handler
         for handler in (
+            publish_job_progress,
             enrich_video,
             poll_subscription,
             process_pubsub_notification,
@@ -94,16 +96,36 @@ async def run_durable_job(ctx: dict[str, Any], operation_id: str) -> Any:
                     operation.lease_until = None
                     await db.commit()
                     raise
-                if ctx.get("db") is not None:
-                    await ctx["db"].commit()
-                operation.status = (
-                    "failed"
-                    if isinstance(result, dict)
-                    and result.get("status") in {"failed", "error"}
-                    else "completed"
+                business = ctx.get("db", db)
+                failed = isinstance(result, dict) and result.get("status") in {
+                    "failed",
+                    "error",
+                }
+                if operation.kind == "process_video":
+                    args = operation.payload["args"]
+                    parent_id = (
+                        args[3]
+                        if len(args) > 3
+                        else operation.payload["kwargs"].get("job_id")
+                    )
+                    if parent_id:
+                        from app.services.job_progress_service import (
+                            advance_job_progress,
+                        )
+
+                        await advance_job_progress(
+                            business, UUID(parent_id), not failed
+                        )
+                # The acknowledgement and final business changes share one commit.
+                # A crash before it replays both; a crash after it ignores delivery.
+                await business.execute(
+                    update(JobOutbox)
+                    .where(JobOutbox.id == operation.id)
+                    .values(
+                        status="failed" if failed else "completed", lease_until=None
+                    )
                 )
-                operation.lease_until = None
-                await db.commit()
+                await business.commit()
                 return result
             finally:
                 await lock_connection.execute(

@@ -211,7 +211,11 @@ async def get_progress_history(
             query = query.where(JobProgressEvent.created_at >= since)
 
         # Order chronologically and apply pagination
-        query = query.order_by(JobProgressEvent.created_at).offset(offset).limit(limit)
+        query = (
+            query.order_by(JobProgressEvent.created_at, JobProgressEvent.id)
+            .offset(offset)
+            .limit(limit)
+        )
 
         result = await db.execute(query)
         events = result.scalars().all()

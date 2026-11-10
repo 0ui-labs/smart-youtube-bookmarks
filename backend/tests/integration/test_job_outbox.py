@@ -192,3 +192,40 @@ async def test_parallel_processing_requests_do_not_create_orphan_parent_jobs(
     assert (
         await test_db.execute(select(func.count()).select_from(JobOutbox))
     ).scalar_one() == 1
+
+
+async def test_individual_video_delivery_advances_parent_once(
+    test_db, test_engine, test_list
+):
+    from unittest.mock import patch
+
+    from app.models.job import ProcessingJob
+    from app.workers.outbox_dispatcher import run_durable_job
+
+    job = ProcessingJob(list_id=test_list.id, total_videos=1, status="running")
+    test_db.add(job)
+    await test_db.flush()
+    operation = await record_job(
+        test_db,
+        "process_video",
+        "synthetic-video",
+        ["synthetic-video", str(test_list.id), {}, str(job.id)],
+    )
+    await test_db.commit()
+    sessions = async_sessionmaker(test_engine, expire_on_commit=False)
+
+    async def handler(ctx, *args):
+        return {"status": "success"}
+
+    async with sessions() as business:
+        with patch(
+            "app.workers.outbox_dispatcher.job_handlers",
+            return_value={"process_video": handler},
+        ):
+            ctx = {"outbox_session_factory": sessions, "db": business}
+            await run_durable_job(ctx, str(operation.id))
+            assert await run_durable_job(ctx, str(operation.id)) == {
+                "status": "ignored"
+            }
+    await test_db.refresh(job)
+    assert (job.processed_count, job.status) == (1, "completed")

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.clients.youtube import YouTubeClient
 from app.core.config import settings
 from app.core.redis import get_redis_client
-from app.models import ProcessingJob, Video
+from app.models import Video
 from app.models.job_progress import JobProgressEvent
 from app.models.list import BookmarkList
 from app.services.channel_service import get_or_create_channel
@@ -544,132 +544,6 @@ async def _publish_video_update(redis_client, video, job_id: str, user_id: str) 
 async def _update_job_progress(
     db: AsyncSession, job_id: str, success: bool, redis_client=None
 ) -> None:
-    """
-    Update parent ProcessingJob progress counters and create progress event.
+    from app.services.job_progress_service import advance_job_progress
 
-    Args:
-        db: Database session
-        job_id: UUID of ProcessingJob
-        success: Whether video processing succeeded
-        redis_client: Optional Redis client for publishing progress (from ctx)
-    """
-    try:
-        result = await db.execute(
-            select(ProcessingJob).where(ProcessingJob.id == UUID(job_id))
-        )
-        parent_job = result.scalar_one_or_none()
-
-        if not parent_job:
-            logger.warning(f"Parent job {job_id} not found for progress update")
-            return
-
-        # Increment counters
-        if success:
-            parent_job.processed_count += 1
-        else:
-            parent_job.failed_count += 1
-
-        # Calculate progress percentage
-        total_processed = parent_job.processed_count + parent_job.failed_count
-        progress_percentage = (
-            int((total_processed / parent_job.total_videos) * 100)
-            if parent_job.total_videos > 0
-            else 0
-        )
-
-        # Determine status
-        if total_processed >= parent_job.total_videos:
-            # Job complete
-            event_status = "completed"
-        elif success:
-            event_status = "success"
-        else:
-            event_status = "error"
-
-        # Throttling: Only create DB events for significant progress changes (for large batches)
-        # For small batches (<= 20 videos), create event for every video
-        # For large batches, create event on: 0%, every 5%, and 100%
-        if parent_job.total_videos <= 20:
-            should_create_event = True  # Every update for small batches
-        else:
-            should_create_event = (
-                progress_percentage == 0  # Initial
-                or progress_percentage == 100  # Final
-                or progress_percentage % 5 == 0  # Every 5%
-            )
-
-        # Create progress event (with error handling to not block Redis publish)
-        if should_create_event:
-            try:
-                progress_event = JobProgressEvent(
-                    job_id=UUID(job_id),
-                    progress_data={
-                        "progress": progress_percentage,
-                        "processed": parent_job.processed_count,
-                        "failed": parent_job.failed_count,
-                        "total": parent_job.total_videos,
-                        "status": event_status,
-                    },
-                )
-                db.add(progress_event)
-            except Exception as e:
-                logger.warning(f"Failed to create progress event: {e}")
-                # Continue to Redis publish even if DB write fails
-
-        # Publish progress to Redis (with throttling for large batches)
-        # For small batches (<= 20 videos), publish every update
-        # For large batches, publish on: 0%, every 5%, and 100%
-        if parent_job.total_videos <= 20:
-            should_publish = True
-        else:
-            should_publish = (
-                progress_percentage == 0  # Initial
-                or progress_percentage == 100  # Final
-                or progress_percentage % 5 == 0  # Every 5%
-            )
-
-        if should_publish and redis_client:
-            try:
-                import json
-
-                from app.models.list import BookmarkList
-
-                # Get user_id for channel routing
-                list_result = await db.execute(
-                    select(BookmarkList.user_id).where(
-                        BookmarkList.id == parent_job.list_id
-                    )
-                )
-                user_id = list_result.scalar_one_or_none()
-
-                if user_id:
-                    progress_message = {
-                        "job_id": str(job_id),
-                        "progress": progress_percentage,
-                        "processed": parent_job.processed_count,
-                        "failed": parent_job.failed_count,
-                        "total": parent_job.total_videos,
-                        "status": event_status,
-                    }
-                    channel = f"progress:user:{user_id}"
-                    await redis_client.publish(channel, json.dumps(progress_message))
-            except Exception as e:
-                logger.warning(f"Failed to publish progress to Redis: {e}")
-                # Don't fail job if Redis publish fails
-
-        # Auto-complete job when all videos processed
-        if total_processed >= parent_job.total_videos:
-            if parent_job.failed_count == 0:
-                parent_job.status = "completed"
-            else:
-                parent_job.status = "completed_with_errors"
-            logger.info(
-                f"Job {job_id} completed: {parent_job.processed_count}/{parent_job.total_videos} succeeded, "
-                f"{parent_job.failed_count} failed"
-            )
-
-        await db.flush()
-
-    except Exception as e:
-        logger.error(f"Failed to update job progress for job {job_id}: {e}")
-        # Don't raise - progress update failure shouldn't fail video processing
+    await advance_job_progress(db, UUID(job_id), success)

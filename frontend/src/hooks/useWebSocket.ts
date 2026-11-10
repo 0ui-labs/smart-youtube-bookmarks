@@ -7,6 +7,8 @@ import { useImportProgressStore } from "@/stores/importProgressStore";
  */
 export interface ProgressUpdate {
   job_id: string;
+  event_id?: string;
+  created_at?: string;
   status:
     | "pending"
     | "processing"
@@ -330,6 +332,13 @@ export function useWebSocket(): UseWebSocketReturn {
 }
 
 function canAdvance(current: ProgressUpdate, update: ProgressUpdate): boolean {
+  if (current.event_id && current.event_id === update.event_id) return false;
+  if (
+    current.created_at &&
+    update.created_at &&
+    Date.parse(update.created_at) < Date.parse(current.created_at)
+  )
+    return false;
   const terminal = ["completed", "failed", "completed_with_errors"];
   if (terminal.includes(current.status) && !terminal.includes(update.status))
     return false;
@@ -345,6 +354,10 @@ function canAdvance(current: ProgressUpdate, update: ProgressUpdate): boolean {
 function normalizeProgress(data: Record<string, any>): ProgressUpdate {
   return {
     ...data,
+    event_id: data.event_id ?? data.id,
+    status: ["started", "success", "error"].includes(data.status)
+      ? "processing"
+      : data.status,
     current_video:
       data.current_video ?? (data.processed ?? 0) + (data.failed ?? 0),
     total_videos: data.total_videos ?? data.total ?? 0,

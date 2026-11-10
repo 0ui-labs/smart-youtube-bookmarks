@@ -171,6 +171,8 @@ async def test_dual_write_verification(
     # Assert: Processing completed
     assert result["processed"] == 3, "All 3 videos should be processed"
 
+    await deliver_committed_progress(test_db, ctx)
+
     # Assert: Redis pubsub was called (verifies Redis write path)
     assert mock_redis.publish.called, "Redis publish should be called"
     redis_call_count = mock_redis.publish.call_count
@@ -266,6 +268,8 @@ async def test_user_isolation_in_progress_updates(
     await process_video_list(
         ctx_a, str(job_a_id), str(list_a.id), video_ids_a, schema={}
     )
+
+    await deliver_committed_progress(test_db, ctx_a)
 
     # Verify Redis channel includes user_id for isolation
     assert mock_redis.publish.called, "Redis publish should be called"
@@ -495,3 +499,21 @@ async def test_throttling_verification(
     assert throttle_ratio < 0.3, (
         f"Throttle ratio should be < 30% (got {throttle_ratio:.1%}), indicating effective throttling"
     )
+
+
+async def deliver_committed_progress(db, ctx):
+    from app.models.job_outbox import JobOutbox
+    from app.workers.progress_delivery import publish_job_progress
+
+    await db.commit()
+    operations = (
+        (
+            await db.execute(
+                select(JobOutbox).where(JobOutbox.kind == "publish_job_progress")
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for operation in operations:
+        await publish_job_progress(ctx, operation.payload["args"][0])

@@ -15,6 +15,7 @@ from app.models.job_outbox import JobOutbox
 
 JOB_KINDS = frozenset(
     {
+        "publish_job_progress",
         "process_video",
         "process_video_list",
         "enrich_video",
