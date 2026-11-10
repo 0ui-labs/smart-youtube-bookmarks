@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import useWebSocketLib, { ReadyState } from "react-use-websocket";
+import { api } from "@/lib/api";
+import { ProgressContext } from "@/lib/progressContext";
+import { authorizedFetch } from "@/lib/sessionTransport";
 import { useImportProgressStore } from "@/stores/importProgressStore";
 
 /**
@@ -66,6 +69,12 @@ const COMPLETED_JOB_TTL = 5 * 60 * 1000; // 5 minutes
  * @returns WebSocket state and job progress map
  */
 export function useWebSocket(): UseWebSocketReturn {
+  const shared = useContext(ProgressContext);
+  const connection = useProgressConnection(!shared);
+  return shared ?? connection;
+}
+
+export function useProgressConnection(enabled = true): UseWebSocketReturn {
   const [jobProgress, setJobProgress] = useState<Map<string, ProgressUpdate>>(
     new Map()
   );
@@ -80,27 +89,21 @@ export function useWebSocket(): UseWebSocketReturn {
   const isReconnectingRef = useRef(false);
   const connectionEpoch = useRef(0);
 
-  // Get auth token from localStorage (optional in dev mode)
-  const token = localStorage.getItem("token");
-  // In dev mode, connect without token (backend will use default user)
-  const wsUrl = token ? `${WS_URL}?token=${token}` : WS_URL;
+  const getSocketUrl = useCallback(async () => {
+    const { data } = await api.post<{ ticket: string }>("/auth/ws-ticket");
+    const url = new URL(WS_URL);
+    url.searchParams.set("ticket", data.ticket);
+    return url.toString();
+  }, []);
 
   // ===== react-use-websocket Integration =====
   const { lastJsonMessage, readyState, sendJsonMessage } = useWebSocketLib(
-    wsUrl, // null if no token (won't connect)
+    enabled ? getSocketUrl : null,
     {
       // Connection lifecycle
       onOpen: () => {
         console.log("WebSocket connected");
         setReconnecting(false);
-
-        // Send auth message (backend expects this)
-        if (token) {
-          sendJsonMessage({
-            type: "auth",
-            token,
-          });
-        }
       },
 
       onClose: (event) => {
@@ -248,11 +251,8 @@ export function useWebSocket(): UseWebSocketReturn {
       try {
         // Replay persisted history: client receipt times are not server cursors.
         for (let offset = 0; ; offset += 100) {
-          const response = await fetch(
-            `/api/jobs/${jobId}/progress-history?offset=${offset}&limit=100`,
-            {
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            }
+          const response = await authorizedFetch(
+            `/api/jobs/${jobId}/progress-history?offset=${offset}&limit=100`
           );
           if (!response.ok) throw new Error(`History HTTP ${response.status}`);
           const events = await response.json();

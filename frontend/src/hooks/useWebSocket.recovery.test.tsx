@@ -185,6 +185,7 @@ it("ignores a history response belonging to a disconnected connection", async ()
   act(() => {
     pending = result.current.retryHistory();
   });
+  await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
   act(() => socket.options.onClose({ code: 1006 }));
   await act(async () => {
     resolveHistory({

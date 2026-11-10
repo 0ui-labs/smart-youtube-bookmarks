@@ -1,5 +1,6 @@
-import axios from "axios";
+import axios, { type InternalAxiosRequestConfig } from "axios";
 import type { AnalyticsResponse } from "@/types/analytics";
+import { prepareSessionRequest } from "./sessionTransport";
 
 /**
  * Axios instance configured for the backend API.
@@ -15,6 +16,52 @@ import type { AnalyticsResponse } from "@/types/analytics";
 export const api = axios.create({
   baseURL: "/api",
 });
+
+type SessionRequestConfig = InternalAxiosRequestConfig & {
+  sessionRelease?: () => void;
+  sessionCurrent?: () => boolean;
+  sessionRefreshed?: boolean;
+};
+api.interceptors.request.use(async (configuration) => {
+  const config = configuration as SessionRequestConfig;
+  const request = await prepareSessionRequest(
+    config.sessionRefreshed,
+    config.signal as AbortSignal | undefined
+  );
+  if (request.token)
+    config.headers.set("Authorization", `Bearer ${request.token}`);
+  config.signal = request.signal;
+  config.sessionRelease = request.release;
+  config.sessionCurrent = request.isCurrent;
+  return config;
+});
+api.interceptors.response.use(
+  (response) => {
+    const config = response.config as SessionRequestConfig;
+    config.sessionRelease?.();
+    if (config.sessionCurrent && !config.sessionCurrent())
+      throw new DOMException("Session changed", "AbortError");
+    return response;
+  },
+  async (error) => {
+    const config = error.config as SessionRequestConfig | undefined;
+    config?.sessionRelease?.();
+    if (config?.sessionCurrent && !config.sessionCurrent())
+      throw new DOMException("Session changed", "AbortError");
+    if (
+      error.response?.status === 401 &&
+      config &&
+      !config.sessionRefreshed &&
+      config.headers.has("Authorization")
+    ) {
+      config.sessionRefreshed = true;
+      return api.request(config);
+    }
+    // Application error handlers must not accidentally log bearer credentials.
+    config?.headers.delete("Authorization");
+    return Promise.reject(error);
+  }
+);
 
 /**
  * Response interceptor for comprehensive error handling.

@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { api } from "@/lib/api";
 import { useWebSocket } from "./useWebSocket";
 
 // Mock react-use-websocket
@@ -116,19 +117,20 @@ describe("useWebSocket", () => {
       expect(result.current.isConnected).toBe(true);
     });
 
-    it("sends auth message AFTER connection opens", async () => {
-      const { result } = renderHook(() => useWebSocket());
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
-
-      // Should have called sendJsonMessage with auth message
-      expect(mockSendJsonMessage).toHaveBeenCalledWith({
-        type: "auth",
-        token: "test-token-123",
-      });
-      expect(result.current.isConnected).toBe(true);
+    it("uses fresh one-use tickets without sending a bearer message", async () => {
+      const post = vi
+        .spyOn(api, "post")
+        .mockResolvedValueOnce({ data: { ticket: "ticket-a" } })
+        .mockResolvedValueOnce({ data: { ticket: "ticket-b" } });
+      renderHook(() => useWebSocket());
+      const getUrl = mockUrl as unknown as () => Promise<string>;
+      expect(await getUrl()).toContain("ticket=ticket-a");
+      expect(await getUrl()).toContain("ticket=ticket-b");
+      expect(post).toHaveBeenNthCalledWith(1, "/auth/ws-ticket");
+      expect(mockSendJsonMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: "auth" })
+      );
+      post.mockRestore();
     });
 
     it("updates authStatus to authenticated on auth confirmation", async () => {
@@ -617,17 +619,10 @@ describe("useWebSocket", () => {
       expect(result.current.isConnected).toBe(true);
     });
 
-    it("connects without a token in the current development contract", async () => {
-      localStorage.clear(); // No token
-
-      const { result } = renderHook(() => useWebSocket());
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
-
-      expect(result.current.isConnected).toBe(true);
-      expect(mockUrl).toContain("/api/ws/progress"); // react-use-websocket called with null URL
+    it("provides a ticket URL factory regardless of legacy localStorage tokens", () => {
+      localStorage.removeItem("token");
+      renderHook(() => useWebSocket());
+      expect(typeof mockUrl).toBe("function");
     });
 
     it("sets historyError when history API fails", async () => {

@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
+import { authorizedFetch } from "@/lib/sessionTransport";
 
 export interface SmartSuggestion {
   field: {
@@ -44,7 +45,7 @@ export function useSmartDuplicateCheck(options: UseSmartDuplicateCheckOptions) {
       setError(null);
 
       try {
-        const response = await fetch(
+        const response = await authorizedFetch(
           `/api/lists/${listId}/custom-fields/check-duplicate?mode=${mode}`,
           {
             method: "POST",
