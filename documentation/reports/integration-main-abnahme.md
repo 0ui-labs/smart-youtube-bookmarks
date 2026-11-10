@@ -38,7 +38,9 @@ Kein Rückmerge dieses alten Entwicklungsbranches. Die alte Implementierung enth
 | Feldwertsicherung bei Kategoriewechsel | `backend/app/services/field_value_backup.py`, `backend/tests/unit/test_field_value_backup.py`, `backend/tests/integration/test_category_change.py`. |
 | Datenbankgrundlage | Vorhandene Migration `5e0cc055afa3_add_is_video_type_and_default_schema_id.py`; komplette Migrationskette wird erneut gegen Testdatenbank geprüft. |
 
-Keine fehlende exklusive Funktion wurde beim gezielten Vergleich festgestellt. Vollständige Suites bestätigen anschließend den aktuellen Vertrag; der Backup-Branch bleibt erhalten.
+Der unabhängige Review fand drei schon in main vorhandene Kategoriefehler. `35df76c` behebt sie: Detail-Tags erhalten `is_video_type`; der Restore-Wunsch nutzt den vorhandenen Queryvertrag statt eines ignorierten JSON-Feldes; Wiederherstellung aktualisiert bestehende Werte atomar, validiert aktuelle Schemafelder/Werttypen und überlässt den Commit dem Kategorie-Endpunkt. Zwei echte PostgreSQL-Regressionen schlugen vorher fehl und laufen nun grün, einschließlich wiederholtem A→B→A, unbekannten Backupfeldern und äußerem Rollback. Die alte isolierte Unit-Assertion für `db.add` wurde auf Schemaabfrage/Upserts ohne inneren Commit aktualisiert.
+
+Die aktuelle Oberfläche erkennt vorhandene Backups vor dem Wechsel weiterhin nicht automatisch (`hasBackup=false`); der Wiederherstellungs-Checkbox wird dort noch nicht angeboten. Das ist bestehende, ausdrücklich nicht als fertig behauptete Folgearbeit. API und Hook behandeln explizite Wiederherstellung jetzt korrekt. Keine neue Backup-Auswahloberfläche wird im Zuge der Integration erfunden. Der Backup-Branch bleibt erhalten.
 
 ## Historische Analysen: Abgleich
 
@@ -48,7 +50,7 @@ Keine fehlende exklusive Funktion wurde beim gezielten Vergleich festgestellt. V
 | Benutzer-/Listenisolation | Lokal implementiert; echte Clerk-Konfiguration und Login-Abnahme weiterhin notwendig. |
 | Große Router/Page/Hooks aufteilen | In Stabilisierung umgesetzt; aktueller Modulzuschnitt ersetzt historische Pfad-/Zeilenangaben. |
 | Cachekonventionen und Modaländerungen | Vereinheitlicht und durch zusätzliche aktive Query-Tests abgesichert. |
-| Vollständiges Polling/Listenrendering | Serverseitige Seiten und begrenzte Importabfragen vorhanden; gewünschte sichtbare Navigation ist vor main zu klären. |
+| Vollständiges Polling/Listenrendering | Serverseitige Batches und begrenzte Importabfragen vorhanden; Nutzerentscheidung: zusammenhängende Liste ohne Seitenknöpfe. Im Browser mit synthetischen Daten von 50 auf 51 Karten gewachsen, erste und letzte Karte gleichzeitig erhalten. |
 | Fortschrittsanimation/Store-Benachrichtigungen | Noch offen. Diagnoseskript auf integriertem Store reproduziert die historische Zahl von 120/1.200/12.000 Store-Updates bei 1/10/100 Importen über 60 simulierte Frames mit je 1.000 unselektierten Abonnenten. Keine Browser-FPS-Messung und keine Behauptung neuer Performanceverbesserung. |
 | Gezieltes Watch-Progress-Cacheupdate | Weiterhin breite Video-Invalidierung; separate Optimierung, kein Rückschritt dieser Integration. |
 | Bundle-Splitting, Memoisierung und Metadaten-Batching | Empfehlungen für gezielte Folgearbeit, keine pauschal abgeschlossenen Optimierungen. |
@@ -63,10 +65,21 @@ Unit-Nachweis: drei neue Fälle zunächst fehlgeschlagen, nach Korrektur alle 13
 
 ## Offene Freigabepunkte
 
-- Pagination: explizite Auswahl zwischen Seitenknöpfen und bisheriger Bedienung angefragt. Bis zur Klärung bleibt die integrierte Implementierung auf dem Prüfbranch; keine stillschweigende Freigabe nach main.
+- Pagination: Nutzer hat die bisherige Bedienung ohne Seitenwechsel bestätigt. `03674ae` ersetzt Seitenknöpfe durch kontinuierliches Nachladen mit 50er-Serverbatches, Abbruch veralteter Auswahlrequests, tastaturzugänglichem Fallback und Retry. Alte Paging-Komponente/URL-State entfernt.
 - Clerk: vorhandene lokale Konfiguration enthält keine Clerk-Werte. Private Publishable-Key-Anfrage ohne Eingabe abgelaufen. Das ist keine Eingabe oder Zustimmung. Echte Anmeldung, Tokenablauf, A/B-Wechsel und Datenzuordnung bleiben offen; kein Auth-Bypass.
 - Reale Player-/Providerreise sowie gehostete CI und unabhängiger Integrationsreview folgen separat. Keine vollständige Gesamtabnahme behauptet.
 
 ## Prüfungen und Abschluss
 
-Ergebnisse werden nach den Integrationsläufen ergänzt. Es werden ausschließlich dedizierte `_test`-Datenbanken und isolierte Redis-Datenbanken benutzt.
+Es werden ausschließlich dedizierte `_test`-Datenbanken und isolierte Redis-Datenbanken benutzt.
+
+- Player: 13 Tests nach RED→GREEN erfolgreich; tatsächlicher iframe im Browser enthält leere `hl`-/`cc_lang_pref`-Parameter. Keine Originalton-Garantie und keine Abnahme eines bestimmten mehrsprachigen Videos.
+- Alte Cache-/Schemaabsichten: zusätzliche aktive Query-Integrationstests erfolgreich; unbekannte alte Cache-Keys werden nicht neu angelegt.
+- Kontinuierliches Nachladen: 5 gezielte Fälle erfolgreich, darunter Retry, Löschen, Filterwechsel und Abbruch; danach vollständige Frontendsuite vor Kategorie-Reviewfix: 1.320 bestanden.
+- Backend vor Kategorie-Reviewfix: 1.001 bestanden, 10 vorhandene Skips. Erster Lauf mit Redis-DB 6 wurde von fünf Schutzprüfungen korrekt abgewiesen; korrigiert auf die dokumentierte isolierte Test-Redis-DB 3. Kein Produktfehler und keine Regelabschwächung.
+- Migration auf neuer Testdatenbank samt synthetischem Altbestand erfolgreich. Worker-Burst mit ausdrücklich gesetzter `DATABASE_URL` auf dieser Testdatenbank erfolgreich; ein erster Start nur mit `TEST_DATABASE_URL` erreichte erwartungsgemäß nicht die Worker-DB und gilt nicht als Nachweis.
+- Strenges mypy: 125 Dateien ohne Fehler. Ruff erfolgreich. API-Client-Abgleich: 249 Dateien stimmen mit eigenem laufendem Backend überein.
+- Reale Browser-UI, synthetischer Transport: 50 initiale Karten, Scrollen fordert Offset 50 mit Limit 50 an, danach 51 Karten; erste und letzte Karte bleiben sichtbar, keine Seitenknöpfe. Die temporäre Testseite war kein Auth-Bypass der Anwendung und wurde anschließend entfernt; Browser-Tab und Testserver geschlossen.
+- Normale App im echten Browser ohne Clerk-Konfiguration: „Die Anmeldung ist noch nicht konfiguriert.“ Das bestätigt den Blocker für die Nutzbarkeit nach main, keine echte Login-Abnahme.
+
+Nach den Kategorie-Reviewfixes folgen die finalen Suites; keine historischen grünen Läufe als Abschlussnachweis dieser Änderungen verwenden.

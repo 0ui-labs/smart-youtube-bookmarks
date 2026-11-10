@@ -38,9 +38,9 @@ it("refreshes first field values in modal and sorted/filtered pages without losi
   const inactiveKey = videoKeys.page("list", { offset: 50, limit: 50 });
   const originalPage = { items: [], total: 100, offset: 50, limit: 50 };
   client.setQueryData(inactiveKey, originalPage);
-  const put = vi.spyOn(api, "put").mockImplementation(async () => {
+  const put = vi.spyOn(api, "put").mockImplementation(() => {
     rating = 4;
-    return { data: { updated_count: 1 } } as never;
+    return Promise.resolve({ data: { updated_count: 1 } } as never);
   });
   const fields = () =>
     rating === null ? [] : [{ field_id: "rating", value: rating }];
@@ -120,7 +120,9 @@ it("preserves confirmed detail and page data when a field save fails", async () 
   const put = vi
     .spyOn(api, "put")
     .mockRejectedValueOnce(new Error("Save rejected"));
-  const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
+  const alert = vi.spyOn(window, "alert").mockImplementation(() => {
+    /* Dialog suppressed for this rejection test. */
+  });
   const { result, unmount } = renderHook(useVideoFieldMutation, { wrapper });
   try {
     await act(async () => {
@@ -162,9 +164,9 @@ describe.each(["single", "bulk"] as const)("%s tag schema changes", (mode) => {
       ["tags"],
       [{ id: "tag", name: "Tutorial", schema_id: schema }]
     );
-    const put = vi.spyOn(api, "put").mockImplementation(async () => {
+    const put = vi.spyOn(api, "put").mockImplementation(() => {
       schema = newSchema;
-      return { data: { ...tag, schema_id: schema } } as never;
+      return Promise.resolve({ data: { ...tag, schema_id: schema } } as never);
     });
     const { result, unmount } = renderHook(
       () => ({
