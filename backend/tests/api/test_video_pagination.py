@@ -159,3 +159,45 @@ async def test_import_status_is_bounded_and_scoped(client, test_db, test_list):
             json={"video_ids": [str(identity) for identity in identities]},
         )
     ).status_code == 422
+
+
+async def test_export_includes_all_filtered_matches_not_only_visible_page(
+    client, test_db, test_list, test_user
+):
+    import csv
+    import io
+
+    tag = Tag(user_id=test_user.id, name="Export selected")
+    test_db.add(tag)
+    await test_db.flush()
+    identities = [uuid4() for _ in range(160)]
+    await test_db.execute(
+        insert(Video),
+        [
+            {
+                "id": identity,
+                "list_id": test_list.id,
+                "youtube_id": f"v{index:010d}",
+                "duration": index,
+            }
+            for index, identity in enumerate(identities)
+        ],
+    )
+    await test_db.execute(
+        insert(video_tags),
+        [{"video_id": identity, "tag_id": tag.id} for identity in identities[:120]],
+    )
+    await test_db.commit()
+    filters = {"tags": ["Export selected"], "sort_by": "duration", "sort_order": "desc"}
+    page = await client.post(
+        f"/api/lists/{test_list.id}/videos/filter/page", json=filters
+    )
+    assert (page.json()["total"], len(page.json()["items"])) == (120, 50)
+    response = await client.post(f"/api/lists/{test_list.id}/export/csv", json=filters)
+    assert response.status_code == 200
+    lines = [line for line in response.text.splitlines() if not line.startswith("#")]
+    rows = list(csv.DictReader(io.StringIO("\n".join(lines))))
+    assert len(rows) == 120
+    assert [row["url"] for row in rows] == [
+        f"https://www.youtube.com/watch?v=v{index:010d}" for index in range(119, -1, -1)
+    ]

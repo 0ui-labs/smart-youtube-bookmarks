@@ -45,6 +45,7 @@ import {
 } from "@/hooks/useVideos";
 import { useVideosFilter } from "@/hooks/useVideosFilter";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { buildVideoSelection } from "@/hooks/videos/selection";
 import { useVideoImportPolling } from "@/hooks/videos/useVideoImportPolling";
 import { useVideoPageState } from "@/hooks/videos/useVideoPageState";
 import { api } from "@/lib/api";
@@ -613,7 +614,16 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   const handleExportCSV = async () => {
     try {
-      await exportVideosCSV(listId);
+      await exportVideosCSV(
+        listId,
+        buildVideoSelection({
+          tags: selectedTagNames,
+          channelId: selectedChannelId ?? undefined,
+          fieldFilters: activeFilters,
+          sortBy,
+          sortOrder,
+        })
+      );
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const errorMessage =

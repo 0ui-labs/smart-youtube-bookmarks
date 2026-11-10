@@ -1,9 +1,17 @@
 import { api } from "@/lib/api";
+import type { VideoSelectionRequest } from "./selection";
 
-export const exportVideosCSV = async (listId: string) => {
-  const response = await api.get<Blob>(`/lists/${listId}/export/csv`, {
-    responseType: "blob",
-  });
+export const exportVideosCSV = async (
+  listId: string,
+  selection?: VideoSelectionRequest
+) => {
+  const response = selection
+    ? await api.post<Blob>(`/lists/${listId}/export/csv`, selection, {
+        responseType: "blob",
+      })
+    : await api.get<Blob>(`/lists/${listId}/export/csv`, {
+        responseType: "blob",
+      });
 
   // Validate response is actually a Blob
   if (!(response.data instanceof Blob)) {
