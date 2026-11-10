@@ -12,8 +12,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from isodate import parse_duration
-from sqlalchemy import select
+from sqlalchemy import any_, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.youtube import VideoMetadata, VideoSearchResult, YouTubeClient
@@ -26,21 +25,13 @@ from app.services.comments_service import CommentsService
 from app.services.job_dispatch_service import DurableJobQueue
 from app.services.pubsub_service import PubSubHubbubService
 from app.services.quota_service import QuotaService
+from app.services.video_metadata_service import parse_youtube_duration
 from app.services.video_pre_filter_service import VideoPreFilterService
 
 logger = logging.getLogger(__name__)
 
 
-def _parse_duration_to_seconds(iso_duration: str | None) -> int | None:
-    """Parse ISO 8601 duration to seconds."""
-    if not iso_duration:
-        return None
-    try:
-        duration_obj = parse_duration(iso_duration)
-        return int(duration_obj.total_seconds())
-    except Exception as e:
-        logger.debug(f"Invalid duration format '{iso_duration}': {e}")
-        return None
+_parse_duration_to_seconds = parse_youtube_duration
 
 
 async def process_pubsub_notification(
@@ -157,7 +148,7 @@ async def _process_subscription_match(
             youtube_id=video_id,
             title=video_data.get("title", ""),
             description=video_data.get("description", ""),
-            channel_id=video_data.get("channel_id", ""),
+            channel_id=video_data.get("channel_id") or "",
             channel_name=video_data.get("channel", "Unknown"),
             thumbnail_url=video_data.get("thumbnail_url", ""),
             published_at=datetime.fromisoformat(
@@ -180,7 +171,7 @@ async def _process_subscription_match(
     channel = await get_or_create_channel(
         db,
         user_id=subscription.user_id,
-        youtube_channel_id=video_data.get("channel_id", ""),
+        youtube_channel_id=video_data.get("channel_id") or "",
         channel_name=video_data.get("channel", "Unknown"),
     )
 
@@ -318,7 +309,8 @@ async def renew_pubsub_leases(ctx: dict[str, Any]) -> dict[str, Any]:
 
     query = select(Subscription).where(
         Subscription.is_active == True,
-        Subscription.pubsub_expires_at < threshold,
+        (Subscription.pubsub_expires_at < threshold)
+        | Subscription.pubsub_expires_at.is_(None),
         Subscription.channel_ids != None,  # noqa: E711
     )
     result = await db.execute(query)
@@ -330,35 +322,17 @@ async def renew_pubsub_leases(ctx: dict[str, Any]) -> dict[str, Any]:
 
     logger.info(f"Found {len(subscriptions)} subscriptions with expiring leases")
 
-    renewed_count = 0
-    async with PubSubHubbubService() as pubsub:
-        for subscription in subscriptions:
-            channel_ids = subscription.channel_ids or []
-
-            for channel_id in channel_ids:
-                try:
-                    success = await pubsub.subscribe(channel_id)
-
-                    if success:
-                        renewed_count += 1
-                        logger.info(
-                            f"Renewed lease for channel {channel_id} "
-                            f"(subscription {subscription.id})"
-                        )
-                    else:
-                        logger.warning(
-                            f"Failed to renew lease for channel {channel_id}"
-                        )
-                except Exception as e:
-                    logger.error(f"Error renewing lease for channel {channel_id}: {e}")
-
-            # Update expiry timestamp (10 days from now)
-            subscription.pubsub_expires_at = datetime.utcnow() + timedelta(days=10)
-
+    channels = {
+        channel
+        for subscription in subscriptions
+        for channel in subscription.channel_ids or []
+    }
+    for channel in sorted(channels):
+        await DurableJobQueue(db).enqueue_job("sync_pubsub_channel", channel)
+    # The handler advances expiry only after the committed intent reaches the Hub.
+    # Renewal acceptance must never pretend that a failed Hub call succeeded.
     await db.commit()
-
-    logger.info(f"PubSubHubbub lease renewal complete: renewed {renewed_count} leases")
-    return {"status": "ok", "renewed": renewed_count}
+    return {"status": "ok", "renewed": 0, "queued": len(channels)}
 
 
 async def poll_due_subscriptions(ctx: dict[str, Any]) -> dict[str, Any]:
@@ -536,16 +510,16 @@ async def poll_subscription(
                         )
 
                     # Perform detail analysis
-                    result = await pre_filter.analyze_with_transcript(
+                    analysis_result = await pre_filter.analyze_with_transcript(
                         video, sub, transcript, comments
                     )
 
-                    if result.recommendation == "IMPORT":
+                    if analysis_result.recommendation == "IMPORT":
                         final_filtered.append(video)
                     else:
                         logger.debug(
                             f"Video {video.youtube_id} skipped by detail analysis: "
-                            f"{result.reasoning}"
+                            f"{analysis_result.reasoning}"
                         )
 
                 filtered = final_filtered
@@ -573,7 +547,7 @@ async def poll_subscription(
             )
 
             # Create video
-            video = Video(
+            imported_video = Video(
                 list_id=sub.list_id,
                 youtube_id=video_result.youtube_id,
                 title=video_result.title,
@@ -588,13 +562,13 @@ async def poll_subscription(
                 view_count=video_result.view_count,
                 processing_status="completed",
             )
-            db.add(video)
+            db.add(imported_video)
             await db.flush()  # Get video.id
 
             # Create match record
             match = SubscriptionMatch(
                 subscription_id=sub.id,
-                video_id=video.id,
+                video_id=imported_video.id,
                 source="search",
             )
             db.add(match)
@@ -674,7 +648,7 @@ def _apply_search_filters(
     return result
 
 
-async def sync_pubsub_channel(ctx: dict, channel_id: str) -> dict:
+async def sync_pubsub_channel(ctx: dict[str, Any], channel_id: str) -> dict[str, Any]:
     """Reconcile the shared hub callback after committed subscription changes."""
     db: AsyncSession = ctx["db"]
     subscriptions = (
@@ -682,7 +656,7 @@ async def sync_pubsub_channel(ctx: dict, channel_id: str) -> dict:
             await db.execute(
                 select(Subscription).where(
                     Subscription.is_active.is_(True),
-                    Subscription.channel_ids.any(channel_id),
+                    literal(channel_id) == any_(Subscription.channel_ids),
                 )
             )
         )

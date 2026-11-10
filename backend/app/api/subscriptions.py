@@ -6,6 +6,7 @@ that automatically import new videos from YouTube channels and topics.
 """
 
 import logging
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -13,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.redis import get_redis_client
+from app.models.subscription import Subscription, SubscriptionMatch
 from app.schemas.subscription import (
     QuotaStatusResponse,
     SubscriptionCreate,
@@ -37,7 +39,7 @@ async def list_subscriptions(
     list_id: UUID | None = Query(None, description="Filter by target list"),
     is_active: bool | None = Query(None, description="Filter by active status"),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[Subscription]:
     """
     List all subscriptions for the current user.
 
@@ -53,7 +55,7 @@ async def list_subscriptions(
 
 
 @router.get("/quota", response_model=QuotaStatusResponse)
-async def get_quota_status():
+async def get_quota_status() -> dict[str, Any]:
     """
     Get current YouTube API quota status.
 
@@ -75,7 +77,7 @@ async def get_quota_status():
 async def create_subscription(
     data: SubscriptionCreate,
     db: AsyncSession = Depends(get_db),
-):
+) -> Subscription:
     """
     Create a new subscription.
 
@@ -96,7 +98,7 @@ async def create_subscription(
 async def get_subscription(
     subscription_id: UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> Subscription:
     """Get a single subscription by ID."""
     current_user = authenticated_user(db)
     service = SubscriptionService(db, current_user.id)
@@ -114,7 +116,7 @@ async def update_subscription(
     subscription_id: UUID,
     data: SubscriptionUpdate,
     db: AsyncSession = Depends(get_db),
-):
+) -> Subscription:
     """
     Update a subscription.
 
@@ -138,7 +140,7 @@ async def update_subscription(
 async def delete_subscription(
     subscription_id: UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> None:
     """Delete a subscription."""
     current_user = authenticated_user(db)
     service = SubscriptionService(db, current_user.id)
@@ -155,14 +157,14 @@ async def delete_subscription(
 async def sync_subscription(
     subscription_id: UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> SyncResponse:
     """
     Manually trigger sync for a subscription.
 
     Checks for new videos matching the subscription criteria
     and imports them to the target list.
 
-    Note: This is currently a stub. Full implementation in Etappe 2.
+    Returns acceptance; import completes asynchronously through the durable worker.
     """
     current_user = authenticated_user(db)
     service = SubscriptionService(db, current_user.id)
@@ -182,7 +184,7 @@ async def get_subscription_matches(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[SubscriptionMatch]:
     """
     Get match history for a subscription.
 

@@ -40,7 +40,11 @@ def job_handlers() -> dict[str, Callable[..., Awaitable[Any]]]:
 async def dispatch_outbox(ctx: dict[str, Any]) -> int:
     sessions = ctx.get("outbox_session_factory", AsyncSessionLocal)
     async with sessions() as db:
-        return await dispatch_jobs(db, ctx["redis"])
+        delivered = await dispatch_jobs(db, ctx["redis"])
+        from app.core.readiness import mark_worker_ready
+
+        await mark_worker_ready(ctx["redis"])
+        return delivered
 
 
 async def run_durable_job(ctx: dict[str, Any], operation_id: str) -> Any:
@@ -82,6 +86,11 @@ async def run_durable_job(ctx: dict[str, Any], operation_id: str) -> Any:
                     operation.last_error = "UnsupportedPayload"
                     await db.commit()
                     return {"status": "failed"}
+                executions = int(operation.payload.get("execution_attempts", 0)) + 1
+                operation.payload = {
+                    **operation.payload,
+                    "execution_attempts": executions,
+                }
                 operation.status = "running"
                 operation.lease_until = datetime.now(UTC) + timedelta(minutes=20)
                 await db.commit()
@@ -92,7 +101,7 @@ async def run_durable_job(ctx: dict[str, Any], operation_id: str) -> Any:
                 except Exception as error:
                     if ctx.get("db") is not None:
                         await ctx["db"].rollback()
-                    operation.status = "pending"
+                    operation.status = "failed" if executions >= 5 else "pending"
                     operation.last_error = type(error).__name__
                     operation.next_attempt_at = datetime.now(UTC) + timedelta(minutes=1)
                     operation.lease_until = None

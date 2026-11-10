@@ -38,7 +38,7 @@ STUCK_VIDEO_THRESHOLD_MINUTES = 5
 redis_dsn = urlparse(settings.redis_url)
 
 
-async def startup(ctx: dict) -> None:
+async def startup(ctx: dict[str, Any]) -> None:
     """Initialize worker resources on startup and recover pending enrichments."""
     logger.info("ARQ worker starting up")
     await sessionmanager.connect()
@@ -112,7 +112,8 @@ async def startup(ctx: dict) -> None:
 
                 await db.commit()
             finally:
-                await sessionmanager.scoped_session.remove()
+                if sessionmanager.scoped_session is not None:
+                    await sessionmanager.scoped_session.remove()
                 db_session_context.set(None)
         except Exception as e:
             logger.warning(f"Failed to recover enrichments: {e}")
@@ -129,12 +130,12 @@ async def startup(ctx: dict) -> None:
                 minutes=STUCK_VIDEO_THRESHOLD_MINUTES
             )
 
-            result = await db.execute(
+            videos_result = await db.execute(
                 select(Video)
                 .where(Video.processing_status == "pending")
                 .where(Video.updated_at < threshold_time)
             )
-            stuck_videos = result.scalars().all()
+            stuck_videos = videos_result.scalars().all()
 
             if stuck_videos:
                 logger.info(
@@ -157,7 +158,8 @@ async def startup(ctx: dict) -> None:
 
             await db.commit()
         finally:
-            await sessionmanager.scoped_session.remove()
+            if sessionmanager.scoped_session is not None:
+                await sessionmanager.scoped_session.remove()
             db_session_context.set(None)
     except Exception as e:
         logger.warning(f"Failed to recover stuck videos on startup: {e}")
@@ -165,7 +167,7 @@ async def startup(ctx: dict) -> None:
     logger.info("ARQ worker startup complete")
 
 
-async def recover_failed_enrichments(ctx: dict) -> dict:
+async def recover_failed_enrichments(ctx: dict[str, Any]) -> dict[str, Any]:
     """
     Periodic job to retry failed enrichments.
 
@@ -235,7 +237,8 @@ async def recover_failed_enrichments(ctx: dict) -> dict:
 
             await db.commit()
         finally:
-            await sessionmanager.scoped_session.remove()
+            if sessionmanager.scoped_session is not None:
+                await sessionmanager.scoped_session.remove()
             db_session_context.set(None)
 
     except Exception as e:
@@ -243,7 +246,7 @@ async def recover_failed_enrichments(ctx: dict) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-async def recover_stuck_videos(ctx: dict) -> dict:
+async def recover_stuck_videos(ctx: dict[str, Any]) -> dict[str, Any]:
     """
     Periodic job to recover videos stuck in 'pending' processing status.
 
@@ -265,12 +268,12 @@ async def recover_stuck_videos(ctx: dict) -> dict:
                 minutes=STUCK_VIDEO_THRESHOLD_MINUTES
             )
 
-            result = await db.execute(
+            videos_result = await db.execute(
                 select(Video)
                 .where(Video.processing_status == "pending")
                 .where(Video.updated_at < threshold_time)
             )
-            stuck_videos = result.scalars().all()
+            stuck_videos = videos_result.scalars().all()
 
             if not stuck_videos:
                 logger.debug("No stuck videos to recover")
@@ -310,7 +313,8 @@ async def recover_stuck_videos(ctx: dict) -> dict:
 
             await db.commit()
         finally:
-            await sessionmanager.scoped_session.remove()
+            if sessionmanager.scoped_session is not None:
+                await sessionmanager.scoped_session.remove()
             db_session_context.set(None)
 
     except Exception as e:
@@ -318,14 +322,14 @@ async def recover_stuck_videos(ctx: dict) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-async def shutdown(ctx: dict | None) -> None:
+async def shutdown(ctx: dict[str, Any] | None) -> None:
     """Cleanup worker resources on shutdown."""
     logger.info("ARQ worker shutting down")
     await sessionmanager.disconnect()
     logger.info("ARQ worker shutdown complete")
 
 
-async def on_job_start(ctx: dict) -> None:
+async def on_job_start(ctx: dict[str, Any]) -> None:
     """Set job-specific context before job execution."""
     job_id = ctx.get("job_id", "unknown")
     logger.debug(f"Starting job {job_id}")
@@ -337,7 +341,7 @@ async def on_job_start(ctx: dict) -> None:
     ctx["db"] = sessionmanager.get_session()
 
 
-async def after_job_end(ctx: dict) -> None:
+async def after_job_end(ctx: dict[str, Any]) -> None:
     """Release residual transaction state; handlers commit before ARQ reports success."""
     try:
         if ctx.get("db") is not None:
@@ -366,6 +370,12 @@ def transactional_job(
             raise
 
     return run
+
+
+async def maintain_outbox(ctx: dict[str, Any]) -> int:
+    from app.services.outbox_operations import prune_completed_operations
+
+    return await prune_completed_operations(ctx["db"])
 
 
 class WorkerSettings:
@@ -397,6 +407,7 @@ class WorkerSettings:
         for handler in (
             run_durable_job,
             dispatch_outbox,
+            maintain_outbox,
             process_video,
             process_video_list,
             enrich_video,
@@ -415,6 +426,7 @@ class WorkerSettings:
     # Renew PubSubHubbub leases every 12 hours (00:00 and 12:00)
     # Poll keyword subscriptions every 15 minutes
     cron_jobs = [
+        cron(transactional_job(maintain_outbox), minute={0, 15, 30, 45}, second=5),
         cron(transactional_job(dispatch_outbox), second={0, 10, 20, 30, 40, 50}),
         cron(
             transactional_job(recover_failed_enrichments),

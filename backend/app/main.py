@@ -5,9 +5,10 @@ This module sets up the FastAPI application with CORS middleware
 and provides the health check endpoint.
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
@@ -34,7 +35,7 @@ from app.core.ticket_redaction import TicketRedactionMiddleware
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     Application lifespan manager.
 
@@ -119,3 +120,12 @@ app.include_router(webhooks.router)
 @app.get("/api/health")
 async def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/ready", response_model=dict[str, bool])
+async def readiness_check(response: Response) -> dict[str, bool]:
+    from app.core.readiness import readiness_status
+
+    status = await readiness_status()
+    response.status_code = 200 if all(status.values()) else 503
+    return status

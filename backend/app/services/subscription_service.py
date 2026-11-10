@@ -222,14 +222,13 @@ class SubscriptionService:
         """
         Manually trigger sync for a subscription.
 
-        This is a stub implementation. Full implementation will be in
-        Etappe 2 with the polling worker.
+        Accepts durable polling and channel-reconciliation operations.
 
         Args:
             subscription_id: ID of subscription to sync
 
         Returns:
-            Number of new videos imported (0 for stub)
+            Number already imported at acceptance time (zero)
 
         Raises:
             ValueError: If subscription not found
@@ -238,21 +237,19 @@ class SubscriptionService:
         if not subscription:
             raise ValueError(f"Subscription {subscription_id} not found")
 
-        # TODO: Implement actual sync logic in Etappe 2
-        # - Fetch videos from YouTube API based on channel_ids/keywords
-        # - Apply filters
-        # - Import new videos to target list
-        # - Create SubscriptionMatch records
-        # - Update last_polled_at and next_poll_at
+        if not subscription.is_active:
+            raise ValueError("Inactive subscription cannot be synchronized")
+        from app.services.job_dispatch_service import DurableJobQueue
 
-        # For now, just update timestamps
-        subscription.last_polled_at = datetime.utcnow()
-        subscription.next_poll_at = self._calculate_next_poll(
-            subscription.poll_interval
-        )
+        if subscription.keywords:
+            await DurableJobQueue(self.db).enqueue_job(
+                "poll_subscription", str(subscription.id)
+            )
+        if subscription.channel_ids:
+            await self._queue_channel_sync(subscription.channel_ids)
         await self.db.commit()
-
-        return 0  # Stub: no videos imported yet
+        # No import has completed at acceptance time. Worker updates poll timestamps.
+        return 0
 
     async def get_matches(
         self, subscription_id: UUID, *, skip: int = 0, limit: int = 50
