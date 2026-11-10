@@ -100,6 +100,8 @@ vi.mock("@/hooks/useVideos", () => ({
 }));
 
 vi.mock("@/hooks/useTags", () => ({
+  useCategories: () => ({ data: [], isLoading: false, error: null }),
+  useLabels: () => ({ data: [], isLoading: false, error: null }),
   useTags: vi.fn(() => ({
     data: [],
     isLoading: false,

@@ -8,7 +8,7 @@ import { SettingsPage } from "./SettingsPage";
 // Mock the hooks
 vi.mock("@/hooks/useSchemas", () => ({
   useSchemas: vi.fn(),
-  useSchema: vi.fn(),
+  useSchema: vi.fn(() => ({ data: undefined, isLoading: false, error: null })),
   usePrefetchSchema: vi.fn(() => vi.fn()),
   useCreateSchema: vi.fn(() => ({
     mutate: vi.fn(),

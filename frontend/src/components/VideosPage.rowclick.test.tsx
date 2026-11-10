@@ -94,13 +94,16 @@ vi.mock("@/hooks/useTags", () => ({
 }));
 
 vi.mock("@/stores/tagStore", () => ({
-  useTagStore: vi.fn((selector) =>
-    selector({
+  useTagStore: vi.fn((selector) => {
+    const state = {
       selectedTagIds: [],
+      tags: [],
       toggleTag: vi.fn(),
       clearTags: vi.fn(),
-    })
-  ),
+      setSelectedTagIds: vi.fn(),
+    };
+    return selector ? selector(state) : state;
+  }),
 }));
 
 describe("VideosPage - Row Click & Menu Interaction", () => {
