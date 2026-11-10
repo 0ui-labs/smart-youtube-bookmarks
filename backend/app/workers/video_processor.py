@@ -17,6 +17,7 @@ from app.models import ProcessingJob, Video
 from app.models.job_progress import JobProgressEvent
 from app.models.list import BookmarkList
 from app.services.channel_service import get_or_create_channel
+from app.services.job_dispatch_service import DurableJobQueue
 from app.services.rate_limiter import AdaptiveRateLimiter
 
 logger = logging.getLogger(__name__)
@@ -367,13 +368,16 @@ async def process_video(
             if settings.enrichment_enabled and settings.enrichment_auto_trigger:
                 try:
                     # Use the worker's existing Redis connection from ctx
-                    arq_redis = ctx["redis"]
-                    job = await arq_redis.enqueue_job("enrich_video", str(video.id))
+                    job = await DurableJobQueue(db).enqueue_job(
+                        "enrich_video", str(video.id)
+                    )
 
                     # Retry once if enqueue failed (handles transient Redis issues)
                     if not job:
                         await asyncio.sleep(0.1)
-                        job = await arq_redis.enqueue_job("enrich_video", str(video.id))
+                        job = await DurableJobQueue(db).enqueue_job(
+                            "enrich_video", str(video.id)
+                        )
 
                     if job:
                         logger.info(f"Enqueued enrichment job for video {video_id}")

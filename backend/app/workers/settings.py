@@ -4,17 +4,20 @@ import logging
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
-from arq.connections import ArqRedis, RedisSettings
+from arq.connections import RedisSettings
 from arq.cron import cron
 from arq.jobs import Job
+from arq.worker import func
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.video import Video
 from app.models.video_enrichment import EnrichmentStatus, VideoEnrichment
+from app.services.job_dispatch_service import DurableJobQueue
 from app.workers.db_manager import db_session_context, sessionmanager
 from app.workers.enrichment_worker import enrich_video
+from app.workers.outbox_dispatcher import dispatch_outbox, run_durable_job
 from app.workers.subscription_worker import (
     poll_due_subscriptions,
     poll_subscription,
@@ -49,7 +52,6 @@ async def startup(ctx: dict) -> None:
             # Set a temporary context for the session
             db_session_context.set("startup_recovery")
             db = sessionmanager.get_session()
-            arq_redis: ArqRedis = ctx["redis"]
             try:
                 # Case 1: Recover pending enrichments (existing logic)
                 result = await db.execute(
@@ -63,7 +65,7 @@ async def startup(ctx: dict) -> None:
                     logger.info(f"Found {len(pending)} pending enrichments to recover")
                     for enrichment in pending:
                         try:
-                            await arq_redis.enqueue_job(
+                            await DurableJobQueue(db).enqueue_job(
                                 "enrich_video", str(enrichment.video_id)
                             )
                             logger.info(
@@ -97,7 +99,9 @@ async def startup(ctx: dict) -> None:
                     )
                     for video_id in orphaned_video_ids:
                         try:
-                            await arq_redis.enqueue_job("enrich_video", video_id)
+                            await DurableJobQueue(db).enqueue_job(
+                                "enrich_video", video_id
+                            )
                             logger.info(
                                 f"Enqueued enrichment for orphaned video {video_id}"
                             )
@@ -106,6 +110,7 @@ async def startup(ctx: dict) -> None:
                                 f"Failed to enqueue enrichment for orphaned video {video_id}: {e}"
                             )
 
+                await db.commit()
             finally:
                 await sessionmanager.scoped_session.remove()
                 db_session_context.set(None)
@@ -117,7 +122,6 @@ async def startup(ctx: dict) -> None:
     try:
         db_session_context.set("startup_stuck_videos")
         db = sessionmanager.get_session()
-        arq_redis: ArqRedis = ctx["redis"]
 
         try:
             # Find videos stuck in pending for more than threshold
@@ -138,7 +142,7 @@ async def startup(ctx: dict) -> None:
                 )
                 for video in stuck_videos:
                     try:
-                        await arq_redis.enqueue_job(
+                        await DurableJobQueue(db).enqueue_job(
                             "process_video",
                             str(video.id),
                             str(video.list_id),
@@ -151,6 +155,7 @@ async def startup(ctx: dict) -> None:
                     except Exception as e:
                         logger.warning(f"Failed to enqueue stuck video {video.id}: {e}")
 
+            await db.commit()
         finally:
             await sessionmanager.scoped_session.remove()
             db_session_context.set(None)
@@ -175,7 +180,6 @@ async def recover_failed_enrichments(ctx: dict) -> dict:
     try:
         db_session_context.set("recover_failed_enrichments")
         db = sessionmanager.get_session()
-        arq_redis: ArqRedis = ctx["redis"]
 
         try:
             # Find failed enrichments that haven't exceeded retry limit
@@ -208,7 +212,7 @@ async def recover_failed_enrichments(ctx: dict) -> dict:
                     )
 
                     # Enqueue the enrichment job
-                    job = await arq_redis.enqueue_job(
+                    job = await DurableJobQueue(db).enqueue_job(
                         "enrich_video", str(enrichment.video_id)
                     )
                     if job:
@@ -229,6 +233,7 @@ async def recover_failed_enrichments(ctx: dict) -> dict:
             logger.info(f"Retried {retried} failed enrichments")
             return {"status": "ok", "retried": retried}
 
+            await db.commit()
         finally:
             await sessionmanager.scoped_session.remove()
             db_session_context.set(None)
@@ -253,7 +258,6 @@ async def recover_stuck_videos(ctx: dict) -> dict:
     try:
         db_session_context.set("recover_stuck_videos")
         db = sessionmanager.get_session()
-        arq_redis: ArqRedis = ctx["redis"]
 
         try:
             # Find videos stuck in pending status older than threshold
@@ -279,7 +283,7 @@ async def recover_stuck_videos(ctx: dict) -> dict:
                 try:
                     # Re-enqueue as process_video job
                     # Pass None for schema and job_id since recovery doesn't need parent job
-                    job = await arq_redis.enqueue_job(
+                    job = await DurableJobQueue(db).enqueue_job(
                         "process_video",
                         str(video.id),
                         str(video.list_id),
@@ -304,6 +308,7 @@ async def recover_stuck_videos(ctx: dict) -> dict:
             logger.info(f"Recovered {recovered} stuck videos")
             return {"status": "ok", "recovered": recovered}
 
+            await db.commit()
         finally:
             await sessionmanager.scoped_session.remove()
             db_session_context.set(None)
@@ -390,6 +395,8 @@ class WorkerSettings:
 
     # Worker functions
     functions = [
+        func(run_durable_job, keep_result=0),
+        dispatch_outbox,
         process_video,
         process_video_list,
         enrich_video,
@@ -407,6 +414,7 @@ class WorkerSettings:
     # Renew PubSubHubbub leases every 12 hours (00:00 and 12:00)
     # Poll keyword subscriptions every 15 minutes
     cron_jobs = [
+        cron(dispatch_outbox, second={0, 10, 20, 30, 40, 50}),
         cron(
             recover_failed_enrichments,
             minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55},

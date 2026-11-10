@@ -1,4 +1,5 @@
-import asyncio
+"""Processing job API and progress history."""
+
 import logging
 from datetime import datetime
 from uuid import UUID
@@ -9,11 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.core.redis import get_arq_pool
 from app.models import BookmarkList, ProcessingJob, Schema, Video
 from app.models.job_progress import JobProgressEvent
 from app.schemas.job import JobResponse, JobStatus
 from app.schemas.job_progress import JobProgressEventRead
+from app.services.job_dispatch_service import DurableJobQueue
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,7 @@ router = APIRouter(prefix="/api", tags=["processing"])
 
 
 @router.post("/lists/{list_id}/process", response_model=JobResponse, status_code=201)
-async def start_processing(
-    list_id: UUID, db: AsyncSession = Depends(get_db), arq_pool=Depends(get_arq_pool)
-):
+async def start_processing(list_id: UUID, db: AsyncSession = Depends(get_db)):
     try:
         # Verify list exists
         result = await db.execute(
@@ -44,15 +43,14 @@ async def start_processing(
         if pending_count == 0:
             raise HTTPException(status_code=400, detail="No pending videos to process")
 
-        # Create job in database FIRST (workers need to query it)
+        # Persist job and all delivery intents in the same transaction.
         job = ProcessingJob(
             list_id=list_id, total_videos=pending_count, status="running"
         )
         db.add(job)
-        await db.commit()  # CRITICAL: Commit before enqueue (not just flush)
-        await db.refresh(job)
+        await db.flush()
 
-        # Wrap all post-commit operations to handle failures (prevents orphaned jobs)
+        # No dispatcher can observe these intents before the final commit.
         try:
             # Fetch schema for Gemini extraction (if list has one)
             schema_fields = {}
@@ -72,33 +70,27 @@ async def start_processing(
             )
             pending_videos = videos_result.scalars().all()
 
-            # Build list of enqueue coroutines
-            enqueue_tasks = [
-                arq_pool.enqueue_job(
-                    "process_video",  # Function name from WorkerSettings
-                    str(video.id),  # video_id
-                    str(list_id),  # list_id
-                    schema_fields,  # schema for Gemini
-                    str(job.id),  # job_id for progress updates
+            for video in pending_videos:
+                await DurableJobQueue(db).enqueue_job(
+                    "process_video",
+                    str(video.id),
+                    str(list_id),
+                    schema_fields,
+                    str(job.id),
                 )
-                for video in pending_videos
-            ]
-
-            # Execute all enqueues atomically
-            await asyncio.gather(*enqueue_tasks)
+            await db.commit()
             logger.info(
                 f"Enqueued {len(pending_videos)} videos for processing (job {job.id})"
             )
 
         except Exception as e:
-            # Mark job as failed if ANY operation fails (schema fetch, video fetch, or enqueue)
-            logger.exception("Failed to enqueue jobs for list %s", list_id)
-            job.status = "failed"
-            job.error_message = f"Failed to start processing: {e!s}"
-            await db.commit()
-            raise HTTPException(
-                status_code=500, detail=f"Failed to start processing: {e!s}"
+            await db.rollback()
+            logger.exception(
+                "Failed to persist processing intents for list %s", list_id
             )
+            raise HTTPException(
+                status_code=500, detail="Failed to accept processing job"
+            ) from e
 
         return JobResponse(
             job_id=job.id,
@@ -173,17 +165,7 @@ async def get_progress_history(
     limit: int = Query(100, gt=0, le=100, description="Maximum records to return"),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Get progress history for a job with pagination and filtering.
 
-    Supports:
-    - Filtering by 'since' timestamp for efficient reconnection
-    - Pagination with offset/limit (max 100 per request)
-    - Authorization: user can only access their own jobs
-
-    Note: Uses user_id query param for temporary mock authentication.
-    This will be replaced with proper JWT authentication later.
-    """
     try:
         # Verify job exists and load list relationship (with eager loading)
         stmt = (

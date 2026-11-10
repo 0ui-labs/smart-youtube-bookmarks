@@ -28,7 +28,6 @@ from fastapi.responses import StreamingResponse
 from httpx import HTTPError, TimeoutException
 from isodate import parse_duration
 from pydantic import BaseModel
-from redis.exceptions import ConnectionError as RedisConnectionError, RedisError
 from sqlalchemy import and_, asc, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -43,7 +42,7 @@ from app.api.helpers.field_union import (
 from app.clients.youtube import YouTubeClient
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.redis import get_arq_pool, get_redis_client
+from app.core.redis import get_redis_client
 from app.models.channel import Channel
 from app.models.custom_field import CustomField
 from app.models.job import ProcessingJob
@@ -71,6 +70,7 @@ from app.schemas.video_field_value import (
     BatchUpdateFieldValuesResponse,
 )
 from app.services.channel_service import get_or_create_channel
+from app.services.job_dispatch_service import DurableJobQueue
 
 logger = logging.getLogger(__name__)
 
@@ -128,8 +128,8 @@ async def _enqueue_enrichment(video_id: UUID, db: AsyncSession) -> None:
     """
     Enqueue enrichment job for a video if auto-trigger is enabled.
 
-    Creates pending VideoEnrichment record and enqueues ARQ job.
-    Silently skips if enrichment is disabled or Redis unavailable.
+    Records enrichment and its durable delivery intent in the caller transaction.
+    Skips only when enrichment is disabled; acceptance does not require Redis.
     """
     if not settings.enrichment_enabled or not settings.enrichment_auto_trigger:
         return
@@ -140,18 +140,8 @@ async def _enqueue_enrichment(video_id: UUID, db: AsyncSession) -> None:
     )
     db.add(enrichment)
 
-    try:
-        # Enqueue ARQ job first - if this fails, we don't want the DB record
-        arq_pool = await get_arq_pool()
-        await arq_pool.enqueue_job("enrich_video", str(video_id))
-
-        # Only flush after job is successfully enqueued
-        await db.flush()
-        logger.info(f"Enqueued enrichment job for video {video_id}")
-    except (RedisError, RedisConnectionError, OSError) as e:
-        # Redis/connection errors - expunge the unpersisted enrichment record
-        db.expunge(enrichment)
-        logger.warning(f"Failed to enqueue enrichment job for video {video_id}: {e}")
+    await DurableJobQueue(db).enqueue_job("enrich_video", str(video_id))
+    await db.flush()
 
 
 def parse_youtube_duration(iso_duration: str | None) -> int | None:
@@ -216,8 +206,7 @@ async def _enqueue_video_processing(
     # Create processing job
     job = ProcessingJob(list_id=list_id, total_videos=total_videos, status="running")
     db.add(job)
-    await db.commit()
-    await db.refresh(job)
+    await db.flush()
 
     # Query pending video IDs
     result = await db.execute(
@@ -228,8 +217,7 @@ async def _enqueue_video_processing(
     video_ids = [str(vid) for vid in result.scalars().all()]
 
     # Enqueue ARQ job with schema
-    arq_pool = await get_arq_pool()
-    await arq_pool.enqueue_job(
+    await DurableJobQueue(db).enqueue_job(
         "process_video_list",
         str(job.id),
         str(list_id),
@@ -494,7 +482,6 @@ async def add_video_to_list(
         db.add(new_video)
         await db.flush()
         await db.refresh(new_video)
-        await db.commit()
     except IntegrityError:
         await db.rollback()
         raise HTTPException(
@@ -505,7 +492,11 @@ async def add_video_to_list(
     # Trigger enrichment if video was successfully created with metadata
     if new_video.processing_status == "completed":
         await _enqueue_enrichment(new_video.id, db)
-        await db.commit()  # Commit enrichment record
+    else:
+        await DurableJobQueue(db).enqueue_job(
+            "process_video", str(new_video.id), str(list_id), None, None
+        )
+    await db.commit()
 
     # Set tags to empty list to avoid async relationship loading issues
     # (newly created video has no tags assigned yet)
@@ -1870,7 +1861,6 @@ async def bulk_upload_videos(
                     field_columns=field_columns,
                     failures=failures,
                 )
-                await db.commit()
 
             # Create processing job only for pending videos
             if pending_videos:
@@ -1880,7 +1870,7 @@ async def bulk_upload_videos(
             if completed_videos:
                 for video in completed_videos:
                     await _enqueue_enrichment(video.id, db)
-                await db.commit()
+            await db.commit()
 
         return BulkUploadResponse(
             created_count=len(created_videos),

@@ -92,13 +92,14 @@ async def mock_redis_client():
 
 
 @pytest.fixture
-async def client(test_db, mock_arq_pool, mock_redis_client):
+async def client(test_db, mock_arq_pool, mock_redis_client, monkeypatch):
     """Create test client with database override and mocked ARQ/Redis."""
 
     async def override_get_db():
         yield test_db
 
     app.dependency_overrides[get_db] = override_get_db
+    monkeypatch.setattr(settings, "youtube_api_key", "synthetic-offline-test-key")
 
     # Mock both get_arq_pool and get_redis_client to avoid Redis connection
     # FIX: Patch at all import locations including app.core.redis for app startup
@@ -106,9 +107,23 @@ async def client(test_db, mock_arq_pool, mock_redis_client):
     # at the source module (app.core.redis) in addition to where it's imported.
     with (
         patch("app.core.redis.get_arq_pool", return_value=mock_arq_pool),
-        patch("app.api.videos.get_arq_pool", return_value=mock_arq_pool),
-        patch("app.api.processing.get_arq_pool", return_value=mock_arq_pool),
         patch("app.core.redis.get_redis_client", return_value=mock_redis_client),
+        patch("app.api.videos.get_redis_client", return_value=mock_redis_client),
+        patch(
+            "app.clients.youtube.YouTubeClient.get_video_metadata",
+            new_callable=AsyncMock,
+            return_value={
+                "title": "Synthetic video",
+                "channel": "Synthetic channel",
+                "duration": "PT3M",
+                "published_at": "2026-01-01T00:00:00Z",
+            },
+        ),
+        patch(
+            "app.clients.youtube.YouTubeClient.get_channel_info",
+            new_callable=AsyncMock,
+            return_value={"thumbnail_url": None, "description": None},
+        ),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:

@@ -23,6 +23,7 @@ from app.models import Video
 from app.models.subscription import Subscription, SubscriptionMatch
 from app.services.channel_service import get_or_create_channel
 from app.services.comments_service import CommentsService
+from app.services.job_dispatch_service import DurableJobQueue
 from app.services.pubsub_service import PubSubHubbubService
 from app.services.quota_service import QuotaService
 from app.services.video_pre_filter_service import VideoPreFilterService
@@ -374,7 +375,6 @@ async def poll_due_subscriptions(ctx: dict[str, Any]) -> dict[str, Any]:
         Status dict with number of enqueued jobs
     """
     db: AsyncSession = ctx["db"]
-    redis = ctx["redis"]
 
     logger.info("Starting poll_due_subscriptions check")
 
@@ -412,12 +412,15 @@ async def poll_due_subscriptions(ctx: dict[str, Any]) -> dict[str, Any]:
     enqueued = 0
     for sub in subscriptions:
         try:
-            await redis.enqueue_job("poll_subscription", subscription_id=str(sub.id))
+            await DurableJobQueue(db).enqueue_job(
+                "poll_subscription", subscription_id=str(sub.id)
+            )
             enqueued += 1
             logger.debug(f"Enqueued poll_subscription for {sub.id}")
         except Exception as e:
             logger.error(f"Failed to enqueue poll_subscription for {sub.id}: {e}")
 
+    await db.commit()
     logger.info(f"poll_due_subscriptions complete: enqueued {enqueued} jobs")
     return {"status": "ok", "enqueued": enqueued}
 

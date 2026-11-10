@@ -9,9 +9,11 @@ import logging
 from typing import Any
 
 import feedparser
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.redis import get_arq_pool
+from app.core.database import get_db
+from app.services.job_dispatch_service import DurableJobQueue
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +49,9 @@ async def verify_pubsub(
         raise HTTPException(status_code=404, detail="Unknown topic")
 
     # Extract channel_id from topic for logging
-    channel_id = hub_topic.split("channel_id=")[-1] if "channel_id=" in hub_topic else "unknown"
+    channel_id = (
+        hub_topic.split("channel_id=")[-1] if "channel_id=" in hub_topic else "unknown"
+    )
 
     logger.info(
         f"PubSubHubbub verification: mode={hub_mode}, "
@@ -59,7 +63,9 @@ async def verify_pubsub(
 
 
 @router.post("/pubsubhubbub")
-async def receive_pubsub_notification(request: Request) -> dict[str, Any]:
+async def receive_pubsub_notification(
+    request: Request, db: AsyncSession = Depends(get_db)
+) -> dict[str, Any]:
     """
     Receive new video notifications from YouTube.
 
@@ -98,13 +104,6 @@ async def receive_pubsub_notification(request: Request) -> dict[str, Any]:
         logger.debug("PubSubHubbub notification contained no entries")
         return {"status": "no_entries", "processed": 0}
 
-    # Get ARQ pool for job queueing
-    try:
-        arq_pool = await get_arq_pool()
-    except Exception as e:
-        logger.error(f"Failed to get ARQ pool: {e}")
-        raise HTTPException(status_code=503, detail="Job queue unavailable")
-
     processed_count = 0
     for entry in feed.entries:
         # YouTube Atom feeds use custom namespaces
@@ -127,16 +126,15 @@ async def receive_pubsub_notification(request: Request) -> dict[str, Any]:
 
         # Queue background job to process this notification
         try:
-            await arq_pool.enqueue_job(
+            await DurableJobQueue(db).enqueue_job(
                 "process_pubsub_notification",
                 video_id=video_id,
                 channel_id=channel_id,
             )
             processed_count += 1
         except Exception as e:
-            logger.error(
-                f"Failed to queue job for video {video_id}: {e}"
-            )
+            logger.error(f"Failed to queue job for video {video_id}: {e}")
 
+    await db.commit()
     logger.info(f"PubSubHubbub processed {processed_count} entries")
     return {"status": "ok", "processed": processed_count}
