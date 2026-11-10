@@ -62,3 +62,10 @@ jobs:
       - run: python -m mypy app
         if: always()
         working-directory: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: npm
+      - run: npm ci
+      - run: python scripts/check_api_client.py
+        working-directory: backend

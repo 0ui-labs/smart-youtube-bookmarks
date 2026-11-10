@@ -18,7 +18,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
@@ -38,7 +38,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  HealthCheckApiHealthGet200
+  HealthCheckApiHealthGet200,
+  ReadinessCheckApiReadyGet200
 } from '.././model';
 
 import { customInstance } from '../../../lib/axios-instance';
@@ -127,6 +128,98 @@ export function useHealthCheckApiHealthGet<TData = Awaited<ReturnType<typeof hea
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
   const queryOptions = getHealthCheckApiHealthGetQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * @summary Readiness Check
+ */
+export const readinessCheckApiReadyGet = (
+    
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<ReadinessCheckApiReadyGet200>(
+      {url: `/api/ready`, method: 'GET', signal
+    },
+      );
+    }
+  
+
+
+
+export const getReadinessCheckApiReadyGetQueryKey = () => {
+    return [
+    `/api/ready`
+    ] as const;
+    }
+
+    
+export const getReadinessCheckApiReadyGetQueryOptions = <TData = Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getReadinessCheckApiReadyGetQueryKey();
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof readinessCheckApiReadyGet>>> = ({ signal }) => readinessCheckApiReadyGet(signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ReadinessCheckApiReadyGetQueryResult = NonNullable<Awaited<ReturnType<typeof readinessCheckApiReadyGet>>>
+export type ReadinessCheckApiReadyGetQueryError = unknown
+
+
+export function useReadinessCheckApiReadyGet<TData = Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readinessCheckApiReadyGet>>,
+          TError,
+          Awaited<ReturnType<typeof readinessCheckApiReadyGet>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useReadinessCheckApiReadyGet<TData = Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readinessCheckApiReadyGet>>,
+          TError,
+          Awaited<ReturnType<typeof readinessCheckApiReadyGet>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useReadinessCheckApiReadyGet<TData = Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+/**
+ * @summary Readiness Check
+ */
+
+export function useReadinessCheckApiReadyGet<TData = Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof readinessCheckApiReadyGet>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+
+  const queryOptions = getReadinessCheckApiReadyGetQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 

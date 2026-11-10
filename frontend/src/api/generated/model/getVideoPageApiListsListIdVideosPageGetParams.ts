@@ -18,14 +18,23 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
+import type { GetVideoPageApiListsListIdVideosPageGetSortOrder } from './getVideoPageApiListsListIdVideosPageGetSortOrder';
 
-export type CreateSubscriptionFromChatApiChatSubscriptionCreatePostParams = {
+export type GetVideoPageApiListsListIdVideosPageGetParams = {
+tags?: string[] | null;
+sort_by?: string | null;
+sort_order?: GetVideoPageApiListsListIdVideosPageGetSortOrder;
 /**
- * [TESTING ONLY] User ID
+ * @minimum 0
  */
-user_id?: string | null;
+offset?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };

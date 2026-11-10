@@ -18,7 +18,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
@@ -42,18 +42,106 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  CreateTagApiTagsPostParams,
-  DeleteTagApiTagsTagIdDeleteParams,
-  GetTagApiTagsTagIdGetParams,
   HTTPValidationError,
-  ListTagsApiTagsGetParams,
   TagCreate,
   TagResponse,
-  TagUpdate,
-  UpdateTagApiTagsTagIdPutParams
+  TagUpdate
 } from '.././model';
 
 import { customInstance } from '../../../lib/axios-instance';
+
+
+
+
+/**
+ * List all tags for current user.
+ * @summary List Tags
+ */
+export const listTagsApiTagsGet = (
+    
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<TagResponse[]>(
+      {url: `/api/tags`, method: 'GET', signal
+    },
+      );
+    }
+  
+
+
+
+export const getListTagsApiTagsGetQueryKey = () => {
+    return [
+    `/api/tags`
+    ] as const;
+    }
+
+    
+export const getListTagsApiTagsGetQueryOptions = <TData = Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTagsApiTagsGetQueryKey();
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTagsApiTagsGet>>> = ({ signal }) => listTagsApiTagsGet(signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListTagsApiTagsGetQueryResult = NonNullable<Awaited<ReturnType<typeof listTagsApiTagsGet>>>
+export type ListTagsApiTagsGetQueryError = unknown
+
+
+export function useListTagsApiTagsGet<TData = Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTagsApiTagsGet>>,
+          TError,
+          Awaited<ReturnType<typeof listTagsApiTagsGet>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListTagsApiTagsGet<TData = Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTagsApiTagsGet>>,
+          TError,
+          Awaited<ReturnType<typeof listTagsApiTagsGet>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListTagsApiTagsGet<TData = Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+/**
+ * @summary List Tags
+ */
+
+export function useListTagsApiTagsGet<TData = Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+
+  const queryOptions = getListTagsApiTagsGetQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
 
 
 
@@ -64,7 +152,6 @@ import { customInstance } from '../../../lib/axios-instance';
  */
 export const createTagApiTagsPost = (
     tagCreate: TagCreate,
-    params?: CreateTagApiTagsPostParams,
  signal?: AbortSignal
 ) => {
       
@@ -72,8 +159,7 @@ export const createTagApiTagsPost = (
       return customInstance<TagResponse>(
       {url: `/api/tags`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: tagCreate,
-        params, signal
+      data: tagCreate, signal
     },
       );
     }
@@ -81,8 +167,8 @@ export const createTagApiTagsPost = (
 
 
 export const getCreateTagApiTagsPostMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTagApiTagsPost>>, TError,{data: TagCreate;params?: CreateTagApiTagsPostParams}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof createTagApiTagsPost>>, TError,{data: TagCreate;params?: CreateTagApiTagsPostParams}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTagApiTagsPost>>, TError,{data: TagCreate}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof createTagApiTagsPost>>, TError,{data: TagCreate}, TContext> => {
 
 const mutationKey = ['createTagApiTagsPost'];
 const {mutation: mutationOptions} = options ?
@@ -94,10 +180,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTagApiTagsPost>>, {data: TagCreate;params?: CreateTagApiTagsPostParams}> = (props) => {
-          const {data,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTagApiTagsPost>>, {data: TagCreate}> = (props) => {
+          const {data} = props ?? {};
 
-          return  createTagApiTagsPost(data,params,)
+          return  createTagApiTagsPost(data,)
         }
 
         
@@ -113,11 +199,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Create Tag
  */
 export const useCreateTagApiTagsPost = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTagApiTagsPost>>, TError,{data: TagCreate;params?: CreateTagApiTagsPostParams}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTagApiTagsPost>>, TError,{data: TagCreate}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createTagApiTagsPost>>,
         TError,
-        {data: TagCreate;params?: CreateTagApiTagsPostParams},
+        {data: TagCreate},
         TContext
       > => {
 
@@ -126,113 +212,17 @@ export const useCreateTagApiTagsPost = <TError = HTTPValidationError,
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * List all tags for current user.
- * @summary List Tags
- */
-export const listTagsApiTagsGet = (
-    params?: ListTagsApiTagsGetParams,
- signal?: AbortSignal
-) => {
-      
-      
-      return customInstance<TagResponse[]>(
-      {url: `/api/tags`, method: 'GET',
-        params, signal
-    },
-      );
-    }
-  
-
-
-
-export const getListTagsApiTagsGetQueryKey = (params?: ListTagsApiTagsGetParams,) => {
-    return [
-    `/api/tags`, ...(params ? [params]: [])
-    ] as const;
-    }
-
-    
-export const getListTagsApiTagsGetQueryOptions = <TData = Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError = HTTPValidationError>(params?: ListTagsApiTagsGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData>>, }
-) => {
-
-const {query: queryOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListTagsApiTagsGetQueryKey(params);
-
-  
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTagsApiTagsGet>>> = ({ signal }) => listTagsApiTagsGet(params, signal);
-
-      
-
-      
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
-}
-
-export type ListTagsApiTagsGetQueryResult = NonNullable<Awaited<ReturnType<typeof listTagsApiTagsGet>>>
-export type ListTagsApiTagsGetQueryError = HTTPValidationError
-
-
-export function useListTagsApiTagsGet<TData = Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError = HTTPValidationError>(
- params: undefined |  ListTagsApiTagsGetParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listTagsApiTagsGet>>,
-          TError,
-          Awaited<ReturnType<typeof listTagsApiTagsGet>>
-        > , 'initialData'
-      >, }
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
-export function useListTagsApiTagsGet<TData = Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError = HTTPValidationError>(
- params?: ListTagsApiTagsGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listTagsApiTagsGet>>,
-          TError,
-          Awaited<ReturnType<typeof listTagsApiTagsGet>>
-        > , 'initialData'
-      >, }
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
-export function useListTagsApiTagsGet<TData = Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError = HTTPValidationError>(
- params?: ListTagsApiTagsGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData>>, }
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
-/**
- * @summary List Tags
- */
-
-export function useListTagsApiTagsGet<TData = Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError = HTTPValidationError>(
- params?: ListTagsApiTagsGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTagsApiTagsGet>>, TError, TData>>, }
- , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-
-  const queryOptions = getListTagsApiTagsGetQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-
-  query.queryKey = queryOptions.queryKey ;
-
-  return query;
-}
-
-
-
-
-/**
  * Get a specific tag by ID.
  * @summary Get Tag
  */
 export const getTagApiTagsTagIdGet = (
     tagId: string,
-    params?: GetTagApiTagsTagIdGetParams,
  signal?: AbortSignal
 ) => {
       
       
       return customInstance<TagResponse>(
-      {url: `/api/tags/${tagId}`, method: 'GET',
-        params, signal
+      {url: `/api/tags/${tagId}`, method: 'GET', signal
     },
       );
     }
@@ -240,25 +230,23 @@ export const getTagApiTagsTagIdGet = (
 
 
 
-export const getGetTagApiTagsTagIdGetQueryKey = (tagId?: string,
-    params?: GetTagApiTagsTagIdGetParams,) => {
+export const getGetTagApiTagsTagIdGetQueryKey = (tagId?: string,) => {
     return [
-    `/api/tags/${tagId}`, ...(params ? [params]: [])
+    `/api/tags/${tagId}`
     ] as const;
     }
 
     
-export const getGetTagApiTagsTagIdGetQueryOptions = <TData = Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError = HTTPValidationError>(tagId: string,
-    params?: GetTagApiTagsTagIdGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError, TData>>, }
+export const getGetTagApiTagsTagIdGetQueryOptions = <TData = Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError = HTTPValidationError>(tagId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetTagApiTagsTagIdGetQueryKey(tagId,params);
+  const queryKey =  queryOptions?.queryKey ?? getGetTagApiTagsTagIdGetQueryKey(tagId);
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>> = ({ signal }) => getTagApiTagsTagIdGet(tagId,params, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>> = ({ signal }) => getTagApiTagsTagIdGet(tagId, signal);
 
       
 
@@ -272,8 +260,7 @@ export type GetTagApiTagsTagIdGetQueryError = HTTPValidationError
 
 
 export function useGetTagApiTagsTagIdGet<TData = Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError = HTTPValidationError>(
- tagId: string,
-    params: undefined |  GetTagApiTagsTagIdGetParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError, TData>> & Pick<
+ tagId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>,
           TError,
@@ -283,8 +270,7 @@ export function useGetTagApiTagsTagIdGet<TData = Awaited<ReturnType<typeof getTa
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 export function useGetTagApiTagsTagIdGet<TData = Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError = HTTPValidationError>(
- tagId: string,
-    params?: GetTagApiTagsTagIdGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError, TData>> & Pick<
+ tagId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>,
           TError,
@@ -294,8 +280,7 @@ export function useGetTagApiTagsTagIdGet<TData = Awaited<ReturnType<typeof getTa
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 export function useGetTagApiTagsTagIdGet<TData = Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError = HTTPValidationError>(
- tagId: string,
-    params?: GetTagApiTagsTagIdGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError, TData>>, }
+ tagId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
@@ -303,12 +288,11 @@ export function useGetTagApiTagsTagIdGet<TData = Awaited<ReturnType<typeof getTa
  */
 
 export function useGetTagApiTagsTagIdGet<TData = Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError = HTTPValidationError>(
- tagId: string,
-    params?: GetTagApiTagsTagIdGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError, TData>>, }
+ tagId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTagApiTagsTagIdGet>>, TError, TData>>, }
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const queryOptions = getGetTagApiTagsTagIdGetQueryOptions(tagId,params,options)
+  const queryOptions = getGetTagApiTagsTagIdGetQueryOptions(tagId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 
@@ -327,15 +311,13 @@ export function useGetTagApiTagsTagIdGet<TData = Awaited<ReturnType<typeof getTa
 export const updateTagApiTagsTagIdPut = (
     tagId: string,
     tagUpdate: TagUpdate,
-    params?: UpdateTagApiTagsTagIdPutParams,
  ) => {
       
       
       return customInstance<TagResponse>(
       {url: `/api/tags/${tagId}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: tagUpdate,
-        params
+      data: tagUpdate
     },
       );
     }
@@ -343,8 +325,8 @@ export const updateTagApiTagsTagIdPut = (
 
 
 export const getUpdateTagApiTagsTagIdPutMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTagApiTagsTagIdPut>>, TError,{tagId: string;data: TagUpdate;params?: UpdateTagApiTagsTagIdPutParams}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof updateTagApiTagsTagIdPut>>, TError,{tagId: string;data: TagUpdate;params?: UpdateTagApiTagsTagIdPutParams}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTagApiTagsTagIdPut>>, TError,{tagId: string;data: TagUpdate}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updateTagApiTagsTagIdPut>>, TError,{tagId: string;data: TagUpdate}, TContext> => {
 
 const mutationKey = ['updateTagApiTagsTagIdPut'];
 const {mutation: mutationOptions} = options ?
@@ -356,10 +338,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTagApiTagsTagIdPut>>, {tagId: string;data: TagUpdate;params?: UpdateTagApiTagsTagIdPutParams}> = (props) => {
-          const {tagId,data,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTagApiTagsTagIdPut>>, {tagId: string;data: TagUpdate}> = (props) => {
+          const {tagId,data} = props ?? {};
 
-          return  updateTagApiTagsTagIdPut(tagId,data,params,)
+          return  updateTagApiTagsTagIdPut(tagId,data,)
         }
 
         
@@ -375,11 +357,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Update Tag
  */
 export const useUpdateTagApiTagsTagIdPut = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTagApiTagsTagIdPut>>, TError,{tagId: string;data: TagUpdate;params?: UpdateTagApiTagsTagIdPutParams}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTagApiTagsTagIdPut>>, TError,{tagId: string;data: TagUpdate}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof updateTagApiTagsTagIdPut>>,
         TError,
-        {tagId: string;data: TagUpdate;params?: UpdateTagApiTagsTagIdPutParams},
+        {tagId: string;data: TagUpdate},
         TContext
       > => {
 
@@ -393,13 +375,11 @@ export const useUpdateTagApiTagsTagIdPut = <TError = HTTPValidationError,
  */
 export const deleteTagApiTagsTagIdDelete = (
     tagId: string,
-    params?: DeleteTagApiTagsTagIdDeleteParams,
  ) => {
       
       
       return customInstance<void>(
-      {url: `/api/tags/${tagId}`, method: 'DELETE',
-        params
+      {url: `/api/tags/${tagId}`, method: 'DELETE'
     },
       );
     }
@@ -407,8 +387,8 @@ export const deleteTagApiTagsTagIdDelete = (
 
 
 export const getDeleteTagApiTagsTagIdDeleteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTagApiTagsTagIdDelete>>, TError,{tagId: string;params?: DeleteTagApiTagsTagIdDeleteParams}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof deleteTagApiTagsTagIdDelete>>, TError,{tagId: string;params?: DeleteTagApiTagsTagIdDeleteParams}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTagApiTagsTagIdDelete>>, TError,{tagId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTagApiTagsTagIdDelete>>, TError,{tagId: string}, TContext> => {
 
 const mutationKey = ['deleteTagApiTagsTagIdDelete'];
 const {mutation: mutationOptions} = options ?
@@ -420,10 +400,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTagApiTagsTagIdDelete>>, {tagId: string;params?: DeleteTagApiTagsTagIdDeleteParams}> = (props) => {
-          const {tagId,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTagApiTagsTagIdDelete>>, {tagId: string}> = (props) => {
+          const {tagId} = props ?? {};
 
-          return  deleteTagApiTagsTagIdDelete(tagId,params,)
+          return  deleteTagApiTagsTagIdDelete(tagId,)
         }
 
         
@@ -439,11 +419,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Delete Tag
  */
 export const useDeleteTagApiTagsTagIdDelete = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTagApiTagsTagIdDelete>>, TError,{tagId: string;params?: DeleteTagApiTagsTagIdDeleteParams}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTagApiTagsTagIdDelete>>, TError,{tagId: string}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteTagApiTagsTagIdDelete>>,
         TError,
-        {tagId: string;params?: DeleteTagApiTagsTagIdDeleteParams},
+        {tagId: string},
         TContext
       > => {
 

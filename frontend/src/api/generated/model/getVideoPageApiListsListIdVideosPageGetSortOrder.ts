@@ -18,11 +18,16 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
 
-export type DeleteChannelApiChannelsChannelIdDeleteParams = {
-user_id?: string | null;
-};
+export type GetVideoPageApiListsListIdVideosPageGetSortOrder = typeof GetVideoPageApiListsListIdVideosPageGetSortOrder[keyof typeof GetVideoPageApiListsListIdVideosPageGetSortOrder];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const GetVideoPageApiListsListIdVideosPageGetSortOrder = {
+  asc: 'asc',
+  desc: 'desc',
+} as const;

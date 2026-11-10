@@ -18,7 +18,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
@@ -44,10 +44,8 @@ import type {
 import type {
   ChannelResponse,
   ChannelUpdate,
-  DeleteChannelApiChannelsChannelIdDeleteParams,
   GetChannelsApiChannelsGetParams,
-  HTTPValidationError,
-  UpdateChannelApiChannelsChannelIdPatchParams
+  HTTPValidationError
 } from '.././model';
 
 import { customInstance } from '../../../lib/axios-instance';
@@ -161,15 +159,13 @@ Only is_hidden can be changed by the user.
 export const updateChannelApiChannelsChannelIdPatch = (
     channelId: string,
     channelUpdate: ChannelUpdate,
-    params?: UpdateChannelApiChannelsChannelIdPatchParams,
  ) => {
       
       
       return customInstance<ChannelResponse>(
       {url: `/api/channels/${channelId}`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: channelUpdate,
-        params
+      data: channelUpdate
     },
       );
     }
@@ -177,8 +173,8 @@ export const updateChannelApiChannelsChannelIdPatch = (
 
 
 export const getUpdateChannelApiChannelsChannelIdPatchMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChannelApiChannelsChannelIdPatch>>, TError,{channelId: string;data: ChannelUpdate;params?: UpdateChannelApiChannelsChannelIdPatchParams}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof updateChannelApiChannelsChannelIdPatch>>, TError,{channelId: string;data: ChannelUpdate;params?: UpdateChannelApiChannelsChannelIdPatchParams}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChannelApiChannelsChannelIdPatch>>, TError,{channelId: string;data: ChannelUpdate}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updateChannelApiChannelsChannelIdPatch>>, TError,{channelId: string;data: ChannelUpdate}, TContext> => {
 
 const mutationKey = ['updateChannelApiChannelsChannelIdPatch'];
 const {mutation: mutationOptions} = options ?
@@ -190,10 +186,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateChannelApiChannelsChannelIdPatch>>, {channelId: string;data: ChannelUpdate;params?: UpdateChannelApiChannelsChannelIdPatchParams}> = (props) => {
-          const {channelId,data,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateChannelApiChannelsChannelIdPatch>>, {channelId: string;data: ChannelUpdate}> = (props) => {
+          const {channelId,data} = props ?? {};
 
-          return  updateChannelApiChannelsChannelIdPatch(channelId,data,params,)
+          return  updateChannelApiChannelsChannelIdPatch(channelId,data,)
         }
 
         
@@ -209,11 +205,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Update Channel
  */
 export const useUpdateChannelApiChannelsChannelIdPatch = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChannelApiChannelsChannelIdPatch>>, TError,{channelId: string;data: ChannelUpdate;params?: UpdateChannelApiChannelsChannelIdPatchParams}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChannelApiChannelsChannelIdPatch>>, TError,{channelId: string;data: ChannelUpdate}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof updateChannelApiChannelsChannelIdPatch>>,
         TError,
-        {channelId: string;data: ChannelUpdate;params?: UpdateChannelApiChannelsChannelIdPatchParams},
+        {channelId: string;data: ChannelUpdate},
         TContext
       > => {
 
@@ -230,13 +226,11 @@ Videos linked to this channel will have channel_id set to NULL
  */
 export const deleteChannelApiChannelsChannelIdDelete = (
     channelId: string,
-    params?: DeleteChannelApiChannelsChannelIdDeleteParams,
  ) => {
       
       
       return customInstance<void>(
-      {url: `/api/channels/${channelId}`, method: 'DELETE',
-        params
+      {url: `/api/channels/${channelId}`, method: 'DELETE'
     },
       );
     }
@@ -244,8 +238,8 @@ export const deleteChannelApiChannelsChannelIdDelete = (
 
 
 export const getDeleteChannelApiChannelsChannelIdDeleteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChannelApiChannelsChannelIdDelete>>, TError,{channelId: string;params?: DeleteChannelApiChannelsChannelIdDeleteParams}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof deleteChannelApiChannelsChannelIdDelete>>, TError,{channelId: string;params?: DeleteChannelApiChannelsChannelIdDeleteParams}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChannelApiChannelsChannelIdDelete>>, TError,{channelId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteChannelApiChannelsChannelIdDelete>>, TError,{channelId: string}, TContext> => {
 
 const mutationKey = ['deleteChannelApiChannelsChannelIdDelete'];
 const {mutation: mutationOptions} = options ?
@@ -257,10 +251,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteChannelApiChannelsChannelIdDelete>>, {channelId: string;params?: DeleteChannelApiChannelsChannelIdDeleteParams}> = (props) => {
-          const {channelId,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteChannelApiChannelsChannelIdDelete>>, {channelId: string}> = (props) => {
+          const {channelId} = props ?? {};
 
-          return  deleteChannelApiChannelsChannelIdDelete(channelId,params,)
+          return  deleteChannelApiChannelsChannelIdDelete(channelId,)
         }
 
         
@@ -276,11 +270,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Delete Channel
  */
 export const useDeleteChannelApiChannelsChannelIdDelete = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChannelApiChannelsChannelIdDelete>>, TError,{channelId: string;params?: DeleteChannelApiChannelsChannelIdDeleteParams}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChannelApiChannelsChannelIdDelete>>, TError,{channelId: string}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteChannelApiChannelsChannelIdDelete>>,
         TError,
-        {channelId: string;params?: DeleteChannelApiChannelsChannelIdDeleteParams},
+        {channelId: string},
         TContext
       > => {
 

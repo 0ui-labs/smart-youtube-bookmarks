@@ -18,7 +18,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
@@ -42,9 +42,6 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  CreateSubscriptionApiSubscriptionsPostParams,
-  DeleteSubscriptionApiSubscriptionsSubscriptionIdDeleteParams,
-  GetSubscriptionApiSubscriptionsSubscriptionIdGetParams,
   GetSubscriptionMatchesApiSubscriptionsSubscriptionIdMatchesGetParams,
   HTTPValidationError,
   ListSubscriptionsApiSubscriptionsGetParams,
@@ -53,9 +50,7 @@ import type {
   SubscriptionMatchResponse,
   SubscriptionResponse,
   SubscriptionUpdate,
-  SyncResponse,
-  SyncSubscriptionApiSubscriptionsSubscriptionIdSyncPostParams,
-  UpdateSubscriptionApiSubscriptionsSubscriptionIdPutParams
+  SyncResponse
 } from '.././model';
 
 import { customInstance } from '../../../lib/axios-instance';
@@ -169,7 +164,6 @@ and automatically imports matching videos to the specified list.
  */
 export const createSubscriptionApiSubscriptionsPost = (
     subscriptionCreate: SubscriptionCreate,
-    params?: CreateSubscriptionApiSubscriptionsPostParams,
  signal?: AbortSignal
 ) => {
       
@@ -177,8 +171,7 @@ export const createSubscriptionApiSubscriptionsPost = (
       return customInstance<SubscriptionResponse>(
       {url: `/api/subscriptions`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: subscriptionCreate,
-        params, signal
+      data: subscriptionCreate, signal
     },
       );
     }
@@ -186,8 +179,8 @@ export const createSubscriptionApiSubscriptionsPost = (
 
 
 export const getCreateSubscriptionApiSubscriptionsPostMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionApiSubscriptionsPost>>, TError,{data: SubscriptionCreate;params?: CreateSubscriptionApiSubscriptionsPostParams}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionApiSubscriptionsPost>>, TError,{data: SubscriptionCreate;params?: CreateSubscriptionApiSubscriptionsPostParams}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionApiSubscriptionsPost>>, TError,{data: SubscriptionCreate}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionApiSubscriptionsPost>>, TError,{data: SubscriptionCreate}, TContext> => {
 
 const mutationKey = ['createSubscriptionApiSubscriptionsPost'];
 const {mutation: mutationOptions} = options ?
@@ -199,10 +192,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSubscriptionApiSubscriptionsPost>>, {data: SubscriptionCreate;params?: CreateSubscriptionApiSubscriptionsPostParams}> = (props) => {
-          const {data,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSubscriptionApiSubscriptionsPost>>, {data: SubscriptionCreate}> = (props) => {
+          const {data} = props ?? {};
 
-          return  createSubscriptionApiSubscriptionsPost(data,params,)
+          return  createSubscriptionApiSubscriptionsPost(data,)
         }
 
         
@@ -218,11 +211,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Create Subscription
  */
 export const useCreateSubscriptionApiSubscriptionsPost = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionApiSubscriptionsPost>>, TError,{data: SubscriptionCreate;params?: CreateSubscriptionApiSubscriptionsPostParams}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionApiSubscriptionsPost>>, TError,{data: SubscriptionCreate}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createSubscriptionApiSubscriptionsPost>>,
         TError,
-        {data: SubscriptionCreate;params?: CreateSubscriptionApiSubscriptionsPostParams},
+        {data: SubscriptionCreate},
         TContext
       > => {
 
@@ -336,14 +329,12 @@ export function useGetQuotaStatusApiSubscriptionsQuotaGet<TData = Awaited<Return
  */
 export const getSubscriptionApiSubscriptionsSubscriptionIdGet = (
     subscriptionId: string,
-    params?: GetSubscriptionApiSubscriptionsSubscriptionIdGetParams,
  signal?: AbortSignal
 ) => {
       
       
       return customInstance<SubscriptionResponse>(
-      {url: `/api/subscriptions/${subscriptionId}`, method: 'GET',
-        params, signal
+      {url: `/api/subscriptions/${subscriptionId}`, method: 'GET', signal
     },
       );
     }
@@ -351,25 +342,23 @@ export const getSubscriptionApiSubscriptionsSubscriptionIdGet = (
 
 
 
-export const getGetSubscriptionApiSubscriptionsSubscriptionIdGetQueryKey = (subscriptionId?: string,
-    params?: GetSubscriptionApiSubscriptionsSubscriptionIdGetParams,) => {
+export const getGetSubscriptionApiSubscriptionsSubscriptionIdGetQueryKey = (subscriptionId?: string,) => {
     return [
-    `/api/subscriptions/${subscriptionId}`, ...(params ? [params]: [])
+    `/api/subscriptions/${subscriptionId}`
     ] as const;
     }
 
     
-export const getGetSubscriptionApiSubscriptionsSubscriptionIdGetQueryOptions = <TData = Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError = HTTPValidationError>(subscriptionId: string,
-    params?: GetSubscriptionApiSubscriptionsSubscriptionIdGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError, TData>>, }
+export const getGetSubscriptionApiSubscriptionsSubscriptionIdGetQueryOptions = <TData = Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError = HTTPValidationError>(subscriptionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetSubscriptionApiSubscriptionsSubscriptionIdGetQueryKey(subscriptionId,params);
+  const queryKey =  queryOptions?.queryKey ?? getGetSubscriptionApiSubscriptionsSubscriptionIdGetQueryKey(subscriptionId);
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>> = ({ signal }) => getSubscriptionApiSubscriptionsSubscriptionIdGet(subscriptionId,params, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>> = ({ signal }) => getSubscriptionApiSubscriptionsSubscriptionIdGet(subscriptionId, signal);
 
       
 
@@ -383,8 +372,7 @@ export type GetSubscriptionApiSubscriptionsSubscriptionIdGetQueryError = HTTPVal
 
 
 export function useGetSubscriptionApiSubscriptionsSubscriptionIdGet<TData = Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError = HTTPValidationError>(
- subscriptionId: string,
-    params: undefined |  GetSubscriptionApiSubscriptionsSubscriptionIdGetParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError, TData>> & Pick<
+ subscriptionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>,
           TError,
@@ -394,8 +382,7 @@ export function useGetSubscriptionApiSubscriptionsSubscriptionIdGet<TData = Awai
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 export function useGetSubscriptionApiSubscriptionsSubscriptionIdGet<TData = Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError = HTTPValidationError>(
- subscriptionId: string,
-    params?: GetSubscriptionApiSubscriptionsSubscriptionIdGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError, TData>> & Pick<
+ subscriptionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>,
           TError,
@@ -405,8 +392,7 @@ export function useGetSubscriptionApiSubscriptionsSubscriptionIdGet<TData = Awai
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 export function useGetSubscriptionApiSubscriptionsSubscriptionIdGet<TData = Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError = HTTPValidationError>(
- subscriptionId: string,
-    params?: GetSubscriptionApiSubscriptionsSubscriptionIdGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError, TData>>, }
+ subscriptionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
@@ -414,12 +400,11 @@ export function useGetSubscriptionApiSubscriptionsSubscriptionIdGet<TData = Awai
  */
 
 export function useGetSubscriptionApiSubscriptionsSubscriptionIdGet<TData = Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError = HTTPValidationError>(
- subscriptionId: string,
-    params?: GetSubscriptionApiSubscriptionsSubscriptionIdGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError, TData>>, }
+ subscriptionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionApiSubscriptionsSubscriptionIdGet>>, TError, TData>>, }
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const queryOptions = getGetSubscriptionApiSubscriptionsSubscriptionIdGetQueryOptions(subscriptionId,params,options)
+  const queryOptions = getGetSubscriptionApiSubscriptionsSubscriptionIdGetQueryOptions(subscriptionId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 
@@ -440,15 +425,13 @@ Can modify name, active status, channels, keywords, filters, and poll interval.
 export const updateSubscriptionApiSubscriptionsSubscriptionIdPut = (
     subscriptionId: string,
     subscriptionUpdate: SubscriptionUpdate,
-    params?: UpdateSubscriptionApiSubscriptionsSubscriptionIdPutParams,
  ) => {
       
       
       return customInstance<SubscriptionResponse>(
       {url: `/api/subscriptions/${subscriptionId}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: subscriptionUpdate,
-        params
+      data: subscriptionUpdate
     },
       );
     }
@@ -456,8 +439,8 @@ export const updateSubscriptionApiSubscriptionsSubscriptionIdPut = (
 
 
 export const getUpdateSubscriptionApiSubscriptionsSubscriptionIdPutMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSubscriptionApiSubscriptionsSubscriptionIdPut>>, TError,{subscriptionId: string;data: SubscriptionUpdate;params?: UpdateSubscriptionApiSubscriptionsSubscriptionIdPutParams}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof updateSubscriptionApiSubscriptionsSubscriptionIdPut>>, TError,{subscriptionId: string;data: SubscriptionUpdate;params?: UpdateSubscriptionApiSubscriptionsSubscriptionIdPutParams}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSubscriptionApiSubscriptionsSubscriptionIdPut>>, TError,{subscriptionId: string;data: SubscriptionUpdate}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updateSubscriptionApiSubscriptionsSubscriptionIdPut>>, TError,{subscriptionId: string;data: SubscriptionUpdate}, TContext> => {
 
 const mutationKey = ['updateSubscriptionApiSubscriptionsSubscriptionIdPut'];
 const {mutation: mutationOptions} = options ?
@@ -469,10 +452,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSubscriptionApiSubscriptionsSubscriptionIdPut>>, {subscriptionId: string;data: SubscriptionUpdate;params?: UpdateSubscriptionApiSubscriptionsSubscriptionIdPutParams}> = (props) => {
-          const {subscriptionId,data,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSubscriptionApiSubscriptionsSubscriptionIdPut>>, {subscriptionId: string;data: SubscriptionUpdate}> = (props) => {
+          const {subscriptionId,data} = props ?? {};
 
-          return  updateSubscriptionApiSubscriptionsSubscriptionIdPut(subscriptionId,data,params,)
+          return  updateSubscriptionApiSubscriptionsSubscriptionIdPut(subscriptionId,data,)
         }
 
         
@@ -488,11 +471,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Update Subscription
  */
 export const useUpdateSubscriptionApiSubscriptionsSubscriptionIdPut = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSubscriptionApiSubscriptionsSubscriptionIdPut>>, TError,{subscriptionId: string;data: SubscriptionUpdate;params?: UpdateSubscriptionApiSubscriptionsSubscriptionIdPutParams}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSubscriptionApiSubscriptionsSubscriptionIdPut>>, TError,{subscriptionId: string;data: SubscriptionUpdate}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof updateSubscriptionApiSubscriptionsSubscriptionIdPut>>,
         TError,
-        {subscriptionId: string;data: SubscriptionUpdate;params?: UpdateSubscriptionApiSubscriptionsSubscriptionIdPutParams},
+        {subscriptionId: string;data: SubscriptionUpdate},
         TContext
       > => {
 
@@ -506,13 +489,11 @@ export const useUpdateSubscriptionApiSubscriptionsSubscriptionIdPut = <TError = 
  */
 export const deleteSubscriptionApiSubscriptionsSubscriptionIdDelete = (
     subscriptionId: string,
-    params?: DeleteSubscriptionApiSubscriptionsSubscriptionIdDeleteParams,
  ) => {
       
       
       return customInstance<void>(
-      {url: `/api/subscriptions/${subscriptionId}`, method: 'DELETE',
-        params
+      {url: `/api/subscriptions/${subscriptionId}`, method: 'DELETE'
     },
       );
     }
@@ -520,8 +501,8 @@ export const deleteSubscriptionApiSubscriptionsSubscriptionIdDelete = (
 
 
 export const getDeleteSubscriptionApiSubscriptionsSubscriptionIdDeleteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSubscriptionApiSubscriptionsSubscriptionIdDelete>>, TError,{subscriptionId: string;params?: DeleteSubscriptionApiSubscriptionsSubscriptionIdDeleteParams}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof deleteSubscriptionApiSubscriptionsSubscriptionIdDelete>>, TError,{subscriptionId: string;params?: DeleteSubscriptionApiSubscriptionsSubscriptionIdDeleteParams}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSubscriptionApiSubscriptionsSubscriptionIdDelete>>, TError,{subscriptionId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSubscriptionApiSubscriptionsSubscriptionIdDelete>>, TError,{subscriptionId: string}, TContext> => {
 
 const mutationKey = ['deleteSubscriptionApiSubscriptionsSubscriptionIdDelete'];
 const {mutation: mutationOptions} = options ?
@@ -533,10 +514,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSubscriptionApiSubscriptionsSubscriptionIdDelete>>, {subscriptionId: string;params?: DeleteSubscriptionApiSubscriptionsSubscriptionIdDeleteParams}> = (props) => {
-          const {subscriptionId,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSubscriptionApiSubscriptionsSubscriptionIdDelete>>, {subscriptionId: string}> = (props) => {
+          const {subscriptionId} = props ?? {};
 
-          return  deleteSubscriptionApiSubscriptionsSubscriptionIdDelete(subscriptionId,params,)
+          return  deleteSubscriptionApiSubscriptionsSubscriptionIdDelete(subscriptionId,)
         }
 
         
@@ -552,11 +533,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Delete Subscription
  */
 export const useDeleteSubscriptionApiSubscriptionsSubscriptionIdDelete = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSubscriptionApiSubscriptionsSubscriptionIdDelete>>, TError,{subscriptionId: string;params?: DeleteSubscriptionApiSubscriptionsSubscriptionIdDeleteParams}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSubscriptionApiSubscriptionsSubscriptionIdDelete>>, TError,{subscriptionId: string}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteSubscriptionApiSubscriptionsSubscriptionIdDelete>>,
         TError,
-        {subscriptionId: string;params?: DeleteSubscriptionApiSubscriptionsSubscriptionIdDeleteParams},
+        {subscriptionId: string},
         TContext
       > => {
 
@@ -570,19 +551,17 @@ export const useDeleteSubscriptionApiSubscriptionsSubscriptionIdDelete = <TError
 Checks for new videos matching the subscription criteria
 and imports them to the target list.
 
-Note: This is currently a stub. Full implementation in Etappe 2.
+Returns acceptance; import completes asynchronously through the durable worker.
  * @summary Sync Subscription
  */
 export const syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost = (
     subscriptionId: string,
-    params?: SyncSubscriptionApiSubscriptionsSubscriptionIdSyncPostParams,
  signal?: AbortSignal
 ) => {
       
       
       return customInstance<SyncResponse>(
-      {url: `/api/subscriptions/${subscriptionId}/sync`, method: 'POST',
-        params, signal
+      {url: `/api/subscriptions/${subscriptionId}/sync`, method: 'POST', signal
     },
       );
     }
@@ -590,8 +569,8 @@ export const syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost = (
 
 
 export const getSyncSubscriptionApiSubscriptionsSubscriptionIdSyncPostMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost>>, TError,{subscriptionId: string;params?: SyncSubscriptionApiSubscriptionsSubscriptionIdSyncPostParams}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost>>, TError,{subscriptionId: string;params?: SyncSubscriptionApiSubscriptionsSubscriptionIdSyncPostParams}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost>>, TError,{subscriptionId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost>>, TError,{subscriptionId: string}, TContext> => {
 
 const mutationKey = ['syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost'];
 const {mutation: mutationOptions} = options ?
@@ -603,10 +582,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost>>, {subscriptionId: string;params?: SyncSubscriptionApiSubscriptionsSubscriptionIdSyncPostParams}> = (props) => {
-          const {subscriptionId,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost>>, {subscriptionId: string}> = (props) => {
+          const {subscriptionId} = props ?? {};
 
-          return  syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost(subscriptionId,params,)
+          return  syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost(subscriptionId,)
         }
 
         
@@ -622,11 +601,11 @@ const {mutation: mutationOptions} = options ?
  * @summary Sync Subscription
  */
 export const useSyncSubscriptionApiSubscriptionsSubscriptionIdSyncPost = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost>>, TError,{subscriptionId: string;params?: SyncSubscriptionApiSubscriptionsSubscriptionIdSyncPostParams}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost>>, TError,{subscriptionId: string}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof syncSubscriptionApiSubscriptionsSubscriptionIdSyncPost>>,
         TError,
-        {subscriptionId: string;params?: SyncSubscriptionApiSubscriptionsSubscriptionIdSyncPostParams},
+        {subscriptionId: string},
         TContext
       > => {
 

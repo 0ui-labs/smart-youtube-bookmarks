@@ -17,12 +17,12 @@ export default defineConfig({
   api: {
     input: {
       // Backend OpenAPI spec (requires backend to be running)
-      target: "http://localhost:8000/openapi.json",
+      target: process.env.OPENAPI_URL ?? "http://localhost:8000/openapi.json",
     },
     output: {
       // Output directory for generated files
-      target: "./src/api/generated/endpoints.ts",
-      schemas: "./src/api/generated/model",
+      target: `${process.env.API_OUTPUT_DIR ?? "./src/api/generated"}/endpoints.ts`,
+      schemas: `${process.env.API_OUTPUT_DIR ?? "./src/api/generated"}/model`,
 
       // Generate React Query hooks
       client: "react-query",

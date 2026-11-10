@@ -18,7 +18,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     
  * OpenAPI spec version: 0.1.0
  */
@@ -53,20 +53,6 @@ import { customInstance } from '../../../lib/axios-instance';
 
 
 /**
- * Verification callback for PubSubHubbub subscriptions.
-
-When we subscribe to a YouTube channel feed, Google's hub sends a GET
-request to verify we control this callback URL. We must echo back the
-hub.challenge to confirm the subscription.
-
-Args:
-    hub_mode: Either "subscribe" or "unsubscribe"
-    hub_topic: The feed URL we're subscribing to
-    hub_challenge: Random string we must echo back
-    hub_lease_seconds: How long the subscription will last
-
-Returns:
-    The hub.challenge value as plain text
  * @summary Verify Pubsub
  */
 export const verifyPubsubApiWebhooksPubsubhubbubGet = (
@@ -160,24 +146,6 @@ export function useVerifyPubsubApiWebhooksPubsubhubbubGet<TData = Awaited<Return
 
 
 /**
- * Receive new video notifications from YouTube.
-
-YouTube's PubSubHubbub hub sends POST requests with Atom XML
-containing information about newly uploaded videos. We parse
-the feed and queue background jobs to process each video.
-
-The Atom feed contains entries like:
-```xml
-<entry>
-    <yt:videoId>VIDEO_ID</yt:videoId>
-    <yt:channelId>CHANNEL_ID</yt:channelId>
-    <title>Video Title</title>
-    <published>2024-01-01T00:00:00+00:00</published>
-</entry>
-```
-
-Returns:
-    Status and count of processed entries
  * @summary Receive Pubsub Notification
  */
 export const receivePubsubNotificationApiWebhooksPubsubhubbubPost = (
