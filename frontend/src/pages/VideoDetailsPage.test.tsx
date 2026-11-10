@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithRouter } from "@/test/renderWithRouter";
@@ -143,52 +143,6 @@ const createSelectField = (
     ...overrides,
   }) as VideoFieldValue;
 
-const createTextField = (
-  overrides?: Partial<VideoFieldValue>
-): VideoFieldValue =>
-  ({
-    id: "text-fv-3",
-    video_id: "test-video-id",
-    field_id: "field-3",
-    field_name: "Notes",
-    show_on_card: false,
-    field: {
-      id: "field-3",
-      list_id: "list-123",
-      name: "Notes",
-      field_type: "text",
-      config: { max_length: 500 },
-      created_at: "2025-11-12T00:00:00Z",
-      updated_at: "2025-11-12T00:00:00Z",
-    },
-    value: "Great tutorial!",
-    updated_at: "2025-11-12T00:00:00Z",
-    ...overrides,
-  }) as VideoFieldValue;
-
-const createBooleanField = (
-  overrides?: Partial<VideoFieldValue>
-): VideoFieldValue =>
-  ({
-    id: "boolean-fv-4",
-    video_id: "test-video-id",
-    field_id: "field-4",
-    field_name: "Recommended",
-    show_on_card: true,
-    field: {
-      id: "field-4",
-      list_id: "list-123",
-      name: "Recommended",
-      field_type: "boolean",
-      config: {},
-      created_at: "2025-11-12T00:00:00Z",
-      updated_at: "2025-11-12T00:00:00Z",
-    },
-    value: true,
-    updated_at: "2025-11-12T00:00:00Z",
-    ...overrides,
-  }) as VideoFieldValue;
-
 const createAvailableField = (
   overrides?: Partial<AvailableFieldResponse>
 ): AvailableFieldResponse => ({
@@ -266,533 +220,156 @@ const mockVideo: VideoResponse = {
 // Tests
 // ============================================================================
 
+vi.mock("@/components/VideoPlayer", () => ({
+  VideoPlayer: (props: Record<string, unknown>) => (
+    <div data-props={JSON.stringify(props)} data-testid="video-player" />
+  ),
+}));
+
 describe("VideoDetailsPage", () => {
+  const mutate = vi.fn();
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Default mock: successful query with mutation
     mockUseQuery.mockReturnValue({
       data: mockVideo,
       isLoading: false,
       error: null,
     });
-
-    mockUseMutation.mockReturnValue({
-      mutate: vi.fn(),
-      isPending: false,
-      isError: false,
-      error: null,
+    mockUseMutation.mockReturnValue({ mutate, isPending: false });
+  });
+  const show = () => renderWithRouter(<VideoDetailsPage />);
+  const showFields = async () => {
+    show();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Mehr Informationen" })
+    );
+    return screen.getByRole("dialog", { name: "Video Informationen" });
+  };
+  it.each([
+    [{ data: null, isLoading: true }, "Lädt Video..."],
+    [
+      { data: null, error: new Error("offline") },
+      "Fehler beim Laden des Videos.",
+    ],
+    [{ data: null, isLoading: false }, "Video nicht gefunden."],
+  ])("renders query state %j", (state, message) => {
+    mockUseQuery.mockReturnValue(state);
+    show();
+    expect(screen.getByText(message)).toBeVisible();
+  });
+  it("renders the title, channel, category and labels", () => {
+    show();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      mockVideo.title!
+    );
+    for (const text of ["Test Channel", "Tutorial", "Python"])
+      expect(screen.getByText(text)).toBeVisible();
+  });
+  it("passes playback identity and thumbnail to the player", () => {
+    show();
+    expect(
+      JSON.parse(screen.getByTestId("video-player").dataset.props!)
+    ).toMatchObject({
+      videoId: mockVideo.id,
+      youtubeId: mockVideo.youtube_id,
+      thumbnailUrl: mockVideo.thumbnail_url,
     });
   });
-
-  // ============================================================================
-  // Unit Tests: Loading/Error States (3 tests)
-  // ============================================================================
-
-  describe("Loading and Error States", () => {
-    it("renders loading state while fetching", () => {
-      mockUseQuery.mockReturnValue({
-        data: null,
-        isLoading: true,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      expect(screen.getByText("Lädt Video...")).toBeInTheDocument();
-    });
-
-    it("renders error state on fetch failure", () => {
-      mockUseQuery.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error: new Error("Network error"),
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      expect(
-        screen.getByText("Fehler beim Laden des Videos.")
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /zurück zur übersicht/i })
-      ).toBeInTheDocument();
-    });
-
-    it("renders not found state when video is null", () => {
-      mockUseQuery.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      expect(screen.getByText("Video nicht gefunden.")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /zurück zur übersicht/i })
-      ).toBeInTheDocument();
+  it("keeps fields in the information dialog until requested", async () => {
+    show();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByText("Rating")).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Mehr Informationen" })
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Video Informationen" })
+    ).toBeVisible();
+    for (const name of ["Rating", "Quality", "Notes"])
+      expect(screen.getByText(name)).toBeVisible();
+  });
+  it("closes and reopens the information dialog", async () => {
+    await showFields();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Mehr Informationen" })
+    );
+    expect(screen.getByText("Rating")).toBeVisible();
+  });
+  it("shows existing and empty values in display order", async () => {
+    await showFields();
+    expect(screen.getByText("High")).toBeVisible();
+    expect(screen.getByRole("textbox")).toHaveTextContent("");
+    const labels = ["Rating", "Quality", "Notes"].map((name) =>
+      screen.getByText(name)
+    );
+    expect(
+      labels[0]!.compareDocumentPosition(labels[1]!) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      labels[1]!.compareDocumentPosition(labels[2]!) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+  it("sends a rating change with its field identity", async () => {
+    await showFields();
+    await userEvent.click(screen.getAllByRole("radio")[0]!);
+    expect(mutate).toHaveBeenCalledWith({ fieldId: "field-1", value: 1 });
+  });
+  it("sends the selected value with its field identity", async () => {
+    await showFields();
+    await userEvent.click(screen.getByText("High"));
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Low" }));
+    expect(mutate).toHaveBeenCalledWith({ fieldId: "field-2", value: "Low" });
+  });
+  it("invalidates detail data after a successful save", () => {
+    show();
+    mockUseMutation.mock.calls[0][0].onSuccess();
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["videos", "test-video-id"],
     });
   });
-
-  // ============================================================================
-  // Unit Tests: Video Header (5 tests)
-  // ============================================================================
-
-  describe("Video Header", () => {
-    it("displays video title as h1", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      const heading = screen.getByRole("heading", {
-        level: 1,
-        name: mockVideo.title!,
-      });
-      expect(heading).toBeInTheDocument();
-    });
-
-    it("displays channel name", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      expect(screen.getByText(mockVideo.channel!)).toBeInTheDocument();
-    });
-
-    it("displays thumbnail with correct aspect ratio", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      const thumbnail = screen.getByAltText(mockVideo.title!);
-      expect(thumbnail).toBeInTheDocument();
-      expect(thumbnail).toHaveAttribute("src", mockVideo.thumbnail_url!);
-    });
-
-    it("displays duration badge on thumbnail", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Duration 600 seconds = 10:00
-      expect(screen.getByText("10:00")).toBeInTheDocument();
-    });
-
-    it("displays category and labels separately", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Category "Tutorial" should be shown in CategorySelector
-      // Label "Python" should be shown as a badge
-      expect(screen.getByText("Tutorial")).toBeInTheDocument();
-      expect(screen.getByText("Python")).toBeInTheDocument();
-    });
+  it("returns to the video overview", async () => {
+    const { useNavigate } = await import("react-router-dom");
+    const navigate = vi.fn();
+    vi.mocked(useNavigate).mockReturnValue(navigate);
+    show();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Zurück zur Übersicht/i })
+    );
+    expect(navigate).toHaveBeenCalledWith("/videos");
   });
-
-  // ============================================================================
-  // Unit Tests: Field Grouping (7 tests)
-  // ============================================================================
-
-  describe("Field Grouping by Schema", () => {
-    it("groups fields by schema_name", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      // All fields in mockVideo have schema_name: "Tutorial Schema"
-      expect(screen.getByText(/tutorial schema/i)).toBeInTheDocument();
+  it.each([
+    null,
+    [],
+  ])("hides the field action for unavailable fields %j", (fields) => {
+    mockUseQuery.mockReturnValue({
+      data: { ...mockVideo, available_fields: fields },
+      isLoading: false,
     });
-
-    it("shows field count in section header", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      // 3 available fields - now shows just the number in parentheses
-      expect(screen.getByText(/tutorial schema \(3\)/i)).toBeInTheDocument();
-    });
-
-    it("shows count for single field", () => {
-      const videoWithOneField: VideoResponse = {
-        ...mockVideo,
-        available_fields: [
-          createAvailableField({ field_id: "field-1", display_order: 0 }),
-        ],
-      };
-
-      mockUseQuery.mockReturnValue({
-        data: videoWithOneField,
-        isLoading: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Now shows just the number in parentheses (no "Feld/Felder")
-      expect(screen.getByText(/tutorial schema \(1\)/i)).toBeInTheDocument();
-    });
-
-    it("sorts schemas alphabetically", () => {
-      const videoWithMultipleSchemas: VideoResponse = {
-        ...mockVideo,
-        available_fields: [
-          createAvailableField({
-            field_id: "field-1",
-            schema_name: "Zebra Schema",
-            display_order: 0,
-          }),
-          createAvailableField({
-            field_id: "field-2",
-            schema_name: "Alpha Schema",
-            display_order: 0,
-          }),
-        ],
-      };
-
-      mockUseQuery.mockReturnValue({
-        data: videoWithMultipleSchemas,
-        isLoading: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Look for schema section headers - now shows just number in parentheses (not "Feld")
-      expect(screen.getByText(/alpha schema \(1\)/i)).toBeInTheDocument();
-      expect(screen.getByText(/zebra schema \(1\)/i)).toBeInTheDocument();
-
-      // Alpha should appear before Zebra in DOM
-      const sections = screen
-        .getAllByRole("button")
-        .filter((btn) => btn.textContent?.includes("Schema"));
-      expect(sections[0]).toHaveTextContent(/alpha schema/i);
-      expect(sections[1]).toHaveTextContent(/zebra schema/i);
-    });
-
-    it("initializes all schemas as expanded", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Fields should be visible (sections expanded by default)
-      expect(screen.getByText("Rating")).toBeInTheDocument();
-      expect(screen.getByText("Quality")).toBeInTheDocument();
-    });
-
-    it('shows "Keine Informationen verfügbar" when no fields', () => {
-      const videoWithNoFields: VideoResponse = {
-        ...mockVideo,
-        available_fields: null, // Use null instead of empty array to avoid infinite loop
-        field_values: [],
-      };
-
-      mockUseQuery.mockReturnValue({
-        data: videoWithNoFields,
-        isLoading: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Updated terminology: "Informationen" instead of "benutzerdefinierten Felder"
-      expect(
-        screen.getByText("Keine Informationen verfügbar.")
-      ).toBeInTheDocument();
-    });
-
-    it("sorts fields by display_order within schema", () => {
-      const videoWithUnsortedFields: VideoResponse = {
-        ...mockVideo,
-        available_fields: [
-          createAvailableField({
-            field_id: "field-3",
-            field_name: "Field C",
-            display_order: 2,
-          }),
-          createAvailableField({
-            field_id: "field-1",
-            field_name: "Field A",
-            display_order: 0,
-          }),
-          createAvailableField({
-            field_id: "field-2",
-            field_name: "Field B",
-            display_order: 1,
-          }),
-        ],
-      };
-
-      mockUseQuery.mockReturnValue({
-        data: videoWithUnsortedFields,
-        isLoading: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      const fieldLabels = screen.getAllByText(/Field [ABC]/);
-      expect(fieldLabels[0]).toHaveTextContent("Field A");
-      expect(fieldLabels[1]).toHaveTextContent("Field B");
-      expect(fieldLabels[2]).toHaveTextContent("Field C");
-    });
+    show();
+    expect(
+      screen.queryByRole("button", { name: "Mehr Informationen" })
+    ).not.toBeInTheDocument();
   });
-
-  // ============================================================================
-  // Unit Tests: Field Rendering (2 tests)
-  // ============================================================================
-
-  describe("Field Rendering", () => {
-    it("renders filled field values correctly", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Rating field should show value
-      expect(screen.getByText("Rating")).toBeInTheDocument();
-
-      // Select field should show value
-      expect(screen.getByText("Quality")).toBeInTheDocument();
+  it.each(["thumbnail_url", "channel", "title"])("handles absent %s", (key) => {
+    mockUseQuery.mockReturnValue({
+      data: { ...mockVideo, [key]: null },
+      isLoading: false,
     });
-
-    it("renders empty fields with null values", () => {
-      const videoWithEmptyField: VideoResponse = {
-        ...mockVideo,
-        field_values: [], // No filled values
-        available_fields: [
-          createAvailableField({
-            field_id: "field-1",
-            field_name: "Empty Rating",
-            field_type: "rating",
-            display_order: 0,
-          }),
-        ],
-      };
-
-      mockUseQuery.mockReturnValue({
-        data: videoWithEmptyField,
-        isLoading: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Field label should be visible even if empty
-      expect(screen.getByText("Empty Rating")).toBeInTheDocument();
-    });
+    show();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      key === "title" ? "Untitled Video" : mockVideo.title!
+    );
   });
-
-  // ============================================================================
-  // Unit Tests: Navigation (2 tests)
-  // ============================================================================
-
-  describe("Navigation", () => {
-    it("back button navigates to /videos", async () => {
-      const { useNavigate } = await import("react-router-dom");
-      const mockNavigate = vi.fn();
-      vi.mocked(useNavigate).mockReturnValue(mockNavigate);
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      const backButton = screen.getAllByRole("button", {
-        name: /zurück zur übersicht/i,
-      })[0];
-      await userEvent.click(backButton);
-
-      expect(mockNavigate).toHaveBeenCalledWith("/videos");
+  it("handles a video without tags", () => {
+    mockUseQuery.mockReturnValue({
+      data: { ...mockVideo, tags: [] },
+      isLoading: false,
     });
-
-    it("channel button exists but does not navigate yet", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      const channelButton = screen.getByText(mockVideo.channel!);
-      await userEvent.click(channelButton);
-
-      // Should log (functionality placeholder)
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Channel clicked:",
-        mockVideo.channel
-      );
-
-      consoleSpy.mockRestore();
-    });
-  });
-
-  // ============================================================================
-  // Integration Tests (3 tests)
-  // ============================================================================
-
-  describe("Integration: Full User Flows", () => {
-    it("toggles schema section on click", async () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Find the collapsible trigger button
-      const sectionButton = screen.getByRole("button", {
-        name: /tutorial schema/i,
-      });
-
-      // Initially expanded - fields visible
-      expect(screen.getByText("Rating")).toBeInTheDocument();
-
-      // Click to collapse
-      await userEvent.click(sectionButton);
-
-      // Fields should still be visible (Collapsible content may not unmount immediately)
-      // Check for aria-expanded attribute instead
-      await waitFor(() => {
-        const button = screen.getByRole("button", { name: /tutorial schema/i });
-        expect(button).toHaveAttribute("aria-expanded", "false");
-      });
-
-      // Click to expand again
-      await userEvent.click(sectionButton);
-
-      await waitFor(() => {
-        const button = screen.getByRole("button", { name: /tutorial schema/i });
-        expect(button).toHaveAttribute("aria-expanded", "true");
-      });
-    });
-
-    it("field value update triggers mutation", async () => {
-      const mockMutate = vi.fn();
-      mockUseMutation.mockReturnValue({
-        mutate: mockMutate,
-        isPending: false,
-        isError: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Find a rating field (RatingStars component)
-      const ratingButtons = screen.getAllByRole("button");
-
-      // Click first star (should be in the rating component)
-      // Note: Actual interaction depends on FieldDisplay implementation
-      // This tests that the mutation hook is wired up correctly
-      expect(mockMutate).not.toHaveBeenCalled();
-    });
-
-    it("handles null available_fields gracefully", () => {
-      const videoWithNullFields: VideoResponse = {
-        ...mockVideo,
-        available_fields: null,
-        field_values: [],
-      };
-
-      mockUseQuery.mockReturnValue({
-        data: videoWithNullFields,
-        isLoading: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Should show "no fields" message (updated terminology)
-      expect(
-        screen.getByText("Keine Informationen verfügbar.")
-      ).toBeInTheDocument();
-    });
-  });
-
-  // ============================================================================
-  // Accessibility Tests (5 tests)
-  // ============================================================================
-
-  describe("Accessibility", () => {
-    it("video title has correct heading hierarchy (h1)", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      const h1 = screen.getByRole("heading", { level: 1 });
-      expect(h1).toHaveTextContent(mockVideo.title!);
-    });
-
-    it("back button has accessible label", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      const backButton = screen.getAllByRole("button", {
-        name: /zurück zur übersicht/i,
-      })[0];
-      expect(backButton).toBeInTheDocument();
-    });
-
-    it("collapsible triggers are buttons", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      const sectionButton = screen.getByRole("button", {
-        name: /tutorial schema/i,
-      });
-      expect(sectionButton.tagName).toBe("BUTTON");
-    });
-
-    it("collapsible has aria-expanded attribute", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      const sectionButton = screen.getByRole("button", {
-        name: /tutorial schema/i,
-      });
-      expect(sectionButton).toHaveAttribute("aria-expanded");
-    });
-
-    it("field sections have proper structure", () => {
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Check that "Informationen" heading exists (renamed from "Benutzerdefinierte Felder")
-      const fieldsHeading = screen.getByRole("heading", {
-        level: 2,
-        name: /informationen/i,
-      });
-      expect(fieldsHeading).toBeInTheDocument();
-    });
-  });
-
-  // ============================================================================
-  // Edge Cases (3 tests)
-  // ============================================================================
-
-  describe("Edge Cases", () => {
-    it("handles video without thumbnail", () => {
-      const videoWithoutThumbnail: VideoResponse = {
-        ...mockVideo,
-        thumbnail_url: null,
-      };
-
-      mockUseQuery.mockReturnValue({
-        data: videoWithoutThumbnail,
-        isLoading: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Should not crash, title still visible
-      expect(
-        screen.getByRole("heading", { level: 1, name: mockVideo.title! })
-      ).toBeInTheDocument();
-    });
-
-    it("handles video without tags (shows empty category selector)", () => {
-      const videoWithoutTags: VideoResponse = {
-        ...mockVideo,
-        tags: [],
-      };
-
-      mockUseQuery.mockReturnValue({
-        data: videoWithoutTags,
-        isLoading: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Should not crash, title still visible
-      expect(
-        screen.getByRole("heading", { level: 1, name: mockVideo.title! })
-      ).toBeInTheDocument();
-      // Category selector should show "Keine Kategorie" or be present
-    });
-
-    it("handles video without channel", () => {
-      const videoWithoutChannel: VideoResponse = {
-        ...mockVideo,
-        channel: null,
-      };
-
-      mockUseQuery.mockReturnValue({
-        data: videoWithoutChannel,
-        isLoading: false,
-        error: null,
-      });
-
-      renderWithRouter(<VideoDetailsPage />);
-
-      // Should not crash, but channel button should not exist
-      expect(screen.queryByText("Test Channel")).not.toBeInTheDocument();
-    });
+    show();
+    expect(screen.queryByText("Python")).not.toBeInTheDocument();
   });
 });

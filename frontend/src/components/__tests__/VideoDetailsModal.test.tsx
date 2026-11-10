@@ -171,9 +171,12 @@ describe("VideoDetailsModal", () => {
       />
     );
 
-    const thumbnail = screen.getByRole("img", { name: /test video title/i });
-    expect(thumbnail).toHaveAttribute("src", "https://example.com/thumb.jpg");
-    expect(thumbnail).toHaveAttribute("alt", "Test Video Title");
+    const thumbnail = screen.getByTestId("video-player");
+    expect(thumbnail).toHaveAttribute(
+      "data-thumbnail",
+      "https://example.com/thumb.jpg"
+    );
+    expect(thumbnail).toHaveAttribute("data-youtube-id", "abc123");
   });
 
   // ============================================================================
@@ -361,7 +364,27 @@ describe("VideoDetailsModal", () => {
     );
 
     // When thumbnail_url is null, alt still uses video.title
-    const thumbnail = screen.getByRole("img", { name: /test video title/i });
-    expect(thumbnail).toHaveAttribute("src", "");
+    const thumbnail = screen.getByTestId("video-player");
+    expect(thumbnail).toHaveAttribute("data-thumbnail", "");
   });
 });
+
+vi.mock("../VideoPlayer", () => ({
+  VideoPlayer: ({
+    thumbnailUrl,
+    youtubeId,
+  }: {
+    thumbnailUrl?: string | null;
+    youtubeId: string;
+  }) => (
+    <div
+      data-testid="video-player"
+      data-thumbnail={thumbnailUrl ?? ""}
+      data-youtube-id={youtubeId}
+    />
+  ),
+}));
+vi.mock("@/hooks/useVideoEnrichment", () => ({
+  useVideoEnrichment: () => ({ data: null, isLoading: false }),
+  useRetryEnrichment: () => ({ mutate: vi.fn(), isPending: false }),
+}));
