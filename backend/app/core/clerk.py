@@ -6,11 +6,15 @@ No secret key or Clerk backend request is needed for signature verification.
 
 import asyncio
 import time
+from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+from fastapi import Depends, HTTPException, Request
 from jose import JWTError, jwt
+
+from app.core.config import settings
 
 
 class InvalidSession(ValueError):
@@ -104,3 +108,41 @@ class ClerkVerifier:
             return claims
         except (JWTError, httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             raise InvalidSession("Invalid session") from error
+
+
+# Dependency injection keeps synthetic verification local to tests.
+
+
+@lru_cache(maxsize=1)
+def get_clerk_verifier() -> ClerkVerifier:
+    return ClerkVerifier(
+        settings.clerk_issuer,
+        [
+            value.strip()
+            for value in settings.clerk_authorized_parties.split(",")
+            if value.strip()
+        ],
+        settings.clerk_audience,
+    )
+
+
+async def get_verified_subject(
+    request: Request, verifier: ClerkVerifier = Depends(get_clerk_verifier)
+) -> str:
+    authorization = request.headers.get("authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        claims = await verifier.verify(token)
+    except InvalidSession as error:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid session",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from error
+    return str(claims["sub"])

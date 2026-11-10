@@ -172,9 +172,6 @@ async def pause_job(job_id: UUID, db: AsyncSession = Depends(get_db)):
 )
 async def get_progress_history(
     job_id: UUID,
-    user_id: UUID = Query(
-        ..., description="User ID for authentication (temporary mock auth)"
-    ),
     since: datetime | None = Query(
         None, description="Return events after this timestamp"
     ),
@@ -196,12 +193,6 @@ async def get_progress_history(
 
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
-
-        # Authorization: Check ownership via job -> list -> user relationship
-        if job.list.user_id != user_id:
-            raise HTTPException(
-                status_code=403, detail="Not authorized to access this job"
-            )
 
         # Query progress events with filters and pagination
         query = select(JobProgressEvent).where(JobProgressEvent.job_id == job_id)

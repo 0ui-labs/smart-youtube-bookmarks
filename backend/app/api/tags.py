@@ -1,105 +1,28 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.database import get_db
 from app.models.field_schema import FieldSchema  # ADD THIS
 from app.models.tag import Tag
-from app.models.user import User
 from app.schemas.tag import TagCreate, TagResponse, TagUpdate
+from app.services.access_service import authenticated_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/tags", tags=["tags"])
 
 
-# ============================================================================
-# SECURITY WARNING: Temporary User Access Helper
-# ============================================================================
-#
-# This function provides a TEMPORARY solution for user authentication.
-# It allows specifying a user_id via query parameter for testing purposes.
-#
-# CRITICAL SECURITY ISSUE:
-# - Without this parameter, endpoints default to the first user in the database
-# - This allows ANY caller to access/modify data of the first user
-# - This is ONLY acceptable for local development/testing
-#
-# TODO: Replace with proper JWT-based authentication:
-# - Implement get_current_user() dependency
-# - Use JWT tokens for user identification
-# - Remove user_id query parameter
-# - See: https://fastapi.tiangolo.com/tutorial/security/
-# ============================================================================
-async def get_user_for_testing(
-    db: AsyncSession,
-    user_id: UUID | None = Query(
-        None,
-        description="[TESTING ONLY] User ID - defaults to first user if not provided",
-    ),
-) -> User:
-    """
-    Get user for testing purposes.
-
-    SECURITY WARNING: This is a temporary solution for local development.
-    Production deployments MUST implement proper JWT authentication.
-
-    Args:
-        db: Database session
-        user_id: Optional user ID (defaults to first user)
-
-    Returns:
-        User object
-
-    Raises:
-        HTTPException: If no user found or if called in production
-    """
-    # PRODUCTION GUARD: Block this testing helper in production environments
-    if settings.env == "production":
-        logger.error(
-            "get_user_for_testing() called in PRODUCTION environment - this is a security risk!"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Testing helper not available in production environment",
-        )
-
-    # Log usage in development/testing (for visibility)
-    logger.warning(
-        f"get_user_for_testing() called with user_id={user_id or 'None (defaulting to first user)'}"
-    )
-
-    if user_id:
-        # Use specified user ID
-        stmt = select(User).where(User.id == user_id)
-        result = await db.execute(stmt)
-        user = result.scalar_one_or_none()
-        if not user:
-            raise HTTPException(
-                status_code=404, detail=f"User with ID {user_id} not found"
-            )
-    else:
-        # Default to first user (backwards compatibility)
-        result = await db.execute(select(User))
-        user = result.scalars().first()
-        if not user:
-            raise HTTPException(status_code=400, detail="No user found in database")
-
-    return user
-
-
 @router.post("", response_model=TagResponse, status_code=status.HTTP_201_CREATED)
 async def create_tag(
     tag: TagCreate,
     db: AsyncSession = Depends(get_db),
-    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ):
     """Create a new tag."""
-    current_user = await get_user_for_testing(db, user_id)
+    current_user = authenticated_user(db)
 
     # Check if tag name already exists for this user (case-insensitive)
     # This prevents case-sensitive duplicates (e.g., "Python" and "python")
@@ -167,10 +90,9 @@ async def create_tag(
 @router.get("", response_model=list[TagResponse])
 async def list_tags(
     db: AsyncSession = Depends(get_db),
-    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ):
     """List all tags for current user."""
-    current_user = await get_user_for_testing(db, user_id)
+    current_user = authenticated_user(db)
 
     # Load tags (no need to load schema relationship - TagResponse doesn't include it)
     stmt = select(Tag).where(Tag.user_id == current_user.id).order_by(Tag.name)
@@ -187,10 +109,9 @@ async def list_tags(
 async def get_tag(
     tag_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ):
     """Get a specific tag by ID."""
-    current_user = await get_user_for_testing(db, user_id)
+    current_user = authenticated_user(db)
 
     # Load tag (no need to load schema relationship - TagResponse doesn't include it)
     stmt = select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)
@@ -211,10 +132,9 @@ async def update_tag(
     tag_id: UUID,
     tag_update: TagUpdate,
     db: AsyncSession = Depends(get_db),
-    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ):
     """Update a tag (rename, change color, or bind/unbind schema)."""
-    current_user = await get_user_for_testing(db, user_id)
+    current_user = authenticated_user(db)
 
     # Fetch tag (no need to load schema - TagResponse doesn't include it)
     stmt = select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)
@@ -300,10 +220,9 @@ async def update_tag(
 async def delete_tag(
     tag_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ):
     """Delete a tag."""
-    current_user = await get_user_for_testing(db, user_id)
+    current_user = authenticated_user(db)
 
     stmt = select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id)
     result = await db.execute(stmt)

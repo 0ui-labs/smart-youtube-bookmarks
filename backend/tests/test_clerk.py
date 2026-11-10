@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.serialization import (
     Encoding,
     NoEncryption,
     PrivateFormat,
+    PublicFormat,
 )
 from jose import jwk, jwt
 
@@ -19,7 +20,12 @@ from app.core.clerk import ClerkVerifier, InvalidSession
 def identity_keys():
     private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     pem = private.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
-    public = jwk.construct(pem, algorithm="RS256").to_dict()
+    public = jwk.construct(
+        private.public_key().public_bytes(
+            Encoding.PEM, PublicFormat.SubjectPublicKeyInfo
+        ),
+        algorithm="RS256",
+    ).to_dict()
     public.pop("d", None)
     return pem, public
 

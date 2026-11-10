@@ -12,7 +12,7 @@ import feedparser
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import get_public_db
 from app.services.job_dispatch_service import DurableJobQueue
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ async def verify_pubsub(
 
 @router.post("/pubsubhubbub")
 async def receive_pubsub_notification(
-    request: Request, db: AsyncSession = Depends(get_db)
+    request: Request, db: AsyncSession = Depends(get_public_db)
 ) -> dict[str, Any]:
     """
     Receive new video notifications from YouTube.

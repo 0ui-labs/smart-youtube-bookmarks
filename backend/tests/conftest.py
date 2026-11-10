@@ -105,10 +105,48 @@ async def mock_redis_client():
 async def client(test_db, mock_arq_pool, mock_redis_client, monkeypatch):
     """Create test client with database override and mocked ARQ/Redis."""
 
-    async def override_get_db():
+    from fastapi import Request
+    from sqlalchemy import select
+
+    from app.core.database import get_public_db
+    from app.services.access_service import validate_request_references
+
+    async def override_get_db(request: Request):
+        # Legacy unit tests explicitly simulate a principal. The signed-session
+        # matrix uses isolated_api and never installs this dependency override.
+        from uuid import UUID
+
+        test_db.info.pop("user", None)
+        identity = request.query_params.get("user_id")
+        if not identity and request.headers.get("content-type", "").startswith(
+            "application/json"
+        ):
+            try:
+                identity = (await request.json()).get("user_id")
+            except (ValueError, AttributeError):
+                pass
+        statement = select(User)
+        if identity:
+            statement = statement.where(User.id == UUID(identity))
+        user = (await test_db.execute(statement)).scalars().first()
+        if user is None:
+            user = User(
+                email="synthetic-unit-principal@test.invalid", hashed_password="!test"
+            )
+            test_db.add(user)
+            await test_db.commit()
+        test_db.info["user"] = user
+        try:
+            await validate_request_references(request, test_db)
+            yield test_db
+        finally:
+            test_db.info.pop("user", None)
+
+    async def override_public_db():
         yield test_db
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_public_db] = override_public_db
     monkeypatch.setattr(settings, "youtube_api_key", "synthetic-offline-test-key")
 
     # Mock both get_arq_pool and get_redis_client to avoid Redis connection

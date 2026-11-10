@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models import BookmarkList, User, Video
+from app.models import BookmarkList, Video
 from app.models.field_schema import FieldSchema
 from app.schemas.list import ListCreate, ListResponse, ListUpdate
 
@@ -61,24 +61,10 @@ async def get_lists(db: AsyncSession = Depends(get_db)):
 
 @router.post("", response_model=ListResponse, status_code=201)
 async def create_list(list_data: ListCreate, db: AsyncSession = Depends(get_db)):
-    # TODO: Replace with actual authenticated user once auth is implemented
-    # For now, use the default test user or create one if it doesn't exist
-    if not list_data.user_id:
-        result = await db.execute(select(User).where(User.email == "test@example.com"))
-        test_user = result.scalar_one_or_none()
-        if not test_user:
-            # Create default test user if it doesn't exist
-            test_user = User(
-                email="test@example.com",
-                hashed_password="$2b$12$placeholder_hash",
-                is_active=True,
-            )
-            db.add(test_user)
-            await db.flush()
-            await db.refresh(test_user)
-        list_data.user_id = test_user.id
+    from app.services.access_service import authenticated_user
 
-    new_list = BookmarkList(**list_data.model_dump())
+    values = list_data.model_dump(exclude={"user_id"})
+    new_list = BookmarkList(**values, user_id=authenticated_user(db).id)
     db.add(new_list)
     await db.flush()
     await db.refresh(new_list)

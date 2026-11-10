@@ -7,7 +7,7 @@ and provides the health check endpoint.
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
@@ -27,6 +27,7 @@ from app.api import (
     webhooks,
     websocket,
 )
+from app.core.database import require_api_session
 from app.core.redis import close_arq_pool, close_redis_client, get_arq_pool
 
 
@@ -77,7 +78,7 @@ API for managing YouTube video collections with custom fields, real-time process
 
 ## Authentication
 
-Currently uses a hardcoded user_id for development. Production deployment requires proper authentication.
+Business routes require a verified Clerk session and enforce user ownership.
     """,
     version="0.1.0",
     lifespan=lifespan,
@@ -92,20 +93,20 @@ app.add_middleware(
 )
 
 # Register routers
-app.include_router(lists.router)
-app.include_router(videos.router)
-app.include_router(processing.router)
+app.include_router(lists.router, dependencies=[Depends(require_api_session)])
+app.include_router(videos.router, dependencies=[Depends(require_api_session)])
+app.include_router(processing.router, dependencies=[Depends(require_api_session)])
 app.include_router(websocket.router, prefix="/api", tags=["websocket"])
-app.include_router(tags.router)
-app.include_router(custom_fields.router)
-app.include_router(schemas.router)
-app.include_router(schema_fields.router)
-app.include_router(analytics.router)
-app.include_router(channels.router)
-app.include_router(enrichment.router)
-app.include_router(search.router)
-app.include_router(subscriptions.router)
-app.include_router(chat.router)
+app.include_router(tags.router, dependencies=[Depends(require_api_session)])
+app.include_router(custom_fields.router, dependencies=[Depends(require_api_session)])
+app.include_router(schemas.router, dependencies=[Depends(require_api_session)])
+app.include_router(schema_fields.router, dependencies=[Depends(require_api_session)])
+app.include_router(analytics.router, dependencies=[Depends(require_api_session)])
+app.include_router(channels.router, dependencies=[Depends(require_api_session)])
+app.include_router(enrichment.router, dependencies=[Depends(require_api_session)])
+app.include_router(search.router, dependencies=[Depends(require_api_session)])
+app.include_router(subscriptions.router, dependencies=[Depends(require_api_session)])
+app.include_router(chat.router, dependencies=[Depends(require_api_session)])
 app.include_router(webhooks.router)
 
 

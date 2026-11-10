@@ -9,19 +9,18 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.user import User
 from app.schemas.subscription import (
     SubscriptionCreate,
     SubscriptionFilters,
     SubscriptionResponse,
 )
+from app.services.access_service import authenticated_user
 from app.services.channel_resolver_service import ChannelResolverService
 from app.services.subscription_chat_service import SubscriptionChatService
 from app.services.subscription_service import SubscriptionService
@@ -32,47 +31,8 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 # ============================================================================
-# User Helper (same pattern as subscriptions.py)
+# Authenticated identity is supplied by the scoped database dependency.
 # ============================================================================
-
-
-async def get_user_for_testing(
-    db: AsyncSession,
-    user_id: UUID | None = Query(
-        None,
-        description="[TESTING ONLY] User ID - defaults to first user if not provided",
-    ),
-) -> User:
-    """
-    Get user for testing purposes.
-
-    SECURITY WARNING: This is a temporary solution for local development.
-    Production deployments MUST implement proper JWT authentication.
-    """
-    if settings.env == "production":
-        logger.error(
-            "get_user_for_testing() called in PRODUCTION environment - security risk!"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Testing helper not available in production environment",
-        )
-
-    if user_id:
-        stmt = select(User).where(User.id == user_id)
-        result = await db.execute(stmt)
-        user = result.scalar_one_or_none()
-        if not user:
-            raise HTTPException(
-                status_code=404, detail=f"User with ID {user_id} not found"
-            )
-    else:
-        result = await db.execute(select(User))
-        user = result.scalars().first()
-        if not user:
-            raise HTTPException(status_code=400, detail="No user found in database")
-
-    return user
 
 
 # ============================================================================
@@ -193,7 +153,6 @@ async def chat_subscription(request: ChatRequest) -> ChatResponseSchema:
 async def create_subscription_from_chat(
     request: CreateFromChatRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: UUID | None = Query(None, description="[TESTING ONLY] User ID"),
 ) -> SubscriptionResponse:
     """
     Create a subscription from chat configuration.
@@ -203,7 +162,7 @@ async def create_subscription_from_chat(
 
     Resolves channel names to channel IDs automatically.
     """
-    current_user = await get_user_for_testing(db, user_id)
+    current_user = authenticated_user(db)
     config = request.config
 
     # Resolve channel names to IDs if present
