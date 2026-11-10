@@ -5,7 +5,9 @@ is at least once; workers claim operations durably before invoking handlers.
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
+from arq.connections import ArqRedis
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +25,11 @@ JOB_KINDS = frozenset(
 
 
 async def record_job(
-    db: AsyncSession, kind: str, target_id: str, args: list, kwargs: dict | None = None
+    db: AsyncSession,
+    kind: str,
+    target_id: str,
+    args: list[Any],
+    kwargs: dict[str, Any] | None = None,
 ) -> JobOutbox:
     if kind not in JOB_KINDS:
         raise ValueError("Unsupported durable job kind")
@@ -37,7 +43,7 @@ async def record_job(
     return operation
 
 
-async def dispatch_jobs(db: AsyncSession, queue, batch_size: int = 50) -> int:
+async def dispatch_jobs(db: AsyncSession, queue: ArqRedis, batch_size: int = 50) -> int:
     if not 1 <= batch_size <= 100:
         raise ValueError("Outbox batch size must be between 1 and 100")
     now = datetime.now(UTC)
@@ -76,7 +82,10 @@ async def dispatch_jobs(db: AsyncSession, queue, batch_size: int = 50) -> int:
     )  # Lease only committed intents; never call from a business transaction.
     delivered = 0
     for operation_id in ids:
-        row = await db.get(JobOutbox, operation_id)
+        maybe_row = await db.get(JobOutbox, operation_id)
+        if maybe_row is None:
+            continue
+        row = maybe_row
         try:
             await queue.enqueue_job(
                 "run_durable_job", str(operation_id), _job_id=f"outbox:{operation_id}"
@@ -118,10 +127,10 @@ async def dispatch_jobs(db: AsyncSession, queue, batch_size: int = 50) -> int:
 class DurableJobQueue:
     """Transaction-bound adapter for existing producer call signatures."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    async def enqueue_job(self, kind: str, *args, **kwargs) -> JobOutbox:
+    async def enqueue_job(self, kind: str, *args: Any, **kwargs: Any) -> JobOutbox:
         from sqlalchemy import text
 
         target = str(

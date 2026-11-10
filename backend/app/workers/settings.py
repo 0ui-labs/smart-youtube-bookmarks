@@ -6,10 +6,8 @@ from urllib.parse import parse_qs, urlparse
 
 from arq.connections import RedisSettings
 from arq.cron import cron
-from arq.jobs import Job
 from arq.worker import func
 from sqlalchemy import select, text, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.video import Video
@@ -338,40 +336,32 @@ async def on_job_start(ctx: dict) -> None:
 
 
 async def after_job_end(ctx: dict) -> None:
-    """Cleanup and commit/rollback after job completion."""
-    job_id = ctx.get("job_id", "unknown")
-
+    """Release residual transaction state; handlers commit before ARQ reports success."""
     try:
-        # Get job info to determine success/failure
-        job = Job(job_id, ctx["redis"])
-        job_info = await job.info()
-
-        db: AsyncSession = ctx["db"]
-
-        # Commit on success, rollback on failure
-        if job_info and job_info.success:
-            await db.commit()
-            logger.debug(f"Job {job_id} succeeded - committed transaction")
-        else:
-            try:
-                await db.rollback()
-                logger.debug(f"Job {job_id} failed - rolled back transaction")
-            except Exception:
-                # Transaction may have already been rolled back or not started
-                pass
-
-    except Exception as e:
-        logger.error(f"Error in after_job_end for job {job_id}: {e}")
-        # Always rollback on exception
-        try:
+        if ctx.get("db") is not None:
             await ctx["db"].rollback()
-        except Exception:
-            pass
-
     finally:
-        # Always remove session from scope
-        await sessionmanager.scoped_session.remove()
+        if sessionmanager.scoped_session is not None:
+            await sessionmanager.scoped_session.remove()
         db_session_context.set(None)
+
+
+def transactional_job(handler):
+    from functools import wraps
+
+    @wraps(handler)
+    async def run(ctx, *args, **kwargs):
+        try:
+            result = await handler(ctx, *args, **kwargs)
+            if ctx.get("db") is not None:
+                await ctx["db"].commit()
+            return result
+        except BaseException:
+            if ctx.get("db") is not None:
+                await ctx["db"].rollback()
+            raise
+
+    return run
 
 
 class WorkerSettings:
@@ -395,17 +385,24 @@ class WorkerSettings:
 
     # Worker functions
     functions = [
-        func(run_durable_job, keep_result=0),
-        dispatch_outbox,
-        process_video,
-        process_video_list,
-        enrich_video,
-        recover_failed_enrichments,
-        recover_stuck_videos,
-        process_pubsub_notification,
-        renew_pubsub_leases,
-        poll_due_subscriptions,
-        poll_subscription,
+        func(
+            transactional_job(handler),
+            name=handler.__name__,
+            keep_result=0 if handler is run_durable_job else None,
+        )
+        for handler in (
+            run_durable_job,
+            dispatch_outbox,
+            process_video,
+            process_video_list,
+            enrich_video,
+            recover_failed_enrichments,
+            recover_stuck_videos,
+            process_pubsub_notification,
+            renew_pubsub_leases,
+            poll_due_subscriptions,
+            poll_subscription,
+        )
     ]
 
     # Cron jobs - periodic tasks
@@ -414,16 +411,17 @@ class WorkerSettings:
     # Renew PubSubHubbub leases every 12 hours (00:00 and 12:00)
     # Poll keyword subscriptions every 15 minutes
     cron_jobs = [
-        cron(dispatch_outbox, second={0, 10, 20, 30, 40, 50}),
+        cron(transactional_job(dispatch_outbox), second={0, 10, 20, 30, 40, 50}),
         cron(
-            recover_failed_enrichments,
+            transactional_job(recover_failed_enrichments),
             minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55},
         ),
         cron(
-            recover_stuck_videos, minute={2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57}
+            transactional_job(recover_stuck_videos),
+            minute={2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57},
         ),
-        cron(renew_pubsub_leases, hour={0, 12}, minute=0),
-        cron(poll_due_subscriptions, minute={0, 15, 30, 45}),
+        cron(transactional_job(renew_pubsub_leases), hour={0, 12}, minute=0),
+        cron(transactional_job(poll_due_subscriptions), minute={0, 15, 30, 45}),
     ]
 
     # Worker configuration
