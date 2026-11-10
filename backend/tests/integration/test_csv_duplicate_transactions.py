@@ -28,13 +28,13 @@ async def test_duplicate_import_preserves_other_rows(client, test_db, test_list,
         f"https://youtu.be/{youtube_id}" for youtube_id in ids
     )
     with (
-        patch("app.api.video_routes.import_export.YouTubeClient") as youtube,
+        patch("app.services.video_creation_service.YouTubeClient") as youtube,
         patch(
-            "app.api.video_routes.import_export._enqueue_enrichment",
+            "app.services.video_creation_service._enqueue_enrichment",
             new_callable=AsyncMock,
         ),
         patch(
-            "app.api.video_routes.import_export._enqueue_video_processing",
+            "app.services.video_creation_service._enqueue_video_processing",
             new_callable=AsyncMock,
         ),
     ):
@@ -86,9 +86,9 @@ async def test_parallel_imports_keep_one_video(test_db, test_list, test_engine):
             )
 
     with (
-        patch("app.api.video_routes.import_export.YouTubeClient") as youtube,
+        patch("app.services.video_creation_service.YouTubeClient") as youtube,
         patch(
-            "app.api.video_routes.import_export._enqueue_enrichment",
+            "app.services.video_creation_service._enqueue_enrichment",
             new_callable=AsyncMock,
         ),
     ):
@@ -119,7 +119,8 @@ async def test_repeated_fields_use_last_valid_value(client, test_db, test_list):
     await test_db.commit()
     contents = "url,field_Rating\nhttps://youtu.be/aaaaaaaaaaa,2\nhttps://youtu.be/aaaaaaaaaaa,4\nhttps://youtu.be/aaaaaaaaaaa,invalid"
     with patch(
-        "app.api.video_routes.import_export._enqueue_enrichment", new_callable=AsyncMock
+        "app.services.video_creation_service._enqueue_enrichment",
+        new_callable=AsyncMock,
     ):
         response = await client.post(
             f"/api/lists/{test_list.id}/videos/bulk",

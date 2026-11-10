@@ -308,7 +308,7 @@ async def test_bulk_upload_csv_success(client, test_list, monkeypatch):
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         # Create CSV content with 3 videos
@@ -381,7 +381,7 @@ async def test_bulk_upload_csv_with_failures(client, test_list, monkeypatch):
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         csv_content = """url
@@ -522,10 +522,10 @@ async def test_bulk_upload_fetches_youtube_metadata(
     # Patch YouTubeClient and extract_youtube_id within the videos module
     with (
         patch(
-            "app.api.video_routes.import_export.YouTubeClient"
+            "app.services.video_creation_service.YouTubeClient"
         ) as mock_youtube_client_class,
         patch(
-            "app.api.video_routes.import_export.extract_youtube_id"
+            "app.services.video_creation_service.extract_youtube_id"
         ) as mock_extract_id,
     ):
         # Mock extract_youtube_id with exact URL mapping (not substring matching)
@@ -1091,7 +1091,7 @@ async def test_sort_by_title_ascending(
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         # Create videos with different titles
@@ -1160,7 +1160,7 @@ async def test_sort_by_title_descending(
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         # Create videos with different titles
@@ -1231,7 +1231,7 @@ async def test_sort_by_duration_ascending(
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         # Create videos
@@ -1305,7 +1305,7 @@ async def test_sort_by_duration_descending(
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         # Create videos
@@ -1396,7 +1396,7 @@ async def test_sort_by_field_rating_descending(
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         # Create videos
@@ -1496,7 +1496,7 @@ async def test_sort_by_field_rating_ascending_nulls_last(
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         # Create videos
@@ -1591,7 +1591,7 @@ async def test_sort_by_field_select_ascending(
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         # Create videos
@@ -1736,7 +1736,7 @@ async def test_sort_combined_with_tag_filter(
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         # Create videos
@@ -1823,7 +1823,7 @@ async def test_default_sort_created_at_desc(
     )
 
     with patch(
-        "app.api.video_routes.import_export.YouTubeClient",
+        "app.services.video_creation_service.YouTubeClient",
         return_value=mock_youtube_client,
     ):
         # Create videos with slight delay to ensure different timestamps
