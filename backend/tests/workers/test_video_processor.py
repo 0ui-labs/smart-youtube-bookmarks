@@ -16,6 +16,10 @@ async def test_process_video_updates_status_to_processing(
     """Test video processing marks video as 'processing'."""
     # Arrange: Mock YouTube client
     mock_client_instance = AsyncMock()
+    mock_client_instance.get_channel_info.return_value = {
+        "thumbnail_url": None,
+        "description": None,
+    }
     mock_client_instance.get_video_metadata.return_value = {
         "title": "Test Video",
         "channel": "Test Channel",
@@ -144,6 +148,10 @@ async def test_process_video_fetches_youtube_metadata(
     """Test video processing fetches and stores YouTube metadata."""
     # Arrange: Mock YouTube client
     mock_client_instance = AsyncMock()
+    mock_client_instance.get_channel_info.return_value = {
+        "thumbnail_url": None,
+        "description": None,
+    }
     mock_client_instance.get_video_metadata.return_value = {
         "title": "Rick Astley - Never Gonna Give You Up",
         "channel": "Rick Astley",
@@ -205,6 +213,10 @@ async def test_process_video_creates_channel(
 
     # Arrange: Mock YouTube client with channel_id
     mock_client_instance = AsyncMock()
+    mock_client_instance.get_channel_info.return_value = {
+        "thumbnail_url": None,
+        "description": None,
+    }
     mock_client_instance.get_video_metadata.return_value = {
         "title": "Python Tutorial",
         "channel": "Tech Channel",
@@ -285,6 +297,10 @@ async def test_process_video_reuses_existing_channel(
 
     # Arrange: Mock YouTube client returning same channel_id
     mock_client_instance = AsyncMock()
+    mock_client_instance.get_channel_info.return_value = {
+        "thumbnail_url": None,
+        "description": None,
+    }
     mock_client_instance.get_video_metadata.return_value = {
         "title": "New Video",
         "channel": "Existing Channel",

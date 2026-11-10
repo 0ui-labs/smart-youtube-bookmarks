@@ -268,14 +268,6 @@ async def test_bulk_upload_csv_success(client, test_list, monkeypatch):
     # Mock ARQ pool to avoid event loop issues in tests
     from unittest.mock import AsyncMock, patch
 
-    mock_arq_pool = AsyncMock()
-    mock_arq_pool.enqueue_job = AsyncMock()
-
-    async def mock_get_arq_pool():
-        return mock_arq_pool
-
-    monkeypatch.setattr("app.api.videos.get_arq_pool", mock_get_arq_pool)
-
     # Mock YouTube client to return basic metadata
     mock_youtube_client = AsyncMock()
     mock_youtube_client.get_batch_metadata = AsyncMock(
@@ -307,6 +299,14 @@ async def test_bulk_upload_csv_success(client, test_list, monkeypatch):
         ]
     )
 
+    mock_youtube_client.get_video_metadata = AsyncMock(
+        side_effect=lambda video_id: next(
+            item
+            for item in mock_youtube_client.get_batch_metadata.return_value
+            if item["youtube_id"] == video_id
+        )
+    )
+
     with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
         # Create CSV content with 3 videos
         csv_content = """url
@@ -334,10 +334,10 @@ https://www.youtube.com/watch?v=9bZkp7q19f0"""
         videos = videos_response.json()
         assert len(videos) == 3
 
-        # Verify videos start in "pending" state (ARQ-driven processing)
+        # Small imports fetch metadata synchronously.
         for video in videos:
-            assert video["processing_status"] == "pending"
-            assert video["title"] is None  # Metadata not fetched yet
+            assert video["processing_status"] == "completed"
+            assert video["title"] is not None
 
 
 @pytest.mark.asyncio
@@ -345,14 +345,6 @@ async def test_bulk_upload_csv_with_failures(client, test_list, monkeypatch):
     """Test bulk upload handles invalid URLs gracefully."""
     # Mock ARQ pool to avoid event loop issues in tests
     from unittest.mock import AsyncMock, patch
-
-    mock_arq_pool = AsyncMock()
-    mock_arq_pool.enqueue_job = AsyncMock()
-
-    async def mock_get_arq_pool():
-        return mock_arq_pool
-
-    monkeypatch.setattr("app.api.videos.get_arq_pool", mock_get_arq_pool)
 
     # Mock YouTube client
     mock_youtube_client = AsyncMock()
@@ -375,6 +367,14 @@ async def test_bulk_upload_csv_with_failures(client, test_list, monkeypatch):
                 "published_at": "2024-01-02T00:00:00Z",
             },
         ]
+    )
+
+    mock_youtube_client.get_video_metadata = AsyncMock(
+        side_effect=lambda video_id: next(
+            item
+            for item in mock_youtube_client.get_batch_metadata.return_value
+            if item["youtube_id"] == video_id
+        )
     )
 
     with patch("app.api.videos.YouTubeClient", return_value=mock_youtube_client):
@@ -492,13 +492,6 @@ async def test_bulk_upload_fetches_youtube_metadata(
     from sqlalchemy import select
 
     # Mock ARQ pool to avoid event loop issues
-    mock_arq_pool = AsyncMock()
-    mock_arq_pool.enqueue_job = AsyncMock()
-
-    async def mock_get_arq_pool():
-        return mock_arq_pool
-
-    monkeypatch.setattr("app.api.videos.get_arq_pool", mock_get_arq_pool)
 
     # Mock YouTube batch metadata response
     mock_metadata = [
@@ -535,6 +528,11 @@ async def test_bulk_upload_fetches_youtube_metadata(
         # Mock YouTube client instance
         mock_client = AsyncMock()
         mock_client.get_batch_metadata = AsyncMock(return_value=mock_metadata)
+        mock_client.get_video_metadata = AsyncMock(
+            side_effect=lambda video_id: next(
+                item for item in mock_metadata if item["youtube_id"] == video_id
+            )
+        )
         mock_youtube_client_class.return_value = mock_client
 
         # Create CSV
@@ -561,12 +559,12 @@ async def test_bulk_upload_fetches_youtube_metadata(
 
         # Option B: Videos start with pending status (metadata fetched by ARQ worker)
         video1 = next(v for v in videos if v.youtube_id == "VIDEO_ID_1")
-        assert video1.processing_status == "pending"
-        assert video1.title is None  # Metadata not fetched yet
+        assert video1.processing_status == "completed"
+        assert video1.title == "Python Tutorial"
 
         video2 = next(v for v in videos if v.youtube_id == "VIDEO_ID_2")
-        assert video2.processing_status == "pending"
-        assert video2.title is None  # Metadata not fetched yet
+        assert video2.processing_status == "completed"
+        assert video2.title == "FastAPI Guide"
 
         # No batch metadata fetch in bulk_upload anymore (moved to ARQ worker)
         # Mock is no longer used in this endpoint
@@ -587,10 +585,12 @@ async def test_get_videos_includes_tags(
 
     # Create tags
     tag1_response = await client.post(
-        "/api/tags", json={"name": "Python-test", "color": "#3B82F6"}
+        "/api/tags",
+        json={"is_video_type": False, "name": "Python-test", "color": "#3B82F6"},
     )
     tag2_response = await client.post(
-        "/api/tags", json={"name": "Tutorial-test", "color": "#10B981"}
+        "/api/tags",
+        json={"is_video_type": False, "name": "Tutorial-test", "color": "#10B981"},
     )
     tag1_id = tag1_response.json()["id"]
     tag2_id = tag2_response.json()["id"]
@@ -640,10 +640,16 @@ async def test_get_videos_filter_by_single_tag(
 
     # Create tags with unique names for this test
     python_tag = await client.post(
-        "/api/tags", json={"name": "SingleTag-Python", "color": "#3B82F6"}
+        "/api/tags",
+        json={"is_video_type": False, "name": "SingleTag-Python", "color": "#3B82F6"},
     )
     js_tag = await client.post(
-        "/api/tags", json={"name": "SingleTag-JavaScript", "color": "#F59E0B"}
+        "/api/tags",
+        json={
+            "is_video_type": False,
+            "name": "SingleTag-JavaScript",
+            "color": "#F59E0B",
+        },
     )
     python_id = python_tag.json()["id"]
     js_id = js_tag.json()["id"]
@@ -698,13 +704,16 @@ async def test_get_videos_filter_by_multiple_tags_or_logic(
 
     # Create tags with unique names for this test
     python_tag = await client.post(
-        "/api/tags", json={"name": "MultiTag-Python", "color": "#3B82F6"}
+        "/api/tags",
+        json={"is_video_type": False, "name": "MultiTag-Python", "color": "#3B82F6"},
     )
     tutorial_tag = await client.post(
-        "/api/tags", json={"name": "MultiTag-Tutorial", "color": "#10B981"}
+        "/api/tags",
+        json={"is_video_type": False, "name": "MultiTag-Tutorial", "color": "#10B981"},
     )
     advanced_tag = await client.post(
-        "/api/tags", json={"name": "MultiTag-Advanced", "color": "#EF4444"}
+        "/api/tags",
+        json={"is_video_type": False, "name": "MultiTag-Advanced", "color": "#EF4444"},
     )
     python_id = python_tag.json()["id"]
     tutorial_id = tutorial_tag.json()["id"]
@@ -747,7 +756,8 @@ async def test_get_videos_filter_case_insensitive(
 
     # Create tag with mixed case and unique name
     tag = await client.post(
-        "/api/tags", json={"name": "CaseTest-PyThOn", "color": "#3B82F6"}
+        "/api/tags",
+        json={"is_video_type": False, "name": "CaseTest-PyThOn", "color": "#3B82F6"},
     )
     tag_id = tag.json()["id"]
 
@@ -787,7 +797,8 @@ async def test_get_videos_filter_no_matching_tags(
     video_id = video_response.json()["id"]
 
     tag = await client.post(
-        "/api/tags", json={"name": "NoMatch-Python", "color": "#3B82F6"}
+        "/api/tags",
+        json={"is_video_type": False, "name": "NoMatch-Python", "color": "#3B82F6"},
     )
     tag_id = tag.json()["id"]
     await client.post(f"/api/videos/{video_id}/tags", json={"tag_ids": [tag_id]})
@@ -820,7 +831,8 @@ async def test_get_videos_without_filter_returns_all(
 
     # Tag only first video with unique tag name
     tag = await client.post(
-        "/api/tags", json={"name": "AllVideos-Python", "color": "#3B82F6"}
+        "/api/tags",
+        json={"is_video_type": False, "name": "AllVideos-Python", "color": "#3B82F6"},
     )
     await client.post(
         f"/api/videos/{video1_id}/tags", json={"tag_ids": [tag.json()["id"]]}
@@ -913,14 +925,14 @@ async def test_get_videos_field_values_union_from_multiple_schemas(
 
     # Create tag1 with schema1
     tag1_response = await client.post(
-        "/api/tags", json={"name": "Tag1", "color": "#3B82F6"}
+        "/api/tags", json={"is_video_type": False, "name": "Tag1", "color": "#3B82F6"}
     )
     tag1_id = tag1_response.json()["id"]
     await client.put(f"/api/tags/{tag1_id}", json={"schema_id": schema1_id})
 
     # Create tag2 with schema2
     tag2_response = await client.post(
-        "/api/tags", json={"name": "Tag2", "color": "#10B981"}
+        "/api/tags", json={"is_video_type": False, "name": "Tag2", "color": "#10B981"}
     )
     tag2_id = tag2_response.json()["id"]
     await client.put(f"/api/tags/{tag2_id}", json={"schema_id": schema2_id})
@@ -990,7 +1002,8 @@ async def test_get_videos_field_values_rating_accepts_float(
 
     # Create tag with schema (pass user_id to ensure correct user association)
     tag_response = await client.post(
-        f"/api/tags?user_id={test_user.id}", json={"name": "Rated", "color": "#F59E0B"}
+        f"/api/tags?user_id={test_user.id}",
+        json={"is_video_type": False, "name": "Rated", "color": "#F59E0B"},
     )
     tag_id = tag_response.json()["id"]
     await client.put(
@@ -1338,7 +1351,12 @@ async def test_sort_by_field_rating_descending(
     # Create rating field
     field_response = await client.post(
         f"/api/lists/{test_list.id}/custom-fields",
-        json={"name": "Quality", "field_type": "rating", "config": {"max_rating": 5}},
+        json={
+            "is_video_type": False,
+            "name": "Quality",
+            "field_type": "rating",
+            "config": {"max_rating": 5},
+        },
     )
     field_id = field_response.json()["id"]
 
@@ -1430,7 +1448,12 @@ async def test_sort_by_field_rating_ascending_nulls_last(
     # Create rating field
     field_response = await client.post(
         f"/api/lists/{test_list.id}/custom-fields",
-        json={"name": "Rating", "field_type": "rating", "config": {"max_rating": 5}},
+        json={
+            "is_video_type": False,
+            "name": "Rating",
+            "field_type": "rating",
+            "config": {"max_rating": 5},
+        },
     )
     field_id = field_response.json()["id"]
 
@@ -1653,13 +1676,18 @@ async def test_sort_combined_with_tag_filter(
     # Create rating field
     field_response = await client.post(
         f"/api/lists/{test_list.id}/custom-fields",
-        json={"name": "Rating", "field_type": "rating", "config": {"max_rating": 5}},
+        json={
+            "is_video_type": False,
+            "name": "Rating",
+            "field_type": "rating",
+            "config": {"max_rating": 5},
+        },
     )
     field_id = field_response.json()["id"]
 
     # Create tag
     tag_response = await client.post(
-        "/api/tags", json={"name": "Python", "color": "#3B82F6"}
+        "/api/tags", json={"is_video_type": False, "name": "Python", "color": "#3B82F6"}
     )
     tag_id = tag_response.json()["id"]
 

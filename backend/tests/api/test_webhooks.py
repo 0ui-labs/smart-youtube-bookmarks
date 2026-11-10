@@ -3,6 +3,9 @@
 from unittest.mock import patch
 
 import pytest
+from sqlalchemy import select
+
+from app.models.job_outbox import JobOutbox
 
 
 class TestPubSubHubbubVerification:
@@ -98,9 +101,11 @@ class TestPubSubHubbubNotification:
 </feed>"""
 
     @pytest.mark.asyncio
-    async def test_notification_success(self, client, sample_atom_feed, mock_arq_pool):
+    async def test_notification_success(
+        self, client, sample_atom_feed, mock_arq_pool, test_db
+    ):
         """Notification parses feed and enqueues job."""
-        with patch("app.api.webhooks.get_arq_pool", return_value=mock_arq_pool):
+        with patch("app.core.redis.get_arq_pool", return_value=mock_arq_pool):
             response = await client.post(
                 "/api/webhooks/pubsubhubbub",
                 content=sample_atom_feed,
@@ -112,12 +117,12 @@ class TestPubSubHubbubNotification:
         assert data["status"] == "ok"
         assert data["processed"] == 1
 
-        # Verify job was enqueued
-        mock_arq_pool.enqueue_job.assert_called_once_with(
-            "process_pubsub_notification",
-            video_id="dQw4w9WgXcQ",
-            channel_id="UCxxxxxx",
-        )
+        intent = (await test_db.execute(select(JobOutbox))).scalar_one()
+        assert intent.kind == "process_pubsub_notification"
+        assert intent.payload["kwargs"] == {
+            "video_id": "dQw4w9WgXcQ",
+            "channel_id": "UCxxxxxx",
+        }
 
     @pytest.mark.asyncio
     async def test_notification_empty_body(self, client):
@@ -152,7 +157,7 @@ class TestPubSubHubbubNotification:
         assert data["status"] == "no_entries"
 
     @pytest.mark.asyncio
-    async def test_notification_multiple_entries(self, client, mock_arq_pool):
+    async def test_notification_multiple_entries(self, client, mock_arq_pool, test_db):
         """Notification processes multiple entries."""
         multi_entry_feed = b"""<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"
@@ -169,7 +174,7 @@ class TestPubSubHubbubNotification:
   </entry>
 </feed>"""
 
-        with patch("app.api.webhooks.get_arq_pool", return_value=mock_arq_pool):
+        with patch("app.core.redis.get_arq_pool", return_value=mock_arq_pool):
             response = await client.post(
                 "/api/webhooks/pubsubhubbub",
                 content=multi_entry_feed,
@@ -179,10 +184,10 @@ class TestPubSubHubbubNotification:
         assert response.status_code == 200
         data = response.json()
         assert data["processed"] == 2
-        assert mock_arq_pool.enqueue_job.call_count == 2
+        assert len((await test_db.execute(select(JobOutbox))).scalars().all()) == 2
 
     @pytest.mark.asyncio
-    async def test_notification_missing_video_id(self, client, mock_arq_pool):
+    async def test_notification_missing_video_id(self, client, mock_arq_pool, test_db):
         """Notification skips entries without video_id."""
         incomplete_feed = b"""<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"
@@ -193,7 +198,7 @@ class TestPubSubHubbubNotification:
   </entry>
 </feed>"""
 
-        with patch("app.api.webhooks.get_arq_pool", return_value=mock_arq_pool):
+        with patch("app.core.redis.get_arq_pool", return_value=mock_arq_pool):
             response = await client.post(
                 "/api/webhooks/pubsubhubbub",
                 content=incomplete_feed,
@@ -203,13 +208,15 @@ class TestPubSubHubbubNotification:
         assert response.status_code == 200
         data = response.json()
         assert data["processed"] == 0
-        mock_arq_pool.enqueue_job.assert_not_called()
+        assert (await test_db.execute(select(JobOutbox))).scalars().all() == []
 
     @pytest.mark.asyncio
-    async def test_notification_redis_unavailable(self, client, sample_atom_feed):
-        """Notification returns 503 when Redis unavailable."""
+    async def test_notification_redis_unavailable(
+        self, client, sample_atom_feed, test_db
+    ):
+        """Notification remains durably accepted while Redis is unavailable."""
         with patch(
-            "app.api.webhooks.get_arq_pool",
+            "app.core.redis.get_arq_pool",
             side_effect=Exception("Redis connection failed"),
         ):
             response = await client.post(
@@ -218,5 +225,8 @@ class TestPubSubHubbubNotification:
                 headers={"Content-Type": "application/atom+xml"},
             )
 
-        assert response.status_code == 503
-        assert "Job queue unavailable" in response.json()["detail"]
+        assert response.status_code == 200
+        assert response.json()["processed"] == 1
+        assert (
+            await test_db.execute(select(JobOutbox))
+        ).scalar_one().status == "pending"
