@@ -1,6 +1,5 @@
 """Tests for Enrichment API endpoints."""
 
-from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -98,11 +97,18 @@ class TestRetryEnrichment:
         test_db.add(enrichment)
         await test_db.commit()
 
-        with patch("app.api.enrichment.get_arq_pool") as mock_pool:
-            mock_redis = AsyncMock()
-            mock_pool.return_value = mock_redis
+        response = await client.post(f"/api/videos/{video.id}/enrichment/retry")
+        from sqlalchemy import select
 
-            response = await client.post(f"/api/videos/{video.id}/enrichment/retry")
+        from app.models.job_outbox import JobOutbox
+
+        intent = (
+            await test_db.execute(
+                select(JobOutbox).where(JobOutbox.target_id == str(video.id))
+            )
+        ).scalar_one()
+        assert intent.kind == "enrich_video"
+        assert intent.status == "pending"
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -155,11 +161,18 @@ class TestRetryEnrichment:
         test_db.add(video)
         await test_db.commit()
 
-        with patch("app.api.enrichment.get_arq_pool") as mock_pool:
-            mock_redis = AsyncMock()
-            mock_pool.return_value = mock_redis
+        response = await client.post(f"/api/videos/{video.id}/enrichment/retry")
+        from sqlalchemy import select
 
-            response = await client.post(f"/api/videos/{video.id}/enrichment/retry")
+        from app.models.job_outbox import JobOutbox
+
+        intent = (
+            await test_db.execute(
+                select(JobOutbox).where(JobOutbox.target_id == str(video.id))
+            )
+        ).scalar_one()
+        assert intent.kind == "enrich_video"
+        assert intent.status == "pending"
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
