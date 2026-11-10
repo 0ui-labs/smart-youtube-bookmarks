@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { videoKeys } from "@/lib/videoKeys";
 import { VideoPageSchema } from "./page";
 import type { UseVideosOptions } from "./types";
+import { useVideoPageQuery } from "./useVideoPageQuery";
 
 export const useVideos = (
   listId: string,
@@ -22,10 +22,11 @@ export const useVideos = (
     offset = 0,
     limit = 50,
     enabled = true,
+    continuous = false,
     refetchInterval,
     refetchIntervalInBackground,
   } = options;
-  const query = useQuery({
+  const query = useVideoPageQuery({
     queryKey: videoKeys.page(listId, {
       tags,
       sortBy,
@@ -33,9 +34,9 @@ export const useVideos = (
       offset,
       limit,
     }),
-    queryFn: async ({ signal }) => {
+    queryPage: async (pageOffset, signal) => {
       const params = new URLSearchParams({
-        offset: String(offset),
+        offset: String(pageOffset < 0 ? offset : pageOffset),
         limit: String(limit),
       });
       tags?.forEach((tag) => params.append("tags", tag));
@@ -49,19 +50,9 @@ export const useVideos = (
       return VideoPageSchema.parse(data);
     },
     enabled: enabled && !!listId,
-    refetchOnWindowFocus: false,
-    refetchOnMount: true,
-    refetchOnReconnect: false,
+    continuous,
     staleTime: refetchInterval ? 0 : 5 * 60 * 1000,
-    refetchInterval: (query) =>
-      refetchInterval ??
-      (query.state.data?.items.some(
-        (video) =>
-          video.import_stage &&
-          !["complete", "error"].includes(video.import_stage)
-      )
-        ? 2000
-        : false),
+    refetchInterval,
     refetchIntervalInBackground,
   });
   return { ...query, data: query.data?.items, total: query.data?.total };

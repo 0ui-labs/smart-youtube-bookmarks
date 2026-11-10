@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { videoKeys } from "@/lib/videoKeys";
 import { VideoPageSchema } from "./videos/page";
@@ -7,6 +6,8 @@ import {
   type VideoSelectionOptions,
 } from "./videos/selection";
 
+import { useVideoPageQuery } from "./videos/useVideoPageQuery";
+
 export { convertToBackendFilters } from "./videos/selection";
 
 interface UseVideosFilterOptions extends VideoSelectionOptions {
@@ -14,6 +15,7 @@ interface UseVideosFilterOptions extends VideoSelectionOptions {
   offset?: number;
   limit?: number;
   enabled?: boolean;
+  continuous?: boolean;
   refetchInterval?: number;
 }
 export function useVideosFilter({
@@ -21,33 +23,24 @@ export function useVideosFilter({
   offset = 0,
   limit = 50,
   enabled = true,
+  continuous = false,
   refetchInterval,
   ...selection
 }: UseVideosFilterOptions) {
-  const query = useQuery({
+  const query = useVideoPageQuery({
     queryKey: videoKeys.page(listId, { ...selection, offset, limit }),
-    queryFn: async ({ signal }) => {
+    queryPage: async (pageOffset, signal) => {
       const { data } = await api.post(
-        `/lists/${listId}/videos/filter/page?offset=${offset}&limit=${limit}`,
+        `/lists/${listId}/videos/filter/page?offset=${pageOffset < 0 ? offset : pageOffset}&limit=${limit}`,
         buildVideoSelection(selection),
         { signal }
       );
       return VideoPageSchema.parse(data);
     },
     enabled: enabled && !!listId,
+    continuous,
     staleTime: 30_000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: true,
-    refetchOnReconnect: false,
-    refetchInterval: (query) =>
-      refetchInterval ??
-      (query.state.data?.items.some(
-        (video) =>
-          video.import_stage &&
-          !["complete", "error"].includes(video.import_stage)
-      )
-        ? 2000
-        : false),
+    refetchInterval,
   });
   return { ...query, data: query.data?.items, total: query.data?.total };
 }

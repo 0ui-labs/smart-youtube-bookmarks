@@ -21,7 +21,6 @@ import { buildVideoSelection } from "@/hooks/videos/selection";
 import { useVideoFieldMutation } from "@/hooks/videos/useVideoFieldMutation";
 import { useVideoImportController } from "@/hooks/videos/useVideoImportController";
 import { useVideoImportPolling } from "@/hooks/videos/useVideoImportPolling";
-import { useVideoPageState } from "@/hooks/videos/useVideoPageState";
 import { useFieldFilterStore } from "@/stores/fieldFilterStore";
 import { useTableSettingsStore } from "@/stores/tableSettingsStore";
 import { useTagStore } from "@/stores/tagStore";
@@ -32,7 +31,7 @@ import { CSVUpload } from "./CSVUpload";
 import { VideoDetailsModal } from "./VideoDetailsModal";
 import { VideoGrid } from "./VideoGrid";
 import { VideoFilterControls } from "./videos/VideoFilterControls";
-import { VideoPagination } from "./videos/VideoPagination";
+import { VideoLoadMore } from "./videos/VideoLoadMore";
 import { VideoRecoveryStatus } from "./videos/VideoRecoveryStatus";
 import { VideoTable } from "./videos/VideoTable";
 
@@ -158,15 +157,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     });
   }, [activeFilters.forEach, removeFilter]); // Run once on mount to clean up stale data
 
-  const selectionKey = JSON.stringify({
-    listId,
-    tags: selectedTagNames,
-    channel: selectedChannelId,
-    fields: activeFilters,
-    sortBy,
-    sortOrder,
-  });
-  const { page, setPage } = useVideoPageState(selectionKey);
   const pageSize = 50;
 
   // Fetch videos with both tag filters and field filters
@@ -181,9 +171,13 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     total: filteredTotal,
     isLoading: filterLoading,
     error: filterError,
+    hasNextPage: filteredHasMore,
+    isFetchingNextPage: filteredLoadingMore,
+    isFetchNextPageError: filteredLoadFailed,
+    fetchNextPage: fetchFilteredMore,
   } = useVideosFilter({
     listId,
-    offset: page * pageSize,
+    continuous: true,
     limit: pageSize,
     tags: hasTagFilters ? selectedTagNames : undefined,
     channelId: hasChannelFilter ? selectedChannelId : undefined,
@@ -199,8 +193,12 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     total: allTotal,
     isLoading: allLoading,
     error: allError,
+    hasNextPage: allHasMore,
+    isFetchingNextPage: allLoadingMore,
+    isFetchNextPageError: allLoadFailed,
+    fetchNextPage: fetchAllMore,
   } = useVideos(listId, {
-    offset: page * pageSize,
+    continuous: true,
     limit: pageSize,
     enabled: !(hasFieldFilters || hasTagFilters || hasChannelFilter),
     tags: undefined,
@@ -216,10 +214,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   const error = hasAnyFilter ? filterError : allError;
   const serverTotal = hasAnyFilter ? filteredTotal : allTotal;
   const totalVideos = serverTotal ?? videos.length;
-  useEffect(() => {
-    if (serverTotal !== undefined && page > 0 && page * pageSize >= serverTotal)
-      setPage(Math.max(0, Math.ceil(serverTotal / pageSize) - 1));
-  }, [serverTotal, page, setPage]);
+  const hasMore = hasAnyFilter ? filteredHasMore : allHasMore;
+  const loadingMore = hasAnyFilter ? filteredLoadingMore : allLoadingMore;
+  const loadFailed = hasAnyFilter ? filteredLoadFailed : allLoadFailed;
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    void (hasAnyFilter
+      ? fetchFilteredMore({ cancelRefetch: false })
+      : fetchAllMore({ cancelRefetch: false }));
+  }, [loadingMore, hasMore, hasAnyFilter, fetchFilteredMore, fetchAllMore]);
   const createVideo = useCreateVideo(listId);
   const {
     importPreviewModal,
@@ -777,12 +780,11 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           </button>
         </div>
       )}
-      <VideoPagination
-        onPage={setPage}
-        page={page}
-        pageSize={pageSize}
-        shown={videos.length}
-        total={totalVideos}
+      <VideoLoadMore
+        failed={!!loadFailed}
+        hasMore={!!hasMore}
+        loading={!!loadingMore}
+        onLoad={loadMore}
       />
 
       {/* Confirm Delete Modal */}

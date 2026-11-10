@@ -1,4 +1,5 @@
 export interface UseVideosOptions {
+  continuous?: boolean;
   offset?: number;
   limit?: number;
   enabled?: boolean;

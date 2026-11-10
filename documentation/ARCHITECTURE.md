@@ -77,7 +77,7 @@ Mutationen invalidieren abgeleitete Ansichten statt Videos ungeprüft anzuhänge
 Generierte Orval-Dateien beziehen ihren Transport aus demselben Axios-Client.
 
 Die Videoseite koordiniert `VideoTable`, `VideoGrid`, `VideoFilterControls`,
-`VideoRecoveryStatus`, Pagination und Dialoge. Importsteuerung, begrenztes
+`VideoRecoveryStatus`, kontinuierliches Nachladen und Dialoge. Importsteuerung, begrenztes
 Statuspolling, seitenübergreifende Duplikatsuche und Feldmutationen haben eigene
 Hooks. Ein `WebSocketProvider` verwaltet die einzige Fortschrittsverbindung.
 History und Live-Nachrichten teilen Event-IDs und monotone Fortschrittsregeln.
@@ -86,7 +86,7 @@ History und Live-Nachrichten teilen Event-IDs und monotone Fortschrittsregeln.
 
 Offsetseiten: Standard 50, Maximum 100, Gesamtanzahl aus derselben Auswahl und
 ID als Tie-Breaker. Tags/Feldwerte werden nur für die aktuelle Seite geladen.
-Filterwechsel setzen die Seite zurück; alte Requests werden abgebrochen. CSV
+Die UI hält bereits geladene Abschnitte in einem Infinite-Query-Cache und lädt beim Scrollen weitere Abschnitte nach. Filterwechsel starten eine neue Auswahl; alte Requests werden abgebrochen. CSV
 bleibt vollständig. Eine seitenübergreifende „Alles auswählen“-Aktion existiert
 nicht; eine zukünftige Auswahlaktion muss ihre Reichweite ausdrücklich benennen.
 

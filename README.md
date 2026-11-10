@@ -126,9 +126,10 @@ OpenAPI: `http://localhost:8000/docs`. Neue Listenabrufe:
 
 - `GET /api/lists/{id}/videos/page`: `{items,total,offset,limit}`.
 - `POST /api/lists/{id}/videos/filter/page`: derselbe Seitenvertrag mit Feld-/Tag-/Kanalfiltern.
-- Standard 50, maximal 100 Einträge; stabile Sortierung mit ID als Tie-Breaker.
+- Standard 50, maximal 100 Einträge pro Serverantwort; stabile Sortierung mit ID als Tie-Breaker.
+- Die Oberfläche lädt beim Scrollen weitere Videos nach und erhält die bisherigen Karten/Zeilen. Es gibt keine Seitenknöpfe; Filterwechsel starten eine neue Auswahl. Tastaturbedienung und Wiederholung nach Ladefehlern bleiben möglich.
 - Alte JSON-Listenrouten sind auf 100 begrenzt. Importstatus und Duplikatsuche verwenden Batches bis 100 IDs.
-- CSV-Export liefert alle passenden Treffer, unabhängig von der angezeigten Seite.
+- CSV-Export liefert alle passenden Treffer, unabhängig von den bereits geladenen Videos.
 
 Videoänderungen invalidieren abhängige Listen, Details und Statistiken. Ein
 angenommener Import speichert fachliche Daten und Jobabsicht atomar. Dispatcher,
