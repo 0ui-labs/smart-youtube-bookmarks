@@ -310,7 +310,8 @@ export function useUpdateSchema(listId: string) {
       }
     },
     // ✅ v5 signature: includes context
-    onSettled: (_data, _error, variables, _onMutateResult, context) => {
+    onSettled: (...args) => {
+      const [, , variables, , context] = args;
       context.client.invalidateQueries({ queryKey: schemasKeys.list(listId) });
       context.client.invalidateQueries({
         queryKey: schemasKeys.detail(variables.schemaId),
@@ -395,7 +396,8 @@ export function useDeleteSchema(listId: string) {
       }
     },
     // ✅ v5 signature: includes context
-    onSettled: (_data, _error, variables, _onMutateResult, context) => {
+    onSettled: (...args) => {
+      const [, , variables, , context] = args;
       context.client.invalidateQueries({ queryKey: schemasKeys.list(listId) });
       context.client.removeQueries({
         queryKey: schemasKeys.detail(variables.schemaId),

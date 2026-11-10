@@ -123,6 +123,8 @@ const newFieldFormSchema = CustomFieldCreateSchema.superRefine((data, ctx) => {
     case "boolean":
       // No config validation needed
       break;
+    default:
+      break;
   }
 });
 
