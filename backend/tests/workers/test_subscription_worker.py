@@ -144,60 +144,52 @@ class TestApplyFilters:
         assert _apply_filters(video_data, subscription) is False
 
 
-# NOTE: Integration tests for process_pubsub_notification and renew_pubsub_leases
-# require a real database session. These are tested via the API endpoint tests
-# (test_webhooks.py) which provide full integration coverage.
-#
-# The unit tests above cover the core filter logic and duration parsing.
-# For full integration testing, run the complete test suite with a test database.
-
-
 class TestPollDueSubscriptions:
-    """Tests for poll_due_subscriptions cron job.
-
-    Note: These integration tests require a running database and Redis.
-    They are skipped by default to avoid event loop issues in CI.
-    Run with: pytest -m "not skip" to include them.
-    """
-
-    @pytest.fixture
-    def mock_quota_service(self):
-        """Mock quota service with available quota."""
-        quota = AsyncMock()
-        quota.is_quota_available = AsyncMock(return_value=True)
-        return quota
-
-    @pytest.mark.skip(reason="Integration test - event loop issues with pytest-asyncio")
-    @pytest.mark.asyncio
-    async def test_poll_due_subscriptions_finds_due_keyword_subscriptions(
-        self, test_db, test_user, test_list, arq_context
+    @pytest.mark.parametrize(
+        "keywords,active,quota_available,expected",
+        [
+            (["Python"], True, True, 1),
+            (None, True, True, 0),
+            (["Python"], False, True, 0),
+            (["Python"], True, False, 0),
+        ],
+    )
+    async def test_cron_enqueues_only_due_authorized_work(
+        self,
+        test_db,
+        test_user,
+        test_list,
+        arq_context,
+        keywords,
+        active,
+        quota_available,
+        expected,
     ):
-        """poll_due_subscriptions finds subscriptions where next_poll_at < now."""
-        pass
+        from app.models.job_outbox import JobOutbox
+        from app.workers.subscription_worker import poll_due_subscriptions
 
-    @pytest.mark.skip(reason="Integration test - event loop issues with pytest-asyncio")
-    @pytest.mark.asyncio
-    async def test_poll_due_subscriptions_skips_channel_only_subscriptions(
-        self, test_db, test_user, test_list, arq_context
-    ):
-        """poll_due_subscriptions skips subscriptions without keywords."""
-        pass
-
-    @pytest.mark.skip(reason="Integration test - event loop issues with pytest-asyncio")
-    @pytest.mark.asyncio
-    async def test_poll_due_subscriptions_respects_quota(
-        self, test_db, test_user, test_list, arq_context
-    ):
-        """poll_due_subscriptions returns early when quota exhausted."""
-        pass
-
-    @pytest.mark.skip(reason="Integration test - event loop issues with pytest-asyncio")
-    @pytest.mark.asyncio
-    async def test_poll_due_subscriptions_skips_inactive(
-        self, test_db, test_user, test_list, arq_context
-    ):
-        """poll_due_subscriptions skips inactive subscriptions."""
-        pass
+        subscription = Subscription(
+            user_id=test_user.id,
+            list_id=test_list.id,
+            name="Cron probe",
+            keywords=keywords,
+            is_active=active,
+            next_poll_at=datetime.utcnow() - timedelta(hours=1),
+        )
+        test_db.add(subscription)
+        await test_db.commit()
+        with (
+            patch("app.workers.subscription_worker.get_redis_client", new=AsyncMock()),
+            patch("app.workers.subscription_worker.QuotaService") as factory,
+        ):
+            factory.return_value.is_quota_available = AsyncMock(
+                return_value=quota_available
+            )
+            result = await poll_due_subscriptions(arq_context)
+        assert result["enqueued"] == expected
+        assert (
+            len((await test_db.execute(select(JobOutbox))).scalars().all()) == expected
+        )
 
 
 class TestApplySearchFilters:
@@ -332,9 +324,6 @@ class TestPollSubscription:
             ),
         ]
 
-    @pytest.mark.skip(
-        reason="Integration test has event loop issues - needs E2E testing"
-    )
     @pytest.mark.asyncio
     async def test_poll_subscription_creates_videos(
         self, test_db, test_user, test_list, arq_context, mock_youtube_search_results
@@ -376,8 +365,15 @@ class TestPollSubscription:
             mock_yt_cls.return_value = mock_yt
 
             # Mock channel creation
-            mock_channel_obj = MagicMock()
-            mock_channel_obj.id = uuid4()
+            from app.models.channel import Channel
+
+            mock_channel_obj = Channel(
+                user_id=test_user.id,
+                youtube_channel_id="UCsynthetic",
+                name="Synthetic channel",
+            )
+            test_db.add(mock_channel_obj)
+            await test_db.flush()
             mock_channel.return_value = mock_channel_obj
 
             result = await poll_subscription(arq_context, str(sub.id))
@@ -393,9 +389,6 @@ class TestPollSubscription:
         )
         assert len(videos) == 2
 
-    @pytest.mark.skip(
-        reason="Integration test has event loop issues - needs E2E testing"
-    )
     @pytest.mark.asyncio
     async def test_poll_subscription_applies_duration_filter(
         self, test_db, test_user, test_list, arq_context, mock_youtube_search_results
@@ -437,8 +430,15 @@ class TestPollSubscription:
             mock_yt.search_videos = AsyncMock(return_value=mock_youtube_search_results)
             mock_yt_cls.return_value = mock_yt
 
-            mock_channel_obj = MagicMock()
-            mock_channel_obj.id = uuid4()
+            from app.models.channel import Channel
+
+            mock_channel_obj = Channel(
+                user_id=test_user.id,
+                youtube_channel_id="UCsynthetic",
+                name="Synthetic channel",
+            )
+            test_db.add(mock_channel_obj)
+            await test_db.flush()
             mock_channel.return_value = mock_channel_obj
 
             result = await poll_subscription(arq_context, str(sub.id))
@@ -446,9 +446,6 @@ class TestPollSubscription:
         # Only VIDEO_2 (1200s) should pass the filter
         assert result["new_videos"] == 1
 
-    @pytest.mark.skip(
-        reason="Integration test has event loop issues - needs E2E testing"
-    )
     @pytest.mark.asyncio
     async def test_poll_subscription_skips_duplicates(
         self, test_db, test_user, test_list, arq_context, mock_youtube_search_results
@@ -498,8 +495,15 @@ class TestPollSubscription:
             mock_yt.search_videos = AsyncMock(return_value=mock_youtube_search_results)
             mock_yt_cls.return_value = mock_yt
 
-            mock_channel_obj = MagicMock()
-            mock_channel_obj.id = uuid4()
+            from app.models.channel import Channel
+
+            mock_channel_obj = Channel(
+                user_id=test_user.id,
+                youtube_channel_id="UCsynthetic",
+                name="Synthetic channel",
+            )
+            test_db.add(mock_channel_obj)
+            await test_db.flush()
             mock_channel.return_value = mock_channel_obj
 
             result = await poll_subscription(arq_context, str(sub.id))
@@ -507,9 +511,6 @@ class TestPollSubscription:
         # Only VIDEO_2 should be created (VIDEO_1 already exists)
         assert result["new_videos"] == 1
 
-    @pytest.mark.skip(
-        reason="Integration test has event loop issues - needs E2E testing"
-    )
     @pytest.mark.asyncio
     async def test_poll_subscription_updates_timestamps(
         self, test_db, test_user, test_list, arq_context
@@ -559,9 +560,6 @@ class TestPollSubscription:
         assert sub.last_polled_at is not None
         assert sub.next_poll_at > old_next_poll
 
-    @pytest.mark.skip(
-        reason="Integration test has event loop issues - needs E2E testing"
-    )
     @pytest.mark.asyncio
     async def test_poll_subscription_handles_quota_exhausted(
         self, test_db, test_user, test_list, arq_context
@@ -597,9 +595,6 @@ class TestPollSubscription:
 
         assert result["status"] == "quota_exhausted"
 
-    @pytest.mark.skip(
-        reason="Integration test has event loop issues with arq_context fixture teardown"
-    )
     @pytest.mark.asyncio
     async def test_poll_subscription_not_found(self, arq_context):
         """poll_subscription returns error for non-existent subscription."""
@@ -615,9 +610,6 @@ class TestPollSubscription:
 
         assert result["status"] == "not_found_or_inactive"
 
-    @pytest.mark.skip(
-        reason="Integration test has event loop issues - needs E2E testing"
-    )
     @pytest.mark.asyncio
     async def test_poll_subscription_creates_match_records(
         self, test_db, test_user, test_list, arq_context, mock_youtube_search_results
@@ -660,8 +652,15 @@ class TestPollSubscription:
             mock_yt.search_videos = AsyncMock(return_value=mock_youtube_search_results)
             mock_yt_cls.return_value = mock_yt
 
-            mock_channel_obj = MagicMock()
-            mock_channel_obj.id = uuid4()
+            from app.models.channel import Channel
+
+            mock_channel_obj = Channel(
+                user_id=test_user.id,
+                youtube_channel_id="UCsynthetic",
+                name="Synthetic channel",
+            )
+            test_db.add(mock_channel_obj)
+            await test_db.flush()
             mock_channel.return_value = mock_channel_obj
 
             await poll_subscription(arq_context, str(sub_id))
@@ -714,3 +713,47 @@ async def test_channel_reconciliation_keeps_other_users_subscribed(
         await test_db.commit()
         await sync_pubsub_channel({"db": test_db}, "UCshared")
         service.unsubscribe.assert_awaited_once_with("UCshared")
+
+
+async def test_pubsub_match_persists_real_video_columns_and_deduplicates(
+    test_db, test_user, test_list
+):
+    from app.workers.subscription_worker import _process_subscription_match
+
+    subscription = Subscription(
+        user_id=test_user.id,
+        list_id=test_list.id,
+        name="Signed delivery subscriber",
+        channel_ids=["UCsynthetic"],
+        match_count=0,
+    )
+    test_db.add(subscription)
+    await test_db.commit()
+    metadata = {
+        "title": "Synthetic push video",
+        "channel": "Synthetic channel",
+        "channel_id": "UCsynthetic",
+        "duration": "PT2M",
+        "published_at": "2026-11-10T00:00:00Z",
+    }
+    assert (
+        await _process_subscription_match(
+            test_db, subscription, "synthetic12", metadata
+        )
+        is True
+    )
+    assert (
+        await _process_subscription_match(
+            test_db, subscription, "synthetic12", metadata
+        )
+        is False
+    )
+    await test_db.commit()
+    video = (await test_db.execute(select(Video))).scalar_one()
+    assert (
+        video.duration,
+        video.channel,
+        video.import_stage,
+        video.import_progress,
+    ) == (120, "Synthetic channel", "complete", 100)
+    assert len((await test_db.execute(select(SubscriptionMatch))).scalars().all()) == 1

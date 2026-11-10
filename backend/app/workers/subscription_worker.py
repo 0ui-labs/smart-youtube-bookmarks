@@ -204,16 +204,18 @@ async def _process_subscription_match(
         title=video_data.get("title", ""),
         description=video_data.get("description", ""),
         channel_id=channel.id,
+        channel=video_data.get("channel", "Unknown"),
+        import_stage="complete",
+        import_progress=100,
         thumbnail_url=video_data.get("thumbnail_url", ""),
         published_at=published_at,
-        duration_seconds=duration_seconds,
+        duration=duration_seconds,
         view_count=video_data.get("view_count"),
         like_count=video_data.get("like_count"),
         comment_count=video_data.get("comment_count"),
         youtube_category_id=video_data.get("youtube_category_id"),
         youtube_tags=video_data.get("youtube_tags", []),
         processing_status="completed",
-        source="subscription",
     )
     db.add(video)
     await db.flush()  # Get video.id
@@ -577,12 +579,14 @@ async def poll_subscription(
                 title=video_result.title,
                 description=video_result.description,
                 channel_id=channel.id,
+                channel=video_result.channel_name,
+                import_stage="complete",
+                import_progress=100,
                 thumbnail_url=video_result.thumbnail_url,
                 published_at=video_result.published_at,
-                duration_seconds=video_result.duration_seconds,
+                duration=video_result.duration_seconds,
                 view_count=video_result.view_count,
                 processing_status="completed",
-                source="subscription",
             )
             db.add(video)
             await db.flush()  # Get video.id
