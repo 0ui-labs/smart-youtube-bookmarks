@@ -1,5 +1,7 @@
 # Performance-Analyse: Smart YouTube Bookmarks
 
+> Historische Analyse des Standes `0ddbd6f` einschließlich damaliger lokaler Änderungen. Befunde, Zeilennummern und Messwerte beschreiben diesen Altstand. Den Abgleich mit der integrierten Implementierung enthält der [Integrationsbericht](../../documentation/reports/integration-main-abnahme.md).
+
 Stand: 10. November 2026. Untersucht: `0ddbd6f44e801e889f020c94c9689e22aa9cf84d` auf `fix/grid-field-updates-from-modal`, einschließlich vorhandener lokaler Änderungen. Keine App-Implementierung verändert. Die lokalen Änderungen in VideoPlayer, VideosPage und useTags samt Tests bleiben fremde Arbeit.
 
 ## Ergebnis

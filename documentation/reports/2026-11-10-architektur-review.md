@@ -1,5 +1,7 @@
 # Architekturreview: Smart YouTube Bookmarks
 
+> Historische Analyse des Standes `0ddbd6f` einschließlich damaliger lokaler Änderungen. Befunde, Zeilennummern und Messwerte beschreiben diesen Altstand. Den Abgleich mit der integrierten Implementierung enthält der [Integrationsbericht](integration-main-abnahme.md).
+
 Stand: 10. November 2026. Untersucht wurde Branch `fix/grid-field-updates-from-modal`, HEAD `0ddbd6f44e801e889f020c94c9689e22aa9cf84d`, einschließlich der vorhandenen lokalen Änderungen. Diese wurden nicht verändert. Dieser Bericht enthält Vorschläge; die Architektur wurde nicht umgebaut.
 
 ## Einschätzung
