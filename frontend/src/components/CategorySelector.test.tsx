@@ -130,6 +130,11 @@ it("confirms a category change before notifying the parent", async () => {
     })
   );
   await waitFor(() => expect(change).toHaveBeenCalledWith("b"));
+  expect(state.mutate).toHaveBeenCalledWith({
+    videoId: "video",
+    categoryId: "b",
+    restoreBackup: false,
+  });
 });
 it("cancels a category change without changing server state", async () => {
   show({ currentCategoryId: "a", fieldValues: fields });

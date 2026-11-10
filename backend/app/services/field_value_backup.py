@@ -8,11 +8,17 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.field_validation import validate_field_value
+from app.models.custom_field import CustomField
+from app.models.field_schema import FieldSchema
+from app.models.schema_field import SchemaField
 from app.models.tag import Tag
+from app.models.video import Video
 from app.models.video_field_value import VideoFieldValue
 
 logger = logging.getLogger(__name__)
@@ -140,7 +146,7 @@ async def restore_field_values(
         Number of values restored
 
     Raises:
-        Exception: If commit fails (after rollback)
+        Exception: If a database write fails; the caller rolls back the switch.
     """
     backup_path = BACKUP_DIR / str(video_id) / f"{category_id}.json"
 
@@ -153,34 +159,60 @@ async def restore_field_values(
         logger.error(f"Corrupted backup file {backup_path}: {e}")
         return 0
 
+    # Old backups can contain removed fields. Restore only the current category's
+    # schema fields in the video's list, subject to the normal ownership scope.
+    fields_result = await db.execute(
+        select(CustomField)
+        .join(SchemaField, SchemaField.field_id == CustomField.id)
+        .join(FieldSchema, FieldSchema.id == SchemaField.schema_id)
+        .join(Tag, Tag.schema_id == FieldSchema.id)
+        .join(Video, Video.list_id == CustomField.list_id)
+        .where(
+            Video.id == video_id,
+            Tag.id == category_id,
+            Tag.is_video_type == True,
+            FieldSchema.list_id == Video.list_id,
+        )
+    )
+    fields = {field.id: field for field in fields_result.scalars().all()}
     restored_count = 0
     for value_data in backup_data.get("values", []):
         try:
-            field_value = VideoFieldValue(
-                video_id=video_id,
-                field_id=UUID(value_data["field_id"]),
-                value_numeric=value_data.get("value_numeric"),
-                value_text=value_data.get("value_text"),
-                value_boolean=value_data.get("value_boolean"),
+            field = fields.get(UUID(value_data["field_id"]))
+            if field is None:
+                continue
+            column = {
+                "rating": "value_numeric",
+                "text": "value_text",
+                "select": "value_text",
+                "boolean": "value_boolean",
+            }[field.field_type]
+            value = value_data.get(column)
+            if value is None:
+                continue
+            validate_field_value(
+                value, field.field_type, field.config or {}, field.name
             )
-            db.add(field_value)
-            restored_count += 1
-        except Exception as e:
-            logger.error(f"Failed to restore field value: {e}")
+        except (ValueError, TypeError, KeyError) as error:
+            logger.warning("Skipping incompatible backed-up field: %s", error)
             continue
-
-    # Commit the restored values
-    if restored_count > 0:
-        try:
-            await db.commit()
-            logger.info(f"Restored {restored_count} field values for video {video_id}")
-        except Exception as e:
-            await db.rollback()
-            logger.error(
-                f"Failed to commit restored field values for video {video_id}: {e}"
+        values = {
+            "value_numeric": None,
+            "value_text": None,
+            "value_boolean": None,
+            column: value,
+        }
+        statement = (
+            pg_insert(VideoFieldValue)
+            .values(video_id=video_id, field_id=field.id, **values)
+            .on_conflict_do_update(
+                index_elements=[VideoFieldValue.video_id, VideoFieldValue.field_id],
+                set_={**values, "updated_at": func.now()},
             )
-            raise
-
+        )
+        await db.execute(statement)
+        restored_count += 1
+    # The category endpoint owns the transaction; never commit a partial switch.
     return restored_count
 
 

@@ -256,8 +256,8 @@ export const useSetVideoCategory = () => {
         `/videos/${videoId}/category`,
         {
           category_id: categoryId,
-          restore_backup: restoreBackup ?? false,
-        }
+        },
+        { params: { restore_backup: restoreBackup ?? false } }
       );
       return data;
     },

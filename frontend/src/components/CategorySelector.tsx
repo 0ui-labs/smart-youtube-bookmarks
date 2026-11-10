@@ -127,11 +127,15 @@ export function CategorySelector({
     }
   };
 
-  const executeChange = async (newCategoryId: string | null) => {
+  const executeChange = async (
+    newCategoryId: string | null,
+    restoreBackup?: boolean
+  ) => {
     try {
       await setCategory.mutateAsync({
         videoId,
         categoryId: newCategoryId,
+        ...(restoreBackup === undefined ? {} : { restoreBackup }),
       });
       onCategoryChange?.(newCategoryId);
     } catch (error) {
@@ -139,10 +143,9 @@ export function CategorySelector({
     }
   };
 
-  const handleConfirm = async (_restoreBackup: boolean) => {
+  const handleConfirm = async (restoreBackup: boolean) => {
     setWarningOpen(false);
-    // TODO: Pass _restoreBackup to backend when implemented
-    await executeChange(pendingCategoryId);
+    await executeChange(pendingCategoryId, restoreBackup);
     setPendingCategoryId(null);
   };
 

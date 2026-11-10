@@ -8,7 +8,7 @@ They should fail until the backup service is implemented.
 import json
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -267,7 +267,18 @@ class TestRestoreFieldValues:
         When: restore_field_values is called
         Then: VideoFieldValue objects are created in DB and count is returned
         """
-        _backup_path, video_id, category_id, _backup_data = sample_backup_file
+        _backup_path, video_id, category_id, backup_data = sample_backup_file
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [
+            MagicMock(
+                id=UUID(value["field_id"]),
+                field_type=value["field_type"],
+                config={},
+                name=value["field_name"],
+            )
+            for value in backup_data["values"]
+        ]
+        mock_db.execute.return_value = result
 
         with patch("app.services.field_value_backup.BACKUP_DIR", tmp_backup_dir):
             restored_count = await restore_field_values(
@@ -279,8 +290,9 @@ class TestRestoreFieldValues:
         # Assert correct number of values restored
         assert restored_count == 2
 
-        # Assert db.add was called for each value
-        assert mock_db.add.call_count == 2
+        # One schema lookup and two atomic upserts; caller owns the commit.
+        assert mock_db.execute.call_count == 3
+        mock_db.commit.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_restore_handles_corrupted_file(self, tmp_backup_dir, mock_db):

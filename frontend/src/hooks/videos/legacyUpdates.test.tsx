@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { useBulkApplySchema, useUpdateTag } from "@/hooks/useTags";
 import { api } from "@/lib/api";
 import { videoKeys } from "@/lib/videoKeys";
+import { useSetVideoCategory } from "./mutations";
 import { useVideoFieldMutation } from "./useVideoFieldMutation";
 
 function setup() {
@@ -218,4 +219,37 @@ describe.each(["single", "bulk"] as const)("%s tag schema changes", (mode) => {
       put.mockRestore();
     }
   });
+});
+
+it.each([
+  true,
+  false,
+])("sends the category restore choice through the API query contract (%s)", async (restoreBackup) => {
+  const { client, wrapper } = setup();
+  const put = vi.spyOn(api, "put").mockResolvedValueOnce({
+    data: {
+      backup_created: false,
+      backup_available: true,
+      restored_count: restoreBackup ? 1 : 0,
+    },
+  });
+  const { result, unmount } = renderHook(useSetVideoCategory, { wrapper });
+  try {
+    await act(() =>
+      result.current.mutateAsync({
+        videoId: "video",
+        categoryId: "category",
+        restoreBackup,
+      })
+    );
+    expect(put).toHaveBeenCalledWith(
+      "/videos/video/category",
+      { category_id: "category" },
+      { params: { restore_backup: restoreBackup } }
+    );
+  } finally {
+    unmount();
+    client.clear();
+    put.mockRestore();
+  }
 });

@@ -206,6 +206,7 @@ async def get_video_by_id(
             "color": tag.color,
             "user_id": tag.user_id,
             "schema_id": tag.schema_id,
+            "is_video_type": tag.is_video_type,
             "created_at": tag.created_at,
             "updated_at": tag.updated_at,
         }
