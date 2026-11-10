@@ -1,3 +1,11 @@
+> Fortschreibung 10.11.2026: Die folgende Liste dokumentiert die ursprüngliche
+> rote Abnahme. Die bekannten Frontend-Fehlergruppen sind inzwischen bearbeitet;
+> Lint hat keine Fehler mehr. Der vollständige Lauf endete mit 1.288 bestanden
+> und einer inzwischen gezielt behobenen neuen Cache-Regression. Stabile
+> Gesamtabnahme steht nach weiteren AP-Änderungen aus. Mypy aktuell 205 Fehler
+> in 41 Dateien; Einzelheiten im Abnahmeprotokoll. Keine Tests stillgelegt und
+> keine strengen Regeln abgeschwächt.
+
 # Offene Prüfungsbefunde
 
 Frontend-Snapshot: unveränderte Frontend-Dateien aus `7184630`, Backend-Schlussbasis `238f7df`.

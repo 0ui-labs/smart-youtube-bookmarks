@@ -12,10 +12,10 @@ Die offenen Punkte umfassen noch Implementierung, nicht nur fehlende externe Nac
 | AP | Status | Umgesetzt / verbleibend |
 | --- | --- | --- |
 | 1 | Lokal umgesetzt | Python 3.11, Root-npm-Lockfile, separate PostgreSQL-/Redis-Services, DB-Ziel-/Verbindungs-/Suite-Schutz, reguläre vollständige Testläufe. |
-| 2 | Teilweise | Build repariert, mehrere Produktfehler und Testverträge korrigiert. Vollständiges Frontend und Linting noch nicht grün. |
+| 2 | Teilweise | Build repariert, mehrere Produktfehler und Testverträge korrigiert. Bekannte Frontend-Fehlergruppen behoben, Lint ohne Fehler. Stabile abschließende Gesamtsuite nach den weiteren Änderungen ausstehend. |
 | 3 | Teilweise | Auth-bestätigter Reconnect, paginierte History, monotone Zusammenführung, Retry-UI und Origin-URL lokal getestet. Der HTTP-Vertrag verlangt noch `user_id`; produktive History-/Clerk-Integration und stabile serverseitige Eventidentitäten fehlen. |
 | 4 | Lokal abgeschlossen | PostgreSQL-Upsert statt Zeilen-Rollback, letzte gültige Feldzeile, Parallelimport und CSV-Roundtrip nachgewiesen. Provider gemockt. |
-| 5 | Teilweise | Create verändert keine fremden Filter-/Sortiercaches, inaktive Varianten werden stale. Vollständige Detail-/Schema-/Feldwert-Invalidierung noch offen. |
+| 5 | Teilweise | Create verändert keine fremden Filter-/Sortiercaches, inaktive Varianten werden stale. Detail-/Schema-/Feldwert-Invalidierung ergänzt; Pagination und endgültige Integrationsprüfung bleiben offen. |
 | 6 | Weitgehend lokal implementiert, nicht vollständig abgenommen | Outbox, Dispatcher, Leases/Backoff, stabile ARQ-ID, dauerhafte Worker-Claims, Ziel-Lock und Commit vor Bestätigung; fachliche Produzenten/Recovery umgestellt. Einige geforderte Crash-/Doppeldispatch-Fälle und Oberflächen für verwaiste/finale Fehler fehlen. |
 | 7 | Nicht implementiert | Clerk-Tokens, alle HTTP-Eigentumsprüfungen, Zwei-Benutzer-Matrix, Altdatenzuordnung und verifizierte WebSub-Ausnahmen fehlen. |
 | 8 | Nicht implementiert | Clerk-Frontend, zentrale Tokens, Einmal-Tickets und vollständige Bereinigung beim Benutzerwechsel fehlen. |
@@ -259,3 +259,39 @@ beenden. Neue Alembic-Revisionen werden nicht mehr durch `.gitignore` verborgen.
 - `7184630` test: align grid sizing and animated progress expectations
 - `238f7df` fix: serialize processing acceptance and claim each imported video
 - `532291e` chore: keep new alembic revisions visible to git
+
+## Fortsetzung am 10.11.2026 – laufende Implementierung
+
+Der vollständige Auftrag bleibt aktiv; dies ist ein Zwischenprotokoll.
+
+- `ddeaa1a`: SQLAlchemy-Beziehungen, Python-UUID-Typen und Timestamp-Vererbung
+  korrigiert; 37 Modell-/Feldwerttests bestanden. Mypy von 232 auf 205 Fehler
+  in 41 Dateien reduziert, ohne Regelabschwächung.
+- `7c3bb73`, `3cad882`, `0a7bfbe`: Frontend-Lintfehler bearbeitet,
+  Kategorie-/Einstellungsfehler mit Retry sichtbar gemacht, Sortierköpfe
+  zugänglich und Test-Mocks dem aktuellen UI-Vertrag angepasst.
+  Neun betroffene Dateien: 95 Tests bestanden.
+- `ed16b7a`: Query-Cache-Array beim Feldsortieren nicht mehr mutiert;
+  Rich Text sanitisiert, abgeschnittener Inhalt als Text gerendert;
+  Editor als Textbox zugänglich. Neue Regressionen zunächst rot,
+  anschließend fünf betroffene Dateien mit 88 Tests grün.
+- `8b1c32a`: Aktuellen Player-/Informationsdialog-Vertrag statt überholter
+  Thumbnail-/Collapsible-Annahmen getestet: 32 Tests bestanden.
+- `bd9b37c`, `91c8e7e`, `96e895f`: Eindeutige Schemafeldauswahl mit
+  Abwahl/Entfernung, keine verschachtelten Formulare, sichtbare wiederholbare
+  Feldanlagefehler und keine verlorene Schemaauswahl während Options-Refresh.
+  Durchgängiger Kategorien-/Schema-/Feldablauf mit echtem Frontendtransport
+  gegen MSW geprüft; keine echte Provider-/Browserabnahme.
+- `4ffe443`: Gemeinsame Video-Query-Schlüssel einschließlich Detailansichten,
+  Optimismus auf Listencaches begrenzt, abhängige Details bei Schema-/Feldänderung
+  invalidiert. Neue Detailobjekt-Regression zuerst rot, danach 68 gezielte Tests
+  bestanden. Produktionsbuild erneut erfolgreich.
+
+Gesamtlauf Frontend: 1.288 bestanden, ein Fehler im während des Laufs neu
+hinzugekommenen Cache-Regressionstest; dieser ist danach gezielt behoben und
+verifiziert. Daher noch kein abschließender vollständiger grüner Lauf auf
+stabilem Head. Lint aktuell ohne Fehler (156 bestehende Warnungen), Regeln
+unverändert. AP 2: bekannte Fehlergruppen bearbeitet, stabile Gesamtprüfung
+noch ausstehend. AP 5: Detail-/Schema-/Feldinvalidierung ergänzt; die spätere
+Pagination muss die Cacheverträge erneut absichern. AP 3/6–11 bleiben gemäß
+obiger Matrix weiter in Arbeit.
