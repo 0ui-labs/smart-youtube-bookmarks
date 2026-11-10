@@ -33,11 +33,13 @@ export interface UseWebSocketReturn {
   sendJsonMessage: (message: any) => void; // NEW: Expose sendJsonMessage
   authStatus: "pending" | "authenticated" | "failed";
   historyError: string | null;
+  retryHistory: () => Promise<void>;
 }
 
 // WebSocket configuration constants
 const WS_URL =
-  import.meta.env.VITE_WS_URL || "ws://localhost:8000/api/ws/progress";
+  import.meta.env.VITE_WS_URL ||
+  `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/api/ws/progress`;
 const MAX_BACKOFF = 30_000; // 30 seconds
 const INITIAL_BACKOFF = 3000; // 3 seconds (not used anymore - react-use-websocket handles it)
 const CLEANUP_INTERVAL = 60_000; // 1 minute
@@ -74,6 +76,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const monitoredJobsRef = useRef<Set<string>>(new Set());
   const lastConnectedTimeRef = useRef<Map<string, number>>(new Map());
   const isReconnectingRef = useRef(false);
+  const connectionEpoch = useRef(0);
 
   // Get auth token from localStorage (optional in dev mode)
   const token = localStorage.getItem("token");
@@ -88,7 +91,6 @@ export function useWebSocket(): UseWebSocketReturn {
       onOpen: () => {
         console.log("WebSocket connected");
         setReconnecting(false);
-        isReconnectingRef.current = false;
 
         // Send auth message (backend expects this)
         if (token) {
@@ -97,16 +99,12 @@ export function useWebSocket(): UseWebSocketReturn {
             token,
           });
         }
-
-        // Fetch history if this is a reconnection
-        if (isReconnectingRef.current && monitoredJobsRef.current.size > 0) {
-          fetchJobHistory(Array.from(monitoredJobsRef.current), token!);
-        }
       },
 
       onClose: (event) => {
         console.log("WebSocket disconnected", event.code);
         setAuthStatus("pending");
+        connectionEpoch.current += 1;
 
         // Don't set reconnecting on intentional close (code 1000)
         if (event.code !== 1000) {
@@ -122,7 +120,11 @@ export function useWebSocket(): UseWebSocketReturn {
       // Reconnection configuration
       shouldReconnect: (closeEvent) => {
         // Don't reconnect on intentional closure
-        return closeEvent.code !== 1000;
+        return (
+          closeEvent.code !== 1000 &&
+          closeEvent.code !== 1008 &&
+          closeEvent.code !== 4001
+        );
       },
       reconnectAttempts: 10,
       reconnectInterval: (attemptNumber) => {
@@ -171,6 +173,10 @@ export function useWebSocket(): UseWebSocketReturn {
     // Handle auth confirmation/failure
     if (data.type === "auth_confirmed" && data.authenticated) {
       setAuthStatus("authenticated");
+      if (isReconnectingRef.current) {
+        isReconnectingRef.current = false;
+        void fetchJobHistory(Array.from(monitoredJobsRef.current));
+      }
       return;
     }
 
@@ -188,7 +194,20 @@ export function useWebSocket(): UseWebSocketReturn {
     }
 
     // Handle job-level progress updates
-    const update: ProgressUpdate = data;
+    if (
+      !(
+        data.job_id &&
+        [
+          "pending",
+          "processing",
+          "completed",
+          "failed",
+          "completed_with_errors",
+        ].includes(data.status)
+      )
+    )
+      return;
+    const update: ProgressUpdate = normalizeProgress(data);
 
     // Add timestamp for cleanup logic
     update.timestamp = Date.now();
@@ -211,60 +230,57 @@ export function useWebSocket(): UseWebSocketReturn {
     // Update job progress state
     setJobProgress((prev) => {
       const next = new Map(prev);
-      next.set(update.job_id, update);
+      const current = next.get(update.job_id);
+      if (!current || canAdvance(current, update))
+        next.set(update.job_id, update);
       return next;
     });
   }, [lastJsonMessage]);
 
   // ===== History API Integration =====
-  const fetchJobHistory = async (jobIds: string[], token: string) => {
+  const fetchJobHistory = async (jobIds: string[]) => {
+    const epoch = connectionEpoch.current;
+    let failed = false;
+    setHistoryError(null);
     for (const jobId of jobIds) {
       try {
-        const sinceTimestamp = lastConnectedTimeRef.current.get(jobId) || 0;
-
-        const response = await fetch(
-          `/api/jobs/${jobId}/progress-history?since=${sinceTimestamp}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          const errorMsg = `Failed to load progress history for job ${jobId}`;
-          console.error("Failed to load progress history:", {
-            jobId,
-            status: response.statusText,
-          });
-          setHistoryError(errorMsg);
-          continue;
-        }
-
-        const events: ProgressUpdate[] = await response.json();
-
-        // Batch state updates (reduce re-renders)
-        if (events.length > 0) {
+        // Replay persisted history: client receipt times are not server cursors.
+        for (let offset = 0; ; offset += 100) {
+          const response = await fetch(
+            `/api/jobs/${jobId}/progress-history?offset=${offset}&limit=100`,
+            {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            }
+          );
+          if (!response.ok) throw new Error(`History HTTP ${response.status}`);
+          const events = await response.json();
+          if (connectionEpoch.current !== epoch) return;
           setJobProgress((prev) => {
             const next = new Map(prev);
             for (const event of events) {
-              const update: ProgressUpdate = { ...event };
-              update.timestamp = event.timestamp || Date.now();
-              next.set(update.job_id, update);
+              const update = normalizeProgress({
+                ...event,
+                ...(event.progress_data ?? event),
+                timestamp: event.created_at
+                  ? Date.parse(event.created_at)
+                  : (event.timestamp ?? Date.now()),
+              });
+              if (!update.job_id) continue;
+              const current = next.get(update.job_id);
+              if (!current || canAdvance(current, update))
+                next.set(update.job_id, update);
             }
             return next;
           });
+          if (events.length < 100) break;
         }
-      } catch (error) {
-        const errorMsg = `Failed to load progress history for job ${jobId}`;
-        console.error("Failed to load progress history:", {
-          jobId,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        setHistoryError(errorMsg);
+      } catch {
+        if (connectionEpoch.current !== epoch) return;
+        failed = true;
+        setHistoryError(`Failed to load progress history for job ${jobId}`);
       }
     }
+    if (!failed && connectionEpoch.current === epoch) setHistoryError(null);
   };
 
   // ===== Automatic Cleanup (5 min TTL) =====
@@ -292,7 +308,10 @@ export function useWebSocket(): UseWebSocketReturn {
       });
     }, CLEANUP_INTERVAL);
 
-    return () => clearInterval(cleanup);
+    return () => {
+      clearInterval(cleanup);
+      connectionEpoch.current += 1;
+    };
   }, []);
 
   // ===== Derived State =====
@@ -306,5 +325,29 @@ export function useWebSocket(): UseWebSocketReturn {
     sendJsonMessage,
     authStatus,
     historyError,
+    retryHistory: () => fetchJobHistory(Array.from(monitoredJobsRef.current)),
   };
+}
+
+function canAdvance(current: ProgressUpdate, update: ProgressUpdate): boolean {
+  const terminal = ["completed", "failed", "completed_with_errors"];
+  if (terminal.includes(current.status) && !terminal.includes(update.status))
+    return false;
+  if (update.current_video < current.current_video) return false;
+  if (
+    update.current_video === current.current_video &&
+    update.progress < current.progress
+  )
+    return false;
+  return true;
+}
+
+function normalizeProgress(data: Record<string, any>): ProgressUpdate {
+  return {
+    ...data,
+    current_video:
+      data.current_video ?? (data.processed ?? 0) + (data.failed ?? 0),
+    total_videos: data.total_videos ?? data.total ?? 0,
+    message: data.message ?? "",
+  } as ProgressUpdate;
 }

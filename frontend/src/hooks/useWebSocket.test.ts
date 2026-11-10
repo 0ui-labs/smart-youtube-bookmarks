@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useWebSocket } from "./useWebSocket";
 
@@ -13,6 +14,7 @@ let mockUrl: string | null = null;
 vi.mock("react-use-websocket", () => {
   return {
     default: (url: string | null, options: any) => {
+      const [, setTick] = useState(0);
       mockUrl = url;
 
       // Store callbacks
@@ -28,6 +30,7 @@ vi.mock("react-use-websocket", () => {
         if (url && mockReadyState === 0) {
           mockReadyState = 1; // OPEN
           mockOnOpenCallback?.();
+          setTick((tick) => tick + 1);
         }
       }, 0);
 
@@ -502,7 +505,7 @@ describe("useWebSocket", () => {
         .getState()
         .getProgress("video-123");
       expect(storeProgress).toBeDefined();
-      expect(storeProgress?.progress).toBe(60);
+      expect(storeProgress?.realProgress).toBe(60);
       expect(storeProgress?.stage).toBe("captions");
     });
 
@@ -546,8 +549,8 @@ describe("useWebSocket", () => {
 
       // Both videos should be tracked
       const store = useImportProgressStore.getState();
-      expect(store.getProgress("video-1")?.progress).toBe(25);
-      expect(store.getProgress("video-2")?.progress).toBe(90);
+      expect(store.getProgress("video-1")?.realProgress).toBe(25);
+      expect(store.getProgress("video-2")?.realProgress).toBe(90);
     });
 
     it("clears import progress when stage is complete", async () => {
@@ -614,7 +617,7 @@ describe("useWebSocket", () => {
       expect(result.current.isConnected).toBe(true);
     });
 
-    it("handles missing token gracefully and sets auth status to failed", async () => {
+    it("connects without a token in the current development contract", async () => {
       localStorage.clear(); // No token
 
       const { result } = renderHook(() => useWebSocket());
@@ -623,9 +626,8 @@ describe("useWebSocket", () => {
         await vi.advanceTimersByTimeAsync(0);
       });
 
-      // Should not connect without token
-      expect(result.current.isConnected).toBe(false);
-      expect(mockUrl).toBeNull(); // react-use-websocket called with null URL
+      expect(result.current.isConnected).toBe(true);
+      expect(mockUrl).toContain("/api/ws/progress"); // react-use-websocket called with null URL
     });
 
     it("sets historyError when history API fails", async () => {

@@ -700,7 +700,8 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // WebSocket for bulk upload progress and import progress tracking
   // Provides real-time updates for video enrichment stages (created → metadata → captions → chapters → complete)
-  const { jobProgress, reconnecting, historyError } = useWebSocket();
+  const { jobProgress, reconnecting, historyError, retryHistory } =
+    useWebSocket();
 
   const deleteVideo = useDeleteVideo(listId);
 
@@ -1386,6 +1387,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
                 Fehler beim Laden der Verlaufshistorie
               </h3>
               <p className="mt-1 text-red-700 text-sm">{historyError}</p>
+              <button onClick={() => void retryHistory()} type="button">
+                Erneut versuchen
+              </button>
             </div>
           </div>
         </div>

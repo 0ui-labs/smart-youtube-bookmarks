@@ -56,3 +56,14 @@ Wiederholte CSV-Zeilen werden für Feldwerte in Dateireihenfolge verarbeitet; un
 Werte überschreiben keine vorherigen gültigen Werte.
 Gezielter Lauf inklusive bestehender Feldimport-/Export- und Roundtrip-Tests:
 **23 bestanden** in 8,23 s. Parallelimport und expliziter Letzte-gültige-Zeile-Test stehen noch aus.
+
+### AP 3: Fortschritt nach Wiederverbindung
+
+Reconnect-Zustand bleibt bis zur Authentifizierungsbestätigung erhalten. History wird
+seitenweise im tatsächlichen API-Format gelesen (keine Millisekunden als Datetime-Cursor).
+Live-/History-Updates werden monoton zusammengeführt; getrennte Verbindungsgenerationen
+verwerfen verspätete Antworten. Fehler bleiben sichtbar und sind über die UI erneut versuchbar.
+WebSocket-URL folgt Origin und ws/wss; Proxy nutzt `/api` einschließlich WebSockets.
+Gezielte Reconnect-Regression rot → grün. Bestehender Hook-Testvertrag korrigiert:
+Socket-Mock löst bei Öffnen wie die echte Library ein Render aus; Store liefert `realProgress`.
+HTTP-History-Authentifizierung und persistente Eventidentität bleiben Teil der offenen AP-7/8-Arbeit.
