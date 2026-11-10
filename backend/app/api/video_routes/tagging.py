@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.orm_loading import load_committed_relationship
 from app.models.tag import Tag, video_tags
 from app.models.video import Video
 from app.schemas.tag import TagResponse
@@ -119,7 +120,9 @@ async def assign_tags_to_video(
         select(Tag).join(video_tags).where(video_tags.c.video_id == video_id)
     )
     existing_tags_result = await db.execute(existing_tags_stmt)
-    video.__dict__["tags"] = list(existing_tags_result.scalars().all())
+    load_committed_relationship(
+        video, "tags", list(existing_tags_result.scalars().all())
+    )
 
     # Validate category assignment (only one category per video)
     try:

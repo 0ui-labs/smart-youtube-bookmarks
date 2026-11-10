@@ -8,17 +8,22 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import and_, asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import InstrumentedAttribute, aliased, selectinload
+from sqlalchemy.orm import (
+    InstrumentedAttribute,
+    aliased,
+    selectinload,
+)
 from sqlalchemy.sql import Select
 
 from app.api.helpers.field_union import get_available_fields_for_videos
+from app.core.orm_loading import load_committed_relationship
 from app.models.channel import Channel
 from app.models.custom_field import CustomField
 from app.models.list import BookmarkList
 from app.models.tag import Tag, video_tags
 from app.models.video import Video
 from app.models.video_field_value import VideoFieldValue
-from app.schemas.video import FieldFilterOperator, VideoFilterRequest
+from app.schemas.video import FieldFilterOperator, VideoFilterRequest, VideoResponse
 
 logger = logging.getLogger(__name__)
 
@@ -318,7 +323,9 @@ async def build_video_selection(
     return stmt
 
 
-async def hydrate_videos(db: AsyncSession, videos: Sequence[Video]) -> list[Video]:
+async def hydrate_videos(
+    db: AsyncSession, videos: Sequence[Video]
+) -> list[VideoResponse]:
     if not videos:
         return []
     # Load all tags for all videos in two queries (prevents N+1)
@@ -357,7 +364,7 @@ async def hydrate_videos(db: AsyncSession, videos: Sequence[Video]) -> list[Vide
 
     # Assign tags to videos
     for video in videos:
-        video.__dict__["tags"] = tags_by_video.get(video.id, [])
+        load_committed_relationship(video, "tags", tags_by_video.get(video.id, []))
 
     parent_lists = (
         (
@@ -372,13 +379,14 @@ async def hydrate_videos(db: AsyncSession, videos: Sequence[Video]) -> list[Vide
     )
     parents = {parent.id: parent for parent in parent_lists}
     for video in videos:
-        video.__dict__["list"] = parents.get(video.list_id)
+        load_committed_relationship(video, "list", parents.get(video.list_id))
 
     # === NEW: Batch-load applicable fields for ALL videos ===
     # ✅ REF #1: Single query for all videos
     applicable_fields_by_video = await get_available_fields_for_videos(videos, db)
 
-    # === NEW: Batch load field values ===
+    response_values: dict[UUID, list[dict[str, Any]]] = {}
+    # Batch-load field values without replacing mapped relationships with DTOs.
     if video_ids:
         # Fetch all field values for all videos in one query
         field_values_stmt = (
@@ -443,16 +451,24 @@ async def hydrate_videos(db: AsyncSession, videos: Sequence[Video]) -> list[Vide
                     )
 
             # Assign to video (FastAPI will serialize via VideoResponse schema)
-            video.__dict__["field_values"] = field_values_response
-    else:
-        # No videos → no field values needed
-        for video in videos:
-            video.__dict__["field_values"] = []
-
+            response_values[video.id] = field_values_response
     # Load channel thumbnails for all videos
     await _load_channel_thumbnails(videos, db)
 
-    return list(videos)
+    return [
+        VideoResponse.model_validate(
+            {
+                **{
+                    column.key: getattr(video, column.key)
+                    for column in Video.__table__.columns
+                },
+                "tags": video.tags,
+                "field_values": response_values.get(video.id, []),
+                "channel_thumbnail_url": getattr(video, "channel_thumbnail_url", None),
+            }
+        )
+        for video in videos
+    ]
 
 
 async def query_video_page(
@@ -487,7 +503,7 @@ async def query_videos_in_list(
     sort_order: Literal["asc", "desc"] | None = "asc",
     offset: int = 0,
     limit: int = 100,
-) -> list[Video]:
+) -> list[VideoResponse]:
     selection = await build_video_selection(
         db,
         list_id,
@@ -506,7 +522,7 @@ async def query_filtered_videos(
     filter_request: VideoFilterRequest,
     offset: int = 0,
     limit: int = 100,
-) -> list[Video]:
+) -> list[VideoResponse]:
     selection = await build_video_selection(db, list_id, filter_request)
     return await hydrate_videos(
         db, (await db.execute(selection.offset(offset).limit(limit))).scalars().all()
@@ -519,7 +535,7 @@ async def query_all_videos(
     tags_all: list[str] | None = None,
     offset: int = 0,
     limit: int = 100,
-) -> list[Video]:
+) -> list[VideoResponse]:
     selection = select(Video).order_by(Video.created_at, Video.id)
     names = [name.strip().lower() for name in tags or [] if name.strip()]
     if names:

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.youtube import YouTubeClient
 from app.core.config import settings
+from app.core.orm_loading import load_committed_relationship
 from app.core.redis import get_redis_client
 from app.models.custom_field import CustomField
 from app.models.list import BookmarkList
@@ -487,9 +488,9 @@ async def create_video(db: AsyncSession, list_id: UUID, video_data: VideoAdd) ->
 
     # Set tags to empty list to avoid async relationship loading issues
     # (newly created video has no tags assigned yet)
-    new_video.__dict__["tags"] = []
+    load_committed_relationship(new_video, "tags", [])
 
     # Set field_values to empty list (no tags → no applicable fields)
-    new_video.__dict__["field_values"] = []
+    load_committed_relationship(new_video, "field_values", [])
 
     return new_video

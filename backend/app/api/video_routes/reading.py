@@ -14,6 +14,7 @@ from app.api.helpers.field_union import (
     get_available_fields_for_video,
 )
 from app.core.database import get_db
+from app.core.orm_loading import load_committed_relationship
 from app.models.channel import Channel
 from app.models.list import BookmarkList
 from app.models.tag import Tag
@@ -54,7 +55,7 @@ async def get_videos_in_list(
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-) -> list[Video]:
+) -> list[VideoResponse]:
     return await query_videos_in_list(
         list_id=list_id,
         tags=tags,
@@ -73,7 +74,7 @@ async def filter_videos_in_list(
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-) -> list[Video]:
+) -> list[VideoResponse]:
     return await query_filtered_videos(
         list_id=list_id,
         filter_request=filter_request,
@@ -119,7 +120,7 @@ async def get_video_by_id(
     )
     field_values_result = await db.execute(field_values_stmt)
     field_values_list = list(field_values_result.scalars().all())
-    video.__dict__["field_values"] = field_values_list
+    load_committed_relationship(video, "field_values", field_values_list)
 
     # Step 2B: Load tags manually (workaround for SQLAlchemy many-to-many loading issue)
     # SQLAlchemy sometimes returns a single Tag object instead of a list for many-to-many relationships
@@ -133,13 +134,13 @@ async def get_video_by_id(
     )
     tags_result = await db.execute(tags_stmt)
     tags_list = list(tags_result.scalars().all())
-    video.__dict__["tags"] = tags_list
+    load_committed_relationship(video, "tags", tags_list)
 
     # Step 2C: Load parent list (for Two-Layer Field System: workspace fields from list.default_schema_id)
     list_stmt = select(BookmarkList).where(BookmarkList.id == video.list_id)
     list_result = await db.execute(list_stmt)
     parent_list = list_result.scalar_one_or_none()
-    video.__dict__["list"] = parent_list
+    load_committed_relationship(video, "list", parent_list)
 
     # Step 3: Get available fields using helper module
     available_fields_tuples = await get_available_fields_for_video(video, db)
@@ -257,7 +258,7 @@ async def list_all_videos(
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-) -> list[Video]:
+) -> list[VideoResponse]:
     return await query_all_videos(
         tags=tags, tags_all=tags_all, db=db, offset=offset, limit=limit
     )
