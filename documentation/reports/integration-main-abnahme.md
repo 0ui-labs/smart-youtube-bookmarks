@@ -105,7 +105,7 @@ Der Gesamtdiff enthält Orval-generierten Trailing Whitespace (137 Diagnosezeile
 
 - PR #2 geschlossen, weil sein kompletter Head nachweislich bereits in `origin/main` enthalten ist; kein erneuter Merge und kein Datenverlust.
 - PR #8 bleibt offen, bis die Integration wirklich in main enthalten ist. Keine Zusammenführung gegen den alten Feature-Zielbranch.
-- Ein neuer Draft-Integrations-PR wird ausdrücklich gegen `main` erstellt. Die gehostete CI wird diesem konkreten Head zugeordnet; lokales Grün ersetzt sie nicht.
+- [Draft-Integrations-PR #9](https://github.com/0ui-labs/smart-youtube-bookmarks/pull/9) ist ausdrücklich gegen `main` erstellt und im Task-System verlinkt. Beide Quellhistorien sind enthalten. Keine automatische Merge-Freigabe.
 - **Noch nicht nach main gemerged:** Echte Clerk-Konfiguration und A/B-Login-Abnahme fehlen; beide privaten Konfigurationsanfragen liefen ohne Eingabe ab. Die normale Oberfläche ist damit bewusst gesperrt. Der Plan verbietet eine Freigabe dieses im Alltag unbenutzbaren Standes ohne Klärung der Anmeldung. Keine Tokens erfunden, keine Auth-Ausnahme eingebaut und keine bestehenden Daten automatisch übertragen.
 - Reale durchgehende Provider-/Browserreise und die Wirkung auf die Audiospur eines bestimmten mehrsprachigen Videos bleiben ausdrücklich offen. Die nachgewiesene Playerkorrektur entfernt nur die feste englische Embed-/Untertitelvorgabe.
 
@@ -114,3 +114,12 @@ Der Gesamtdiff enthält Orval-generierten Trailing Whitespace (137 Diagnosezeile
 Nutzerentscheidung: bisherige zusammenhängende Bedienung erhalten; Backend-Limits bleiben erhalten. Historische Restore-Verträge wurden repariert, ohne eine neue Backup-Auswahloberfläche einzuführen. Abbrüche werden am tatsächlichen Query-/Axios-Signal geprüft; die MSW-XHR-Darstellung ersetzt keinen echten Browsernachweis.
 
 Zurückgestellt: Generator-Whitespace, bestehende Warnungen/Dependency-Risiken, Store-/Bundle-Performancefolgearbeit und automatische Backup-Erkennung im Kategorie-Dialog. Keine dieser Positionen wird als fertig dargestellt.
+
+
+## Gehostete CI: externer Startblocker
+
+[GitHub-Actions-Lauf 42835805334](https://github.com/0ui-labs/smart-youtube-bookmarks/actions/runs/42835805334) für PR #9 / Push-Head `4e7051a` ist fehlgeschlagen, bevor irgendein Jobschritt ausgeführt wurde. Alle vier Jobs haben leere Schrittlisten und keinen Runner. Die GitHub-Annotation lautet: „The job was not started because your account is locked due to a billing issue.“ Das ist kein fehlgeschlagener Produkt-Test und auch kein gehosteter grüner Testnachweis.
+
+Es wurden weder Zahlungs-/Kontoeinstellungen verändert noch Prüfungen übersprungen oder Merge-Regeln abgeschwächt. Erst nach Aufhebung des externen Kontoblockers kann die CI auf dem aktuellen PR-Head sinnvoll erneut ausgeführt werden. CodeRabbit hat den Draft gemäß Konfiguration nicht automatisch reviewed; der unabhängige lokale Review bleibt separat dokumentiert. Semgrep wird als zusätzlicher externer Check verfolgt.
+
+Die Zusammenführung nach main ist deshalb weiterhin zurückgestellt: echte Clerk-/Provider-Abnahme sowie ausführbare gehostete CI fehlen. Der Integrationsbranch ist bereit zur Fortsetzung; ursprüngliche lokale Dateien, Backup-Branch und alte PR-8-Historie bleiben erhalten.
