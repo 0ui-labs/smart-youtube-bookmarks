@@ -47,3 +47,44 @@ async def test_dependency_error_is_redacted_and_returns_unready(monkeypatch):
         "queue": True,
         "worker": True,
     }
+
+
+async def test_real_database_redis_and_dispatcher_heartbeat(test_engine, monkeypatch):
+    import os
+
+    from redis.asyncio import Redis
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from app.core.readiness import WORKER_HEARTBEAT_KEY, readiness_status
+    from app.workers.outbox_dispatcher import dispatch_outbox
+
+    target = os.environ.get("TEST_REDIS_URL")
+    assert target == "redis://localhost:56388/3"
+    redis = Redis.from_url(target)
+    sessions = async_sessionmaker(test_engine, expire_on_commit=False)
+
+    async def get_redis():
+        return redis
+
+    monkeypatch.setattr("app.core.readiness.AsyncSessionLocal", sessions)
+    monkeypatch.setattr("app.core.readiness.get_redis_client", get_redis)
+    try:
+        await redis.delete(WORKER_HEARTBEAT_KEY)
+        assert await readiness_status() == {
+            "database": True,
+            "queue": True,
+            "worker": False,
+        }
+        assert (
+            await dispatch_outbox({"outbox_session_factory": sessions, "redis": redis})
+            == 0
+        )
+        assert await readiness_status() == {
+            "database": True,
+            "queue": True,
+            "worker": True,
+        }
+        assert 0 < await redis.ttl(WORKER_HEARTBEAT_KEY) <= 60
+    finally:
+        await redis.delete(WORKER_HEARTBEAT_KEY)
+        await redis.aclose()

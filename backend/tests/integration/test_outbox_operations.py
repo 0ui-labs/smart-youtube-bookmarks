@@ -116,3 +116,24 @@ async def test_renewal_records_intents_without_advancing_expiry(
     assert result["queued"] == 1
     assert sub.pubsub_expires_at is None
     assert (await test_db.scalar(select(JobOutbox))).kind == "sync_pubsub_channel"
+
+
+async def test_concurrent_explicit_retries_share_one_successor(test_db, test_engine):
+    import asyncio
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    original = await record_job(test_db, "enrich_video", str(uuid4()), ["video"])
+    original.status = "failed"
+    await test_db.commit()
+    sessions = async_sessionmaker(test_engine, expire_on_commit=False)
+
+    async def retry():
+        async with sessions() as db:
+            next_ = await retry_failed_operation(db, original.id)
+            await db.commit()
+            return next_.id
+
+    results = await asyncio.gather(retry(), retry())
+    assert results[0] == results[1]
+    assert len((await test_db.scalars(select(JobOutbox))).all()) == 2

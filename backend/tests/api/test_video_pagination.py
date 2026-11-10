@@ -201,3 +201,60 @@ async def test_export_includes_all_filtered_matches_not_only_visible_page(
     assert [row["url"] for row in rows] == [
         f"https://www.youtube.com/watch?v=v{index:010d}" for index in range(119, -1, -1)
     ]
+
+
+async def test_custom_field_order_is_stable_across_pages_in_both_directions(
+    client, test_db, test_list
+):
+    from app.models import CustomField, VideoFieldValue
+
+    field = CustomField(
+        list_id=test_list.id,
+        name="Page rating",
+        field_type="rating",
+        config={"max_rating": 5},
+    )
+    test_db.add(field)
+    await test_db.flush()
+    identities = [uuid4() for _ in range(120)]
+    await test_db.execute(
+        insert(Video),
+        [
+            {"id": id_, "list_id": test_list.id, "youtube_id": f"f{i:010d}"}
+            for i, id_ in enumerate(identities)
+        ],
+    )
+    values = {id_: (None if i % 3 == 0 else i % 3) for i, id_ in enumerate(identities)}
+    await test_db.execute(
+        insert(VideoFieldValue),
+        [
+            {"video_id": id_, "field_id": field.id, "value_numeric": value}
+            for id_, value in values.items()
+            if value is not None
+        ],
+    )
+    await test_db.commit()
+    for order in ["asc", "desc"]:
+        received = []
+        for offset in [0, 50, 100]:
+            response = await client.get(
+                f"/api/lists/{test_list.id}/videos/page",
+                params={
+                    "sort_by": f"field:{field.id}",
+                    "sort_order": order,
+                    "offset": offset,
+                },
+            )
+            assert response.status_code == 200, response.text
+            assert response.json()["total"] == 120
+            received.extend(item["id"] for item in response.json()["items"])
+        expected = sorted(
+            identities,
+            key=lambda id_: (
+                values[id_] is None,
+                (values[id_] or 0) * (1 if order == "asc" else -1),
+                str(id_),
+            ),
+        )
+        assert received == [str(id_) for id_ in expected]
+        assert len(set(received)) == 120

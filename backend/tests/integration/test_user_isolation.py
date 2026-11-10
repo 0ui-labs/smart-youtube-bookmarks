@@ -292,3 +292,154 @@ async def test_signed_http_ticket_drives_real_websocket_and_isolates_redis_chann
         await asyncio.wait_for(task, 5)
         sock.close()
         await redis.aclose()
+
+
+async def test_signed_local_acceptance_import_fields_selection_export_recovery_and_user_switch(
+    isolated_api, test_db, test_engine, monkeypatch
+):
+    """Continuous API acceptance; Clerk/provider responses remain explicitly synthetic."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from sqlalchemy import func
+
+    from app.core.config import settings
+    from app.models.video_field_value import VideoFieldValue
+    from app.services.job_dispatch_service import dispatch_jobs
+    from app.workers.outbox_dispatcher import run_durable_job
+
+    client, token = isolated_api
+    monkeypatch.setattr(settings, "enrichment_enabled", False)
+    metadata = {
+        "title": "Synthetic accepted video",
+        "channel": "Synthetic",
+        "duration": "PT1M",
+    }
+    youtube = MagicMock()
+    youtube.get_video_metadata = AsyncMock(return_value=metadata)
+    monkeypatch.setattr(
+        "app.services.video_creation_service.YouTubeClient", lambda **_kwargs: youtube
+    )
+    monkeypatch.setattr(
+        "app.workers.video_processor.YouTubeClient", lambda **_kwargs: youtube
+    )
+    client.headers["Authorization"] = f"Bearer {token('user_acceptance_a')}"
+    own = (await client.post("/api/lists", json={"name": "Acceptance A"})).json()
+    list_id = own["id"]
+    field = (
+        await client.post(
+            f"/api/lists/{list_id}/custom-fields",
+            json={
+                "name": "Rating",
+                "field_type": "rating",
+                "config": {"max_rating": 5},
+            },
+        )
+    ).json()
+    schema = (
+        await client.post(
+            f"/api/lists/{list_id}/schemas",
+            json={
+                "name": "Workspace",
+                "fields": [
+                    {"field_id": field["id"], "display_order": 0, "show_on_card": True}
+                ],
+            },
+        )
+    ).json()
+    assert (
+        await client.put(
+            f"/api/lists/{list_id}", json={"default_schema_id": schema["id"]}
+        )
+    ).status_code == 200
+    added = await client.post(
+        f"/api/lists/{list_id}/videos", json={"url": "https://youtu.be/single00001"}
+    )
+    assert added.status_code == 201, added.text
+    video_id = added.json()["id"]
+    csv = "url\nhttps://youtu.be/single00001\n" + "\n".join(
+        f"https://youtu.be/v{i:010d}" for i in range(6)
+    )
+    imported = await client.post(
+        f"/api/lists/{list_id}/videos/bulk",
+        files={"file": ("duplicates.csv", csv, "text/csv")},
+    )
+    assert imported.status_code == 201, imported.text
+    assert imported.json()["created_count"] == 6
+    tag = (
+        await client.post(
+            "/api/tags", json={"name": "Selected", "is_video_type": False}
+        )
+    ).json()
+    assert (
+        await client.post(f"/api/videos/{video_id}/tags", json={"tag_ids": [tag["id"]]})
+    ).status_code == 200
+    assert (
+        await client.put(
+            f"/api/videos/{video_id}/fields",
+            json={"field_values": [{"field_id": field["id"], "value": 4}]},
+        )
+    ).status_code == 200
+    selection = {
+        "tags": ["selected"],
+        "field_filters": [{"field_id": field["id"], "operator": "gte", "value": 4}],
+        "sort_by": "field:" + field["id"],
+        "sort_order": "desc",
+    }
+    page = await client.post(f"/api/lists/{list_id}/videos/filter/page", json=selection)
+    assert page.status_code == 200, page.text
+    assert page.json()["total"] == 1
+    assert page.json()["items"][0]["id"] == video_id
+    export = await client.post(f"/api/lists/{list_id}/export/csv", json=selection)
+    assert export.status_code == 200
+    assert "single00001" in export.text and "field_Rating" in export.text
+    reimport = await client.post(
+        f"/api/lists/{list_id}/videos/bulk",
+        files={"file": ("roundtrip.csv", export.content, "text/csv")},
+    )
+    assert reimport.status_code == 201, reimport.text
+    assert reimport.json()["created_count"] == 0
+    assert await test_db.scalar(select(func.count(Video.id))) == 7
+    assert (
+        await test_db.scalar(
+            select(VideoFieldValue.value_numeric).where(
+                VideoFieldValue.video_id == video_id
+            )
+        )
+        == 4
+    )
+
+    # Durable acceptance survives a transport outage; replay uses real business handlers.
+    queue = AsyncMock()
+    queue.enqueue_job.side_effect = OSError("synthetic Redis outage")
+    await dispatch_jobs(test_db, queue)
+    operations = (
+        await test_db.scalars(
+            select(JobOutbox).where(JobOutbox.kind == "process_video")
+        )
+    ).all()
+    assert len(operations) == 6 and all(op.status == "pending" for op in operations)
+    sessions = async_sessionmaker(test_engine, expire_on_commit=False)
+    for operation in operations:
+        async with sessions() as business:
+            await run_durable_job(
+                {"outbox_session_factory": sessions, "db": business}, str(operation.id)
+            )
+    recovered = await client.get(f"/api/lists/{list_id}/videos/page")
+    assert recovered.json()["total"] == 7
+    assert all(
+        video["processing_status"] == "completed" for video in recovered.json()["items"]
+    )
+    job_id = (await test_db.scalar(select(ProcessingJob))).id
+    history = await client.get(f"/api/jobs/{job_id}/progress-history")
+    assert history.status_code == 200
+    assert history.json()[-1]["progress_data"]["progress"] == 100
+    client.headers.clear()
+    assert (await client.get(f"/api/lists/{list_id}/videos/page")).status_code == 401
+    client.headers["Authorization"] = f"Bearer {token('user_acceptance_b')}"
+    assert (await client.get("/api/lists")).json() == []
+    for url in [
+        f"/api/lists/{list_id}/videos/page",
+        f"/api/lists/{list_id}/export/csv",
+        f"/api/jobs/{job_id}/progress-history",
+    ]:
+        assert (await client.get(url)).status_code == 404

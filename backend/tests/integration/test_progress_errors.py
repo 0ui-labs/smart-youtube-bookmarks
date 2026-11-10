@@ -177,7 +177,7 @@ async def test_progress_continues_when_redis_fails(
 
 
 @pytest.mark.asyncio
-async def test_progress_with_database_write_errors(
+async def test_progress_database_failure_rolls_back_counters_history_and_intent(
     test_db: AsyncSession, test_user: User, mock_redis, arq_context
 ):
     """
