@@ -13,14 +13,14 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import BaseModel
+from .base import UpdatedModel
 
 if TYPE_CHECKING:
     from .custom_field import CustomField
     from .video import Video
 
 
-class VideoFieldValue(BaseModel):
+class VideoFieldValue(UpdatedModel):
     """
     Stores actual field values for videos with typed columns for performance.
 
@@ -83,7 +83,6 @@ class VideoFieldValue(BaseModel):
     __tablename__ = "video_field_values"
 
     # Override: Exclude created_at from BaseModel (migration omits this column)
-    created_at = None
 
     # Foreign Key Columns
     video_id: Mapped[PyUUID] = mapped_column(

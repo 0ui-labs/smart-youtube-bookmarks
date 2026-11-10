@@ -1,5 +1,7 @@
+from typing import TYPE_CHECKING
+from uuid import UUID as PyUUID
+
 from sqlalchemy import ForeignKey, Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseModel
@@ -15,7 +17,7 @@ class ProcessingJob(BaseModel):
 
     __tablename__ = "processing_jobs"
 
-    list_id: Mapped[UUID] = mapped_column(
+    list_id: Mapped[PyUUID] = mapped_column(
         ForeignKey("bookmarks_lists.id", ondelete="CASCADE"), nullable=False
     )
     total_videos: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -37,3 +39,7 @@ class ProcessingJob(BaseModel):
 
     def __repr__(self) -> str:
         return f"<ProcessingJob(id={self.id}, status={self.status!r}, processed={self.processed_count}/{self.total_videos})>"
+
+
+if TYPE_CHECKING:
+    from .list import BookmarkList

@@ -1,3 +1,4 @@
+import builtins
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID as PyUUID
@@ -33,7 +34,7 @@ class Video(BaseModel):
 
     __tablename__ = "videos"
 
-    list_id: Mapped[UUID] = mapped_column(
+    list_id: Mapped[PyUUID] = mapped_column(
         ForeignKey("bookmarks_lists.id", ondelete="CASCADE"), nullable=False
     )
     # Channel relationship (optional - videos can exist without channel initially)
@@ -54,7 +55,9 @@ class Video(BaseModel):
 
     # Extended YouTube metadata (snippet)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    youtube_tags: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    youtube_tags: Mapped[builtins.list[str] | None] = mapped_column(
+        ARRAY(String), nullable=True
+    )
     youtube_category_id: Mapped[str | None] = mapped_column(String(10), nullable=True)
     default_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
@@ -98,13 +101,13 @@ class Video(BaseModel):
     channel_ref: Mapped[Optional["Channel"]] = relationship(
         "Channel", back_populates="videos", lazy="raise"
     )
-    tags: Mapped[list["Tag"]] = relationship(
+    tags: Mapped[builtins.list["Tag"]] = relationship(
         "Tag",
         secondary=video_tags,
         back_populates="videos",
         uselist=True,  # Explicitly ensure list relationship
     )
-    field_values: Mapped[list["VideoFieldValue"]] = relationship(
+    field_values: Mapped[builtins.list["VideoFieldValue"]] = relationship(
         "VideoFieldValue",
         back_populates="video",
         cascade="all, delete-orphan",
@@ -127,3 +130,9 @@ class Video(BaseModel):
 
     def __repr__(self) -> str:
         return f"<Video(id={self.id}, youtube_id={self.youtube_id!r}, title={self.title!r})>"
+
+
+if TYPE_CHECKING:
+    from .list import BookmarkList
+    from .tag import Tag
+    from .video_field_value import VideoFieldValue

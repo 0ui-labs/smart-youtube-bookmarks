@@ -1,4 +1,5 @@
-from typing import Any
+import builtins
+from typing import TYPE_CHECKING, Any
 from uuid import UUID as PyUUID
 
 from sqlalchemy import ForeignKey, String
@@ -83,14 +84,14 @@ class CustomField(BaseModel):
         "BookmarkList", back_populates="custom_fields"
     )
 
-    schema_fields: Mapped[list["SchemaField"]] = relationship(
+    schema_fields: Mapped[builtins.list["SchemaField"]] = relationship(
         "SchemaField",
         back_populates="field",
         cascade="all, delete-orphan",  # Deleting field removes from all schemas
         passive_deletes=True,  # Trust DB CASCADE (REF MCP 2025-11-05: also optimal for join tables)
     )
 
-    video_field_values: Mapped[list["VideoFieldValue"]] = relationship(
+    video_field_values: Mapped[builtins.list["VideoFieldValue"]] = relationship(
         "VideoFieldValue",
         back_populates="field",
         cascade="all, delete",  # Deleting field deletes all video values
@@ -101,3 +102,9 @@ class CustomField(BaseModel):
         return (
             f"<CustomField(id={self.id}, name={self.name!r}, type={self.field_type!r})>"
         )
+
+
+if TYPE_CHECKING:
+    from .list import BookmarkList
+    from .schema_field import SchemaField
+    from .video_field_value import VideoFieldValue

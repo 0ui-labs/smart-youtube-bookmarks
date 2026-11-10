@@ -86,4 +86,4 @@ class VideoEnrichment(BaseModel):
     )
 
     def __repr__(self) -> str:
-        return f"<VideoEnrichment(id={self.id}, video_id={self.video_id}, status={self.status.value})>"
+        return f"<VideoEnrichment(id={self.id}, video_id={self.video_id}, status={self.status})>"
