@@ -368,3 +368,10 @@ async def test_create_subscription_from_chat_with_ai_filter(client: AsyncClient)
     assert response.status_code == 201
     data = response.json()
     assert data["filters"]["ai_filter"]["enabled"] is True
+
+
+@pytest.fixture(autouse=True)
+def synthetic_provider_configuration(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "gemini_api_key", "synthetic-offline-test-key")
