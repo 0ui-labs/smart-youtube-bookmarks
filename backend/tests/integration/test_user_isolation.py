@@ -206,3 +206,89 @@ async def test_foreign_body_references_reject_bulk_atomically(
     )
     assert response.status_code == 404
     assert (await test_db.execute(select(JobOutbox))).scalars().all() == []
+
+
+async def test_signed_http_ticket_drives_real_websocket_and_isolates_redis_channels(
+    isolated_api, test_engine, monkeypatch
+):
+    import asyncio
+    import json
+    import os
+    import socket
+
+    import uvicorn
+    from redis.asyncio import Redis
+    from websockets import connect
+    from websockets.exceptions import InvalidStatus
+
+    target = os.environ.get("TEST_REDIS_URL")
+    assert target == "redis://localhost:56388/3"
+    redis = Redis.from_url(target)
+    client, token = isolated_api
+    monkeypatch.setattr("app.api.auth.get_redis_client", lambda: _redis())
+    monkeypatch.setattr("app.api.deps.get_redis_client", lambda: _redis())
+    monkeypatch.setattr("app.api.websocket.get_redis_client", lambda: _redis())
+    monkeypatch.setattr(
+        "app.api.deps.AsyncSessionLocal",
+        async_sessionmaker(test_engine, expire_on_commit=False),
+    )
+
+    async def _redis():
+        return redis
+
+    client.headers["Authorization"] = f"Bearer {token('user_socket_a')}"
+    grant_a = await client.post("/api/auth/ws-ticket")
+    assert grant_a.status_code == 200
+    client.headers["Authorization"] = f"Bearer {token('user_socket_b')}"
+    grant_b = await client.post("/api/auth/ws-ticket")
+    assert grant_b.status_code == 200
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    server = uvicorn.Server(
+        uvicorn.Config(app, lifespan="off", access_log=False, log_level="error")
+    )
+    task = asyncio.create_task(server.serve(sockets=[sock]))
+    try:
+        for _ in range(300):
+            if server.started:
+                break
+            await asyncio.sleep(0.01)
+        assert server.started
+        base = f"ws://127.0.0.1:{port}/api/ws/progress?ticket="
+        async with (
+            connect(base + grant_a.json()["ticket"]) as a,
+            connect(base + grant_b.json()["ticket"]) as b,
+        ):
+            identity_a = json.loads(await asyncio.wait_for(a.recv(), 2))["user_id"]
+            identity_b = json.loads(await asyncio.wait_for(b.recv(), 2))["user_id"]
+            assert identity_a != identity_b
+            for _ in range(200):
+                counts = await redis.pubsub_numsub(
+                    f"progress:user:{identity_a}", f"progress:user:{identity_b}"
+                )
+                if all(count == 1 for _, count in counts):
+                    break
+                await asyncio.sleep(0.01)
+            assert all(count == 1 for _, count in counts)
+            await redis.publish(
+                f"progress:user:{identity_b}", json.dumps({"marker": "private B"})
+            )
+            await redis.publish(
+                f"progress:user:{identity_a}", json.dumps({"marker": "private A"})
+            )
+            assert json.loads(await asyncio.wait_for(a.recv(), 2)) == {
+                "marker": "private A"
+            }
+            assert json.loads(await asyncio.wait_for(b.recv(), 2)) == {
+                "marker": "private B"
+            }
+            with pytest.raises(InvalidStatus) as rejection:
+                async with connect(base + grant_a.json()["ticket"]):
+                    pass
+            assert rejection.value.response.status_code == 403
+    finally:
+        server.should_exit = True
+        await asyncio.wait_for(task, 5)
+        sock.close()
+        await redis.aclose()

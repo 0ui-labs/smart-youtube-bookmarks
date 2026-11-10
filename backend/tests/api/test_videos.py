@@ -1683,9 +1683,6 @@ async def test_sort_by_invalid_column(
     assert "Invalid sort_by column" in response.json()["detail"]
 
 
-@pytest.mark.skip(
-    reason="PostgreSQL DISTINCT + ORDER BY limitation with joined tables - requires subquery fix"
-)
 @pytest.mark.asyncio
 async def test_sort_combined_with_tag_filter(
     client: AsyncClient, test_db: AsyncSession, test_list: BookmarkList
