@@ -222,73 +222,63 @@ export function SchemaEditor({
   void _handleToggleShowOnCard;
 
   return (
-    <form className="space-y-6" onSubmit={form.handleSubmit(handleSubmit)}>
-      {/* Schema Metadata */}
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="schema-name">Schema-Name *</Label>
-          <Input
-            id="schema-name"
-            {...form.register("name")}
-            aria-invalid={!!form.formState.errors.name}
-            placeholder="z.B. Video Quality, Content Metrics"
-          />
-          {form.formState.errors.name && (
-            <p className="mt-1 text-red-600 text-sm">
-              {form.formState.errors.name.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="schema-description">Beschreibung (optional)</Label>
-          <Textarea
-            id="schema-description"
-            {...form.register("description")}
-            placeholder="Kurze Beschreibung des Schemas..."
-            rows={2}
-          />
-          {form.formState.errors.description && (
-            <p className="mt-1 text-red-600 text-sm">
-              {form.formState.errors.description.message}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Field Selection & Management */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Label>Felder ({fields.length})</Label>
-          <div className="flex gap-2">
-            <FieldSelector
-              listId={listId}
-              onFieldsSelected={handleFieldsSelected}
-              selectedFieldIds={fields.map((f) => f.field_id)}
+    <>
+      <form className="space-y-6" onSubmit={form.handleSubmit(handleSubmit)}>
+        {/* Schema Metadata */}
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="schema-name">Schema-Name *</Label>
+            <Input
+              id="schema-name"
+              {...form.register("name")}
+              aria-invalid={!!form.formState.errors.name}
+              placeholder="z.B. Video Quality, Content Metrics"
             />
-            <Button
-              onClick={() => setIsCreatingField(true)}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              + Neues Feld
-            </Button>
+            {form.formState.errors.name && (
+              <p className="mt-1 text-red-600 text-sm">
+                {form.formState.errors.name.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="schema-description">Beschreibung (optional)</Label>
+            <Textarea
+              id="schema-description"
+              {...form.register("description")}
+              placeholder="Kurze Beschreibung des Schemas..."
+              rows={2}
+            />
+            {form.formState.errors.description && (
+              <p className="mt-1 text-red-600 text-sm">
+                {form.formState.errors.description.message}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* NewFieldForm (Task #123) */}
-        {isCreatingField && (
-          <div className="rounded-lg border bg-muted/50 p-4">
-            <NewFieldForm
-              listId={listId}
-              onCancel={() => setIsCreatingField(false)}
-              onSubmit={handleFieldCreated}
-            />
+        {/* Field Selection & Management */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label>Felder ({fields.length})</Label>
+            <div className="flex gap-2">
+              <FieldSelector
+                listId={listId}
+                onFieldsSelected={handleFieldsSelected}
+                selectedFieldIds={fields.map((f) => f.field_id)}
+              />
+              <Button
+                onClick={() => setIsCreatingField(true)}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                + Neues Feld
+              </Button>
+            </div>
           </div>
-        )}
 
-        {/* TODO Task #127: Integrate new FieldOrderManager component with batch update API
+          {/* TODO Task #127: Integrate new FieldOrderManager component with batch update API
             Old API (placeholder from Task #83d):
               <FieldOrderManager
                 fields={fieldItems}
@@ -308,71 +298,82 @@ export function SchemaEditor({
                 isUpdating={updateSchemaFieldsBatch.isPending}
               />
         */}
-        {fields.length > 0 ? (
-          <div className="space-y-2">
-            {fieldItems.map((field) => (
-              <div
-                className="flex items-center gap-3 rounded-md border p-3"
-                key={field.field_id}
-              >
-                <div className="flex-1">
-                  <div className="font-medium">{field.field_name}</div>
-                  <div className="text-muted-foreground text-sm">
-                    {field.field_type}
-                  </div>
-                </div>
-                <Button
-                  aria-label={`${field.field_name} entfernen`}
-                  onClick={() => _handleRemove(field.id)}
-                  size="sm"
-                  type="button"
-                  variant="outline"
+          {fields.length > 0 ? (
+            <div className="space-y-2">
+              {fieldItems.map((field) => (
+                <div
+                  className="flex items-center gap-3 rounded-md border p-3"
+                  key={field.field_id}
                 >
-                  Entfernen
-                </Button>
-              </div>
-            ))}
+                  <div className="flex-1">
+                    <div className="font-medium">{field.field_name}</div>
+                    <div className="text-muted-foreground text-sm">
+                      {field.field_type}
+                    </div>
+                  </div>
+                  <Button
+                    aria-label={`${field.field_name} entfernen`}
+                    onClick={() => _handleRemove(field.id)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Entfernen
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-8 text-center text-muted-foreground text-sm">
+              Noch keine Felder hinzugefügt. Erstellen Sie ein neues Feld oder
+              wählen Sie vorhandene aus.
+            </p>
+          )}
+
+          {/* Display field array errors */}
+          {form.formState.errors.fields?.root && (
+            <p className="text-red-600 text-sm">
+              {form.formState.errors.fields.root.message}
+            </p>
+          )}
+          {form.formState.errors.fields?.message && (
+            <p className="text-red-600 text-sm">
+              {form.formState.errors.fields.message}
+            </p>
+          )}
+        </div>
+
+        {/* Root errors */}
+        {form.formState.errors.root && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+            <p className="text-red-600 text-sm">
+              {form.formState.errors.root.message}
+            </p>
           </div>
-        ) : (
-          <p className="py-8 text-center text-muted-foreground text-sm">
-            Noch keine Felder hinzugefügt. Erstellen Sie ein neues Feld oder
-            wählen Sie vorhandene aus.
-          </p>
         )}
 
-        {/* Display field array errors */}
-        {form.formState.errors.fields?.root && (
-          <p className="text-red-600 text-sm">
-            {form.formState.errors.fields.root.message}
-          </p>
-        )}
-        {form.formState.errors.fields?.message && (
-          <p className="text-red-600 text-sm">
-            {form.formState.errors.fields.message}
-          </p>
-        )}
-      </div>
-
-      {/* Root errors */}
-      {form.formState.errors.root && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-          <p className="text-red-600 text-sm">
-            {form.formState.errors.root.message}
-          </p>
+        {/* Form Actions */}
+        <div className="flex justify-end gap-2 border-t pt-4">
+          <Button onClick={onCancel} type="button" variant="outline">
+            Abbrechen
+          </Button>
+          <Button disabled={form.formState.isSubmitting} type="submit">
+            {form.formState.isSubmitting
+              ? "Wird gespeichert..."
+              : "Schema erstellen"}
+          </Button>
+        </div>
+      </form>
+      {/* NewFieldForm (Task #123) */}
+      {isCreatingField && (
+        <div className="rounded-lg border bg-muted/50 p-4">
+          <NewFieldForm
+            listId={listId}
+            onCancel={() => setIsCreatingField(false)}
+            onSubmit={handleFieldCreated}
+          />
         </div>
       )}
-
-      {/* Form Actions */}
-      <div className="flex justify-end gap-2 border-t pt-4">
-        <Button onClick={onCancel} type="button" variant="outline">
-          Abbrechen
-        </Button>
-        <Button disabled={form.formState.isSubmitting} type="submit">
-          {form.formState.isSubmitting
-            ? "Wird gespeichert..."
-            : "Schema erstellen"}
-        </Button>
-      </div>
-    </form>
+    </>
   );
 }

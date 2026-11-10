@@ -223,7 +223,14 @@ export const NewFieldForm = ({
       return;
     }
 
-    await onSubmit(data);
+    try {
+      await onSubmit(data);
+    } catch {
+      form.setError("root", {
+        message:
+          "Feld konnte nicht gespeichert werden. Bitte erneut versuchen.",
+      });
+    }
   });
 
   // REF MCP #5: Keyboard navigation (Escape to cancel)
@@ -444,6 +451,11 @@ export const NewFieldForm = ({
         )}
       </div>
 
+      {form.formState.errors.root && (
+        <p className="text-red-600" role="alert">
+          {form.formState.errors.root.message}
+        </p>
+      )}
       {/* Action Buttons */}
       <div className="flex items-center gap-2 pt-2">
         <Button

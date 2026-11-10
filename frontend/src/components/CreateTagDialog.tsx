@@ -252,17 +252,6 @@ export const CreateTagDialog = ({
               <p className="mt-1 text-gray-500 text-sm">
                 Verknüpfen Sie benutzerdefinierte Felder mit diesem Tag
               </p>
-
-              {/* Bug #001 Fix: Show SchemaEditor when schemaId === 'new' */}
-              {schemaId === "new" && listId && (
-                <div className="mt-4 rounded-lg border bg-gray-50 p-4">
-                  <SchemaEditor
-                    listId={listId}
-                    onCancel={handleSchemaCancelled}
-                    onSave={handleSchemaCreated}
-                  />
-                </div>
-              )}
             </div>
           </div>
 
@@ -279,6 +268,16 @@ export const CreateTagDialog = ({
             </Button>
           </AlertDialogFooter>
         </form>
+        {/* Bug #001 Fix: Show SchemaEditor when schemaId === 'new' */}
+        {schemaId === "new" && listId && (
+          <div className="mt-4 rounded-lg border bg-gray-50 p-4">
+            <SchemaEditor
+              listId={listId}
+              onCancel={handleSchemaCancelled}
+              onSave={handleSchemaCreated}
+            />
+          </div>
+        )}
       </AlertDialogContent>
     </AlertDialog>
   );
