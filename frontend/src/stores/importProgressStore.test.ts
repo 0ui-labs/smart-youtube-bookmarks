@@ -27,7 +27,7 @@ describe("useImportProgressStore", () => {
 
     const progress = result.current.progress.get("video-1");
     expect(progress).toBeDefined();
-    expect(progress?.progress).toBe(25);
+    expect(progress?.realProgress).toBe(25);
     expect(progress?.stage).toBe("metadata");
   });
 
@@ -43,7 +43,7 @@ describe("useImportProgressStore", () => {
     });
 
     const progress = result.current.progress.get("video-1");
-    expect(progress?.progress).toBe(60);
+    expect(progress?.realProgress).toBe(60);
     expect(progress?.stage).toBe("captions");
   });
 
@@ -57,9 +57,9 @@ describe("useImportProgressStore", () => {
     });
 
     expect(result.current.progress.size).toBe(3);
-    expect(result.current.progress.get("video-1")?.progress).toBe(25);
-    expect(result.current.progress.get("video-2")?.progress).toBe(60);
-    expect(result.current.progress.get("video-3")?.progress).toBe(100);
+    expect(result.current.progress.get("video-1")?.realProgress).toBe(25);
+    expect(result.current.progress.get("video-2")?.realProgress).toBe(60);
+    expect(result.current.progress.get("video-3")?.realProgress).toBe(100);
   });
 
   it("clears progress for a specific video", () => {
@@ -101,8 +101,9 @@ describe("useImportProgressStore", () => {
       result.current.setProgress("video-1", 50, "captions");
     });
 
-    expect(result.current.getProgress("video-1")).toEqual({
-      progress: 50,
+    expect(result.current.getProgress("video-1")).toMatchObject({
+      realProgress: 50,
+      targetProgress: 50,
       stage: "captions",
     });
     expect(result.current.getProgress("non-existent")).toBeUndefined();

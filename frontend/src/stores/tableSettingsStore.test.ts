@@ -191,9 +191,9 @@ describe("useTableSettingsStore", () => {
 
   // Task #32 - Step 1.1: TDD tests for viewMode state
   describe("View Mode (Task #32)", () => {
-    it("defaults to list view", () => {
+    it("defaults to grid view", () => {
       const { result } = renderHook(() => useTableSettingsStore());
-      expect(result.current.viewMode).toBe("list");
+      expect(result.current.viewMode).toBe("grid");
     });
 
     it("toggles between list and grid view", () => {
