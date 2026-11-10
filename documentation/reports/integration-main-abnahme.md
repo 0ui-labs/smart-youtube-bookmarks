@@ -82,4 +82,35 @@ Es werden ausschließlich dedizierte `_test`-Datenbanken und isolierte Redis-Dat
 - Reale Browser-UI, synthetischer Transport: 50 initiale Karten, Scrollen fordert Offset 50 mit Limit 50 an, danach 51 Karten; erste und letzte Karte bleiben sichtbar, keine Seitenknöpfe. Die temporäre Testseite war kein Auth-Bypass der Anwendung und wurde anschließend entfernt; Browser-Tab und Testserver geschlossen.
 - Normale App im echten Browser ohne Clerk-Konfiguration: „Die Anmeldung ist noch nicht konfiguriert.“ Das bestätigt den Blocker für die Nutzbarkeit nach main, keine echte Login-Abnahme.
 
-Nach den Kategorie-Reviewfixes folgen die finalen Suites; keine historischen grünen Läufe als Abschlussnachweis dieser Änderungen verwenden.
+## Abschließende lokale Prüfungen nach den Reviewfixes
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Vollständige Frontendsuite | 1.322 bestanden, 123 Dateien, 143,21 s. Nach reinem Test-Lintcleanup nochmals die 5 Scrollregressionen erfolgreich. |
+| Produktionsbuild | Erfolgreich; vorhandene Bundle-Größenwarnung bleibt. |
+| Biome | Keine Fehler, 169 Warnungen wie vor Integration. Keine Regeln abgeschwächt. |
+| Vollständige Backendsuite | 1.003 bestanden, 10 vorhandene Skips, 206,52 s; keine neuen Skips. |
+| Ruff | Alle Prüfungen erfolgreich; Hinweis auf bereits entfernte Regel UP038, kein neuer Ausschluss. |
+| mypy | 125 Quelldateien ohne Fehler, weiterhin strict. |
+| API-Drift | 249 generierte Dateien entsprechen dem eigenen laufenden Backend. |
+| Migration / Worker | Neue Testdatenbank mit kompletter Kette und synthetischem Bestand erfolgreich; explizit darauf gestarteter ARQ-Burst erfolgreich. |
+| Ursprungsworktree | 603 von 603 gesicherten Dateien weiterhin bytegleich, keine Abweichung. |
+| Eigenständiger Review | Kein neuer wichtiger Integrationsfehler; drei historische Kategoriefehler bestätigt und mit Regressionen behoben. Keine vollständige Zeilenprüfung aller generierten Dateien behauptet. |
+
+Geprüfte Produktbasis nach Kategorie-Fix: `35df76c`; `079ffd2` enthält anschließend ausschließlich Test-Lintcleanup. Bericht und spätere GitHub-Zuordnung ändern keinen Produktcode.
+
+Der Gesamtdiff enthält Orval-generierten Trailing Whitespace (137 Diagnosezeilen bei `git diff --check main...HEAD`). Nicht manuell editiert, damit der nachgewiesene deterministische Generatorvertrag erhalten bleibt. Eigenständige handgeschriebene Änderungen haben keinen Whitespacefehler. Bestehende Dependency-/Bundle-/Lintwarnungen bleiben im Stabilisierungsbericht bewertet.
+
+## PR- und main-Status
+
+- PR #2 geschlossen, weil sein kompletter Head nachweislich bereits in `origin/main` enthalten ist; kein erneuter Merge und kein Datenverlust.
+- PR #8 bleibt offen, bis die Integration wirklich in main enthalten ist. Keine Zusammenführung gegen den alten Feature-Zielbranch.
+- Ein neuer Draft-Integrations-PR wird ausdrücklich gegen `main` erstellt. Die gehostete CI wird diesem konkreten Head zugeordnet; lokales Grün ersetzt sie nicht.
+- **Noch nicht nach main gemerged:** Echte Clerk-Konfiguration und A/B-Login-Abnahme fehlen; beide privaten Konfigurationsanfragen liefen ohne Eingabe ab. Die normale Oberfläche ist damit bewusst gesperrt. Der Plan verbietet eine Freigabe dieses im Alltag unbenutzbaren Standes ohne Klärung der Anmeldung. Keine Tokens erfunden, keine Auth-Ausnahme eingebaut und keine bestehenden Daten automatisch übertragen.
+- Reale durchgehende Provider-/Browserreise und die Wirkung auf die Audiospur eines bestimmten mehrsprachigen Videos bleiben ausdrücklich offen. Die nachgewiesene Playerkorrektur entfernt nur die feste englische Embed-/Untertitelvorgabe.
+
+## Getroffene Entscheidungen und verbleibende Kleinigkeiten
+
+Nutzerentscheidung: bisherige zusammenhängende Bedienung erhalten; Backend-Limits bleiben erhalten. Historische Restore-Verträge wurden repariert, ohne eine neue Backup-Auswahloberfläche einzuführen. Abbrüche werden am tatsächlichen Query-/Axios-Signal geprüft; die MSW-XHR-Darstellung ersetzt keinen echten Browsernachweis.
+
+Zurückgestellt: Generator-Whitespace, bestehende Warnungen/Dependency-Risiken, Store-/Bundle-Performancefolgearbeit und automatische Backup-Erkennung im Kategorie-Dialog. Keine dieser Positionen wird als fertig dargestellt.
