@@ -20,6 +20,6 @@ def validated_test_database_url(target: str | None, application_url: str) -> str
     def identity(url):
         return (url.host or "localhost", url.port or 5432, url.database)
 
-    if identity(test) == identity(application):
+    if test.database == application.database or identity(test) == identity(application):
         raise ValueError("Test database must differ from the application database")
     return target

@@ -28,3 +28,10 @@ def test_rejects_same_database_with_different_credentials():
 def test_accepts_explicit_isolated_postgres_database():
     target = "postgresql+asyncpg://test:secret@localhost:55438/bookmarks_test"
     assert validated_test_database_url(target, APP) == target
+
+
+def test_rejects_application_database_under_a_host_alias():
+    app = "postgresql+asyncpg://app:secret@localhost:5432/bookmarks_test"
+    target = "postgresql+asyncpg://test:secret@127.0.0.1:5432/bookmarks_test"
+    with pytest.raises(ValueError):
+        validated_test_database_url(target, app)
