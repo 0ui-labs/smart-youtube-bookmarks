@@ -5,26 +5,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { DropZoneOverlay } from "@/components/DropZoneOverlay";
 import { ImportPreviewModal } from "@/components/ImportPreviewModal";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import { FilterBar } from "@/components/videos/FilterBar";
-import { FilterSettingsModal } from "@/components/videos/FilterSettingsModal";
 import { FEATURE_FLAGS } from "@/config/featureFlags";
 import { useChannels } from "@/hooks/useChannels";
 import { useTags } from "@/hooks/useTags";
-import {
-  type ParsedDropData,
-  useVideoDropZone,
-} from "@/hooks/useVideoDropZone";
+import { useVideoDropZone } from "@/hooks/useVideoDropZone";
 import {
   exportVideosCSV,
-  useAssignTags,
-  useBulkUploadVideos,
   useCreateVideo,
   useDeleteVideo,
   useVideos,
@@ -33,89 +19,22 @@ import { useVideosFilter } from "@/hooks/useVideosFilter";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { buildVideoSelection } from "@/hooks/videos/selection";
 import { useVideoFieldMutation } from "@/hooks/videos/useVideoFieldMutation";
+import { useVideoImportController } from "@/hooks/videos/useVideoImportController";
 import { useVideoImportPolling } from "@/hooks/videos/useVideoImportPolling";
 import { useVideoPageState } from "@/hooks/videos/useVideoPageState";
 import { useFieldFilterStore } from "@/stores/fieldFilterStore";
-import { useImportDropStore } from "@/stores/importDropStore";
 import { useTableSettingsStore } from "@/stores/tableSettingsStore";
 import { useTagStore } from "@/stores/tagStore";
 import type { VideoResponse } from "@/types/video";
-import { createCSVFromUrls, parseUrlsFromText } from "@/utils/urlParser";
+import { parseUrlsFromText } from "@/utils/urlParser";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { CSVUpload } from "./CSVUpload";
-import { TableSettingsDropdown } from "./TableSettingsDropdown";
 import { VideoDetailsModal } from "./VideoDetailsModal";
 import { VideoGrid } from "./VideoGrid";
-import { ViewModeToggle } from "./ViewModeToggle";
+import { VideoFilterControls } from "./videos/VideoFilterControls";
 import { VideoPagination } from "./videos/VideoPagination";
+import { VideoRecoveryStatus } from "./videos/VideoRecoveryStatus";
 import { VideoTable } from "./videos/VideoTable";
-
-// Tag Carousel Component with conditional arrow display
-const TagCarousel = () => {
-  const dummyTags = [
-    "Python",
-    "JavaScript",
-    "React",
-    "Machine Learning",
-    "Web Development",
-    "Tutorial",
-    "Backend",
-    "Database",
-    "API",
-    "DevOps",
-    "Security",
-    "Testing",
-  ];
-  const [api, setApi] = React.useState<any>();
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false);
-  const [canScrollNext, setCanScrollNext] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!api) return;
-
-    const updateScrollState = () => {
-      setCanScrollPrev(api.canScrollPrev());
-      setCanScrollNext(api.canScrollNext());
-    };
-
-    updateScrollState();
-    api.on("select", updateScrollState);
-    api.on("reInit", updateScrollState);
-
-    return () => {
-      api.off("select", updateScrollState);
-    };
-  }, [api]);
-
-  return (
-    <Carousel
-      className="w-full max-w-[calc(100vw-400px)]"
-      opts={{
-        align: "start",
-        slidesToScroll: 3,
-      }}
-      setApi={setApi}
-    >
-      <div className="flex items-center gap-2">
-        {canScrollPrev && (
-          <CarouselPrevious className="static h-8 w-8 flex-shrink-0 translate-y-0" />
-        )}
-        <CarouselContent className="-ml-2">
-          {dummyTags.map((tag) => (
-            <CarouselItem className="basis-auto pl-2" key={tag}>
-              <button className="whitespace-nowrap rounded-full bg-secondary px-3 py-1.5 text-secondary-foreground text-sm transition-colors hover:bg-accent">
-                {tag}
-              </button>
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-        {canScrollNext && (
-          <CarouselNext className="static h-8 w-8 flex-shrink-0 translate-y-0" />
-        )}
-      </div>
-    </Carousel>
-  );
-};
 
 // YouTube URL validation regex
 const YOUTUBE_URL_PATTERN =
@@ -152,15 +71,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   }>({
     open: false,
     video: null,
-  });
-
-  // Drag & Drop Import state (Steps 19-23)
-  const [importPreviewModal, setImportPreviewModal] = useState<{
-    open: boolean;
-    urls: string[];
-  }>({
-    open: false,
-    urls: [],
   });
 
   // Polling state for real-time updates after import
@@ -228,7 +138,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     [selectedTags]
   );
 
-  // TASK 4: Parse sort parameters from URL query params
   const sortBy = searchParams.get("sort_by") || undefined;
   const sortOrderParam = searchParams.get("sort_order");
   const sortOrder: "asc" | "desc" = sortOrderParam === "desc" ? "desc" : "asc";
@@ -312,8 +221,15 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       setPage(Math.max(0, Math.ceil(serverTotal / pageSize) - 1));
   }, [serverTotal, page, setPage]);
   const createVideo = useCreateVideo(listId);
-  const assignTags = useAssignTags();
-  const bulkUpload = useBulkUploadVideos(listId);
+  const {
+    importPreviewModal,
+    setImportPreviewModal,
+    handleVideosDetected,
+    handleImportConfirm,
+    assignTags,
+    pendingImport,
+    clearPendingImport,
+  } = useVideoImportController(listId, setPendingVideoIds);
 
   // Get existing video IDs for duplicate detection in import preview
   const existingVideoIds = useMemo(
@@ -322,65 +238,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     [videos]
   );
 
-  // Drag & Drop handler: called when videos are detected
-  const handleVideosDetected = useCallback((data: ParsedDropData) => {
-    if (data.urls.length === 0) {
-      return;
-    }
-
-    // Open import preview modal with detected URLs
-    setImportPreviewModal({
-      open: true,
-      urls: data.urls,
-    });
-  }, []);
-
-  // Drag & Drop handler: called when import is confirmed
-  const handleImportConfirm = useCallback(
-    async (urls: string[], categoryId?: string) => {
-      try {
-        // Close modal first
-        setImportPreviewModal({ open: false, urls: [] });
-
-        if (urls.length === 0) {
-          return;
-        }
-
-        // Create CSV blob from URLs
-        const csvBlob = createCSVFromUrls(urls);
-        const csvFile = new File([csvBlob], "import.csv", { type: "text/csv" });
-
-        // Upload via bulk upload API
-        const result = await bulkUpload.mutateAsync(csvFile);
-
-        // Start polling for real-time updates after successful import
-        if (result.created_video_ids.length > 0) {
-          console.log(
-            "[Import] Starting polling for",
-            result.created_video_ids.length,
-            "videos:",
-            result.created_video_ids
-          );
-          setPendingVideoIds(result.created_video_ids);
-        }
-
-        // If category was selected, assign it to all imported videos
-        if (categoryId && result.created_video_ids.length > 0) {
-          await Promise.all(
-            result.created_video_ids.map((videoId) =>
-              assignTags.mutateAsync({ videoId, tagIds: [categoryId] })
-            )
-          );
-        }
-      } catch (error) {
-        console.error("Failed to import videos:", error);
-        // TODO: Add toast notification for error
-      }
-    },
-    [bulkUpload, assignTags]
-  );
-
-  // Mobile detection: Disable drag-drop on touch devices (Step 29)
   const isTouchDevice = useMemo(() => {
     if (typeof window === "undefined") return false;
     return "ontouchstart" in window || navigator.maxTouchPoints > 0;
@@ -393,32 +250,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     disabled: dropZoneDisabled,
   });
 
-  // Listen for pending imports from TagNavigation drops
-  const pendingImport = useImportDropStore((state) => state.pendingImport);
-  const clearPendingImport = useImportDropStore(
-    (state) => state.clearPendingImport
-  );
-
-  // Handle pending imports from TagNavigation drops
-  useEffect(() => {
-    if (pendingImport) {
-      // If category was preselected (dropped on a tag), auto-import without modal
-      if (pendingImport.preselectedCategoryId) {
-        handleImportConfirm(
-          pendingImport.urls,
-          pendingImport.preselectedCategoryId
-        );
-        clearPendingImport();
-      } else {
-        // No category preselected - show modal for selection
-        setImportPreviewModal({
-          open: true,
-          urls: pendingImport.urls,
-        });
-      }
-    }
-  }, [pendingImport, handleImportConfirm, clearPendingImport]);
-
   // WebSocket for bulk upload progress and import progress tracking
   // Provides real-time updates for video enrichment stages (created → metadata → captions → chapters → complete)
   const { jobProgress, reconnecting, historyError, retryHistory } =
@@ -426,7 +257,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   const deleteVideo = useDeleteVideo(listId);
 
-  // TASK 4: Handlers to update sort state in URL
   const handleSortChange = useCallback(
     (newSortBy: string, newSortOrder: "asc" | "desc") => {
       const params = new URLSearchParams(searchParams);
@@ -827,102 +657,19 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         </button>
       )}
 
-      {/* Filter and View Controls Bar - Hidden on mobile */}
-      <div className="mb-6 hidden items-center gap-4 md:flex">
-        {/* Left side - Tag filters with carousel */}
-        <div className="min-w-0 flex-1">
-          <TagCarousel />
-        </div>
+      <VideoFilterControls
+        listId={listId}
+        selectedTagIds={selectedTagIds}
+        setViewMode={setViewMode}
+        viewMode={viewMode}
+      />
 
-        {/* Right side - View controls */}
-        <div className="ml-auto flex flex-shrink-0 items-center gap-1">
-          {/* Filter Settings Modal - Field-based filters */}
-          <FilterSettingsModal
-            listId={listId}
-            selectedTagIds={selectedTagIds}
-          />
-          {/* View Mode Toggle - Task #32 */}
-          <ViewModeToggle onToggle={setViewMode} viewMode={viewMode} />
-          {/* Table Settings Dropdown - Task #35 */}
-          <TableSettingsDropdown />
-        </div>
-      </div>
-
-      {/* Field-Based Filter Bar - Task #145 */}
-      <FilterBar listId={listId} />
-
-      {/* WebSocket Connection Status Banner - Only show when jobs are active */}
-      {reconnecting && jobProgress.size > 0 && (
-        <div className="mb-6 rounded-lg border-yellow-400 border-l-4 bg-yellow-50 p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5 animate-spin text-yellow-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  fill="currentColor"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="font-medium text-sm text-yellow-800">
-                Verbindung zu Fortschritts-Updates wird wiederhergestellt...
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* History Error Display */}
-      {historyError && (
-        <div
-          className="mb-6 rounded-lg border-red-400 border-l-4 bg-red-50 p-4"
-          role="alert"
-        >
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5 text-red-400"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  clipRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  fillRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="font-medium text-red-800 text-sm">
-                Fehler beim Laden der Verlaufshistorie
-              </h3>
-              <p className="mt-1 text-red-700 text-sm">{historyError}</p>
-              <button onClick={() => void retryHistory()} type="button">
-                Erneut versuchen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Job-level progress removed - individual video progress is shown on thumbnails */}
+      <VideoRecoveryStatus
+        hasActiveJobs={jobProgress.size > 0}
+        historyError={historyError}
+        reconnecting={reconnecting}
+        retryHistory={retryHistory}
+      />
 
       {isUploadingCSV && (
         <CSVUpload
@@ -1003,7 +750,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
           </p>
         </div>
       ) : viewMode === "grid" ? (
-        // Grid View - Task #32, Task #35 (gridColumns), Task #130 (navigation)
         <VideoGrid
           gridColumns={gridColumns}
           onDeleteVideo={handleGridDeleteClick}
@@ -1082,5 +828,4 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
   );
 };
 
-// Export VideoThumbnail for reuse in VideoCard (Task #32)
 export { VideoThumbnail } from "./videos/VideoThumbnail";
