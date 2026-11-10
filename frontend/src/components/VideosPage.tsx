@@ -45,6 +45,7 @@ import {
 } from "@/hooks/useVideos";
 import { useVideosFilter } from "@/hooks/useVideosFilter";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useVideoImportPolling } from "@/hooks/videos/useVideoImportPolling";
 import { useVideoPageState } from "@/hooks/videos/useVideoPageState";
 import { api } from "@/lib/api";
 import { useFieldFilterStore } from "@/stores/fieldFilterStore";
@@ -190,8 +191,18 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
   // Polling state for real-time updates after import
   // When true, refetch videos frequently until all are processed
-  const [isPolling, setIsPolling] = useState(false);
   const [pendingVideoIds, setPendingVideoIds] = useState<string[]>([]);
+  const isPolling = pendingVideoIds.length > 0;
+  const importPolling = useVideoImportPolling(
+    listId,
+    pendingVideoIds,
+    (finished) => {
+      if (finished.length)
+        setPendingVideoIds((current) =>
+          current.filter((id) => !finished.includes(id))
+        );
+    }
+  );
   const POLLING_INTERVAL = 500; // 500ms for snappy updates
 
   // Mobile detection for responsive behavior
@@ -406,56 +417,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
     [videos]
   );
 
-  // Stop polling when all PENDING videos have been fully processed (import_stage = complete/error)
-  // This provides real-time UI updates after import without manual refresh
-  useEffect(() => {
-    console.log(
-      "[Polling] isPolling:",
-      isPolling,
-      "pendingVideoIds:",
-      pendingVideoIds.length,
-      "videos.length:",
-      videos.length
-    );
-    if (!isPolling || pendingVideoIds.length === 0) return;
-
-    // Find the pending videos in the current videos list
-    const pendingVideos = videos.filter((video) =>
-      pendingVideoIds.includes(video.id)
-    );
-    console.log(
-      "[Polling] Found pending videos:",
-      pendingVideos.length,
-      "of",
-      pendingVideoIds.length
-    );
-
-    // Check if all pending videos have finished import (complete or error)
-    // Videos are "still processing" if import_stage is NOT 'complete' or 'error'
-    // Note: Type assertion needed because import_stage may not be in all response types
-    const stillProcessing = pendingVideos.filter((video) => {
-      const stage = (video as VideoResponse).import_stage || "created";
-      return stage !== "complete" && stage !== "error";
-    });
-    console.log(
-      "[Polling] Still processing:",
-      stillProcessing.length,
-      stillProcessing.map(
-        (v) => `${v.youtube_id}:${(v as VideoResponse).import_stage}`
-      )
-    );
-
-    // Only stop polling when we found all pending videos AND they're all done
-    if (
-      pendingVideos.length === pendingVideoIds.length &&
-      stillProcessing.length === 0
-    ) {
-      console.log("[Polling] All pending videos processed, stopping polling");
-      setIsPolling(false);
-      setPendingVideoIds([]);
-    }
-  }, [isPolling, pendingVideoIds, videos]);
-
   // Drag & Drop handler: called when videos are detected
   const handleVideosDetected = useCallback((data: ParsedDropData) => {
     if (data.urls.length === 0) {
@@ -496,7 +457,6 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
             result.created_video_ids
           );
           setPendingVideoIds(result.created_video_ids);
-          setIsPolling(true);
         }
 
         // If category was selected, assign it to all imported videos
@@ -947,6 +907,9 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
 
     deleteVideo.mutate(deleteModal.videoId, {
       onSuccess: () => {
+        setPendingVideoIds((current) =>
+          current.filter((id) => id !== deleteModal.videoId)
+        );
         // Close modal after successful delete
         setDeleteModal({ open: false, videoId: null, videoTitle: null });
       },
@@ -1428,6 +1391,14 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
         </div>
       )}
 
+      {importPolling.error && (
+        <div role="alert">
+          {importPolling.error}
+          <button onClick={importPolling.retry} type="button">
+            Erneut prüfen
+          </button>
+        </div>
+      )}
       <VideoPagination
         onPage={setPage}
         page={page}
@@ -1463,6 +1434,7 @@ export const VideosPage = ({ listId }: VideosPageProps) => {
       {/* Import Preview Modal (Drag & Drop Import feature) */}
       <ImportPreviewModal
         existingVideoIds={existingVideoIds}
+        listId={listId}
         onImport={handleImportConfirm}
         onOpenChange={(open) => {
           if (!open) {

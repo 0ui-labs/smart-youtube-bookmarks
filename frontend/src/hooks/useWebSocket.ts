@@ -1,9 +1,11 @@
+import { QueryClientContext } from "@tanstack/react-query";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import useWebSocketLib, { ReadyState } from "react-use-websocket";
 import { api } from "@/lib/api";
 import { ProgressContext } from "@/lib/progressContext";
 import { authorizedFetch } from "@/lib/sessionTransport";
 import { useImportProgressStore } from "@/stores/importProgressStore";
+import { invalidateVideoViews } from "./videos/cache";
 
 /**
  * Progress update data structure received from WebSocket
@@ -84,6 +86,7 @@ export function useWebSocket(): UseWebSocketReturn {
 }
 
 export function useProgressConnection(enabled = true): UseWebSocketReturn {
+  const queryClient = useContext(QueryClientContext);
   const [jobProgress, setJobProgress] = useState<Map<string, ProgressUpdate>>(
     new Map()
   );
@@ -204,6 +207,8 @@ export function useProgressConnection(enabled = true): UseWebSocketReturn {
     if (data.type === "import_progress") {
       const { video_id, progress, stage } = data;
       useImportProgressStore.getState().setProgress(video_id, progress, stage);
+      if (queryClient && ["complete", "error"].includes(stage))
+        void invalidateVideoViews(queryClient);
       return;
     }
 
@@ -222,6 +227,11 @@ export function useProgressConnection(enabled = true): UseWebSocketReturn {
     )
       return;
     const update: ProgressUpdate = normalizeProgress(data);
+    if (
+      queryClient &&
+      ["completed", "completed_with_errors", "failed"].includes(update.status)
+    )
+      void invalidateVideoViews(queryClient);
 
     // Add timestamp for cleanup logic
     update.timestamp = Date.now();

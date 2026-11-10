@@ -21,6 +21,10 @@ from app.models.video_field_value import VideoFieldValue
 from app.schemas.video import (
     AvailableFieldResponse,
     VideoFilterRequest,
+    VideoImportStatusRequest,
+    VideoImportStatusResponse,
+    VideoLookupRequest,
+    VideoLookupResponse,
     VideoPageResponse,
     VideoResponse,
 )
@@ -284,3 +288,44 @@ async def get_filtered_video_page(
     db: AsyncSession = Depends(get_db),
 ):
     return await query_video_page(db, list_id, filters, offset, limit)
+
+
+@router.post("/lists/{list_id}/videos/lookup", response_model=VideoLookupResponse)
+async def lookup_video_imports(
+    list_id: UUID, request: VideoLookupRequest, db: AsyncSession = Depends(get_db)
+):
+    existing = (
+        (
+            await db.execute(
+                select(Video.youtube_id).where(
+                    Video.list_id == list_id, Video.youtube_id.in_(request.youtube_ids)
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return {"existing_youtube_ids": list(existing)}
+
+
+@router.post(
+    "/lists/{list_id}/videos/import-status",
+    response_model=list[VideoImportStatusResponse],
+)
+async def get_video_import_status(
+    list_id: UUID, request: VideoImportStatusRequest, db: AsyncSession = Depends(get_db)
+):
+    videos = (
+        (
+            await db.execute(
+                select(Video).where(
+                    Video.list_id == list_id, Video.id.in_(request.video_ids)
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if len(videos) != len(set(request.video_ids)):
+        raise HTTPException(status_code=404, detail="Resource not found")
+    return videos

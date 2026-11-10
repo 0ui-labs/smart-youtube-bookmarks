@@ -53,7 +53,15 @@ export const useVideos = (
     refetchOnMount: true,
     refetchOnReconnect: false,
     staleTime: refetchInterval ? 0 : 5 * 60 * 1000,
-    refetchInterval,
+    refetchInterval: (query) =>
+      refetchInterval ??
+      (query.state.data?.items.some(
+        (video) =>
+          video.import_stage &&
+          !["complete", "error"].includes(video.import_stage)
+      )
+        ? 2000
+        : false),
     refetchIntervalInBackground,
   });
   return { ...query, data: query.data?.items, total: query.data?.total };

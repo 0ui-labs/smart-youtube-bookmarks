@@ -419,3 +419,23 @@ class VideoPageResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+class VideoLookupRequest(BaseModel):
+    youtube_ids: list[str] = Field(..., min_length=1, max_length=100)
+
+
+class VideoLookupResponse(BaseModel):
+    existing_youtube_ids: list[str]
+
+
+class VideoImportStatusRequest(BaseModel):
+    video_ids: list[UUID] = Field(..., min_length=1, max_length=100)
+
+
+class VideoImportStatusResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    import_stage: str
+    import_progress: int
+    processing_status: str

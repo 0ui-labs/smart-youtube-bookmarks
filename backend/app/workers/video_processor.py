@@ -413,6 +413,7 @@ async def process_video(
         # ARQ will rollback the session on exception, so flush() alone would be undone.
         if video:
             video.processing_status = "failed"
+            video.import_stage = "error"
             video.error_message = str(e)
             await db.commit()
 

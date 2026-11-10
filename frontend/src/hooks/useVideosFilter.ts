@@ -243,7 +243,15 @@ export function useVideosFilter({
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     refetchOnReconnect: false,
-    refetchInterval, // Polling for real-time updates (undefined = disabled)
+    refetchInterval: (query) =>
+      refetchInterval ??
+      (query.state.data?.items.some(
+        (video) =>
+          video.import_stage &&
+          !["complete", "error"].includes(video.import_stage)
+      )
+        ? 2000
+        : false),
   });
   return { ...query, data: query.data?.items, total: query.data?.total };
 }

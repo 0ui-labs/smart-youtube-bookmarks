@@ -78,6 +78,20 @@ export const videosHandlers = [
     return HttpResponse.json([]);
   }),
 
+  http.post("/api/lists/:listId/videos/lookup", () =>
+    HttpResponse.json({ existing_youtube_ids: [] })
+  ),
+  http.post("/api/lists/:listId/videos/import-status", async ({ request }) => {
+    const body = (await request.json()) as { video_ids: string[] };
+    return HttpResponse.json(
+      body.video_ids.map((id) => ({
+        id,
+        import_stage: "complete",
+        import_progress: 100,
+        processing_status: "completed",
+      }))
+    );
+  }),
   http.get("/api/lists/:listId/videos/page", ({ request }) => {
     const url = new URL(request.url);
     return HttpResponse.json({

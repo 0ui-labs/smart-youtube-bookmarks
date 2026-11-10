@@ -158,6 +158,7 @@ async def validate_request_references(request: Request, db: AsyncSession) -> Non
             and identity.startswith("field:")
         ):
             references.append(("field_id", identity.removeprefix("field:")))
+    grouped: dict[Any, set[UUID]] = {}
     for name, identity in references:
         model = REFERENCE_MODELS.get(name)
         if model is None or identity is None:
@@ -179,7 +180,12 @@ async def validate_request_references(request: Request, db: AsyncSession) -> Non
             and request.method == "POST"
         ):
             model = Schema
-        if (
-            await db.execute(select(model.id).where(model.id == parsed))
-        ).scalar_one_or_none() is None:
+        grouped.setdefault(model, set()).add(parsed)
+    for model, identities in grouped.items():
+        found = set(
+            (await db.execute(select(model.id).where(model.id.in_(identities))))
+            .scalars()
+            .all()
+        )
+        if found != identities:
             raise HTTPException(status_code=404, detail="Resource not found")
