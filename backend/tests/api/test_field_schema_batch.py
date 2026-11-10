@@ -328,7 +328,7 @@ async def test_batch_update_invalid_field_id_error(
     )
 
     assert batch_response.status_code == 404
-    assert "field_ids not found" in batch_response.json()["detail"].lower()
+    assert batch_response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -383,7 +383,7 @@ async def test_batch_update_schema_not_found_error(
     )
 
     assert batch_response.status_code == 404
-    assert "schema not found" in batch_response.json()["detail"].lower()
+    assert batch_response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -418,8 +418,13 @@ async def test_batch_update_batch_size_limit_50(
     schema_id = schema_response.json()["id"]
 
     # Try batch update with 51 items (should fail)
+    field = await client.post(
+        f"/api/lists/{test_list.id}/custom-fields",
+        json={"name": "Size field", "field_type": "text", "config": {}},
+    )
+    assert field.status_code == 201
     fake_fields = [
-        {"field_id": str(uuid4()), "display_order": i, "show_on_card": False}
+        {"field_id": field.json()["id"], "display_order": i, "show_on_card": False}
         for i in range(51)
     ]
 

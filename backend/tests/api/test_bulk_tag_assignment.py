@@ -105,7 +105,7 @@ async def test_bulk_assign_nonexistent_video(
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "Some videos not found"
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -124,7 +124,7 @@ async def test_bulk_assign_nonexistent_tag(
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "Some tags not found"
+    assert response.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
@@ -148,12 +148,12 @@ async def test_bulk_assign_batch_too_large(
     client: AsyncClient, test_user, test_list, test_video
 ):
     """Test bulk assign rejects batches larger than 10,000 assignments."""
-    import uuid
-
-    # Create 101 fake video IDs and 101 fake tag IDs
-    # 101 × 101 = 10,201 assignments (exceeds limit)
-    fake_video_ids = [str(uuid.uuid4()) for _ in range(101)]
-    fake_tag_ids = [str(uuid.uuid4()) for _ in range(101)]
+    # Existing identities keep ownership validation independent of size validation.
+    tag = await client.post(
+        "/api/tags", json={"name": "Size test", "is_video_type": False}
+    )
+    fake_video_ids = [str(test_video.id)] * 101
+    fake_tag_ids = [tag.json()["id"]] * 101
 
     response = await client.post(
         "/api/videos/bulk/tags",

@@ -186,7 +186,6 @@ async def test_progress_with_database_write_errors(
     Scenario: DB write fails (constraint violation, network error)
     Expected: Worker completes job, Redis events still published (best-effort)
     """
-    from app.workers.video_processor import process_video_list
 
     # Arrange: Create test list
     bookmark_list = BookmarkList(name="DB Failure Test", user_id=test_user.id)
@@ -223,25 +222,24 @@ async def test_progress_with_database_write_errors(
 
     test_db.add = failing_add
 
+    from app.models.job_outbox import JobOutbox
+    from app.services.job_progress_service import advance_job_progress
+
     try:
-        # Act: Process videos (should continue despite DB failures)
-        ctx = {"redis": mock_redis, "db": arq_context["db"]}
-        result = await process_video_list(
-            ctx, str(job_id), str(list_id), video_ids, schema={}
-        )
-
-        # Assert: Processing completed
-        assert result["processed"] == 3, (
-            "Worker should process all videos despite DB write failures"
-        )
-
-        # Assert: Redis publish was still called (best-effort)
-        assert mock_redis.publish.called, (
-            "Redis publish should still be attempted when DB fails"
-        )
-
+        await advance_job_progress(test_db, job_id, True)
+        with pytest.raises(Exception, match="Database write failed"):
+            await advance_job_progress(test_db, job_id, True)
+        await test_db.rollback()
+        await test_db.refresh(job)
+        assert job.processed_count == 0
+        assert (
+            await test_db.scalars(
+                select(JobProgressEvent).where(JobProgressEvent.job_id == job_id)
+            )
+        ).all() == []
+        assert (await test_db.scalars(select(JobOutbox))).all() == []
+        mock_redis.publish.assert_not_called()
     finally:
-        # Restore original add method
         test_db.add = original_add
 
 

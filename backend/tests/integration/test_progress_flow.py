@@ -418,19 +418,9 @@ async def test_unauthorized_access_to_progress_history(
         f"/api/jobs/{job_a_id}/progress-history", params={"user_id": str(user_b.id)}
     )
 
-    # Assert: Should return 403 Forbidden
-    assert response_unauthorized.status_code == 403, (
-        f"Expected 403 Forbidden, got {response_unauthorized.status_code}"
-    )
-
-    # Assert: Error message should indicate authorization failure
-    error_detail = response_unauthorized.json()
-    assert "detail" in error_detail, "Response should contain error detail"
-    assert (
-        "not authorized" in error_detail["detail"].lower()
-        or "forbidden" in error_detail["detail"].lower()
-        or "access denied" in error_detail["detail"].lower()
-    ), f"Error message should indicate authorization failure: {error_detail['detail']}"
+    # Hide foreign-resource existence using the same contract as all protected routes.
+    assert response_unauthorized.status_code == 404
+    assert response_unauthorized.json()["detail"] == "Resource not found"
 
 
 @pytest.mark.asyncio
