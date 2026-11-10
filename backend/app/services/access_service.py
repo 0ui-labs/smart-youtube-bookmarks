@@ -49,41 +49,41 @@ def ownership_policies(user_id: UUID) -> list[tuple[Any, Any]]:
         select(Subscription.id).where(Subscription.user_id == user_id).correlate(None)
     )
     return [
-        (User, User.id == user_id),
-        (BookmarkList, BookmarkList.user_id == user_id),
-        (Tag, Tag.user_id == user_id),
-        (Channel, Channel.user_id == user_id),
+        (User, lambda cls: cls.id == user_id),
+        (BookmarkList, lambda cls: cls.user_id == user_id),
+        (Tag, lambda cls: cls.user_id == user_id),
+        (Channel, lambda cls: cls.user_id == user_id),
         (
             Subscription,
-            and_(Subscription.user_id == user_id, Subscription.list_id.in_(lists)),
+            lambda cls: and_(cls.user_id == user_id, cls.list_id.in_(lists)),
         ),
-        (Video, Video.list_id.in_(lists)),
-        (CustomField, CustomField.list_id.in_(lists)),
-        (FieldSchema, FieldSchema.list_id.in_(lists)),
-        (ProcessingJob, ProcessingJob.list_id.in_(lists)),
-        (VideoEnrichment, VideoEnrichment.video_id.in_(videos)),
+        (Video, lambda cls: cls.list_id.in_(lists)),
+        (CustomField, lambda cls: cls.list_id.in_(lists)),
+        (FieldSchema, lambda cls: cls.list_id.in_(lists)),
+        (ProcessingJob, lambda cls: cls.list_id.in_(lists)),
+        (VideoEnrichment, lambda cls: cls.video_id.in_(videos)),
         (
             VideoFieldValue,
-            and_(
-                VideoFieldValue.video_id.in_(videos),
-                VideoFieldValue.field_id.in_(fields),
+            lambda cls: and_(
+                cls.video_id.in_(videos),
+                cls.field_id.in_(fields),
             ),
         ),
         (
             SchemaField,
-            and_(SchemaField.schema_id.in_(schemas), SchemaField.field_id.in_(fields)),
+            lambda cls: and_(cls.schema_id.in_(schemas), cls.field_id.in_(fields)),
         ),
-        (JobProgressEvent, JobProgressEvent.job_id.in_(jobs)),
+        (JobProgressEvent, lambda cls: cls.job_id.in_(jobs)),
         (
             SubscriptionMatch,
-            and_(
-                SubscriptionMatch.subscription_id.in_(subscriptions),
-                SubscriptionMatch.video_id.in_(videos),
+            lambda cls: and_(
+                cls.subscription_id.in_(subscriptions),
+                cls.video_id.in_(videos),
             ),
         ),
         (
             Schema,
-            Schema.id.in_(
+            lambda cls: cls.id.in_(
                 select(BookmarkList.schema_id)
                 .where(BookmarkList.user_id == user_id)
                 .correlate(None)

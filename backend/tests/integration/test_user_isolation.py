@@ -84,7 +84,7 @@ async def test_every_business_route_rejects_anonymous_requests(isolated_api):
     for route in app.routes:
         if (
             not isinstance(route, APIRoute)
-            or route.path == "/api/health"
+            or route.path in {"/api/health", "/api/ready"}
             or route.path.startswith("/api/webhooks/")
         ):
             continue
