@@ -139,9 +139,11 @@ it("retains earlier cards and removes a deleted final record", async () => {
   await screen.findByText("Video 0");
   act(() => reachEnd());
   await screen.findByText("Video 50");
-  await userEvent.click(
-    screen.getAllByRole("button", { name: "Aktionen" }).at(-1)!
-  );
+  const finalAction = screen
+    .getAllByRole("button", { name: "Aktionen" })
+    .at(-1);
+  if (!finalAction) throw new Error("Missing final video actions");
+  await userEvent.click(finalAction);
   await userEvent.click(screen.getByRole("menuitem", { name: /Löschen/ }));
   const dialog = screen.getByRole("alertdialog");
   await userEvent.click(
