@@ -722,3 +722,24 @@ pip install ruff pre-commit
 ```
 
 Then create config files as documented above.
+
+## Isolierte Stabilisierungsprüfungen
+
+Node 22.22.3 (`.nvmrc`), npm 10 und Python 3.11 verwenden. Das Root-`package-lock.json`
+verwaltet den npm-Workspace; `npm ci` im Projektroot ausführen.
+
+```bash
+uv venv --python 3.11 backend/.venv
+uv pip install --python backend/.venv/bin/python -r backend/requirements.txt
+docker compose -p syb-stabilization-test -f docker-compose.test.yml up -d --wait
+cd backend
+export TEST_DATABASE_URL=postgresql+asyncpg://test:test@localhost:55438/bookmarks_test
+export REDIS_URL=redis://localhost:56388
+.venv/bin/python -m pytest -q
+```
+
+Die Testservices verwenden eigene Loopback-Ports und eine flüchtige Datenbank ohne
+Anwendungsvolume. `TEST_DATABASE_URL` ist zwingend explizit anzugeben. Vor Aufbau,
+Abbau und Tabellenbereinigung prüft die Fixture PostgreSQL, `_test`-Suffix und
+Abweichung von der Anwendungsdatenbank. URL-Query-Overrides sind nicht erlaubt.
+Keine Alembic-Migration gegen eine vorhandene Benutzerdatenbank ausführen.
